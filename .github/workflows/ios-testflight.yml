@@ -23,7 +23,7 @@ concurrency:
 env:
   FLUTTER_VERSION: "3.41.6"
   APPLE_TEAM_ID: "B8LGAS7YHH"
-  BUNDLE_ID: "org.ruhenheim.songbrief"
+  BUNDLE_ID: "app.songbrief.songbrief"
   KEYCHAIN_NAME: "songbrief-build.keychain-db"
 
 jobs:
