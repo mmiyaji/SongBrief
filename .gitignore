@@ -50,21 +50,6 @@ app.*.map.json
 *.provisionprofile
 AuthKey_*.p8
 
-# App icon and splash assets generated from pubspec.yaml in CI
-/android/app/src/main/res/drawable*/background.png
-/android/app/src/main/res/drawable-*/android12splash.png
-/android/app/src/main/res/drawable-*/ic_launcher_foreground.png
-/android/app/src/main/res/drawable-*/splash.png
-/android/app/src/main/res/mipmap-anydpi-v26/
-/android/app/src/main/res/values-v31/
-/android/app/src/main/res/values-night-v31/
-/android/app/src/main/res/values/colors.xml
-/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-50x50@*.png
-/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-57x57@*.png
-/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-72x72@*.png
-/ios/Runner/Assets.xcassets/LaunchBackground.imageset/
-/web/splash/
-
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
