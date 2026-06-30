@@ -16,6 +16,8 @@ enum RankingScope {
   }
 }
 
+enum RankingEntryKind { track, artist, album }
+
 class RankingEntry {
   const RankingEntry({
     required this.title,
@@ -23,6 +25,8 @@ class RankingEntry {
     required this.playCount,
     required this.skipCount,
     required this.listeningSeconds,
+    required this.kind,
+    this.representativeTrackId,
     this.lastPlayedAt,
   });
 
@@ -31,6 +35,8 @@ class RankingEntry {
   final int playCount;
   final int skipCount;
   final int listeningSeconds;
+  final RankingEntryKind kind;
+  final String? representativeTrackId;
   final DateTime? lastPlayedAt;
 }
 
@@ -71,6 +77,40 @@ class LibraryOverview {
       .length;
 
   bool get hasTracks => tracks.isNotEmpty;
+
+  LibraryTrack? trackById(String? id) {
+    if (id == null) {
+      return null;
+    }
+
+    for (final track in tracks) {
+      if (track.id == id) {
+        return track;
+      }
+    }
+    return null;
+  }
+
+  LibraryOverview markTrackPlayed(String trackId) {
+    var changed = false;
+    final now = DateTime.now();
+    final updatedTracks = tracks.map((track) {
+      if (track.id != trackId) {
+        return track;
+      }
+      changed = true;
+      return track.copyWith(
+        playCount: track.playCount + 1,
+        lastPlayedAt: now,
+      );
+    }).toList(growable: false);
+
+    if (!changed) {
+      return this;
+    }
+
+    return LibraryOverview.fromTracks(updatedTracks, isDemo: isDemo);
+  }
 
   List<LibraryTrack> get recentTrackDetails {
     final recent = tracks.where((track) => track.lastPlayedAt != null).toList()
@@ -135,6 +175,8 @@ class LibraryOverview {
                 playCount: track.playCount,
                 skipCount: track.skipCount,
                 listeningSeconds: track.listeningSeconds,
+                kind: RankingEntryKind.track,
+                representativeTrackId: track.id,
                 lastPlayedAt: track.lastPlayedAt,
               ),
             )
@@ -151,6 +193,8 @@ class LibraryOverview {
                 playCount: track.playCount,
                 skipCount: track.skipCount,
                 listeningSeconds: track.listeningSeconds,
+                kind: RankingEntryKind.track,
+                representativeTrackId: track.id,
                 lastPlayedAt: track.lastPlayedAt,
               ),
             )
@@ -173,8 +217,20 @@ class LibraryOverview {
     return LibraryOverview(
       tracks: List.unmodifiable(tracks),
       topTracks: List.unmodifiable(trackEntries.take(100)),
-      topArtists: List.unmodifiable(_groupTracks(tracks, _artistKey).take(100)),
-      topAlbums: List.unmodifiable(_groupTracks(tracks, _albumKey).take(100)),
+      topArtists: List.unmodifiable(
+        _groupTracks(
+          tracks,
+          _artistKey,
+          RankingEntryKind.artist,
+        ).take(100),
+      ),
+      topAlbums: List.unmodifiable(
+        _groupTracks(
+          tracks,
+          _albumKey,
+          RankingEntryKind.album,
+        ).take(100),
+      ),
       recentTracks: List.unmodifiable(recentEntries.take(100)),
       totalPlayCount: totalPlayCount,
       totalSkipCount: totalSkipCount,
@@ -201,6 +257,7 @@ class LibraryOverview {
   static List<RankingEntry> _groupTracks(
     List<LibraryTrack> tracks,
     String Function(LibraryTrack track) keyFor,
+    RankingEntryKind kind,
   ) {
     final groups = <String, _TrackGroup>{};
     for (final track in tracks) {
@@ -210,7 +267,7 @@ class LibraryOverview {
     }
 
     final entries =
-        groups.values.map((group) => group.toRankingEntry()).toList()
+        groups.values.map((group) => group.toRankingEntry(kind)).toList()
           ..sort(_rankByPlays);
     return entries;
   }
@@ -224,9 +281,18 @@ class _TrackGroup {
   int playCount = 0;
   int skipCount = 0;
   int listeningSeconds = 0;
+  LibraryTrack? representativeTrack;
   DateTime? lastPlayedAt;
 
   void add(LibraryTrack track) {
+    final currentRepresentative = representativeTrack;
+    if (currentRepresentative == null ||
+        track.playCount > currentRepresentative.playCount ||
+        (track.playCount == currentRepresentative.playCount &&
+            track.listeningSeconds > currentRepresentative.listeningSeconds)) {
+      representativeTrack = track;
+    }
+
     trackCount += 1;
     playCount += track.playCount;
     skipCount += track.skipCount;
@@ -238,13 +304,15 @@ class _TrackGroup {
     }
   }
 
-  RankingEntry toRankingEntry() {
+  RankingEntry toRankingEntry(RankingEntryKind kind) {
     return RankingEntry(
       title: title,
       subtitle: '$trackCount tracks',
       playCount: playCount,
       skipCount: skipCount,
       listeningSeconds: listeningSeconds,
+      kind: kind,
+      representativeTrackId: representativeTrack?.id,
       lastPlayedAt: lastPlayedAt,
     );
   }

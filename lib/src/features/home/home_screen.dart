@@ -9,6 +9,7 @@ import '../../domain/library_overview.dart';
 import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
+import '../../settings/app_preferences.dart';
 import '../../theme/app_theme.dart';
 import 'home_controller.dart';
 import 'widgets/glass_surface.dart';
@@ -1117,9 +1118,12 @@ class _RecentTrackRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final artwork = ref.watch(trackArtworkProvider(track.id));
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      child: Row(
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => _showTrackDetailSheet(context, track),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Row(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(11),
@@ -1174,6 +1178,7 @@ class _RecentTrackRow extends ConsumerWidget {
             icon: const Icon(Icons.more_vert_rounded),
           ),
         ],
+        ),
       ),
     );
   }
@@ -1210,7 +1215,84 @@ class _TrackActionSheet extends ConsumerWidget {
             icon: const Icon(Icons.play_arrow_rounded),
             label: const Text('再生'),
           ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _showTrackDetailSheet(context, track);
+            },
+            icon: const Icon(Icons.info_outline_rounded),
+            label: const Text('詳細を見る'),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+void _showTrackDetailSheet(BuildContext context, LibraryTrack track) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (context) => _TrackDetailSheet(track: track),
+  );
+}
+
+class _TrackDetailSheet extends ConsumerWidget {
+  const _TrackDetailSheet({required this.track});
+
+  final LibraryTrack track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final artwork = ref.watch(trackArtworkProvider(track.id));
+    final height = MediaQuery.sizeOf(context).height;
+
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: height * 0.86),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: _TrackArtworkImage(track: track, artwork: artwork),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                track.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                track.artist,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _PlaybackControls(track: track),
+              const SizedBox(height: 18),
+              _TrackDetailsPanel(track: track),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1505,7 +1587,6 @@ class _PlaybackControls extends ConsumerWidget {
   }
 }
 
-// ignore: unused_element
 class _TrackDetailsPanel extends StatelessWidget {
   const _TrackDetailsPanel({required this.track});
 
@@ -2162,6 +2243,8 @@ class _RankingPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 14),
           _RankingList(
+            overview: overview,
+            scope: scope,
             entries: entries.take(12).toList(growable: false),
             showLastPlayedAt: scope == RankingScope.recent,
           ),
@@ -2424,6 +2507,7 @@ class _SettingsSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final overview = stats.overview;
     final selectedTheme = ref.watch(themeStyleProvider);
+    final selectedLanguage = ref.watch(appLanguageProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2488,6 +2572,77 @@ class _SettingsSection extends ConsumerWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              const SizedBox(height: 18),
+              Text('Language', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<AppLanguage>(
+                  showSelectedIcon: false,
+                  segments: AppLanguage.values
+                      .map(
+                        (language) => ButtonSegment<AppLanguage>(
+                          value: language,
+                          label: Text(language.label),
+                        ),
+                      )
+                      .toList(),
+                  selected: {selectedLanguage},
+                  onSelectionChanged: (selection) {
+                    ref
+                        .read(appLanguageProvider.notifier)
+                        .setLanguage(selection.first);
+                  },
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text('App Info', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 10),
+              const _SettingsRow(
+                icon: Icons.info_outline,
+                label: 'Application',
+                value: 'SongBrief',
+              ),
+              const _SettingsRow(
+                icon: Icons.sell_outlined,
+                label: 'Version',
+                value: _appVersionLabel,
+              ),
+              const _SettingsRow(
+                icon: Icons.extension_outlined,
+                label: 'Libraries',
+                value: _librarySummaryLabel,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.end,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _showLibrariesSheet(context);
+                    },
+                    icon: const Icon(Icons.inventory_2_outlined),
+                    label: const Text('Libraries'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      showLicensePage(
+                        context: context,
+                        applicationName: 'SongBrief',
+                        applicationVersion: _appVersionLabel,
+                        applicationIcon: Icon(
+                          Icons.graphic_eq_rounded,
+                          color: theme.colorScheme.primary,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.description_outlined),
+                    label: const Text('Licenses'),
+                  ),
+                ],
+              ),
               const SizedBox(height: 14),
               Align(
                 alignment: Alignment.centerRight,
@@ -2505,6 +2660,55 @@ class _SettingsSection extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+void _showLibrariesSheet(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => const _LibrariesSheet(),
+  );
+}
+
+class _LibrariesSheet extends StatelessWidget {
+  const _LibrariesSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Libraries', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+            ..._usedLibraries.map(
+              (library) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(library, style: theme.textTheme.bodyMedium),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2555,8 +2759,15 @@ class _SettingsRow extends StatelessWidget {
 }
 
 class _RankingList extends StatelessWidget {
-  const _RankingList({required this.entries, required this.showLastPlayedAt});
+  const _RankingList({
+    required this.overview,
+    required this.scope,
+    required this.entries,
+    required this.showLastPlayedAt,
+  });
 
+  final LibraryOverview overview;
+  final RankingScope scope;
   final List<RankingEntry> entries;
   final bool showLastPlayedAt;
 
@@ -2575,6 +2786,8 @@ class _RankingList extends StatelessWidget {
           .map(
             (indexed) => _RankingRow(
               rank: indexed.$1 + 1,
+              overview: overview,
+              scope: scope,
               entry: indexed.$2,
               maxPlayCount: maxPlayCount,
               showLastPlayedAt: showLastPlayedAt,
@@ -2585,21 +2798,25 @@ class _RankingList extends StatelessWidget {
   }
 }
 
-class _RankingRow extends StatelessWidget {
+class _RankingRow extends ConsumerWidget {
   const _RankingRow({
     required this.rank,
+    required this.overview,
+    required this.scope,
     required this.entry,
     required this.maxPlayCount,
     required this.showLastPlayedAt,
   });
 
   final int rank;
+  final LibraryOverview overview;
+  final RankingScope scope;
   final RankingEntry entry;
   final int maxPlayCount;
   final bool showLastPlayedAt;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final number = NumberFormat.decimalPattern();
     final ratio = maxPlayCount == 0 ? 0.0 : entry.playCount / maxPlayCount;
@@ -2608,97 +2825,170 @@ class _RankingRow extends StatelessWidget {
       theme.colorScheme.secondary,
       (rank - 1) / 12,
     )!;
+    final track = overview.trackById(entry.representativeTrackId);
+    final artwork = track == null
+        ? const AsyncData<Uint8List?>(null)
+        : ref.watch(trackArtworkProvider(track.id));
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: track == null ? null : () => _showTrackDetailSheet(context, track),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Column(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: rank <= 3
-                      ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                      : Colors.white.withValues(alpha: 0.28),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: rank <= 3
-                        ? theme.colorScheme.primary.withValues(alpha: 0.18)
-                        : Colors.white.withValues(alpha: 0.45),
-                  ),
-                ),
-                child: Text(
-                  '$rank',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: rank <= 3
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      showLastPlayedAt && entry.lastPlayedAt != null
-                          ? DateFormat.yMMMd().add_Hm().format(
-                              entry.lastPlayedAt!,
-                            )
-                          : entry.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: rank <= 3
+                          ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                          : Colors.white.withValues(alpha: 0.28),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: rank <= 3
+                            ? theme.colorScheme.primary.withValues(alpha: 0.18)
+                            : Colors.white.withValues(alpha: 0.45),
                       ),
                     ),
-                  ],
-                ),
+                    child: Text(
+                      '$rank',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: rank <= 3
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _RankingArtwork(
+                    entry: entry,
+                    track: track,
+                    artwork: artwork,
+                    scope: scope,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          showLastPlayedAt && entry.lastPlayedAt != null
+                              ? DateFormat.yMMMd().add_Hm().format(
+                                  entry.lastPlayedAt!,
+                                )
+                              : entry.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    number.format(entry.playCount),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Text(
-                number.format(entry.playCount),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: ColoredBox(
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.36,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: ratio.clamp(0.04, 1.0),
+                      child: SizedBox(
+                        height: 5,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(color: barColor),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: ColoredBox(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.36),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: ratio.clamp(0.04, 1.0),
-                  child: SizedBox(
-                    height: 5,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(color: barColor),
-                    ),
-                  ),
-                ),
-              ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RankingArtwork extends StatelessWidget {
+  const _RankingArtwork({
+    required this.entry,
+    required this.track,
+    required this.artwork,
+    required this.scope,
+  });
+
+  final RankingEntry entry;
+  final LibraryTrack? track;
+  final AsyncValue<Uint8List?> artwork;
+  final RankingScope scope;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bytes = artwork.asData?.value;
+    final asset = track?.artworkAsset;
+    final isArtist = scope == RankingScope.artists;
+    final radius = BorderRadius.circular(isArtist ? 999 : 12);
+
+    final Widget child;
+    if (bytes != null) {
+      child = Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true);
+    } else if (asset != null) {
+      child = Image.asset(asset, fit: BoxFit.cover);
+    } else {
+      child = ColoredBox(
+        color: theme.colorScheme.primary.withValues(alpha: 0.14),
+        child: Center(
+          child: Text(
+            entry.title.isEmpty ? '?' : entry.title.substring(0, 1),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w900,
             ),
           ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: radius,
+      child: SizedBox.square(dimension: 46, child: child),
     );
   }
 }
@@ -2794,6 +3084,22 @@ class _SummaryValue {
   final String label;
   final String value;
 }
+
+const _appVersionLabel = '1.0.0+1';
+
+const _librarySummaryLabel = 'Flutter, Riverpod, fl_chart, intl';
+
+const _usedLibraries = <String>[
+  'Flutter',
+  'flutter_riverpod',
+  'fl_chart',
+  'intl',
+  'liquid_glass_renderer',
+  'cupertino_icons',
+  'flutter_lints',
+  'flutter_native_splash',
+  'flutter_launcher_icons',
+];
 
 String _hoursLabel(int listeningSeconds) {
   final hours = listeningSeconds / 3600;

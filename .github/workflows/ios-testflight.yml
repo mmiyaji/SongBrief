@@ -114,6 +114,12 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
+      - name: Generate app icon and splash assets
+        run: |
+          set -euo pipefail
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+
       - name: Analyze and test
         run: |
           set -euo pipefail

@@ -114,10 +114,34 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   }
 
   Future<void> refreshStats() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(
+    await _load(showLoading: true);
+  }
+
+  Future<void> refreshStatsSilently() async {
+    await _load(showLoading: false);
+  }
+
+  void markTrackPlayed(String trackId) {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+    state = AsyncData(current.markTrackPlayed(trackId));
+  }
+
+  Future<void> _load({required bool showLoading}) async {
+    final previous = state.asData?.value;
+    if (showLoading) {
+      state = const AsyncLoading();
+    }
+    final next = await AsyncValue.guard(
       () => ref.read(musicStatsRepositoryProvider).load(),
     );
+    state = switch (next) {
+      AsyncData() => next,
+      AsyncError() when !showLoading && previous != null => AsyncData(previous),
+      _ => next,
+    };
   }
 }
 
@@ -126,7 +150,10 @@ class PlaybackController extends AsyncNotifier<void> {
   Future<void> build() async {}
 
   Future<void> playTrack(String trackId) {
-    return _run((repository) => repository.playTrack(trackId));
+    return _run(
+      (repository) => repository.playTrack(trackId),
+      playedTrackId: trackId,
+    );
   }
 
   Future<void> play() {
@@ -146,11 +173,25 @@ class PlaybackController extends AsyncNotifier<void> {
   }
 
   Future<void> _run(
-    Future<void> Function(MusicStatsRepository repository) action,
-  ) async {
+    Future<void> Function(MusicStatsRepository repository) action, {
+    String? playedTrackId,
+  }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
       () => action(ref.read(musicStatsRepositoryProvider)),
     );
+    if (state.hasError) {
+      return;
+    }
+    if (playedTrackId != null) {
+      ref
+          .read(musicStatsControllerProvider.notifier)
+          .markTrackPlayed(playedTrackId);
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    await ref
+        .read(musicStatsControllerProvider.notifier)
+        .refreshStatsSilently();
   }
 }

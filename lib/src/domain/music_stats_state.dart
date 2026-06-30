@@ -11,4 +11,11 @@ class MusicStatsState {
   final LibraryOverview overview;
 
   bool get isDemo => overview.isDemo;
+
+  MusicStatsState markTrackPlayed(String trackId) {
+    return MusicStatsState(
+      authorizationStatus: authorizationStatus,
+      overview: overview.markTrackPlayed(trackId),
+    );
+  }
 }

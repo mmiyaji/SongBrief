@@ -29,6 +29,27 @@ class LibraryTrack {
 
   int get listeningSeconds => duration.inSeconds * playCount;
 
+  LibraryTrack copyWith({
+    int? playCount,
+    int? skipCount,
+    DateTime? lastPlayedAt,
+  }) {
+    return LibraryTrack(
+      id: id,
+      title: title,
+      artist: artist,
+      albumTitle: albumTitle,
+      albumArtist: albumArtist,
+      genre: genre,
+      artworkAsset: artworkAsset,
+      duration: duration,
+      playCount: playCount ?? this.playCount,
+      skipCount: skipCount ?? this.skipCount,
+      lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+      isCloudItem: isCloudItem,
+    );
+  }
+
   factory LibraryTrack.fromPlatformMap(Map<Object?, Object?> map) {
     return LibraryTrack(
       id: _readString(map, 'id', fallback: 'unknown'),
