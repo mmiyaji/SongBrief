@@ -1,0 +1,286 @@
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: "Optional CFBundleVersion. Defaults to UTC yyMMddHHmm."
+        required: false
+        type: string
+      upload_to_testflight:
+        description: "Upload the signed IPA to App Store Connect/TestFlight."
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.41.6"
+  APPLE_TEAM_ID: "B8LGAS7YHH"
+  BUNDLE_ID: "org.ruhenheim.songbrief"
+  KEYCHAIN_NAME: "songbrief-build.keychain-db"
+
+jobs:
+  build-and-upload:
+    name: Build iOS IPA and upload to TestFlight
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Show toolchain versions
+        run: |
+          flutter --version
+          xcodebuild -version
+          pod --version
+
+      - name: Resolve build number
+        run: |
+          set -euo pipefail
+          VERSION_NAME="$(sed -nE 's/^version:[[:space:]]*([0-9A-Za-z.+-]+).*/\1/p' pubspec.yaml | head -n 1 | cut -d + -f 1)"
+          if [ -z "$VERSION_NAME" ]; then
+            echo "Could not resolve version name from pubspec.yaml."
+            exit 1
+          fi
+          if [ -n "${{ inputs.build_number }}" ]; then
+            BUILD_NUMBER="${{ inputs.build_number }}"
+          else
+            BUILD_NUMBER="$(date -u +%y%m%d%H%M)"
+          fi
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "Using version name: $VERSION_NAME"
+          echo "Using build number: $BUILD_NUMBER"
+
+      - name: Install Apple signing assets
+        env:
+          IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_APP_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_APP_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_BUILD_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN_PATH="$RUNNER_TEMP/$KEYCHAIN_NAME"
+          : "${IOS_DISTRIBUTION_CERTIFICATE_BASE64:?Missing IOS_DISTRIBUTION_CERTIFICATE_BASE64 secret}"
+          : "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD:?Missing IOS_DISTRIBUTION_CERTIFICATE_PASSWORD secret}"
+          : "${IOS_PROVISIONING_PROFILE_APP_BASE64:?Missing IOS_PROVISIONING_PROFILE_APP_BASE64 secret}"
+
+          KEYCHAIN_PASSWORD="${KEYCHAIN_PASSWORD:-$(uuidgen)}"
+          CERTIFICATE_PATH="$RUNNER_TEMP/distribution.p12"
+          echo "$IOS_DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -P "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed s/\"//g)
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+
+          PROFILE_PATH="$RUNNER_TEMP/songbrief-app-store.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/songbrief-app-store.plist"
+          echo "$IOS_PROVISIONING_PROFILE_APP_BASE64" | base64 --decode > "$PROFILE_PATH"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+          IOS_APP_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$PROFILE_PLIST")
+          IOS_APP_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$PROFILE_PLIST")
+          cp "$PROFILE_PATH" "$PROFILE_DIR/$IOS_APP_PROFILE_UUID.mobileprovision"
+          echo "Installed provisioning profile: $IOS_APP_PROFILE_NAME ($IOS_APP_PROFILE_UUID)"
+          {
+            echo "IOS_APP_PROFILE_UUID=$IOS_APP_PROFILE_UUID"
+            echo "IOS_APP_PROFILE_NAME=$IOS_APP_PROFILE_NAME"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze and test
+        run: |
+          set -euo pipefail
+          flutter analyze
+          flutter test
+
+      - name: Install CocoaPods dependencies
+        run: |
+          set -euo pipefail
+          find ios -name "Podfile" -execdir pod install \;
+
+      - name: Create App Store export options
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>destination</key>
+            <string>export</string>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+            <key>method</key>
+            <string>app-store</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${IOS_APP_PROFILE_NAME}</string>
+            </dict>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Configure manual iOS signing
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import os
+          from pathlib import Path
+
+          project_path = Path("ios/Runner.xcodeproj/project.pbxproj")
+          text = project_path.read_text()
+          bundle_id = os.environ["BUNDLE_ID"]
+          profile_name = os.environ["IOS_APP_PROFILE_NAME"]
+          profile_uuid = os.environ["IOS_APP_PROFILE_UUID"]
+          team_id = os.environ["APPLE_TEAM_ID"]
+
+          def upsert_setting(block: str, key: str, value: str) -> str:
+              quoted_key = f'"{key}"' if "[" in key or "]" in key else key
+              line = f"\t\t\t\t{quoted_key} = {value};"
+              for existing_key in (key, quoted_key):
+                  marker = f"{existing_key} = "
+                  if marker in block:
+                      lines = []
+                      for item in block.splitlines():
+                          if marker in item:
+                              lines.append(line)
+                          else:
+                              lines.append(item)
+                      return "\n".join(lines)
+
+              anchor = "\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = "
+              lines = block.splitlines()
+              for index, item in enumerate(lines):
+                  if item.startswith(anchor):
+                      lines.insert(index + 1, line)
+                      return "\n".join(lines)
+              return block
+
+          output = []
+          cursor = 0
+          configured = 0
+          while True:
+              start = text.find("\t\t\tbuildSettings = {", cursor)
+              if start == -1:
+                  output.append(text[cursor:])
+                  break
+              end = text.find("\n\t\t\t};", start)
+              if end == -1:
+                  raise RuntimeError("Could not find end of buildSettings block")
+              end += len("\n\t\t\t};")
+              block = text[start:end]
+              output.append(text[cursor:start])
+
+              if f"PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};" in block:
+                  block = upsert_setting(block, "CODE_SIGN_IDENTITY", '"Apple Distribution"')
+                  block = upsert_setting(block, "CODE_SIGN_IDENTITY[sdk=iphoneos*]", '"Apple Distribution"')
+                  block = upsert_setting(block, "CODE_SIGN_STYLE", "Manual")
+                  block = upsert_setting(block, "DEVELOPMENT_TEAM", team_id)
+                  block = upsert_setting(block, "PROVISIONING_PROFILE", profile_uuid)
+                  block = upsert_setting(block, "PROVISIONING_PROFILE_SPECIFIER", f'"{profile_name}"')
+                  configured += 1
+                  print(f"Configured manual signing for {bundle_id}: {profile_name} ({profile_uuid})")
+
+              output.append(block)
+              cursor = end
+
+          if configured == 0:
+              raise RuntimeError(f"No build settings block found for {bundle_id}")
+
+          project_path.write_text("".join(output))
+          PY
+
+      - name: Build production IPA
+        run: |
+          set -euo pipefail
+          flutter build ipa --release \
+            --build-name="$VERSION_NAME" \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist="$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Verify IPA
+        run: |
+          set -euo pipefail
+          IPA_PATH="$(find build/ios/ipa -name '*.ipa' | head -n 1)"
+          if [ -z "$IPA_PATH" ]; then
+            echo "No IPA was produced."
+            exit 1
+          fi
+          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+          echo "Produced IPA: $IPA_PATH"
+
+      - name: Upload IPA artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: songbrief-ios-${{ github.run_number }}
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: error
+
+      - name: Upload to App Store Connect
+        if: ${{ inputs.upload_to_testflight }}
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+          APP_STORE_APPLE_ID: ${{ secrets.APP_STORE_APPLE_ID || secrets.SONGBRIEF_APP_STORE_ID }}
+        run: |
+          set -euo pipefail
+          : "${APP_STORE_CONNECT_API_KEY_ID:?Missing APP_STORE_CONNECT_API_KEY_ID secret}"
+          : "${APP_STORE_CONNECT_API_ISSUER_ID:?Missing APP_STORE_CONNECT_API_ISSUER_ID secret}"
+          : "${APP_STORE_CONNECT_API_PRIVATE_KEY:?Missing APP_STORE_CONNECT_API_PRIVATE_KEY secret}"
+          : "${APP_STORE_APPLE_ID:?Missing APP_STORE_APPLE_ID or SONGBRIEF_APP_STORE_ID secret}"
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$APP_STORE_CONNECT_API_PRIVATE_KEY" > "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apple-id "$APP_STORE_APPLE_ID" \
+            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_API_ISSUER_ID"
+
+      - name: Clean up signing assets
+        if: always()
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/$KEYCHAIN_NAME"
+          security delete-keychain "$KEYCHAIN_PATH" || true
+          rm -rf "$HOME/.appstoreconnect/private_keys" || true
