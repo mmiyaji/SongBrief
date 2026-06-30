@@ -26,18 +26,44 @@ migrate_working_dir/
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
+.flutter-plugins
 .dart_tool/
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
 /build/
 /coverage/
+pubspec_overrides.yaml
 
 # Symbolication related
 app.*.symbols
 
 # Obfuscation related
 app.*.map.json
+
+# Signing and App Store Connect secrets
+*.cer
+*.mobileprovision
+*.p12
+*.p8
+*.provisionprofile
+AuthKey_*.p8
+
+# App icon and splash assets generated from pubspec.yaml in CI
+/android/app/src/main/res/drawable*/background.png
+/android/app/src/main/res/drawable-*/android12splash.png
+/android/app/src/main/res/drawable-*/ic_launcher_foreground.png
+/android/app/src/main/res/drawable-*/splash.png
+/android/app/src/main/res/mipmap-anydpi-v26/
+/android/app/src/main/res/values-v31/
+/android/app/src/main/res/values-night-v31/
+/android/app/src/main/res/values/colors.xml
+/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-50x50@*.png
+/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-57x57@*.png
+/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-72x72@*.png
+/ios/Runner/Assets.xcassets/LaunchBackground.imageset/
+/web/splash/
 
 # Android Studio will place build artifacts here
 /android/app/debug
