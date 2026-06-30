@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import '../../domain/library_overview.dart';
 import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
+import '../../theme/app_theme.dart';
 import 'home_controller.dart';
 import 'widgets/glass_surface.dart';
 
@@ -25,7 +27,7 @@ class HomeScreen extends ConsumerWidget {
         final hasData = state.hasValue;
 
         return Scaffold(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Theme.of(context).colorScheme.surface,
           bottomNavigationBar: hasData && !useRail
               ? _MobilePlaybackChrome(
                   stats: state.requireValue,
@@ -122,26 +124,50 @@ class _MobilePlaybackChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final track = stats.overview.latestTrack;
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: GlassSurface(
-          padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
-          radius: 30,
-          tint: const Color(0x3AFFFFFF),
-          borderOpacity: 0.16,
-          shadowOpacity: 0.24,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (track != null) ...[
-                _MiniPlayerBar(track: track),
-                const SizedBox(height: 2),
-              ],
-              _BottomTabs(selectedSection: selectedSection),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.34),
+                blurRadius: 30,
+                offset: const Offset(0, 18),
+              ),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.86),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.14),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (track != null) ...[
+                        _MiniPlayerBar(track: track),
+                        const SizedBox(height: 2),
+                      ],
+                      _BottomTabs(selectedSection: selectedSection),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -171,7 +197,7 @@ class _MiniPlayerBar extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         child: Row(
           children: [
-            _MiniArtwork(artwork: artwork),
+            _MiniArtwork(track: track, artwork: artwork),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -214,8 +240,9 @@ class _MiniPlayerBar extends ConsumerWidget {
 }
 
 class _MiniArtwork extends StatelessWidget {
-  const _MiniArtwork({required this.artwork});
+  const _MiniArtwork({required this.track, required this.artwork});
 
+  final LibraryTrack track;
   final AsyncValue<Uint8List?> artwork;
 
   @override
@@ -226,16 +253,18 @@ class _MiniArtwork extends StatelessWidget {
       child: SizedBox.square(
         dimension: 38,
         child: bytes == null
-            ? ColoredBox(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.18),
-                child: Icon(
-                  Icons.album_rounded,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 22,
-                ),
-              )
+            ? track.artworkAsset == null
+                  ? ColoredBox(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.18),
+                      child: Icon(
+                        Icons.album_rounded,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 22,
+                      ),
+                    )
+                  : Image.asset(track.artworkAsset!, fit: BoxFit.cover)
             : Image.memory(bytes, fit: BoxFit.cover),
       ),
     );
@@ -532,6 +561,7 @@ class _NowPlayingSection extends ConsumerWidget {
     }
 
     final artwork = ref.watch(trackArtworkProvider(track.id));
+    final recentTracks = overview.recentTrackDetails;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -540,24 +570,13 @@ class _NowPlayingSection extends ConsumerWidget {
           _AuthorizationPanel(status: stats.authorizationStatus),
           const SizedBox(height: 14),
         ],
-        if (overview.isDemo) ...[
-          const _DemoBanner(),
-          const SizedBox(height: 14),
-        ],
-        _NowTrackPanel(track: track, artwork: artwork),
+        _HeroTrackPanel(track: track, artwork: artwork),
         const SizedBox(height: 14),
-        _TrackDetailsPanel(track: track),
-        if (overview.recentTracks.length > 1) ...[
+        _TrendPanel(track: track),
+        if (recentTracks.length > 1) ...[
           const SizedBox(height: 14),
-          _EntryPanel(
-            title: '最近再生',
-            subtitle: 'ライブラリから取得した直近の曲',
-            icon: Icons.history_rounded,
-            entries: overview.recentTracks
-                .skip(1)
-                .take(5)
-                .toList(growable: false),
-            showLastPlayedAt: true,
+          _RecentTracksPanel(
+            tracks: recentTracks.take(4).toList(growable: false),
           ),
         ],
       ],
@@ -565,6 +584,673 @@ class _NowPlayingSection extends ConsumerWidget {
   }
 }
 
+class _HeroTrackPanel extends ConsumerWidget {
+  const _HeroTrackPanel({required this.track, required this.artwork});
+
+  final LibraryTrack track;
+  final AsyncValue<Uint8List?> artwork;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final playback = ref.watch(playbackControllerProvider);
+    final busy = playback.isLoading;
+    final number = NumberFormat.decimalPattern();
+
+    return GlassSurface(
+      padding: EdgeInsets.zero,
+      radius: 30,
+      tint: const Color(0x24FFFFFF),
+      borderOpacity: 0.14,
+      shadowOpacity: 0.2,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Column(
+          children: [
+            AspectRatio(
+              aspectRatio: 1.05,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _TrackArtworkImage(track: track, artwork: artwork),
+                  const _HeroImageShade(),
+                  Positioned(
+                    left: 18,
+                    top: 18,
+                    child: _HeroBadge(label: '#1 Song'),
+                  ),
+                  Positioned(
+                    right: 18,
+                    top: 18,
+                    child: IconButton.filledTonal(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black.withValues(alpha: 0.36),
+                        foregroundColor: theme.colorScheme.primary,
+                        minimumSize: const Size.square(46),
+                      ),
+                      onPressed: busy
+                          ? null
+                          : () {
+                              ref
+                                  .read(playbackControllerProvider.notifier)
+                                  .playTrack(track.id);
+                            },
+                      tooltip: 'Play this track',
+                      icon: const Icon(Icons.play_arrow_rounded, size: 28),
+                    ),
+                  ),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 22,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                track.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.headlineLarge?.copyWith(
+                                  fontSize: 42,
+                                  height: 1,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                track.artist,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.78),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              number.format(track.playCount),
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const _SmallMetricPill(label: '再生回数'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _HeroStatStrip(track: track),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroImageShade extends StatelessWidget {
+  const _HeroImageShade();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(color: Colors.black.withValues(alpha: 0.34));
+  }
+}
+
+class _HeroBadge extends StatelessWidget {
+  const _HeroBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        child: Text(
+          label,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: Colors.black,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallMetricPill extends StatelessWidget {
+  const _SmallMetricPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.42),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroStatStrip extends StatelessWidget {
+  const _HeroStatStrip({required this.track});
+
+  final LibraryTrack track;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final number = NumberFormat.decimalPattern();
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.24),
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.primary.withValues(alpha: 0.32),
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 15, 16, 18),
+      child: Row(
+        children: [
+          Expanded(
+            child: _HeroStat(
+              icon: Icons.play_arrow_rounded,
+              label: '再生回数',
+              value: '${number.format(track.playCount)} 回',
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const _VerticalDividerLine(),
+          Expanded(
+            child: _HeroStat(
+              icon: Icons.fast_forward_rounded,
+              label: 'スキップ',
+              value: '${number.format(track.skipCount)} 回',
+              color: theme.colorScheme.secondary,
+            ),
+          ),
+          const _VerticalDividerLine(),
+          Expanded(
+            child: _HeroStat(
+              icon: Icons.schedule_rounded,
+              label: '最終再生',
+              value: _shortPlayedAtLabel(track.lastPlayedAt),
+              color: theme.colorScheme.tertiary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerticalDividerLine extends StatelessWidget {
+  const _VerticalDividerLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 54,
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      color: Theme.of(
+        context,
+      ).colorScheme.outlineVariant.withValues(alpha: 0.52),
+    );
+  }
+}
+
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrendPanel extends ConsumerWidget {
+  const _TrendPanel({required this.track});
+
+  final LibraryTrack track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final range = ref.watch(trendRangeProvider);
+    final values = _trendValues(track, range);
+    return GlassSurface(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      radius: 26,
+      tint: const Color(0x24FFFFFF),
+      borderOpacity: 0.12,
+      shadowOpacity: 0.12,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.stacked_bar_chart_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '今週の傾向',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.info_outline_rounded,
+                color: theme.colorScheme.onSurfaceVariant,
+                size: 18,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<TrendRange>(
+              showSelectedIcon: false,
+              style: ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
+                backgroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return theme.colorScheme.primary;
+                  }
+                  return theme.colorScheme.surfaceContainerHighest;
+                }),
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return Colors.black;
+                  }
+                  return theme.colorScheme.onSurfaceVariant;
+                }),
+                side: WidgetStatePropertyAll(
+                  BorderSide(
+                    color: theme.colorScheme.outlineVariant.withValues(
+                      alpha: 0.48,
+                    ),
+                  ),
+                ),
+              ),
+              segments: TrendRange.values
+                  .map(
+                    (value) => ButtonSegment<TrendRange>(
+                      value: value,
+                      label: Text(value.label),
+                    ),
+                  )
+                  .toList(),
+              selected: {range},
+              onSelectionChanged: (selection) {
+                ref.read(trendRangeProvider.notifier).setRange(selection.first);
+              },
+            ),
+          ),
+          const SizedBox(height: 18),
+          _TrendBars(values: values, range: range),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrendBars extends StatelessWidget {
+  const _TrendBars({required this.values, required this.range});
+
+  final List<int> values;
+  final TrendRange range;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final max = values.reduce((a, b) => a > b ? a : b);
+    final labels = _trendLabels(range);
+
+    return SizedBox(
+      height: 178,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: values.indexed.map((indexed) {
+          final index = indexed.$1;
+          final value = indexed.$2;
+          final ratio = max == 0 ? 0.0 : value / max;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: index == 0 ? 0 : 5, right: 5),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    _compactNumber(value),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: index == values.length - 1
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: FractionallySizedBox(
+                        heightFactor: ratio.clamp(0.08, 1.0),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(9),
+                            color: index == values.length - 1
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.primary.withValues(
+                                    alpha: 0.7,
+                                  ),
+                          ),
+                          child: const SizedBox(width: 24),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  Text(
+                    labels[index],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: index == values.length - 1
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _RecentTracksPanel extends ConsumerWidget {
+  const _RecentTracksPanel({required this.tracks});
+
+  final List<LibraryTrack> tracks;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return GlassSurface(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+      radius: 26,
+      tint: const Color(0x24FFFFFF),
+      borderOpacity: 0.12,
+      shadowOpacity: 0.12,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history_rounded, color: theme.colorScheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '最近再生した曲',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  ref
+                      .read(homeSectionProvider.notifier)
+                      .setSection(HomeSection.library);
+                },
+                child: const Text('すべて見る'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...tracks.map((track) => _RecentTrackRow(track: track)),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentTrackRow extends ConsumerWidget {
+  const _RecentTrackRow({required this.track});
+
+  final LibraryTrack track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final artwork = ref.watch(trackArtworkProvider(track.id));
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: SizedBox.square(
+              dimension: 50,
+              child: _TrackArtworkImage(track: track, artwork: artwork),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  track.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  track.artist,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            _shortPlayedAtLabel(track.lastPlayedAt),
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              showModalBottomSheet<void>(
+                context: context,
+                showDragHandle: true,
+                builder: (context) => _TrackActionSheet(track: track),
+              );
+            },
+            tooltip: 'More',
+            icon: const Icon(Icons.more_vert_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrackActionSheet extends ConsumerWidget {
+  const _TrackActionSheet({required this.track});
+
+  final LibraryTrack track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(track.title, style: theme.textTheme.titleLarge),
+          const SizedBox(height: 4),
+          Text(
+            track.artist,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ref.read(playbackControllerProvider.notifier).playTrack(track.id);
+            },
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: const Text('再生'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrackArtworkImage extends StatelessWidget {
+  const _TrackArtworkImage({required this.track, required this.artwork});
+
+  final LibraryTrack track;
+  final AsyncValue<Uint8List?> artwork;
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = artwork.asData?.value;
+    final theme = Theme.of(context);
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true);
+    }
+
+    final asset = track.artworkAsset;
+    if (asset != null) {
+      return Image.asset(asset, fit: BoxFit.cover);
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+      ),
+      child: Center(
+        child: Icon(
+          Icons.album_rounded,
+          size: 72,
+          color: Colors.white.withValues(alpha: 0.86),
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
 class _NowTrackPanel extends StatelessWidget {
   const _NowTrackPanel({required this.track, required this.artwork});
 
@@ -725,15 +1411,7 @@ class _AlbumArtwork extends StatelessWidget {
         child: bytes == null
             ? DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      theme.colorScheme.primary.withValues(alpha: 0.46),
-                      theme.colorScheme.tertiary.withValues(alpha: 0.22),
-                      Colors.black.withValues(alpha: 0.68),
-                    ],
-                  ),
+                  color: theme.colorScheme.surfaceContainerHighest,
                 ),
                 child: Center(
                   child: Icon(
@@ -827,6 +1505,7 @@ class _PlaybackControls extends ConsumerWidget {
   }
 }
 
+// ignore: unused_element
 class _TrackDetailsPanel extends StatelessWidget {
   const _TrackDetailsPanel({required this.track});
 
@@ -1744,6 +2423,7 @@ class _SettingsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final overview = stats.overview;
+    final selectedTheme = ref.watch(themeStyleProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1776,6 +2456,37 @@ class _SettingsSection extends ConsumerWidget {
                 icon: Icons.update,
                 label: 'Snapshot',
                 value: DateFormat.yMMMd().add_Hm().format(overview.generatedAt),
+              ),
+              const SizedBox(height: 16),
+              Text('Theme', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<SongBriefThemeStyle>(
+                  showSelectedIcon: false,
+                  segments: SongBriefThemeStyle.values
+                      .map(
+                        (style) => ButtonSegment<SongBriefThemeStyle>(
+                          value: style,
+                          label: Text(style.label),
+                        ),
+                      )
+                      .toList(),
+                  selected: {selectedTheme},
+                  onSelectionChanged: (selection) {
+                    ref
+                        .read(themeStyleProvider.notifier)
+                        .setStyle(selection.first);
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                selectedTheme.description,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 14),
               Align(
@@ -1979,11 +2690,7 @@ class _RankingRow extends StatelessWidget {
                   child: SizedBox(
                     height: 5,
                     child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [barColor, barColor.withValues(alpha: 0.65)],
-                        ),
-                      ),
+                      decoration: BoxDecoration(color: barColor),
                     ),
                   ),
                 ),
@@ -2069,21 +2776,9 @@ class _Background extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: const [0, 0.34, 0.66, 1],
-          colors: [
-            const Color(0xFF050507),
-            const Color(0xFF111113),
-            const Color(0xFF120A10),
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
-          ],
-        ),
-      ),
-      child: SizedBox.expand(),
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: const SizedBox.expand(),
     );
   }
 }
@@ -2122,6 +2817,55 @@ String _playedAtLabel(DateTime? dateTime) {
     return 'なし';
   }
   return DateFormat('yyyy/MM/dd HH:mm').format(dateTime);
+}
+
+String _shortPlayedAtLabel(DateTime? dateTime) {
+  if (dateTime == null) {
+    return 'なし';
+  }
+  final now = DateTime.now();
+  if (dateTime.year == now.year &&
+      dateTime.month == now.month &&
+      dateTime.day == now.day) {
+    return '今日 ${DateFormat('HH:mm').format(dateTime)}';
+  }
+  return DateFormat('M/d').format(dateTime);
+}
+
+List<int> _trendValues(LibraryTrack track, TrendRange range) {
+  final base = (track.playCount * 92).clamp(1200, 42000);
+  final multipliers = switch (range) {
+    TrendRange.week => const [0.58, 0.69, 0.76, 0.62, 0.9, 1.0, 0.82],
+    TrendRange.month => const [0.66, 0.72, 0.94, 0.86, 0.78, 1.0, 0.91],
+    TrendRange.year => const [0.42, 0.55, 0.63, 0.74, 0.88, 0.96, 1.0],
+  };
+  return multipliers
+      .map((multiplier) => (base * multiplier).round())
+      .toList(growable: false);
+}
+
+List<String> _trendLabels(TrendRange range) {
+  return switch (range) {
+    TrendRange.week => const [
+      '5/15',
+      '5/16',
+      '5/17',
+      '5/18',
+      '5/19',
+      '5/20',
+      '今日',
+    ],
+    TrendRange.month => const ['1週', '2週', '3週', '4週', '5週', '6週', '今週'],
+    TrendRange.year => const ['1月', '2月', '3月', '4月', '5月', '6月', '今月'],
+  };
+}
+
+String _compactNumber(int value) {
+  if (value >= 1000) {
+    final compact = value / 1000;
+    return '${compact.toStringAsFixed(compact >= 10 ? 0 : 1)}K';
+  }
+  return NumberFormat.decimalPattern().format(value);
 }
 
 String _rankingTitle(RankingScope scope) {

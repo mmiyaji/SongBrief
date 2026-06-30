@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 class GlassSurface extends StatelessWidget {
   const GlassSurface({
@@ -22,9 +21,17 @@ class GlassSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderRadius = BorderRadius.circular(radius);
+    final theme = Theme.of(context);
+    final surfaceColor = _surfaceColor(theme);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: borderRadius,
+        color: surfaceColor,
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(
+            alpha: borderOpacity.clamp(0.06, 0.34),
+          ),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: shadowOpacity),
@@ -33,26 +40,20 @@ class GlassSurface extends StatelessWidget {
           ),
         ],
       ),
-      child: FakeGlass(
-        shape: LiquidRoundedSuperellipse(borderRadius: radius),
-        settings: LiquidGlassSettings(
-          blur: 18,
-          thickness: 8,
-          glassColor: tint,
-          lightIntensity: 0.45,
-          ambientStrength: 0.18,
-          saturation: 1.18,
-        ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: borderRadius,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: borderOpacity),
-            ),
-          ),
-          child: Padding(padding: padding, child: child),
-        ),
-      ),
+      child: Padding(padding: padding, child: child),
+    );
+  }
+
+  Color _surfaceColor(ThemeData theme) {
+    final isWhiteOverlay = tint.r == 1.0 && tint.g == 1.0 && tint.b == 1.0;
+    if (!isWhiteOverlay) {
+      return tint;
+    }
+
+    final alpha = tint.a.clamp(0.0, 0.92);
+    return Color.alphaBlend(
+      theme.colorScheme.surfaceContainerHighest.withValues(alpha: alpha),
+      theme.colorScheme.surface,
     );
   }
 }

@@ -10,6 +10,7 @@ class LibraryTrack {
     required this.isCloudItem,
     this.albumArtist,
     this.genre,
+    this.artworkAsset,
     this.lastPlayedAt,
   });
 
@@ -19,6 +20,7 @@ class LibraryTrack {
   final String albumTitle;
   final String? albumArtist;
   final String? genre;
+  final String? artworkAsset;
   final Duration duration;
   final int playCount;
   final int skipCount;

@@ -6,6 +6,20 @@ import '../../data/music_stats_repository.dart';
 import '../../domain/library_overview.dart';
 import '../../domain/music_stats_state.dart';
 
+enum TrendRange {
+  week,
+  month,
+  year;
+
+  String get label {
+    return switch (this) {
+      TrendRange.week => '7日間',
+      TrendRange.month => '4週間',
+      TrendRange.year => '1年間',
+    };
+  }
+}
+
 enum HomeSection {
   playing,
   overview,
@@ -45,6 +59,10 @@ final rankingScopeProvider =
       RankingScopeController.new,
     );
 
+final trendRangeProvider = NotifierProvider<TrendRangeController, TrendRange>(
+  TrendRangeController.new,
+);
+
 class RankingScopeController extends Notifier<RankingScope> {
   @override
   RankingScope build() {
@@ -53,6 +71,17 @@ class RankingScopeController extends Notifier<RankingScope> {
 
   void setScope(RankingScope scope) {
     state = scope;
+  }
+}
+
+class TrendRangeController extends Notifier<TrendRange> {
+  @override
+  TrendRange build() {
+    return TrendRange.week;
+  }
+
+  void setRange(TrendRange range) {
+    state = range;
   }
 }
 
