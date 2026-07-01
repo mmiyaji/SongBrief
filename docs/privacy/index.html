@@ -47,7 +47,7 @@
           SongBriefは、ユーザーの音楽ライブラリに関する統計を表示するため、iOSのメディアライブラリ権限が許可された場合に、端末上の楽曲メタデータを読み取ります。読み取る情報には、曲名、アーティスト名、アルバム名、ジャンル、再生回数、スキップ回数、最終再生日、再生時間、ジャケット画像などが含まれる場合があります。
         </p>
         <p>
-          SongBriefは、独自のサーバーへ個人情報や音楽ライブラリ情報を送信しません。アカウント作成、広告配信、行動追跡、第三者向け分析SDKは使用していません。
+          SongBriefは、独自のサーバーへ個人情報や音楽ライブラリ情報を送信しません。広告モードが有効なビルドでは、Google AdMob SDKを使用して小さな広告枠を表示する場合があります。広告リクエストに曲名、アーティスト名、再生履歴などの音楽ライブラリ情報は含めません。アカウント作成や第三者向け分析SDKは使用していません。
         </p>
 
         <h3>2. 情報の利用目的</h3>
@@ -55,6 +55,7 @@
           <li>音楽ライブラリのランキング、合計値、傾向、詳細情報を表示するため</li>
           <li>アプリ内の再生・一時停止・スキップなどの操作を行うため</li>
           <li>アプリの動作確認用にデモデータを表示するため</li>
+          <li>広告非表示のプレミアム購入状態を端末内またはストアの購入情報で確認するため</li>
         </ul>
 
         <h3>3. 保存と送信</h3>
@@ -67,7 +68,7 @@
 
         <h3>4. 第三者提供とトラッキング</h3>
         <p>
-          SongBriefは、ユーザーの音楽ライブラリ情報を広告目的で第三者に販売または共有しません。また、他社のアプリやWebサイトをまたいでユーザーを追跡する目的ではデータを使用しません。
+          SongBriefは、ユーザーの音楽ライブラリ情報を広告目的で第三者に販売または共有しません。広告モードが有効な場合、Google AdMobが広告配信、制限付き広告、広告品質確認のために端末情報や広告識別子等を処理する場合があります。SongBriefでは控えめな広告表示を前提とし、音楽ライブラリの詳細を広告ターゲティングに利用しません。
         </p>
 
         <h3>5. 権限の管理</h3>
@@ -104,9 +105,11 @@
         </p>
         <p>
           SongBrief does not send personal information or music library
-          information to servers operated by the developer. The app does not
-          use accounts, advertising, cross-app tracking, or third-party
-          analytics SDKs.
+          information to servers operated by the developer. In builds where ad
+          mode is enabled, SongBrief may use the Google AdMob SDK to show small
+          ad placements. SongBrief does not include track names, artist names,
+          listening history, or other music library details in ad requests. The
+          app does not use accounts or third-party analytics SDKs.
         </p>
 
         <h3>2. How We Use Information</h3>
@@ -114,6 +117,7 @@
           <li>To display rankings, totals, trends, and track details.</li>
           <li>To provide playback controls such as play, pause, and skip.</li>
           <li>To show demo data for app testing and preview purposes.</li>
+          <li>To verify premium purchase status for removing ads.</li>
         </ul>
 
         <h3>3. Storage and Transmission</h3>
@@ -132,8 +136,10 @@
         <h3>4. Sharing and Tracking</h3>
         <p>
           SongBrief does not sell or share your music library information for
-          advertising purposes. SongBrief does not use your data to track you
-          across apps or websites owned by other companies.
+          advertising purposes. When ad mode is enabled, Google AdMob may
+          process device information or advertising identifiers for ad delivery,
+          limited ads, and ad quality. SongBrief is designed for subtle ad
+          placements and does not use music library details for ad targeting.
         </p>
 
         <h3>5. Managing Permissions</h3>

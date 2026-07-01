@@ -62,6 +62,36 @@ flutter analyze
 flutter test
 ```
 
+## Monetization Notes
+
+Ads are opt-in by launch mode. The default mode is ad-free:
+
+```sh
+flutter run --dart-define=SONGBRIEF_AD_MODE=off
+flutter run --dart-define=SONGBRIEF_AD_MODE=admobTest
+flutter run --dart-define=SONGBRIEF_AD_MODE=admobLive \
+  --dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID=ca-app-pub-.../... \
+  --dart-define=SONGBRIEF_ADMOB_ANDROID_BANNER_AD_UNIT_ID=ca-app-pub-.../...
+```
+
+`admobTest` uses Google's sample banner ad units. Web and desktop builds show
+a quiet ad preview instead of loading the mobile AdMob SDK. Premium removal can
+be previewed with:
+
+```sh
+flutter run --dart-define=SONGBRIEF_AD_MODE=admobTest \
+  --dart-define=SONGBRIEF_PREMIUM_UNLOCKED=true
+```
+
+Before release, replace the native AdMob App IDs as well:
+
+- iOS: `ios/Flutter/AdMob.xcconfig`
+- Android: pass `-PSONGBRIEF_ADMOB_ANDROID_APP_ID=ca-app-pub-...~...` to Gradle
+  or update the default manifest placeholder in `android/app/build.gradle.kts`
+
+The premium product ID defaults to `songbrief_premium_lifetime` and can be
+changed with `--dart-define=SONGBRIEF_PREMIUM_PRODUCT_ID=...`.
+
 ## Legal Pages
 
 GitHub Pages publishes the App Store legal pages from `docs/`:

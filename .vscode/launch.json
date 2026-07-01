@@ -1,0 +1,55 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SongBrief Web - Ads Off",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define=SONGBRIEF_AD_MODE=off"
+      ]
+    },
+    {
+      "name": "SongBrief Web - Ad Preview",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define=SONGBRIEF_AD_MODE=admobTest"
+      ]
+    },
+    {
+      "name": "SongBrief Mobile - AdMob Test",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=SONGBRIEF_AD_MODE=admobTest"
+      ]
+    },
+    {
+      "name": "SongBrief Mobile - Premium Preview",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=SONGBRIEF_AD_MODE=admobTest",
+        "--dart-define=SONGBRIEF_PREMIUM_UNLOCKED=true"
+      ]
+    },
+    {
+      "name": "SongBrief Mobile - AdMob Live",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=SONGBRIEF_AD_MODE=admobLive",
+        "--dart-define=SONGBRIEF_ADMOB_ANDROID_BANNER_AD_UNIT_ID=ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy",
+        "--dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID=ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy"
+      ]
+    }
+  ]
+}

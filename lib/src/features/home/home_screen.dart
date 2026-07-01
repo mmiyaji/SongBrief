@@ -11,6 +11,9 @@ import '../../domain/library_snapshot.dart';
 import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
+import '../../monetization/ad_banner_slot.dart';
+import '../../monetization/monetization_config.dart';
+import '../../monetization/premium_controller.dart';
 import '../../settings/app_lock.dart';
 import '../../settings/app_preferences.dart';
 import '../../theme/app_theme.dart';
@@ -2976,6 +2979,8 @@ class _OverviewSection extends StatelessWidget {
         _OverviewInsightPanel(overview: overview),
         const SizedBox(height: 14),
         _OverviewBreakdownPanel(overview: overview),
+        const SizedBox(height: 14),
+        AdBannerSlot(placement: _t(context, 'Overview', '概要')),
       ],
     );
   }
@@ -4169,6 +4174,8 @@ class _RankingPanel extends ConsumerWidget {
               },
             ),
           ],
+          const SizedBox(height: 14),
+          AdBannerSlot(placement: _t(context, 'Rankings', 'ランキング')),
         ],
       ),
     );
@@ -4308,6 +4315,8 @@ class _LibrarySectionState extends State<_LibrarySection> {
             nextCount: _loadMoreCount,
             onLoadMore: _loadMore,
           ),
+        const SizedBox(height: 14),
+        AdBannerSlot(placement: _t(context, 'Library', 'ライブラリ')),
       ],
     );
   }
@@ -5192,6 +5201,7 @@ class _SettingsSection extends ConsumerWidget {
     final selectedTheme = ref.watch(themeStyleProvider);
     final selectedLanguage = ref.watch(appLanguageProvider);
     final appLock = ref.watch(appLockControllerProvider);
+    final premium = ref.watch(premiumControllerProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -5299,6 +5309,13 @@ class _SettingsSection extends ConsumerWidget {
               _AppLockSetting(lockState: appLock),
               const SizedBox(height: 18),
               Text(
+                _t(context, 'Monetization', '収益化'),
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 10),
+              _PremiumSetting(premiumState: premium),
+              const SizedBox(height: 18),
+              Text(
                 _t(context, 'App Info', 'アプリ情報'),
                 style: theme.textTheme.titleMedium,
               ),
@@ -5348,6 +5365,8 @@ class _SettingsSection extends ConsumerWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              AdBannerSlot(placement: _t(context, 'Settings', '設定')),
               const SizedBox(height: 14),
               Align(
                 alignment: Alignment.centerRight,
@@ -5479,6 +5498,185 @@ class _AppLockSetting extends ConsumerWidget {
       },
     );
   }
+}
+
+class _PremiumSetting extends ConsumerWidget {
+  const _PremiumSetting({required this.premiumState});
+
+  final AsyncValue<PremiumState> premiumState;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+
+    return premiumState.when(
+      loading: () => _SettingsRow(
+        icon: Icons.workspace_premium_outlined,
+        label: _t(context, 'Premium', 'プレミアム'),
+        value: _t(context, 'Checking...', '確認中...'),
+      ),
+      error: (_, _) => _SettingsRow(
+        icon: Icons.workspace_premium_outlined,
+        label: _t(context, 'Premium', 'プレミアム'),
+        value: _t(context, 'Unavailable', '利用不可'),
+      ),
+      data: (state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SettingsRow(
+              icon: Icons.ads_click_outlined,
+              label: _t(context, 'Ad mode', '広告モード'),
+              value: _adLaunchModeLabel(context, MonetizationConfig.adMode),
+            ),
+            _SettingsRow(
+              icon: state.entitled
+                  ? Icons.workspace_premium_rounded
+                  : Icons.remove_circle_outline,
+              label: _t(context, 'Remove ads', '広告を非表示'),
+              value: _premiumStatusLabel(context, state),
+            ),
+            if (!state.entitled)
+              _SettingsRow(
+                icon: Icons.shopping_bag_outlined,
+                label: _t(context, 'Product ID', '商品ID'),
+                value: state.productId,
+              ),
+            if (state.message != null || state.errorMessage != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _premiumMessageLabel(
+                  context,
+                  state.message ?? state.errorMessage!,
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: state.errorMessage == null
+                      ? theme.colorScheme.onSurfaceVariant
+                      : theme.colorScheme.error,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            if (!state.entitled) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.end,
+                children: [
+                  FilledButton.icon(
+                    onPressed: state.canPurchase
+                        ? () {
+                            ref
+                                .read(premiumControllerProvider.notifier)
+                                .purchaseRemoveAds();
+                          }
+                        : null,
+                    icon: state.busy
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.workspace_premium_outlined),
+                    label: Text(
+                      state.price == null
+                          ? _t(context, 'Buy premium', 'プレミアムを購入')
+                          : _t(
+                              context,
+                              'Buy premium ${state.price}',
+                              'プレミアムを購入 ${state.price}',
+                            ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: state.canRestore
+                        ? () {
+                            ref
+                                .read(premiumControllerProvider.notifier)
+                                .restorePurchases();
+                          }
+                        : null,
+                    icon: const Icon(Icons.restore_rounded),
+                    label: Text(_t(context, 'Restore', '復元')),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _t(
+                  context,
+                  'Purchases work after the non-consumable product is configured in App Store Connect.',
+                  'App Store Connectで非消耗型の商品を設定すると購入が有効になります。',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+String _adLaunchModeLabel(BuildContext context, AdLaunchMode mode) {
+  return switch (mode) {
+    AdLaunchMode.off => _t(context, 'Off', 'オフ'),
+    AdLaunchMode.admobTest => _t(context, 'AdMob test', 'AdMobテスト'),
+    AdLaunchMode.admobLive => _t(context, 'AdMob live', 'AdMob本番'),
+  };
+}
+
+String _premiumStatusLabel(BuildContext context, PremiumState state) {
+  if (state.entitled) {
+    return _t(context, 'Ads removed', '広告なし');
+  }
+  if (!state.storeSupported) {
+    return _t(context, 'Store unavailable', 'ストア利用不可');
+  }
+  if (state.productLoaded) {
+    return state.price ?? _t(context, 'Available', '利用可能');
+  }
+  return _t(context, 'Not configured', '未設定');
+}
+
+String _premiumMessageLabel(BuildContext context, String message) {
+  return switch (message) {
+    'Premium is unlocked by launch mode.' => _t(
+      context,
+      'Premium is unlocked by launch mode.',
+      '起動モードでプレミアムが有効です。',
+    ),
+    'Configure the premium product in App Store Connect.' => _t(
+      context,
+      'Configure the premium product in App Store Connect.',
+      'App Store Connectでプレミアム商品を設定してください。',
+    ),
+    'Purchase is waiting for store confirmation.' => _t(
+      context,
+      'Purchase is waiting for store confirmation.',
+      'ストアの購入確認を待っています。',
+    ),
+    'Restore request sent to the store.' => _t(
+      context,
+      'Restore request sent to the store.',
+      '購入の復元リクエストを送信しました。',
+    ),
+    'Premium is active. Ads are removed.' => _t(
+      context,
+      'Premium is active. Ads are removed.',
+      'プレミアムが有効です。広告は表示されません。',
+    ),
+    'Purchase is pending.' => _t(
+      context,
+      'Purchase is pending.',
+      '購入処理が保留中です。',
+    ),
+    'Purchase failed.' => _t(context, 'Purchase failed.', '購入に失敗しました。'),
+    _ => message,
+  };
 }
 
 Future<void> _openExternalUrl(BuildContext context, String url) async {
