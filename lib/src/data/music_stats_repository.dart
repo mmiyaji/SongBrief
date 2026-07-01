@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/library_overview.dart';
+import '../domain/library_snapshot.dart';
 import '../domain/library_track.dart';
 import '../domain/music_library_authorization.dart';
 import '../domain/music_stats_state.dart';
+import 'library_snapshot_repository.dart';
 import 'music_library_channel.dart';
 
 final musicLibraryClientProvider = Provider<MusicLibraryClient>(
@@ -12,19 +14,24 @@ final musicLibraryClientProvider = Provider<MusicLibraryClient>(
 );
 
 final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
-  return MusicStatsRepository(ref.watch(musicLibraryClientProvider));
+  return MusicStatsRepository(
+    ref.watch(musicLibraryClientProvider),
+    ref.watch(librarySnapshotRepositoryProvider),
+  );
 });
 
 class MusicStatsRepository {
-  const MusicStatsRepository(this._client);
+  const MusicStatsRepository(this._client, this._snapshotRepository);
 
   final MusicLibraryClient _client;
+  final LibrarySnapshotRepository _snapshotRepository;
 
   Future<MusicStatsState> load({bool requestAccess = false}) async {
     if (!_isIosMusicRuntime) {
       return MusicStatsState(
         authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
         overview: LibraryOverview.fromTracks(_sampleTracks(), isDemo: true),
+        snapshotHistory: SnapshotHistory.empty,
       );
     }
 
@@ -36,13 +43,18 @@ class MusicStatsRepository {
       return MusicStatsState(
         authorizationStatus: status,
         overview: LibraryOverview.empty(isDemo: false),
+        snapshotHistory: await _snapshotRepository.loadHistory(),
       );
     }
 
+    await _client.scheduleSnapshotRefresh();
     final tracks = await _client.fetchTracks();
+    final overview = LibraryOverview.fromTracks(tracks, isDemo: false);
+    final snapshotHistory = await _snapshotRepository.recordSnapshot(overview);
     return MusicStatsState(
       authorizationStatus: status,
-      overview: LibraryOverview.fromTracks(tracks, isDemo: false),
+      overview: overview,
+      snapshotHistory: snapshotHistory,
     );
   }
 
@@ -86,6 +98,13 @@ class MusicStatsRepository {
       return Future.value();
     }
     return _client.skipToPrevious();
+  }
+
+  Future<SnapshotHistory> recordSnapshot(LibraryOverview overview) {
+    if (!_isIosMusicRuntime || overview.isDemo) {
+      return Future.value(SnapshotHistory.empty);
+    }
+    return _snapshotRepository.recordSnapshot(overview);
   }
 
   List<LibraryTrack> _sampleTracks() {

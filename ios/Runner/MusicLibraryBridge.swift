@@ -44,6 +44,9 @@ final class MusicLibraryBridge {
     case "skipToPrevious":
       MPMusicPlayerController.systemMusicPlayer.skipToPreviousItem()
       result(nil)
+    case "scheduleSnapshotRefresh":
+      SongBriefSnapshotRefresh.schedule()
+      result(nil)
     default:
       result(FlutterMethodNotImplemented)
     }

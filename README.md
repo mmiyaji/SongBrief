@@ -35,6 +35,19 @@ library play counts, skip counts, and last played dates. The native bridge uses
 This does not reconstruct every historical play event. It reads the counters
 that iOS exposes and can later store snapshots to calculate day-by-day deltas.
 
+## Daily Snapshot Notes
+
+SongBrief saves a local daily snapshot whenever the iOS Music library is
+scanned in the app. Each snapshot stores the cumulative counters exposed by iOS
+so the app can compare the latest scan with the previous scan and show observed
+play-count deltas.
+
+The iOS app also registers a `BGAppRefreshTask` to attempt a daily background
+snapshot. iOS decides whether and when that task actually runs, so foreground
+launch, resume, and manual refresh scans remain the reliable source of truth.
+When scans are several days apart, the app treats the result as an observed
+multi-day window rather than exact per-day listening history.
+
 ## Liquid Glass Notes
 
 Native iOS Liquid Glass APIs such as SwiftUI `.glassEffect` are not directly

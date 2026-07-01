@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../domain/library_overview.dart';
+import '../../domain/library_snapshot.dart';
 import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
@@ -18,11 +19,47 @@ import 'widgets/glass_surface.dart';
 const _privacyPolicyUrl = 'https://mmiyaji.github.io/SongBrief/privacy/';
 const _termsOfUseUrl = 'https://mmiyaji.github.io/SongBrief/terms/';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
+  DateTime? _lastResumeRefreshAt;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final lastRefresh = _lastResumeRefreshAt;
+    if (lastRefresh != null &&
+        now.difference(lastRefresh) < const Duration(minutes: 15)) {
+      return;
+    }
+    _lastResumeRefreshAt = now;
+    ref.read(musicStatsControllerProvider.notifier).refreshStatsSilently();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(musicStatsControllerProvider);
     final selectedSection = ref.watch(homeSectionProvider);
 
@@ -2189,6 +2226,11 @@ class _OverviewSection extends StatelessWidget {
         ],
         _OverviewPanel(overview: overview),
         const SizedBox(height: 14),
+        _SnapshotStatusPanel(
+          history: stats.snapshotHistory,
+          isDemo: overview.isDemo,
+        ),
+        const SizedBox(height: 14),
         _SummaryGrid(overview: overview),
       ],
     );
@@ -2431,6 +2473,232 @@ class _SignalTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SnapshotStatusPanel extends StatelessWidget {
+  const _SnapshotStatusPanel({required this.history, required this.isDemo});
+
+  final SnapshotHistory history;
+  final bool isDemo;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final number = NumberFormat.decimalPattern();
+    final latest = history.latest;
+    final delta = history.latestDelta;
+
+    if (isDemo || latest == null) {
+      return GlassSurface(
+        padding: const EdgeInsets.all(18),
+        radius: 24,
+        tint: const Color(0x54FFFFFF),
+        borderOpacity: 0.38,
+        shadowOpacity: 0.05,
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_month_outlined,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Daily snapshots', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 3),
+                  Text(
+                    isDemo
+                        ? 'Available after iOS Music access is granted.'
+                        : 'The first snapshot will be saved after the next scan.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final latestDate = DateFormat.yMMMd().add_Hm().format(latest.capturedAt);
+    final observedDays = delta?.observedDays ?? 0;
+    final topDeltas =
+        delta?.trackDeltas.take(3).toList(growable: false) ??
+        const <TrackCounterDelta>[];
+
+    return GlassSurface(
+      padding: const EdgeInsets.all(18),
+      radius: 24,
+      tint: const Color(0x54FFFFFF),
+      borderOpacity: 0.38,
+      shadowOpacity: 0.05,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.calendar_month_outlined,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Daily snapshots', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Last scan $latestDate - ${_snapshotSourceLabel(latest.source)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _StatusPill(label: '${history.snapshotCount} days'),
+            ],
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final metrics = [
+                _SnapshotMetric(
+                  label: 'Window',
+                  value: observedDays <= 0 ? 'Baseline' : '$observedDays days',
+                ),
+                _SnapshotMetric(
+                  label: 'New plays',
+                  value: number.format(delta?.totalPlayDelta ?? 0),
+                ),
+                _SnapshotMetric(
+                  label: 'New skips',
+                  value: number.format(delta?.totalSkipDelta ?? 0),
+                ),
+              ];
+
+              if (constraints.maxWidth < 560) {
+                return Column(
+                  children: metrics
+                      .map(
+                        (metric) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: metric,
+                        ),
+                      )
+                      .toList(),
+                );
+              }
+
+              return Row(
+                children: metrics
+                    .map(
+                      (metric) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: metric,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              );
+            },
+          ),
+          if (topDeltas.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Top gains since previous scan',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...topDeltas.map(
+              (track) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        track.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '+${number.format(track.playDelta)}',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else if (delta != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              'No play count changes were observed between the last two scans.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SnapshotMetric extends StatelessWidget {
+  const _SnapshotMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.42)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(value, style: theme.textTheme.titleSmall),
+          ],
         ),
       ),
     );
@@ -3872,6 +4140,8 @@ const _usedLibraries = <String>[
   'fl_chart',
   'intl',
   'liquid_glass_renderer',
+  'shared_preferences',
+  'url_launcher',
   'cupertino_icons',
   'flutter_lints',
   'flutter_native_splash',
@@ -3884,6 +4154,13 @@ String _hoursLabel(int listeningSeconds) {
     return NumberFormat.decimalPattern().format(hours.round());
   }
   return hours.toStringAsFixed(1);
+}
+
+String _snapshotSourceLabel(String source) {
+  return switch (source) {
+    'background' => 'background refresh',
+    _ => 'app scan',
+  };
 }
 
 String _durationLabel(Duration duration) {

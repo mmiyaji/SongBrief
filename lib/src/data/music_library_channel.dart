@@ -21,6 +21,8 @@ abstract class MusicLibraryClient {
   Future<void> skipToNext();
 
   Future<void> skipToPrevious();
+
+  Future<void> scheduleSnapshotRefresh();
 }
 
 class PlatformMusicLibraryClient implements MusicLibraryClient {
@@ -82,5 +84,10 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
   @override
   Future<void> skipToPrevious() {
     return _channel.invokeMethod<void>('skipToPrevious');
+  }
+
+  @override
+  Future<void> scheduleSnapshotRefresh() {
+    return _channel.invokeMethod<void>('scheduleSnapshotRefresh');
   }
 }

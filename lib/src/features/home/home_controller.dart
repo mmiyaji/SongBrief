@@ -195,12 +195,20 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     await _load(showLoading: false);
   }
 
-  void markTrackPlayed(String trackId) {
+  Future<void> markTrackPlayed(String trackId) async {
     final current = state.asData?.value;
     if (current == null) {
       return;
     }
-    state = AsyncData(current.markTrackPlayed(trackId));
+    final next = current.markTrackPlayed(trackId);
+    state = AsyncData(next);
+    if (next.isDemo) {
+      return;
+    }
+    final snapshotHistory = await ref
+        .read(musicStatsRepositoryProvider)
+        .recordSnapshot(next.overview);
+    state = AsyncData(next.withSnapshotHistory(snapshotHistory));
   }
 
   Future<void> _load({required bool showLoading}) async {
@@ -258,7 +266,7 @@ class PlaybackController extends AsyncNotifier<void> {
       return;
     }
     if (playedTrackId != null) {
-      ref
+      await ref
           .read(musicStatsControllerProvider.notifier)
           .markTrackPlayed(playedTrackId);
       return;
