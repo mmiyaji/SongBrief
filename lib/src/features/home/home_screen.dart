@@ -179,7 +179,8 @@ enum _LibraryBrowseMode {
   songs,
   artists,
   albums,
-  genres;
+  genres,
+  playlists;
 
   String get label {
     return switch (this) {
@@ -187,6 +188,7 @@ enum _LibraryBrowseMode {
       _LibraryBrowseMode.artists => 'Artists',
       _LibraryBrowseMode.albums => 'Albums',
       _LibraryBrowseMode.genres => 'Genres',
+      _LibraryBrowseMode.playlists => 'Playlists',
     };
   }
 
@@ -196,6 +198,7 @@ enum _LibraryBrowseMode {
       _LibraryBrowseMode.artists => Icons.person_rounded,
       _LibraryBrowseMode.albums => Icons.album_rounded,
       _LibraryBrowseMode.genres => Icons.category_rounded,
+      _LibraryBrowseMode.playlists => Icons.playlist_play_rounded,
     };
   }
 }
@@ -4362,8 +4365,8 @@ class _LibrarySearchPanel extends StatelessWidget {
             decoration: InputDecoration(
               hintText: _t(
                 context,
-                'Search songs, artists, albums, or genres',
-                '曲、アーティスト、アルバム、ジャンルを検索',
+                'Search songs, artists, albums, genres, or playlists',
+                '曲、アーティスト、アルバム、ジャンル、プレイリストを検索',
               ),
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: query.isEmpty
@@ -4851,37 +4854,72 @@ class _LibraryStatsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final number = _numberFormat(context);
+    final metrics = [
+      _InlineMetricData(
+        label: _t(context, 'Artists', 'アーティスト'),
+        value: number.format(overview.totalArtists),
+        icon: Icons.person,
+      ),
+      _InlineMetricData(
+        label: _t(context, 'Albums', 'アルバム'),
+        value: number.format(overview.totalAlbums),
+        icon: Icons.album,
+      ),
+      _InlineMetricData(
+        label: _t(context, 'Tracks', '曲'),
+        value: number.format(overview.totalTracks),
+        icon: Icons.music_note,
+      ),
+      _InlineMetricData(
+        label: _t(context, 'Playlists', 'プレイリスト'),
+        value: number.format(_playlistCountForTracks(overview.tracks)),
+        icon: Icons.playlist_play,
+      ),
+    ];
+
     return GlassSurface(
       padding: const EdgeInsets.all(18),
       radius: 24,
       tint: const Color(0x62FFFFFF),
-      child: Row(
-        children: [
-          Expanded(
-            child: _InlineMetric(
-              label: _t(context, 'Artists', 'アーティスト'),
-              value: number.format(overview.totalArtists),
-              icon: Icons.person,
-            ),
-          ),
-          Expanded(
-            child: _InlineMetric(
-              label: _t(context, 'Albums', 'アルバム'),
-              value: number.format(overview.totalAlbums),
-              icon: Icons.album,
-            ),
-          ),
-          Expanded(
-            child: _InlineMetric(
-              label: _t(context, 'Tracks', '曲'),
-              value: number.format(overview.totalTracks),
-              icon: Icons.music_note,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 560) {
+            final itemWidth = (constraints.maxWidth - 12) / 2;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 18,
+              children: [
+                for (final metric in metrics)
+                  SizedBox(
+                    width: itemWidth,
+                    child: _InlineMetric.fromData(metric),
+                  ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              for (final metric in metrics)
+                Expanded(child: _InlineMetric.fromData(metric)),
+            ],
+          );
+        },
       ),
     );
   }
+}
+
+class _InlineMetricData {
+  const _InlineMetricData({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
 }
 
 class _InlineMetric extends StatelessWidget {
@@ -4890,6 +4928,10 @@ class _InlineMetric extends StatelessWidget {
     required this.value,
     required this.icon,
   });
+
+  factory _InlineMetric.fromData(_InlineMetricData data) {
+    return _InlineMetric(label: data.label, value: data.value, icon: data.icon);
+  }
 
   final String label;
   final String value;
@@ -6000,6 +6042,14 @@ List<LibraryTrack> _tracksByPlaylist(
   );
 }
 
+int _playlistCountForTracks(Iterable<LibraryTrack> tracks) {
+  final names = <String>{};
+  for (final track in tracks) {
+    names.addAll(track.playlistNames);
+  }
+  return names.length;
+}
+
 List<LibraryTrack> _sortedDrilldownTracks(Iterable<LibraryTrack> tracks) {
   final sorted = tracks.toList()
     ..sort((a, b) {
@@ -6163,6 +6213,7 @@ List<LibraryTrack> _filteredLibraryTracks(
           track.albumTitle,
           track.albumArtist,
           track.genre,
+          ...track.playlistNames,
         ];
         return fields.whereType<String>().any(
           (field) => _normalizeSearchText(field).contains(normalizedQuery),
@@ -6214,44 +6265,69 @@ List<_LibraryGroupEntry> _libraryGroupsForMode(
 
   final groups = <String, _LibraryGroupAccumulator>{};
   for (final track in tracks) {
-    final accumulator = switch (mode) {
-      _LibraryBrowseMode.songs => null,
-      _LibraryBrowseMode.artists => groups.putIfAbsent(
-        track.artist,
-        () => _LibraryGroupAccumulator(
-          key: track.artist,
-          title: track.artist,
-          subtitle: _t(context, 'Artist', 'アーティスト'),
-          icon: Icons.person_rounded,
-          rankingScope: RankingScope.artists,
-          rankingTitle: track.artist,
-        ),
-      ),
-      _LibraryBrowseMode.albums => groups.putIfAbsent(
-        _albumRankingTitle(track),
-        () => _LibraryGroupAccumulator(
-          key: _albumRankingTitle(track),
-          title: track.albumTitle,
-          subtitle: track.albumArtist ?? track.artist,
-          icon: Icons.album_rounded,
-          rankingScope: RankingScope.albums,
-          rankingTitle: _albumRankingTitle(track),
-        ),
-      ),
-      _LibraryBrowseMode.genres =>
-        track.genre == null || track.genre!.trim().isEmpty
-            ? null
-            : groups.putIfAbsent(
-                track.genre!,
-                () => _LibraryGroupAccumulator(
-                  key: track.genre!,
-                  title: track.genre!,
-                  subtitle: _t(context, 'Genre', 'ジャンル'),
-                  icon: Icons.category_rounded,
-                ),
+    switch (mode) {
+      case _LibraryBrowseMode.songs:
+        break;
+      case _LibraryBrowseMode.artists:
+        groups
+            .putIfAbsent(
+              track.artist,
+              () => _LibraryGroupAccumulator(
+                key: track.artist,
+                title: track.artist,
+                subtitle: _t(context, 'Artist', 'アーティスト'),
+                icon: Icons.person_rounded,
+                rankingScope: RankingScope.artists,
+                rankingTitle: track.artist,
               ),
-    };
-    accumulator?.add(track);
+            )
+            .add(track);
+      case _LibraryBrowseMode.albums:
+        final albumTitle = _albumRankingTitle(track);
+        groups
+            .putIfAbsent(
+              albumTitle,
+              () => _LibraryGroupAccumulator(
+                key: albumTitle,
+                title: track.albumTitle,
+                subtitle: track.albumArtist ?? track.artist,
+                icon: Icons.album_rounded,
+                rankingScope: RankingScope.albums,
+                rankingTitle: albumTitle,
+              ),
+            )
+            .add(track);
+      case _LibraryBrowseMode.genres:
+        final genre = track.genre;
+        if (genre == null || genre.trim().isEmpty) {
+          break;
+        }
+        groups
+            .putIfAbsent(
+              genre,
+              () => _LibraryGroupAccumulator(
+                key: genre,
+                title: genre,
+                subtitle: _t(context, 'Genre', 'ジャンル'),
+                icon: Icons.category_rounded,
+              ),
+            )
+            .add(track);
+      case _LibraryBrowseMode.playlists:
+        for (final playlistName in track.playlistNames) {
+          groups
+              .putIfAbsent(
+                playlistName,
+                () => _LibraryGroupAccumulator(
+                  key: playlistName,
+                  title: playlistName,
+                  subtitle: _t(context, 'Playlist', 'プレイリスト'),
+                  icon: Icons.playlist_play_rounded,
+                ),
+              )
+              .add(track);
+        }
+    }
   }
 
   final entries = groups.values.map((group) => group.toEntry()).toList();
@@ -6566,6 +6642,7 @@ String _libraryBrowseModeLabel(BuildContext context, _LibraryBrowseMode mode) {
     _LibraryBrowseMode.artists => _t(context, 'Artists', 'アーティスト'),
     _LibraryBrowseMode.albums => _t(context, 'Albums', 'アルバム'),
     _LibraryBrowseMode.genres => _t(context, 'Genres', 'ジャンル'),
+    _LibraryBrowseMode.playlists => _t(context, 'Playlists', 'プレイリスト'),
   };
 }
 

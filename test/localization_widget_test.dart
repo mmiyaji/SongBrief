@@ -33,6 +33,24 @@ void main() {
       }
     });
   }
+
+  testWidgets('browses playlist groups in the library', (tester) async {
+    await _pumpSection(
+      tester,
+      language: AppLanguage.english,
+      section: HomeSection.library,
+    );
+    await tester.pumpAndSettle();
+
+    final playlistMode = find.text('Playlists').last;
+    await tester.ensureVisible(playlistMode);
+    await tester.tap(playlistMode);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Late Night Focus'), findsOneWidget);
+    expect(find.text('Recently Played'), findsOneWidget);
+    expect(find.text('Playlist'), findsWidgets);
+  });
 }
 
 const _expectedEnglish = <HomeSection, List<String>>{
@@ -62,6 +80,7 @@ const _expectedEnglish = <HomeSection, List<String>>{
     'Library',
     'Library browser',
     'Songs',
+    'Playlists',
     'Searchable track details with play controls',
     'Sort',
   ],
@@ -78,7 +97,7 @@ const _expectedJapanese = <HomeSection, List<String>>{
   HomeSection.playing: ['再生中', '今週の傾向', '最近再生した曲', '再生回数'],
   HomeSection.overview: ['概要', '総再生回数', '日次スナップショット', 'リスニング洞察', 'ライブラリ分布'],
   HomeSection.rankings: ['ランキング', 'トップ曲', '再生回数順', '曲', 'アーティスト', 'アルバム', '最近'],
-  HomeSection.library: ['ライブラリ', '曲', '検索可能な曲詳細と再生コントロール', '並び替え'],
+  HomeSection.library: ['ライブラリ', '曲', 'プレイリスト', '検索可能な曲詳細と再生コントロール', '並び替え'],
   HomeSection.settings: ['設定', 'ミュージックアクセス', 'テーマ', '言語', 'アプリ情報'],
 };
 
