@@ -772,13 +772,13 @@ class _SmallMetricPill extends StatelessWidget {
   }
 }
 
-class _HeroStatStrip extends StatelessWidget {
+class _HeroStatStrip extends ConsumerWidget {
   const _HeroStatStrip({required this.track});
 
   final LibraryTrack track;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final number = NumberFormat.decimalPattern();
     return Container(
@@ -799,6 +799,7 @@ class _HeroStatStrip extends StatelessWidget {
               label: '再生回数',
               value: '${number.format(track.playCount)} 回',
               color: theme.colorScheme.primary,
+              onTap: () => _focusTrackInRanking(context, ref, track),
             ),
           ),
           const _VerticalDividerLine(),
@@ -808,6 +809,7 @@ class _HeroStatStrip extends StatelessWidget {
               label: 'スキップ',
               value: '${number.format(track.skipCount)} 回',
               color: theme.colorScheme.secondary,
+              onTap: () => _focusTrackInRanking(context, ref, track),
             ),
           ),
           const _VerticalDividerLine(),
@@ -847,17 +849,19 @@ class _HeroStat extends StatelessWidget {
     required this.label,
     required this.value,
     required this.color,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final Color color;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -888,6 +892,19 @@ class _HeroStat extends StatelessWidget {
           ),
         ),
       ],
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        child: content,
+      ),
     );
   }
 }
@@ -1124,60 +1141,60 @@ class _RecentTrackRow extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 9),
         child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(11),
-            child: SizedBox.square(
-              dimension: 50,
-              child: _TrackArtworkImage(track: track, artwork: artwork),
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: SizedBox.square(
+                dimension: 50,
+                child: _TrackArtworkImage(track: track, artwork: artwork),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  track.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    track.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  track.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(height: 3),
+                  Text(
+                    track.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            _shortPlayedAtLabel(track.lastPlayedAt),
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w800,
+            const SizedBox(width: 10),
+            Text(
+              _shortPlayedAtLabel(track.lastPlayedAt),
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-          IconButton(
-            onPressed: () {
-              showModalBottomSheet<void>(
-                context: context,
-                showDragHandle: true,
-                builder: (context) => _TrackActionSheet(track: track),
-              );
-            },
-            tooltip: 'More',
-            icon: const Icon(Icons.more_vert_rounded),
-          ),
-        ],
+            IconButton(
+              onPressed: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  showDragHandle: true,
+                  builder: (context) => _TrackActionSheet(track: track),
+                );
+              },
+              tooltip: 'More',
+              icon: const Icon(Icons.more_vert_rounded),
+            ),
+          ],
         ),
       ),
     );
@@ -1290,6 +1307,218 @@ class _TrackDetailSheet extends ConsumerWidget {
               _PlaybackControls(track: track),
               const SizedBox(height: 18),
               _TrackDetailsPanel(track: track),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showTrackGroupSheet(
+  BuildContext context, {
+  required String title,
+  required String subtitle,
+  required IconData icon,
+  required List<LibraryTrack> tracks,
+  RankingScope? rankingScope,
+  String? rankingTitle,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (context) => _TrackGroupSheet(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      tracks: tracks,
+      rankingScope: rankingScope,
+      rankingTitle: rankingTitle,
+    ),
+  );
+}
+
+class _TrackGroupSheet extends ConsumerWidget {
+  const _TrackGroupSheet({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.tracks,
+    this.rankingScope,
+    this.rankingTitle,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<LibraryTrack> tracks;
+  final RankingScope? rankingScope;
+  final String? rankingTitle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final number = NumberFormat.decimalPattern();
+    final totalPlayCount = tracks.fold<int>(
+      0,
+      (total, track) => total + track.playCount,
+    );
+    final height = MediaQuery.sizeOf(context).height;
+
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: height * 0.86),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: theme.colorScheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$subtitle ・ ${tracks.length}曲 ・ ${number.format(totalPlayCount)}回',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (rankingScope != null && rankingTitle != null) ...[
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: () {
+                    _focusRankingEntry(
+                      context,
+                      ref,
+                      scope: rankingScope!,
+                      title: rankingTitle!,
+                      closeAllRoutes: true,
+                    );
+                  },
+                  icon: const Icon(Icons.leaderboard_rounded),
+                  label: const Text('ランキング内の位置を見る'),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: tracks.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final track = tracks[index];
+                    return _GroupTrackRow(track: track, rank: index + 1);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupTrackRow extends ConsumerWidget {
+  const _GroupTrackRow({required this.track, required this.rank});
+
+  final LibraryTrack track;
+  final int rank;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final number = NumberFormat.decimalPattern();
+    final artwork = ref.watch(trackArtworkProvider(track.id));
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showTrackDetailSheet(context, track),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 30,
+                child: Text(
+                  '$rank',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox.square(
+                  dimension: 42,
+                  child: _TrackArtworkImage(track: track, artwork: artwork),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      track.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      track.albumTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                number.format(track.playCount),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -1587,27 +1816,85 @@ class _PlaybackControls extends ConsumerWidget {
   }
 }
 
-class _TrackDetailsPanel extends StatelessWidget {
+class _TrackDetailsPanel extends ConsumerWidget {
   const _TrackDetailsPanel({required this.track});
 
   final LibraryTrack track;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final number = NumberFormat.decimalPattern();
+    final overview = ref
+        .watch(musicStatsControllerProvider)
+        .asData
+        ?.value
+        .overview;
+    final artistTracks = overview == null
+        ? const <LibraryTrack>[]
+        : _tracksByArtist(overview, track.artist);
+    final albumTracks = overview == null
+        ? const <LibraryTrack>[]
+        : _tracksByAlbum(overview, track);
+    final albumArtist = track.albumArtist ?? track.artist;
+    final albumArtistTracks = overview == null
+        ? const <LibraryTrack>[]
+        : _tracksByAlbumArtist(overview, albumArtist);
+    final genreTracks = track.genre == null || overview == null
+        ? const <LibraryTrack>[]
+        : _tracksByGenre(overview, track.genre!);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _TrackDetailRow(
+          icon: Icons.person_outline,
+          label: 'アーティスト',
+          value: track.artist,
+          onTap: artistTracks.isEmpty
+              ? null
+              : () => _showTrackGroupSheet(
+                  context,
+                  title: track.artist,
+                  subtitle: 'アーティストの曲',
+                  icon: Icons.person_outline,
+                  tracks: artistTracks,
+                  rankingScope: RankingScope.artists,
+                  rankingTitle: track.artist,
+                ),
+        ),
+        const SizedBox(height: 10),
+        _TrackDetailRow(
           icon: Icons.album_outlined,
           label: 'アルバム',
           value: track.albumTitle,
+          onTap: albumTracks.isEmpty
+              ? null
+              : () => _showTrackGroupSheet(
+                  context,
+                  title: track.albumTitle,
+                  subtitle: albumArtist,
+                  icon: Icons.album_outlined,
+                  tracks: albumTracks,
+                  rankingScope: RankingScope.albums,
+                  rankingTitle: _albumRankingTitle(track),
+                ),
         ),
         const SizedBox(height: 10),
         _TrackDetailRow(
           icon: Icons.mic_external_on_outlined,
           label: 'アルバムアーティスト',
-          value: track.albumArtist ?? track.artist,
+          value: albumArtist,
+          onTap: albumArtistTracks.isEmpty
+              ? null
+              : () => _showTrackGroupSheet(
+                  context,
+                  title: albumArtist,
+                  subtitle: 'アルバムアーティストの曲',
+                  icon: Icons.mic_external_on_outlined,
+                  tracks: albumArtistTracks,
+                  rankingScope: RankingScope.artists,
+                  rankingTitle: albumArtist,
+                ),
         ),
         const SizedBox(height: 10),
         LayoutBuilder(
@@ -1618,11 +1905,23 @@ class _TrackDetailsPanel extends StatelessWidget {
                 icon: Icons.play_arrow_outlined,
                 label: '再生回数',
                 value: '${number.format(track.playCount)} 回',
+                onTap: () => _focusTrackInRanking(
+                  context,
+                  ref,
+                  track,
+                  closeCurrentRoute: true,
+                ),
               ),
               _TrackStatCard(
                 icon: Icons.fast_forward_outlined,
                 label: 'スキップ',
                 value: '${number.format(track.skipCount)} 回',
+                onTap: () => _focusTrackInRanking(
+                  context,
+                  ref,
+                  track,
+                  closeCurrentRoute: true,
+                ),
               ),
             ];
 
@@ -1660,6 +1959,15 @@ class _TrackDetailsPanel extends StatelessWidget {
             icon: Icons.category_outlined,
             label: 'ジャンル',
             value: track.genre!,
+            onTap: genreTracks.isEmpty
+                ? null
+                : () => _showTrackGroupSheet(
+                    context,
+                    title: track.genre!,
+                    subtitle: 'ジャンルの曲',
+                    icon: Icons.category_outlined,
+                    tracks: genreTracks,
+                  ),
           ),
         ],
       ],
@@ -1672,16 +1980,18 @@ class _TrackDetailRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GlassSurface(
+    final content = GlassSurface(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       radius: 24,
       tint: const Color(0x2CFFFFFF),
@@ -1715,8 +2025,25 @@ class _TrackDetailRow extends StatelessWidget {
               ],
             ),
           ),
+          if (onTap != null) ...[
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
         ],
       ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: content,
     );
   }
 }
@@ -1726,16 +2053,18 @@ class _TrackStatCard extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GlassSurface(
+    final content = GlassSurface(
       padding: const EdgeInsets.all(18),
       radius: 24,
       tint: const Color(0x2CFFFFFF),
@@ -1769,8 +2098,25 @@ class _TrackStatCard extends StatelessWidget {
               ],
             ),
           ),
+          if (onTap != null) ...[
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
         ],
       ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: content,
     );
   }
 }
@@ -2158,7 +2504,10 @@ class _RankingPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scope = ref.watch(rankingScopeProvider);
     final entries = overview.entriesFor(scope);
+    final focus = ref.watch(rankingFocusProvider);
     final theme = Theme.of(context);
+    final scopedFocus = focus?.scope == scope ? focus : null;
+    final visibleEntries = _visibleRankingEntries(entries, scopedFocus);
 
     return GlassSurface(
       padding: const EdgeInsets.all(18),
@@ -2235,6 +2584,7 @@ class _RankingPanel extends ConsumerWidget {
                   .toList(),
               selected: {scope},
               onSelectionChanged: (selection) {
+                ref.read(rankingFocusProvider.notifier).clear();
                 ref
                     .read(rankingScopeProvider.notifier)
                     .setScope(selection.first);
@@ -2245,8 +2595,9 @@ class _RankingPanel extends ConsumerWidget {
           _RankingList(
             overview: overview,
             scope: scope,
-            entries: entries.take(12).toList(growable: false),
+            entries: visibleEntries,
             showLastPlayedAt: scope == RankingScope.recent,
+            focus: scopedFocus,
           ),
         ],
       ),
@@ -2758,39 +3109,99 @@ class _SettingsRow extends StatelessWidget {
   }
 }
 
-class _RankingList extends StatelessWidget {
+class _RankingList extends StatefulWidget {
   const _RankingList({
     required this.overview,
     required this.scope,
     required this.entries,
     required this.showLastPlayedAt,
+    required this.focus,
   });
 
   final LibraryOverview overview;
   final RankingScope scope;
   final List<RankingEntry> entries;
   final bool showLastPlayedAt;
+  final RankingFocus? focus;
+
+  @override
+  State<_RankingList> createState() => _RankingListState();
+}
+
+class _RankingListState extends State<_RankingList> {
+  final _focusedRowKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleFocusedScroll();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RankingList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focus != widget.focus ||
+        oldWidget.scope != widget.scope ||
+        oldWidget.entries != widget.entries) {
+      _scheduleFocusedScroll();
+    }
+  }
+
+  void _scheduleFocusedScroll() {
+    if (_focusedIndex() < 0) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final context = _focusedRowKey.currentContext;
+      if (context == null) {
+        return;
+      }
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        alignment: 0.34,
+      );
+    });
+  }
+
+  int _focusedIndex() {
+    final focus = widget.focus;
+    if (focus == null || focus.scope != widget.scope) {
+      return -1;
+    }
+    return widget.entries.indexWhere(
+      (entry) => _entryMatchesFocus(entry, focus),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (entries.isEmpty) {
+    if (widget.entries.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final maxPlayCount = entries
+    final focusedIndex = _focusedIndex();
+    final maxPlayCount = widget.entries
         .map((entry) => entry.playCount)
         .reduce((a, b) => a > b ? a : b);
 
     return Column(
-      children: entries.indexed
+      children: widget.entries.indexed
           .map(
             (indexed) => _RankingRow(
               rank: indexed.$1 + 1,
-              overview: overview,
-              scope: scope,
+              rowKey: indexed.$1 == focusedIndex ? _focusedRowKey : null,
+              overview: widget.overview,
+              scope: widget.scope,
               entry: indexed.$2,
               maxPlayCount: maxPlayCount,
-              showLastPlayedAt: showLastPlayedAt,
+              showLastPlayedAt: widget.showLastPlayedAt,
+              isFocused: indexed.$1 == focusedIndex,
             ),
           )
           .toList(),
@@ -2801,19 +3212,23 @@ class _RankingList extends StatelessWidget {
 class _RankingRow extends ConsumerWidget {
   const _RankingRow({
     required this.rank,
+    required this.rowKey,
     required this.overview,
     required this.scope,
     required this.entry,
     required this.maxPlayCount,
     required this.showLastPlayedAt,
+    required this.isFocused,
   });
 
   final int rank;
+  final Key? rowKey;
   final LibraryOverview overview;
   final RankingScope scope;
   final RankingEntry entry;
   final int maxPlayCount;
   final bool showLastPlayedAt;
+  final bool isFocused;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2831,113 +3246,132 @@ class _RankingRow extends ConsumerWidget {
         : ref.watch(trackArtworkProvider(track.id));
 
     return Padding(
+      key: rowKey,
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: track == null ? null : () => _showTrackDetailSheet(context, track),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: rank <= 3
-                          ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                          : Colors.white.withValues(alpha: 0.28),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 240),
+        decoration: BoxDecoration(
+          color: isFocused
+              ? theme.colorScheme.primary.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isFocused
+                ? theme.colorScheme.primary.withValues(alpha: 0.42)
+                : Colors.transparent,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: track == null
+              ? null
+              : () => _showTrackDetailSheet(context, track),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
                         color: rank <= 3
-                            ? theme.colorScheme.primary.withValues(alpha: 0.18)
-                            : Colors.white.withValues(alpha: 0.45),
+                            ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                            : Colors.white.withValues(alpha: 0.28),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: rank <= 3
+                              ? theme.colorScheme.primary.withValues(
+                                  alpha: 0.18,
+                                )
+                              : Colors.white.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Text(
+                        '$rank',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: rank <= 3
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    child: Text(
-                      '$rank',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: rank <= 3
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
+                    const SizedBox(width: 12),
+                    _RankingArtwork(
+                      entry: entry,
+                      track: track,
+                      artwork: artwork,
+                      scope: scope,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            entry.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            showLastPlayedAt && entry.lastPlayedAt != null
+                                ? DateFormat.yMMMd().add_Hm().format(
+                                    entry.lastPlayedAt!,
+                                  )
+                                : entry.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      number.format(entry.playCount),
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  _RankingArtwork(
-                    entry: entry,
-                    track: track,
-                    artwork: artwork,
-                    scope: scope,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entry.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          showLastPlayedAt && entry.lastPlayedAt != null
-                              ? DateFormat.yMMMd().add_Hm().format(
-                                  entry.lastPlayedAt!,
-                                )
-                              : entry.subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: ColoredBox(
+                    color: theme.colorScheme.outlineVariant.withValues(
+                      alpha: 0.36,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: ratio.clamp(0.04, 1.0),
+                        child: SizedBox(
+                          height: 5,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(color: barColor),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    number.format(entry.playCount),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: ColoredBox(
-                  color: theme.colorScheme.outlineVariant.withValues(
-                    alpha: 0.36,
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: FractionallySizedBox(
-                      widthFactor: ratio.clamp(0.04, 1.0),
-                      child: SizedBox(
-                        height: 5,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(color: barColor),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -3071,6 +3505,127 @@ class _Background extends StatelessWidget {
       child: const SizedBox.expand(),
     );
   }
+}
+
+void _focusTrackInRanking(
+  BuildContext context,
+  WidgetRef ref,
+  LibraryTrack track, {
+  bool closeCurrentRoute = false,
+}) {
+  ref.read(rankingScopeProvider.notifier).setScope(RankingScope.tracks);
+  ref.read(rankingFocusProvider.notifier).focus(RankingFocus.track(track.id));
+  ref.read(homeSectionProvider.notifier).setSection(HomeSection.rankings);
+  if (closeCurrentRoute) {
+    Navigator.of(context).pop();
+  }
+}
+
+void _focusRankingEntry(
+  BuildContext context,
+  WidgetRef ref, {
+  required RankingScope scope,
+  required String title,
+  bool closeAllRoutes = false,
+}) {
+  ref.read(rankingScopeProvider.notifier).setScope(scope);
+  ref
+      .read(rankingFocusProvider.notifier)
+      .focus(RankingFocus.entry(scope: scope, title: title));
+  ref.read(homeSectionProvider.notifier).setSection(HomeSection.rankings);
+  if (closeAllRoutes) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+}
+
+List<RankingEntry> _visibleRankingEntries(
+  List<RankingEntry> entries,
+  RankingFocus? focus,
+) {
+  const minimumVisibleEntries = 12;
+  if (focus == null) {
+    return entries.take(minimumVisibleEntries).toList(growable: false);
+  }
+
+  final focusIndex = entries.indexWhere(
+    (entry) => _entryMatchesFocus(entry, focus),
+  );
+  final visibleCount = focusIndex < 0
+      ? minimumVisibleEntries
+      : _clampInt(focusIndex + 1, minimumVisibleEntries, entries.length);
+  return entries.take(visibleCount).toList(growable: false);
+}
+
+int _clampInt(int value, int minimum, int maximum) {
+  if (value < minimum) {
+    return minimum;
+  }
+  if (value > maximum) {
+    return maximum;
+  }
+  return value;
+}
+
+bool _entryMatchesFocus(RankingEntry entry, RankingFocus focus) {
+  if (focus.scope != RankingScope.tracks &&
+      focus.scope != RankingScope.recent) {
+    return entry.title == focus.title;
+  }
+  final trackId = focus.trackId;
+  return trackId != null && entry.representativeTrackId == trackId;
+}
+
+List<LibraryTrack> _tracksByArtist(LibraryOverview overview, String artist) {
+  return _sortedDrilldownTracks(
+    overview.tracks.where((track) => track.artist == artist),
+  );
+}
+
+List<LibraryTrack> _tracksByAlbumArtist(
+  LibraryOverview overview,
+  String albumArtist,
+) {
+  return _sortedDrilldownTracks(
+    overview.tracks.where(
+      (track) => (track.albumArtist ?? track.artist) == albumArtist,
+    ),
+  );
+}
+
+List<LibraryTrack> _tracksByAlbum(
+  LibraryOverview overview,
+  LibraryTrack album,
+) {
+  final albumArtist = album.albumArtist ?? album.artist;
+  return _sortedDrilldownTracks(
+    overview.tracks.where(
+      (track) =>
+          track.albumTitle == album.albumTitle &&
+          (track.albumArtist ?? track.artist) == albumArtist,
+    ),
+  );
+}
+
+List<LibraryTrack> _tracksByGenre(LibraryOverview overview, String genre) {
+  return _sortedDrilldownTracks(
+    overview.tracks.where((track) => track.genre == genre),
+  );
+}
+
+List<LibraryTrack> _sortedDrilldownTracks(Iterable<LibraryTrack> tracks) {
+  final sorted = tracks.toList()
+    ..sort((a, b) {
+      final byPlays = b.playCount.compareTo(a.playCount);
+      if (byPlays != 0) {
+        return byPlays;
+      }
+      return a.title.compareTo(b.title);
+    });
+  return List.unmodifiable(sorted);
+}
+
+String _albumRankingTitle(LibraryTrack track) {
+  return '${track.albumArtist ?? track.artist} - ${track.albumTitle}';
 }
 
 class _SummaryValue {

@@ -20,6 +20,19 @@ enum TrendRange {
   }
 }
 
+class RankingFocus {
+  const RankingFocus.track(this.trackId)
+    : scope = RankingScope.tracks,
+      title = null;
+
+  const RankingFocus.entry({required this.scope, required this.title})
+    : trackId = null;
+
+  final RankingScope scope;
+  final String? trackId;
+  final String? title;
+}
+
 enum HomeSection {
   playing,
   overview,
@@ -59,6 +72,11 @@ final rankingScopeProvider =
       RankingScopeController.new,
     );
 
+final rankingFocusProvider =
+    NotifierProvider<RankingFocusController, RankingFocus?>(
+      RankingFocusController.new,
+    );
+
 final trendRangeProvider = NotifierProvider<TrendRangeController, TrendRange>(
   TrendRangeController.new,
 );
@@ -71,6 +89,21 @@ class RankingScopeController extends Notifier<RankingScope> {
 
   void setScope(RankingScope scope) {
     state = scope;
+  }
+}
+
+class RankingFocusController extends Notifier<RankingFocus?> {
+  @override
+  RankingFocus? build() {
+    return null;
+  }
+
+  void focus(RankingFocus focus) {
+    state = focus;
+  }
+
+  void clear() {
+    state = null;
   }
 }
 
