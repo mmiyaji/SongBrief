@@ -48,3 +48,10 @@ a small SwiftUI platform view for specific surfaces instead of rewriting the app
 flutter analyze
 flutter test
 ```
+
+## Legal Pages
+
+GitHub Pages publishes the App Store legal pages from `docs/`:
+
+- Privacy Policy: https://mmiyaji.github.io/SongBrief/privacy/
+- Terms of Use: https://mmiyaji.github.io/SongBrief/terms/

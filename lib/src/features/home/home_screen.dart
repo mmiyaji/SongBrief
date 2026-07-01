@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../domain/library_overview.dart';
 import '../../domain/library_track.dart';
@@ -13,6 +14,9 @@ import '../../settings/app_preferences.dart';
 import '../../theme/app_theme.dart';
 import 'home_controller.dart';
 import 'widgets/glass_surface.dart';
+
+const _privacyPolicyUrl = 'https://mmiyaji.github.io/SongBrief/privacy/';
+const _termsOfUseUrl = 'https://mmiyaji.github.io/SongBrief/terms/';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -3123,6 +3127,18 @@ class _SettingsSection extends ConsumerWidget {
                 label: 'Libraries',
                 value: _librarySummaryLabel,
               ),
+              _SettingsRow(
+                icon: Icons.privacy_tip_outlined,
+                label: 'Privacy Policy',
+                value: 'Open',
+                onTap: () => _openExternalUrl(context, _privacyPolicyUrl),
+              ),
+              _SettingsRow(
+                icon: Icons.gavel_outlined,
+                label: 'Terms of Use',
+                value: 'Open',
+                onTap: () => _openExternalUrl(context, _termsOfUseUrl),
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 10,
@@ -3172,6 +3188,26 @@ class _SettingsSection extends ConsumerWidget {
       ],
     );
   }
+}
+
+Future<void> _openExternalUrl(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  final messenger = ScaffoldMessenger.maybeOf(context);
+
+  try {
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (launched) {
+      return;
+    }
+  } on Exception {
+    // Fall through to the user-facing error below.
+  }
+
+  if (!context.mounted) {
+    return;
+  }
+
+  messenger?.showSnackBar(SnackBar(content: Text('Could not open $url')));
 }
 
 void _showLibrariesSheet(BuildContext context) {
@@ -3228,16 +3264,18 @@ class _SettingsRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
+    final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
@@ -3258,12 +3296,31 @@ class _SettingsRow extends StatelessWidget {
               value,
               textAlign: TextAlign.right,
               style: theme.textTheme.bodyMedium?.copyWith(
+                color: onTap == null ? null : theme.colorScheme.primary,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
+          if (onTap != null) ...[
+            const SizedBox(width: 6),
+            Icon(
+              Icons.open_in_new_rounded,
+              color: theme.colorScheme.primary,
+              size: 18,
+            ),
+          ],
         ],
       ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: content,
     );
   }
 }
