@@ -19,6 +19,10 @@ import 'widgets/glass_surface.dart';
 const _privacyPolicyUrl = 'https://mmiyaji.github.io/SongBrief/privacy/';
 const _termsOfUseUrl = 'https://mmiyaji.github.io/SongBrief/terms/';
 
+String _t(BuildContext context, String en, String ja) {
+  return Localizations.localeOf(context).languageCode == 'ja' ? ja : en;
+}
+
 enum _LibraryBrowseMode {
   songs,
   artists,
@@ -186,7 +190,7 @@ class _BottomTabs extends ConsumerWidget {
       height: 72,
       backgroundColor: Colors.transparent,
       indicatorColor: theme.colorScheme.primary.withValues(alpha: 0.22),
-      destinations: _navigationDestinations(),
+      destinations: _navigationDestinations(context),
       onDestinationSelected: (index) {
         ref
             .read(homeSectionProvider.notifier)
@@ -385,7 +389,7 @@ class _SideTabs extends ConsumerWidget {
                 (section) => NavigationRailDestination(
                   icon: Icon(_sectionIcon(section)),
                   selectedIcon: Icon(_sectionSelectedIcon(section)),
-                  label: Text(section.label),
+                  label: Text(_sectionLabel(context, section)),
                 ),
               )
               .toList(),
@@ -494,7 +498,7 @@ class _Header extends StatelessWidget {
               Text('SongBrief', style: theme.textTheme.headlineLarge),
               const SizedBox(height: 6),
               Text(
-                _sectionSubtitle(selectedSection, overview.isDemo),
+                _sectionSubtitle(context, selectedSection, overview.isDemo),
                 style: theme.textTheme.titleSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
@@ -1227,7 +1231,7 @@ class _TrendPanel extends ConsumerWidget {
                   .map(
                     (value) => ButtonSegment<TrendRange>(
                       value: value,
-                      label: Text(value.label),
+                      label: Text(_trendRangeLabel(context, value)),
                     ),
                   )
                   .toList(),
@@ -3474,12 +3478,12 @@ class _RankingPanel extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _rankingTitle(scope),
+                      _rankingTitle(context, scope),
                       style: theme.textTheme.titleLarge,
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      _rankingSubtitle(scope),
+                      _rankingSubtitle(context, scope),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -3528,7 +3532,7 @@ class _RankingPanel extends ConsumerWidget {
                   .map(
                     (value) => ButtonSegment<RankingScope>(
                       value: value,
-                      label: Text(value.label),
+                      label: Text(_rankingScopeLabel(context, value)),
                     ),
                   )
                   .toList(),
@@ -3744,9 +3748,12 @@ class _LibrarySearchPanel extends StatelessWidget {
         children: [
           _PanelHeading(
             icon: Icons.search_rounded,
-            title: 'Library browser',
-            subtitle:
-                '${number.format(resultCount)} ${mode.label.toLowerCase()} matched',
+            title: _t(context, 'Library browser', 'ライブラリ'),
+            subtitle: _t(
+              context,
+              '${number.format(resultCount)} ${_libraryBrowseModeLabel(context, mode).toLowerCase()} matched',
+              '${number.format(resultCount)}件の${_libraryBrowseModeLabel(context, mode)}',
+            ),
           ),
           const SizedBox(height: 14),
           TextField(
@@ -3754,13 +3761,17 @@ class _LibrarySearchPanel extends StatelessWidget {
             onChanged: onQueryChanged,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
-              hintText: 'Search songs, artists, albums, or genres',
+              hintText: _t(
+                context,
+                'Search songs, artists, albums, or genres',
+                '曲、アーティスト、アルバム、ジャンルを検索',
+              ),
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: query.isEmpty
                   ? null
                   : IconButton(
                       onPressed: onClearQuery,
-                      tooltip: 'Clear search',
+                      tooltip: _t(context, 'Clear search', '検索をクリア'),
                       icon: const Icon(Icons.close_rounded),
                     ),
               filled: true,
@@ -3797,7 +3808,7 @@ class _LibrarySearchPanel extends StatelessWidget {
                         (value) => ButtonSegment<_LibraryBrowseMode>(
                           value: value,
                           icon: Icon(value.icon, size: 18),
-                          label: Text(value.label),
+                          label: Text(_libraryBrowseModeLabel(context, value)),
                         ),
                       )
                       .toList(),
@@ -3811,7 +3822,7 @@ class _LibrarySearchPanel extends StatelessWidget {
                 initialValue: sort,
                 isExpanded: true,
                 decoration: InputDecoration(
-                  labelText: 'Sort',
+                  labelText: _t(context, 'Sort', '並び替え'),
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerHighest
                       .withValues(alpha: 0.44),
@@ -3827,7 +3838,7 @@ class _LibrarySearchPanel extends StatelessWidget {
                     .map(
                       (value) => DropdownMenuItem<_LibrarySortMode>(
                         value: value,
-                        child: Text(value.label),
+                        child: Text(_librarySortModeLabel(context, value)),
                       ),
                     )
                     .toList(),
@@ -4043,13 +4054,21 @@ class _LibraryGroupPanel extends StatelessWidget {
         children: [
           _PanelHeading(
             icon: mode.icon,
-            title: mode.label,
-            subtitle: 'Grouped library content with drill-down details',
+            title: _libraryBrowseModeLabel(context, mode),
+            subtitle: _t(
+              context,
+              'Grouped library content with drill-down details',
+              'グループごとの詳細へ移動できます',
+            ),
           ),
           const SizedBox(height: 12),
           if (totalCount == 0)
             Text(
-              'No ${mode.label.toLowerCase()} matched the current search.',
+              _t(
+                context,
+                'No ${_libraryBrowseModeLabel(context, mode).toLowerCase()} matched the current search.',
+                '現在の検索に一致する${_libraryBrowseModeLabel(context, mode)}はありません。',
+              ),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
@@ -4524,27 +4543,35 @@ class _SettingsSection extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Music Access', style: theme.textTheme.titleLarge),
+              Text(
+                _t(context, 'Music Access', 'ミュージックアクセス'),
+                style: theme.textTheme.titleLarge,
+              ),
               const SizedBox(height: 14),
               _SettingsRow(
                 icon: Icons.privacy_tip,
-                label: 'Authorization',
+                label: _t(context, 'Authorization', '認証状態'),
                 value: overview.isDemo
-                    ? 'Demo mode'
+                    ? _t(context, 'Demo mode', 'デモモード')
                     : stats.authorizationStatus.label,
               ),
               _SettingsRow(
                 icon: Icons.storage,
-                label: 'Data source',
-                value: overview.isDemo ? 'Sample library' : 'iOS Music library',
+                label: _t(context, 'Data source', 'データソース'),
+                value: overview.isDemo
+                    ? _t(context, 'Sample library', 'サンプルライブラリ')
+                    : _t(context, 'iOS Music library', 'iOSミュージックライブラリ'),
               ),
               _SettingsRow(
                 icon: Icons.update,
-                label: 'Snapshot',
+                label: _t(context, 'Snapshot', 'スナップショット'),
                 value: DateFormat.yMMMd().add_Hm().format(overview.generatedAt),
               ),
               const SizedBox(height: 16),
-              Text('Theme', style: theme.textTheme.titleMedium),
+              Text(
+                _t(context, 'Theme', 'テーマ'),
+                style: theme.textTheme.titleMedium,
+              ),
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
@@ -4575,7 +4602,10 @@ class _SettingsSection extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              Text('Language', style: theme.textTheme.titleMedium),
+              Text(
+                _t(context, 'Language', '言語'),
+                style: theme.textTheme.titleMedium,
+              ),
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
@@ -4598,33 +4628,36 @@ class _SettingsSection extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              Text('App Info', style: theme.textTheme.titleMedium),
+              Text(
+                _t(context, 'App Info', 'アプリ情報'),
+                style: theme.textTheme.titleMedium,
+              ),
               const SizedBox(height: 10),
-              const _SettingsRow(
+              _SettingsRow(
                 icon: Icons.info_outline,
-                label: 'Application',
+                label: _t(context, 'Application', 'アプリケーション'),
                 value: 'SongBrief',
               ),
-              const _SettingsRow(
+              _SettingsRow(
                 icon: Icons.sell_outlined,
-                label: 'Version',
+                label: _t(context, 'Version', 'バージョン'),
                 value: _appVersionLabel,
               ),
-              const _SettingsRow(
+              _SettingsRow(
                 icon: Icons.extension_outlined,
-                label: 'Libraries',
+                label: _t(context, 'Libraries', 'ライブラリ'),
                 value: _librarySummaryLabel,
               ),
               _SettingsRow(
                 icon: Icons.privacy_tip_outlined,
-                label: 'Privacy Policy',
-                value: 'Open',
+                label: _t(context, 'Privacy Policy', 'プライバシーポリシー'),
+                value: _t(context, 'Open', '開く'),
                 onTap: () => _openExternalUrl(context, _privacyPolicyUrl),
               ),
               _SettingsRow(
                 icon: Icons.gavel_outlined,
-                label: 'Terms of Use',
-                value: 'Open',
+                label: _t(context, 'Terms of Use', '利用規約'),
+                value: _t(context, 'Open', '開く'),
                 onTap: () => _openExternalUrl(context, _termsOfUseUrl),
               ),
               const SizedBox(height: 8),
@@ -4638,7 +4671,7 @@ class _SettingsSection extends ConsumerWidget {
                       _showLibrariesSheet(context);
                     },
                     icon: const Icon(Icons.inventory_2_outlined),
-                    label: const Text('Libraries'),
+                    label: Text(_t(context, 'Libraries', 'ライブラリ')),
                   ),
                   OutlinedButton.icon(
                     onPressed: () {
@@ -4653,7 +4686,7 @@ class _SettingsSection extends ConsumerWidget {
                       );
                     },
                     icon: const Icon(Icons.description_outlined),
-                    label: const Text('Licenses'),
+                    label: Text(_t(context, 'Licenses', 'ライセンス')),
                   ),
                 ],
               ),
@@ -4667,7 +4700,7 @@ class _SettingsSection extends ConsumerWidget {
                         .refreshStats();
                   },
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh'),
+                  label: Text(_t(context, 'Refresh', '更新')),
                 ),
               ),
             ],
@@ -5840,34 +5873,91 @@ String _compactNumber(int value) {
   return NumberFormat.decimalPattern().format(value);
 }
 
-String _rankingTitle(RankingScope scope) {
-  return switch (scope) {
-    RankingScope.tracks => 'Top Songs',
-    RankingScope.artists => 'Top Artists',
-    RankingScope.albums => 'Top Albums',
-    RankingScope.recent => 'Recently Played',
+String _trendRangeLabel(BuildContext context, TrendRange range) {
+  return switch (range) {
+    TrendRange.week => _t(context, '7 days', '7日間'),
+    TrendRange.month => _t(context, '4 weeks', '4週間'),
+    TrendRange.year => _t(context, '1 year', '1年間'),
   };
 }
 
-String _rankingSubtitle(RankingScope scope) {
+String _rankingScopeLabel(BuildContext context, RankingScope scope) {
   return switch (scope) {
-    RankingScope.tracks => 'Ranked by play count',
-    RankingScope.artists => 'Aggregated across each artist',
-    RankingScope.albums => 'Aggregated across each album',
-    RankingScope.recent => 'Sorted by last played date',
+    RankingScope.tracks => _t(context, 'Songs', '曲'),
+    RankingScope.artists => _t(context, 'Artists', 'アーティスト'),
+    RankingScope.albums => _t(context, 'Albums', 'アルバム'),
+    RankingScope.recent => _t(context, 'Recent', '最近'),
   };
 }
 
-List<NavigationDestination> _navigationDestinations() {
+String _libraryBrowseModeLabel(BuildContext context, _LibraryBrowseMode mode) {
+  return switch (mode) {
+    _LibraryBrowseMode.songs => _t(context, 'Songs', '曲'),
+    _LibraryBrowseMode.artists => _t(context, 'Artists', 'アーティスト'),
+    _LibraryBrowseMode.albums => _t(context, 'Albums', 'アルバム'),
+    _LibraryBrowseMode.genres => _t(context, 'Genres', 'ジャンル'),
+  };
+}
+
+String _librarySortModeLabel(BuildContext context, _LibrarySortMode sort) {
+  return switch (sort) {
+    _LibrarySortMode.recent => _t(context, 'Recently played', '最近再生'),
+    _LibrarySortMode.plays => _t(context, 'Most played', '再生回数順'),
+    _LibrarySortMode.skips => _t(context, 'Most skipped', 'スキップ順'),
+    _LibrarySortMode.title => _t(context, 'Title', 'タイトル'),
+  };
+}
+
+String _rankingTitle(BuildContext context, RankingScope scope) {
+  return switch (scope) {
+    RankingScope.tracks => _t(context, 'Top Songs', 'トップ曲'),
+    RankingScope.artists => _t(context, 'Top Artists', 'トップアーティスト'),
+    RankingScope.albums => _t(context, 'Top Albums', 'トップアルバム'),
+    RankingScope.recent => _t(context, 'Recently Played', '最近再生した曲'),
+  };
+}
+
+String _rankingSubtitle(BuildContext context, RankingScope scope) {
+  return switch (scope) {
+    RankingScope.tracks => _t(context, 'Ranked by play count', '再生回数順'),
+    RankingScope.artists => _t(
+      context,
+      'Aggregated across each artist',
+      'アーティストごとの合計',
+    ),
+    RankingScope.albums => _t(
+      context,
+      'Aggregated across each album',
+      'アルバムごとの合計',
+    ),
+    RankingScope.recent => _t(
+      context,
+      'Sorted by last played date',
+      '最後に再生した日時順',
+    ),
+  };
+}
+
+List<NavigationDestination> _navigationDestinations(BuildContext context) {
   return HomeSection.values
       .map(
         (section) => NavigationDestination(
           icon: Icon(_sectionIcon(section)),
           selectedIcon: Icon(_sectionSelectedIcon(section)),
-          label: section.label,
+          label: _sectionLabel(context, section),
         ),
       )
       .toList();
+}
+
+String _sectionLabel(BuildContext context, HomeSection section) {
+  return switch (section) {
+    HomeSection.playing => _t(context, 'Playing', '再生中'),
+    HomeSection.overview => _t(context, 'Overview', '概要'),
+    HomeSection.rankings => _t(context, 'Rankings', 'ランキング'),
+    HomeSection.library => _t(context, 'Library', 'ライブラリ'),
+    HomeSection.settings => _t(context, 'Settings', '設定'),
+  };
 }
 
 IconData _sectionIcon(HomeSection section) {
@@ -5890,7 +5980,41 @@ IconData _sectionSelectedIcon(HomeSection section) {
   };
 }
 
-String _sectionSubtitle(HomeSection section, bool isDemo) {
+String _sectionSubtitle(
+  BuildContext context,
+  HomeSection section,
+  bool isDemo,
+) {
+  final source = isDemo
+      ? _t(context, 'demo library', 'デモライブラリ')
+      : _t(context, 'Music library', 'ミュージックライブラリ');
+  return switch (section) {
+    HomeSection.playing => _t(
+      context,
+      'Recent playback from the $source',
+      '$source の直近再生トラック',
+    ),
+    HomeSection.overview => _t(
+      context,
+      'Overview of the $source',
+      '$source の概要',
+    ),
+    HomeSection.rankings => _t(
+      context,
+      'Rankings from the $source',
+      '$source のランキング',
+    ),
+    HomeSection.library => _t(context, 'Browse the $source', '$source のブラウズ'),
+    HomeSection.settings => _t(
+      context,
+      'Access and scan settings',
+      'アクセスとスキャン設定',
+    ),
+  };
+}
+
+// ignore: unused_element
+String _legacySectionSubtitle(HomeSection section, bool isDemo) {
   final source = isDemo ? 'デモライブラリ' : 'Musicライブラリ';
   return switch (section) {
     HomeSection.playing => '$source の直近再生トラック',
