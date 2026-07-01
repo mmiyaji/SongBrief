@@ -1599,6 +1599,8 @@ class _TrackDetailSheet extends ConsumerWidget {
               _PlaybackControls(track: track),
               const SizedBox(height: 18),
               _TrackDetailsPanel(track: track),
+              const SizedBox(height: 18),
+              _TrackLibraryContextPanel(track: track),
             ],
           ),
         ),
@@ -2263,6 +2265,213 @@ class _TrackDetailsPanel extends ConsumerWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _TrackLibraryContextPanel extends ConsumerWidget {
+  const _TrackLibraryContextPanel({required this.track});
+
+  final LibraryTrack track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final overview = ref
+        .watch(musicStatsControllerProvider)
+        .asData
+        ?.value
+        .overview;
+    final lyrics = track.lyrics?.trim();
+
+    return GlassSurface(
+      padding: const EdgeInsets.all(18),
+      radius: 24,
+      tint: const Color(0x22FFFFFF),
+      borderOpacity: 0.12,
+      shadowOpacity: 0.08,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _TrackContextTitle(
+            icon: Icons.playlist_play_rounded,
+            title: _t(context, 'Playlists', 'プレイリスト'),
+          ),
+          const SizedBox(height: 12),
+          if (track.playlistNames.isEmpty)
+            _TrackContextEmptyText(
+              text: _t(
+                context,
+                'No playlist membership was returned for this song.',
+                'この曲が登録されているプレイリストは取得されていません。',
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final playlistName in track.playlistNames)
+                  _TrackMetadataChip(
+                    icon: Icons.queue_music_rounded,
+                    label: playlistName,
+                    onTap: overview == null
+                        ? null
+                        : () {
+                            final tracks = _tracksByPlaylist(
+                              overview,
+                              playlistName,
+                            );
+                            if (tracks.isEmpty) {
+                              return;
+                            }
+                            _showTrackGroupSheet(
+                              context,
+                              title: playlistName,
+                              subtitle: _t(
+                                context,
+                                'Playlist songs',
+                                'プレイリスト内の曲',
+                              ),
+                              icon: Icons.playlist_play_rounded,
+                              tracks: tracks,
+                            );
+                          },
+                  ),
+              ],
+            ),
+          const SizedBox(height: 20),
+          _TrackContextTitle(
+            icon: Icons.lyrics_outlined,
+            title: _t(context, 'Lyrics', '歌詞'),
+          ),
+          const SizedBox(height: 12),
+          if (lyrics == null || lyrics.isEmpty)
+            _TrackContextEmptyText(
+              text: _t(
+                context,
+                'No local lyrics were found for this song.',
+                'この曲のローカル歌詞は見つかりませんでした。',
+              ),
+            )
+          else
+            SelectableText(
+              lyrics,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                height: 1.55,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrackContextTitle extends StatelessWidget {
+  const _TrackContextTitle({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, color: theme.colorScheme.primary, size: 22),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrackContextEmptyText extends StatelessWidget {
+  const _TrackContextEmptyText({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(
+      text,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+        height: 1.45,
+      ),
+    );
+  }
+}
+
+class _TrackMetadataChip extends StatelessWidget {
+  const _TrackMetadataChip({
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final radius = BorderRadius.circular(999);
+    final maxLabelWidth = (MediaQuery.sizeOf(context).width - 128)
+        .clamp(96.0, 240.0)
+        .toDouble();
+    final content = DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+        borderRadius: radius,
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: theme.colorScheme.primary),
+            const SizedBox(width: 7),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxLabelWidth),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(borderRadius: radius, onTap: onTap, child: content),
     );
   }
 }
@@ -5352,6 +5561,17 @@ List<LibraryTrack> _tracksByAlbum(
 List<LibraryTrack> _tracksByGenre(LibraryOverview overview, String genre) {
   return _sortedDrilldownTracks(
     overview.tracks.where((track) => track.genre == genre),
+  );
+}
+
+List<LibraryTrack> _tracksByPlaylist(
+  LibraryOverview overview,
+  String playlistName,
+) {
+  return _sortedDrilldownTracks(
+    overview.tracks.where(
+      (track) => track.playlistNames.contains(playlistName),
+    ),
   );
 }
 

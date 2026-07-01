@@ -120,6 +120,12 @@ class MusicStatsRepository {
         playCount: 184,
         skipCount: 3,
         lastPlayedAt: now.subtract(const Duration(hours: 3)),
+        lyrics:
+            'City lights are waking slow\n'
+            'Footsteps keep the meter low\n'
+            'Every window hums along\n'
+            'To the skyline echo song',
+        playlistNames: const ['Late Night Focus', 'Recently Played'],
         isCloudItem: false,
       ),
       LibraryTrack(
@@ -132,6 +138,7 @@ class MusicStatsRepository {
         playCount: 162,
         skipCount: 8,
         lastPlayedAt: now.subtract(const Duration(days: 1, hours: 2)),
+        playlistNames: const ['Late Night Focus', 'Harbor Walk'],
         isCloudItem: false,
       ),
       LibraryTrack(
@@ -144,6 +151,11 @@ class MusicStatsRepository {
         playCount: 147,
         skipCount: 11,
         lastPlayedAt: now.subtract(const Duration(days: 2)),
+        lyrics:
+            'Hold the frame and let it breathe\n'
+            'Quiet colors underneath\n'
+            'Nothing moves and nothing stays',
+        playlistNames: const ['Recently Played', 'Studio Notes'],
         isCloudItem: false,
       ),
       LibraryTrack(
@@ -155,6 +167,7 @@ class MusicStatsRepository {
         playCount: 121,
         skipCount: 4,
         lastPlayedAt: now.subtract(const Duration(days: 4)),
+        playlistNames: const ['City Pop Tests'],
         isCloudItem: false,
       ),
       LibraryTrack(
@@ -166,6 +179,10 @@ class MusicStatsRepository {
         playCount: 116,
         skipCount: 5,
         lastPlayedAt: now.subtract(const Duration(days: 5, hours: 6)),
+        lyrics:
+            'Small signals find their way\n'
+            'Through the ordinary day',
+        playlistNames: const ['Morning Rotation'],
         isCloudItem: false,
       ),
       LibraryTrack(
@@ -177,6 +194,7 @@ class MusicStatsRepository {
         playCount: 96,
         skipCount: 1,
         lastPlayedAt: now.subtract(const Duration(days: 9)),
+        playlistNames: const ['Morning Rotation', 'Train Window'],
         isCloudItem: false,
       ),
       LibraryTrack(
@@ -188,6 +206,7 @@ class MusicStatsRepository {
         playCount: 78,
         skipCount: 0,
         lastPlayedAt: now.subtract(const Duration(days: 12)),
+        playlistNames: const ['Train Window'],
         isCloudItem: false,
       ),
     ];

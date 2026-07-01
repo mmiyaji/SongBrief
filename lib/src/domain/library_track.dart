@@ -12,6 +12,8 @@ class LibraryTrack {
     this.genre,
     this.artworkAsset,
     this.lastPlayedAt,
+    this.lyrics,
+    this.playlistNames = const <String>[],
   });
 
   final String id;
@@ -26,6 +28,8 @@ class LibraryTrack {
   final int skipCount;
   final DateTime? lastPlayedAt;
   final bool isCloudItem;
+  final String? lyrics;
+  final List<String> playlistNames;
 
   int get listeningSeconds => duration.inSeconds * playCount;
 
@@ -47,6 +51,8 @@ class LibraryTrack {
       skipCount: skipCount ?? this.skipCount,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
       isCloudItem: isCloudItem,
+      lyrics: lyrics,
+      playlistNames: playlistNames,
     );
   }
 
@@ -63,6 +69,8 @@ class LibraryTrack {
       skipCount: _readInt(map, 'skipCount'),
       lastPlayedAt: _readDateTime(map, 'lastPlayedAtMillis'),
       isCloudItem: _readBool(map, 'isCloudItem'),
+      lyrics: _readNullableString(map, 'lyrics'),
+      playlistNames: _readStringList(map, 'playlistNames'),
     );
   }
 
@@ -111,5 +119,31 @@ class LibraryTrack {
       return DateTime.fromMillisecondsSinceEpoch(value.round());
     }
     return null;
+  }
+
+  static List<String> _readStringList(Map<Object?, Object?> map, String key) {
+    final value = map[key];
+    if (value is! Iterable) {
+      return const <String>[];
+    }
+
+    final names = <String>{};
+    for (final item in value) {
+      if (item is! String) {
+        continue;
+      }
+      final trimmed = item.trim();
+      if (trimmed.isNotEmpty) {
+        names.add(trimmed);
+      }
+    }
+
+    if (names.isEmpty) {
+      return const <String>[];
+    }
+
+    final sorted = names.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return List.unmodifiable(sorted);
   }
 }

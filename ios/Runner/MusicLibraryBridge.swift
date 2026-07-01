@@ -65,7 +65,13 @@ final class MusicLibraryBridge {
     DispatchQueue.global(qos: .userInitiated).async {
       let query = MPMediaQuery.songs()
       let items = query.items ?? []
-      let tracks = items.map { Self.trackMap(from: $0) }
+      let playlistNamesByItemID = Self.playlistNamesByItemID()
+      let tracks = items.map { item in
+        Self.trackMap(
+          from: item,
+          playlistNames: playlistNamesByItemID[item.persistentID] ?? []
+        )
+      }
 
       DispatchQueue.main.async {
         result(tracks)
@@ -144,7 +150,10 @@ final class MusicLibraryBridge {
     result(nil)
   }
 
-  private static func trackMap(from item: MPMediaItem) -> [String: Any] {
+  private static func trackMap(
+    from item: MPMediaItem,
+    playlistNames: [String] = []
+  ) -> [String: Any] {
     var track: [String: Any] = [
       "id": String(item.persistentID),
       "title": nonEmpty(item.title) ?? "Untitled",
@@ -162,11 +171,45 @@ final class MusicLibraryBridge {
     if let genre = nonEmpty(item.genre) {
       track["genre"] = genre
     }
+    if let lyrics = nonEmpty(
+      item.value(forProperty: MPMediaItemPropertyLyrics) as? String
+    ) {
+      track["lyrics"] = lyrics
+    }
+    if !playlistNames.isEmpty {
+      track["playlistNames"] = playlistNames
+    }
     if let lastPlayedDate = item.lastPlayedDate {
       track["lastPlayedAtMillis"] = Int(lastPlayedDate.timeIntervalSince1970 * 1000)
     }
 
     return track
+  }
+
+  private static func playlistNamesByItemID() -> [UInt64: [String]] {
+    var namesByID: [UInt64: Set<String>] = [:]
+    let playlists = MPMediaQuery.playlists().collections ?? []
+
+    for collection in playlists {
+      guard
+        let playlist = collection as? MPMediaPlaylist,
+        let playlistName = nonEmpty(playlist.name)
+      else {
+        continue
+      }
+
+      for item in playlist.items {
+        var names = namesByID[item.persistentID] ?? []
+        names.insert(playlistName)
+        namesByID[item.persistentID] = names
+      }
+    }
+
+    return namesByID.mapValues { names in
+      names.sorted {
+        $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+      }
+    }
   }
 
   private static func mediaItem(withPersistentID id: UInt64) -> MPMediaItem? {
