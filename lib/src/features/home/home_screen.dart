@@ -23,6 +23,158 @@ String _t(BuildContext context, String en, String ja) {
   return Localizations.localeOf(context).languageCode == 'ja' ? ja : en;
 }
 
+String _localeName(BuildContext context) {
+  return Localizations.localeOf(context).toLanguageTag();
+}
+
+NumberFormat _numberFormat(BuildContext context) {
+  return NumberFormat.decimalPattern(_localeName(context));
+}
+
+DateFormat _dateTimeFormat(BuildContext context) {
+  return DateFormat.yMMMd(_localeName(context)).add_Hm();
+}
+
+String _countLabel(
+  BuildContext context,
+  int count, {
+  required String singular,
+  required String plural,
+  required String jaUnit,
+}) {
+  final formatted = _numberFormat(context).format(count);
+  return _t(
+    context,
+    '$formatted ${count == 1 ? singular : plural}',
+    '$formatted$jaUnit',
+  );
+}
+
+String _playCountLabel(BuildContext context, int count) {
+  return _countLabel(
+    context,
+    count,
+    singular: 'play',
+    plural: 'plays',
+    jaUnit: '回',
+  );
+}
+
+String _skipCountLabel(BuildContext context, int count) {
+  return _countLabel(
+    context,
+    count,
+    singular: 'skip',
+    plural: 'skips',
+    jaUnit: '回',
+  );
+}
+
+String _trackCountLabel(BuildContext context, int count) {
+  return _countLabel(
+    context,
+    count,
+    singular: 'track',
+    plural: 'tracks',
+    jaUnit: '曲',
+  );
+}
+
+String _artistCountLabel(BuildContext context, int count) {
+  return _countLabel(
+    context,
+    count,
+    singular: 'artist',
+    plural: 'artists',
+    jaUnit: 'アーティスト',
+  );
+}
+
+String _albumCountLabel(BuildContext context, int count) {
+  return _countLabel(
+    context,
+    count,
+    singular: 'album',
+    plural: 'albums',
+    jaUnit: 'アルバム',
+  );
+}
+
+String _dayCountLabel(BuildContext context, int count) {
+  return _countLabel(
+    context,
+    count,
+    singular: 'day',
+    plural: 'days',
+    jaUnit: '日',
+  );
+}
+
+String _authorizationLabel(
+  BuildContext context,
+  MusicLibraryAuthorizationStatus status,
+) {
+  return switch (status) {
+    MusicLibraryAuthorizationStatus.notDetermined => _t(
+      context,
+      'Not requested',
+      '未リクエスト',
+    ),
+    MusicLibraryAuthorizationStatus.authorized => _t(
+      context,
+      'Authorized',
+      '許可済み',
+    ),
+    MusicLibraryAuthorizationStatus.denied => _t(context, 'Denied', '拒否'),
+    MusicLibraryAuthorizationStatus.restricted => _t(
+      context,
+      'Restricted',
+      '制限中',
+    ),
+    MusicLibraryAuthorizationStatus.unsupported => _t(
+      context,
+      'Demo mode',
+      'デモモード',
+    ),
+  };
+}
+
+String _themeStyleLabel(BuildContext context, SongBriefThemeStyle style) {
+  return switch (style) {
+    SongBriefThemeStyle.prism => _t(context, 'Prism', 'プリズム'),
+    SongBriefThemeStyle.ember => _t(context, 'Ember', 'エンバー'),
+    SongBriefThemeStyle.mono => _t(context, 'Mono', 'モノ'),
+  };
+}
+
+String _themeStyleDescription(BuildContext context, SongBriefThemeStyle style) {
+  return switch (style) {
+    SongBriefThemeStyle.prism => _t(
+      context,
+      'Cyan and lime data-first theme.',
+      'シアンとライムを基調にしたデータ重視のテーマです。',
+    ),
+    SongBriefThemeStyle.ember => _t(
+      context,
+      'Pink and amber music-focused theme.',
+      'ピンクとアンバーを基調にした音楽向けテーマです。',
+    ),
+    SongBriefThemeStyle.mono => _t(
+      context,
+      'High-contrast monochrome theme.',
+      '白黒を基調にした高コントラストテーマです。',
+    ),
+  };
+}
+
+String _languageLabel(BuildContext context, AppLanguage language) {
+  return switch (language) {
+    AppLanguage.system => _t(context, 'System', 'システム'),
+    AppLanguage.japanese => _t(context, 'Japanese', '日本語'),
+    AppLanguage.english => _t(context, 'English', '英語'),
+  };
+}
+
 enum _LibraryBrowseMode {
   songs,
   artists,
@@ -305,7 +457,7 @@ class _MiniPlayerBar extends ConsumerWidget {
                           .read(playbackControllerProvider.notifier)
                           .playTrack(track.id);
                     },
-              tooltip: 'Play',
+              tooltip: _t(context, 'Play', '再生'),
               icon: const Icon(Icons.play_arrow_rounded),
             ),
             IconButton(
@@ -316,7 +468,7 @@ class _MiniPlayerBar extends ConsumerWidget {
                           .read(playbackControllerProvider.notifier)
                           .skipToNext();
                     },
-              tooltip: 'Next',
+              tooltip: _t(context, 'Next', '次へ'),
               icon: const Icon(Icons.skip_next_rounded),
             ),
           ],
@@ -508,7 +660,9 @@ class _Header extends StatelessWidget {
           ),
         ),
         _StatusPill(
-          label: overview.isDemo ? 'Demo' : stats.authorizationStatus.label,
+          label: overview.isDemo
+              ? _t(context, 'Demo', 'デモ')
+              : _authorizationLabel(context, stats.authorizationStatus),
         ),
       ],
     );
@@ -546,8 +700,16 @@ class _AuthorizationPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final message = status == MusicLibraryAuthorizationStatus.notDetermined
-        ? 'Allow Music access to read play counts and skip counts.'
-        : 'Music access is ${status.label.toLowerCase()}.';
+        ? _t(
+            context,
+            'Allow Music access to read play counts and skip counts.',
+            '再生回数とスキップ回数を読み取るため、ミュージックへのアクセスを許可してください。',
+          )
+        : _t(
+            context,
+            'Music access is ${_authorizationLabel(context, status).toLowerCase()}.',
+            'ミュージックアクセスは「${_authorizationLabel(context, status)}」です。',
+          );
 
     return GlassSurface(
       tint: const Color(0x5CFFFFFF),
@@ -559,7 +721,7 @@ class _AuthorizationPanel extends ConsumerWidget {
               ref.read(musicStatsControllerProvider.notifier).requestAccess();
             },
             icon: const Icon(Icons.lock_open),
-            label: const Text('Allow'),
+            label: Text(_t(context, 'Allow', '許可')),
           );
 
           final content = Row(
@@ -611,7 +773,11 @@ class _DemoBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Demo data shown until iOS Music access is available.',
+              _t(
+                context,
+                'Demo data shown until iOS Music access is available.',
+                'iOSミュージックへのアクセスが利用可能になるまでデモデータを表示しています。',
+              ),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
@@ -680,7 +846,7 @@ class _HeroTrackPanel extends ConsumerWidget {
     final theme = Theme.of(context);
     final playback = ref.watch(playbackControllerProvider);
     final busy = playback.isLoading;
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
 
     return GlassSurface(
       padding: EdgeInsets.zero,
@@ -718,7 +884,9 @@ class _HeroTrackPanel extends ConsumerWidget {
                       Positioned(
                         left: 18,
                         top: 18,
-                        child: _HeroBadge(label: '#1 Song'),
+                        child: _HeroBadge(
+                          label: _t(context, '#1 Song', '#1 曲'),
+                        ),
                       ),
                       Positioned(
                         right: 18,
@@ -738,7 +906,7 @@ class _HeroTrackPanel extends ConsumerWidget {
                                       .read(playbackControllerProvider.notifier)
                                       .playTrack(track.id);
                                 },
-                          tooltip: 'Play this track',
+                          tooltip: _t(context, 'Play this track', 'この曲を再生'),
                           icon: const Icon(Icons.play_arrow_rounded, size: 28),
                         ),
                       ),
@@ -795,7 +963,9 @@ class _HeroTrackPanel extends ConsumerWidget {
                                       ),
                                 ),
                                 const SizedBox(height: 4),
-                                const _SmallMetricPill(label: '再生回数'),
+                                _SmallMetricPill(
+                                  label: _t(context, 'Plays', '再生回数'),
+                                ),
                               ],
                             ),
                           ],
@@ -856,7 +1026,9 @@ class _HeroTrackWideHeader extends StatelessWidget {
                       Positioned(
                         left: 12,
                         top: 12,
-                        child: _HeroBadge(label: '#1 Song'),
+                        child: _HeroBadge(
+                          label: _t(context, '#1 Song', '#1 曲'),
+                        ),
                       ),
                     ],
                   ),
@@ -873,10 +1045,13 @@ class _HeroTrackWideHeader extends StatelessWidget {
                       children: [
                         _TrackChip(
                           icon: Icons.graphic_eq_rounded,
-                          label: 'Recent play',
+                          label: _t(context, 'Recent play', '直近再生'),
                         ),
                         if (track.isCloudItem)
-                          _TrackChip(icon: Icons.cloud_rounded, label: 'Cloud'),
+                          _TrackChip(
+                            icon: Icons.cloud_rounded,
+                            label: _t(context, 'Cloud', 'クラウド'),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -923,7 +1098,7 @@ class _HeroTrackWideHeader extends StatelessWidget {
                             minimumSize: const Size.square(54),
                           ),
                           onPressed: busy ? null : onPlay,
-                          tooltip: 'Play this track',
+                          tooltip: _t(context, 'Play this track', 'この曲を再生'),
                           icon: const Icon(Icons.play_arrow_rounded, size: 31),
                         ),
                         const SizedBox(width: 14),
@@ -937,7 +1112,9 @@ class _HeroTrackWideHeader extends StatelessWidget {
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
-                            const _SmallMetricPill(label: 'Plays'),
+                            _SmallMetricPill(
+                              label: _t(context, 'Plays', '再生回数'),
+                            ),
                           ],
                         ),
                       ],
@@ -1027,7 +1204,6 @@ class _HeroStatStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.24),
@@ -1043,8 +1219,8 @@ class _HeroStatStrip extends ConsumerWidget {
           Expanded(
             child: _HeroStat(
               icon: Icons.play_arrow_rounded,
-              label: '再生回数',
-              value: '${number.format(track.playCount)} 回',
+              label: _t(context, 'Plays', '再生回数'),
+              value: _playCountLabel(context, track.playCount),
               color: theme.colorScheme.primary,
               onTap: () => _focusTrackInRanking(context, ref, track),
             ),
@@ -1053,8 +1229,8 @@ class _HeroStatStrip extends ConsumerWidget {
           Expanded(
             child: _HeroStat(
               icon: Icons.fast_forward_rounded,
-              label: 'スキップ',
-              value: '${number.format(track.skipCount)} 回',
+              label: _t(context, 'Skips', 'スキップ'),
+              value: _skipCountLabel(context, track.skipCount),
               color: theme.colorScheme.secondary,
               onTap: () => _focusTrackInRanking(context, ref, track),
             ),
@@ -1063,8 +1239,8 @@ class _HeroStatStrip extends ConsumerWidget {
           Expanded(
             child: _HeroStat(
               icon: Icons.schedule_rounded,
-              label: '最終再生',
-              value: _shortPlayedAtLabel(track.lastPlayedAt),
+              label: _t(context, 'Last played', '最終再生'),
+              value: _shortPlayedAtLabel(context, track.lastPlayedAt),
               color: theme.colorScheme.tertiary,
             ),
           ),
@@ -1184,7 +1360,7 @@ class _TrendPanel extends ConsumerWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '今週の傾向',
+                  _t(context, 'This week trend', '今週の傾向'),
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -1259,7 +1435,7 @@ class _TrendBars extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final max = values.reduce((a, b) => a > b ? a : b);
-    final labels = _trendLabels(range);
+    final labels = _trendLabels(context, range);
 
     return SizedBox(
       height: 178,
@@ -1385,7 +1561,7 @@ class _RecentTracksPanelState extends ConsumerState<_RecentTracksPanel> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '最近再生した曲',
+                  _t(context, 'Recently played songs', '最近再生した曲'),
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -1397,7 +1573,7 @@ class _RecentTracksPanelState extends ConsumerState<_RecentTracksPanel> {
                       .read(homeSectionProvider.notifier)
                       .setSection(HomeSection.library);
                 },
-                child: const Text('すべて見る'),
+                child: Text(_t(context, 'See all', 'すべて見る')),
               ),
             ],
           ),
@@ -1469,7 +1645,7 @@ class _RecentTrackRow extends ConsumerWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              _shortPlayedAtLabel(track.lastPlayedAt),
+              _shortPlayedAtLabel(context, track.lastPlayedAt),
               style: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.w800,
@@ -1483,7 +1659,7 @@ class _RecentTrackRow extends ConsumerWidget {
                   builder: (context) => _TrackActionSheet(track: track),
                 );
               },
-              tooltip: 'More',
+              tooltip: _t(context, 'More', 'その他'),
               icon: const Icon(Icons.more_vert_rounded),
             ),
           ],
@@ -1522,7 +1698,7 @@ class _TrackActionSheet extends ConsumerWidget {
               ref.read(playbackControllerProvider.notifier).playTrack(track.id);
             },
             icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('再生'),
+            label: Text(_t(context, 'Play', '再生')),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
@@ -1531,7 +1707,7 @@ class _TrackActionSheet extends ConsumerWidget {
               _showTrackDetailSheet(context, track);
             },
             icon: const Icon(Icons.info_outline_rounded),
-            label: const Text('詳細を見る'),
+            label: Text(_t(context, 'Show details', '詳細を見る')),
           ),
         ],
       ),
@@ -1653,7 +1829,6 @@ class _TrackGroupSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
     final totalPlayCount = tracks.fold<int>(
       0,
       (total, track) => total + track.playCount,
@@ -1688,7 +1863,7 @@ class _TrackGroupSheet extends ConsumerWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$subtitle ・ ${tracks.length}曲 ・ ${number.format(totalPlayCount)}回',
+                          '$subtitle ・ ${_trackCountLabel(context, tracks.length)} ・ ${_playCountLabel(context, totalPlayCount)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -1714,7 +1889,9 @@ class _TrackGroupSheet extends ConsumerWidget {
                     );
                   },
                   icon: const Icon(Icons.leaderboard_rounded),
-                  label: const Text('ランキング内の位置を見る'),
+                  label: Text(
+                    _t(context, 'Show position in ranking', 'ランキング内の位置を見る'),
+                  ),
                 ),
               ],
               const SizedBox(height: 14),
@@ -1747,7 +1924,6 @@ class _GroupTrackRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
     final artwork = ref.watch(trackArtworkProvider(track.id));
 
     return Material(
@@ -1804,7 +1980,7 @@ class _GroupTrackRow extends ConsumerWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                number.format(track.playCount),
+                _numberFormat(context).format(track.playCount),
                 style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -1918,9 +2094,15 @@ class _NowTrackCopy extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _TrackChip(icon: Icons.graphic_eq_rounded, label: '直近再生'),
+            _TrackChip(
+              icon: Icons.graphic_eq_rounded,
+              label: _t(context, 'Recent play', '直近再生'),
+            ),
             if (track.isCloudItem)
-              _TrackChip(icon: Icons.cloud_rounded, label: 'Cloud'),
+              _TrackChip(
+                icon: Icons.cloud_rounded,
+                label: _t(context, 'Cloud', 'クラウド'),
+              ),
           ],
         ),
         const SizedBox(height: 14),
@@ -2068,7 +2250,7 @@ class _PlaybackControls extends ConsumerWidget {
                       .read(playbackControllerProvider.notifier)
                       .skipToPrevious();
                 },
-          tooltip: 'Previous',
+          tooltip: _t(context, 'Previous', '前へ'),
           icon: const Icon(Icons.skip_previous_rounded),
         ),
         IconButton.filled(
@@ -2084,7 +2266,7 @@ class _PlaybackControls extends ConsumerWidget {
                       .read(playbackControllerProvider.notifier)
                       .playTrack(track.id);
                 },
-          tooltip: 'Play this track',
+          tooltip: _t(context, 'Play this track', 'この曲を再生'),
           icon: const Icon(Icons.play_arrow_rounded, size: 32),
         ),
         IconButton.filledTonal(
@@ -2093,7 +2275,7 @@ class _PlaybackControls extends ConsumerWidget {
               : () {
                   ref.read(playbackControllerProvider.notifier).pause();
                 },
-          tooltip: 'Pause',
+          tooltip: _t(context, 'Pause', '一時停止'),
           icon: const Icon(Icons.pause_rounded),
         ),
         IconButton.filledTonal(
@@ -2102,7 +2284,7 @@ class _PlaybackControls extends ConsumerWidget {
               : () {
                   ref.read(playbackControllerProvider.notifier).skipToNext();
                 },
-          tooltip: 'Next',
+          tooltip: _t(context, 'Next', '次へ'),
           icon: const Icon(Icons.skip_next_rounded),
         ),
       ],
@@ -2117,7 +2299,6 @@ class _TrackDetailsPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final number = NumberFormat.decimalPattern();
     final overview = ref
         .watch(musicStatsControllerProvider)
         .asData
@@ -2142,14 +2323,14 @@ class _TrackDetailsPanel extends ConsumerWidget {
       children: [
         _TrackDetailRow(
           icon: Icons.person_outline,
-          label: 'アーティスト',
+          label: _t(context, 'Artist', 'アーティスト'),
           value: track.artist,
           onTap: artistTracks.isEmpty
               ? null
               : () => _showTrackGroupSheet(
                   context,
                   title: track.artist,
-                  subtitle: 'アーティストの曲',
+                  subtitle: _t(context, 'Artist songs', 'アーティストの曲'),
                   icon: Icons.person_outline,
                   tracks: artistTracks,
                   rankingScope: RankingScope.artists,
@@ -2159,7 +2340,7 @@ class _TrackDetailsPanel extends ConsumerWidget {
         const SizedBox(height: 10),
         _TrackDetailRow(
           icon: Icons.album_outlined,
-          label: 'アルバム',
+          label: _t(context, 'Album', 'アルバム'),
           value: track.albumTitle,
           onTap: albumTracks.isEmpty
               ? null
@@ -2176,14 +2357,14 @@ class _TrackDetailsPanel extends ConsumerWidget {
         const SizedBox(height: 10),
         _TrackDetailRow(
           icon: Icons.mic_external_on_outlined,
-          label: 'アルバムアーティスト',
+          label: _t(context, 'Album artist', 'アルバムアーティスト'),
           value: albumArtist,
           onTap: albumArtistTracks.isEmpty
               ? null
               : () => _showTrackGroupSheet(
                   context,
                   title: albumArtist,
-                  subtitle: 'アルバムアーティストの曲',
+                  subtitle: _t(context, 'Album artist songs', 'アルバムアーティストの曲'),
                   icon: Icons.mic_external_on_outlined,
                   tracks: albumArtistTracks,
                   rankingScope: RankingScope.artists,
@@ -2197,8 +2378,8 @@ class _TrackDetailsPanel extends ConsumerWidget {
             final cards = [
               _TrackStatCard(
                 icon: Icons.play_arrow_outlined,
-                label: '再生回数',
-                value: '${number.format(track.playCount)} 回',
+                label: _t(context, 'Plays', '再生回数'),
+                value: _playCountLabel(context, track.playCount),
                 onTap: () => _focusTrackInRanking(
                   context,
                   ref,
@@ -2208,8 +2389,8 @@ class _TrackDetailsPanel extends ConsumerWidget {
               ),
               _TrackStatCard(
                 icon: Icons.fast_forward_outlined,
-                label: 'スキップ',
-                value: '${number.format(track.skipCount)} 回',
+                label: _t(context, 'Skips', 'スキップ'),
+                value: _skipCountLabel(context, track.skipCount),
                 onTap: () => _focusTrackInRanking(
                   context,
                   ref,
@@ -2238,27 +2419,27 @@ class _TrackDetailsPanel extends ConsumerWidget {
         const SizedBox(height: 10),
         _TrackDetailRow(
           icon: Icons.schedule_outlined,
-          label: '最後に再生した日',
-          value: _playedAtLabel(track.lastPlayedAt),
+          label: _t(context, 'Last played', '最後に再生した日'),
+          value: _playedAtLabel(context, track.lastPlayedAt),
         ),
         const SizedBox(height: 10),
         _TrackDetailRow(
           icon: Icons.timer_outlined,
-          label: '曲の長さ',
+          label: _t(context, 'Duration', '曲の長さ'),
           value: _durationLabel(track.duration),
         ),
         if (track.genre != null) ...[
           const SizedBox(height: 10),
           _TrackDetailRow(
             icon: Icons.category_outlined,
-            label: 'ジャンル',
+            label: _t(context, 'Genre', 'ジャンル'),
             value: track.genre!,
             onTap: genreTracks.isEmpty
                 ? null
                 : () => _showTrackGroupSheet(
                     context,
                     title: track.genre!,
-                    subtitle: 'ジャンルの曲',
+                    subtitle: _t(context, 'Genre songs', 'ジャンルの曲'),
                     icon: Icons.category_outlined,
                     tracks: genreTracks,
                   ),
@@ -2665,7 +2846,7 @@ class _OverviewPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     final topTrack = overview.topTracks.isEmpty
         ? null
         : overview.topTracks.first;
@@ -2723,13 +2904,13 @@ class _OverviewMain extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Total Plays',
+          _t(context, 'Total Plays', '総再生回数'),
           style: theme.textTheme.labelLarge?.copyWith(
             color: theme.colorScheme.primary,
             letterSpacing: 0,
@@ -2750,9 +2931,9 @@ class _OverviewMain extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          '${number.format(overview.totalTracks)} tracks - '
-          '${number.format(overview.totalArtists)} artists - '
-          '${number.format(overview.totalAlbums)} albums',
+          '${_trackCountLabel(context, overview.totalTracks)} ・ '
+          '${_artistCountLabel(context, overview.totalArtists)} ・ '
+          '${_albumCountLabel(context, overview.totalAlbums)}',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
@@ -2806,7 +2987,7 @@ class _TopTrackLine extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Top song',
+                    _t(context, 'Top song', 'トップ曲'),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
@@ -2846,9 +3027,21 @@ class _OverviewSignals extends StatelessWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
-        _SignalTile(icon: Icons.schedule, label: 'Hours', value: hours),
-        _SignalTile(icon: Icons.fast_forward, label: 'Skips', value: skips),
-        _SignalTile(icon: Icons.speed, label: 'Skip rate', value: skipRate),
+        _SignalTile(
+          icon: Icons.schedule,
+          label: _t(context, 'Hours', '時間'),
+          value: hours,
+        ),
+        _SignalTile(
+          icon: Icons.fast_forward,
+          label: _t(context, 'Skips', 'スキップ'),
+          value: skips,
+        ),
+        _SignalTile(
+          icon: Icons.speed,
+          label: _t(context, 'Skip rate', 'スキップ率'),
+          value: skipRate,
+        ),
       ],
     );
   }
@@ -2909,7 +3102,7 @@ class _SnapshotStatusPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     final latest = history.latest;
     final delta = history.latestDelta;
 
@@ -2931,12 +3124,23 @@ class _SnapshotStatusPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Daily snapshots', style: theme.textTheme.titleMedium),
+                  Text(
+                    _t(context, 'Daily snapshots', '日次スナップショット'),
+                    style: theme.textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 3),
                   Text(
                     isDemo
-                        ? 'Available after iOS Music access is granted.'
-                        : 'The first snapshot will be saved after the next scan.',
+                        ? _t(
+                            context,
+                            'Available after iOS Music access is granted.',
+                            'iOSミュージックへのアクセス許可後に利用できます。',
+                          )
+                        : _t(
+                            context,
+                            'The first snapshot will be saved after the next scan.',
+                            '次回のスキャン後に最初のスナップショットを保存します。',
+                          ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
@@ -2950,7 +3154,7 @@ class _SnapshotStatusPanel extends StatelessWidget {
       );
     }
 
-    final latestDate = DateFormat.yMMMd().add_Hm().format(latest.capturedAt);
+    final latestDate = _dateTimeFormat(context).format(latest.capturedAt);
     final observedDays = delta?.observedDays ?? 0;
     final topDeltas =
         delta?.trackDeltas.take(3).toList(growable: false) ??
@@ -2977,10 +3181,17 @@ class _SnapshotStatusPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Daily snapshots', style: theme.textTheme.titleMedium),
+                    Text(
+                      _t(context, 'Daily snapshots', '日次スナップショット'),
+                      style: theme.textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 3),
                     Text(
-                      'Last scan $latestDate - ${_snapshotSourceLabel(latest.source)}',
+                      _t(
+                        context,
+                        'Last scan $latestDate - ${_snapshotSourceLabel(context, latest.source)}',
+                        '最終スキャン $latestDate ・ ${_snapshotSourceLabel(context, latest.source)}',
+                      ),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -2989,7 +3200,9 @@ class _SnapshotStatusPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              _StatusPill(label: '${history.snapshotCount} days'),
+              _StatusPill(
+                label: _dayCountLabel(context, history.snapshotCount),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -2997,15 +3210,17 @@ class _SnapshotStatusPanel extends StatelessWidget {
             builder: (context, constraints) {
               final metrics = [
                 _SnapshotMetric(
-                  label: 'Window',
-                  value: observedDays <= 0 ? 'Baseline' : '$observedDays days',
+                  label: _t(context, 'Window', '期間'),
+                  value: observedDays <= 0
+                      ? _t(context, 'Baseline', '基準値')
+                      : _dayCountLabel(context, observedDays),
                 ),
                 _SnapshotMetric(
-                  label: 'New plays',
+                  label: _t(context, 'New plays', '増加再生'),
                   value: number.format(delta?.totalPlayDelta ?? 0),
                 ),
                 _SnapshotMetric(
-                  label: 'New skips',
+                  label: _t(context, 'New skips', '増加スキップ'),
                   value: number.format(delta?.totalSkipDelta ?? 0),
                 ),
               ];
@@ -3040,7 +3255,7 @@ class _SnapshotStatusPanel extends StatelessWidget {
           if (topDeltas.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
-              'Top gains since previous scan',
+              _t(context, 'Top gains since previous scan', '前回スキャンからの増加上位'),
               style: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w800,
@@ -3077,7 +3292,11 @@ class _SnapshotStatusPanel extends StatelessWidget {
           ] else if (delta != null) ...[
             const SizedBox(height: 12),
             Text(
-              'No play count changes were observed between the last two scans.',
+              _t(
+                context,
+                'No play count changes were observed between the last two scans.',
+                '直近2回のスキャン間で再生回数の変化はありませんでした。',
+              ),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
@@ -3133,26 +3352,26 @@ class _SummaryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     final values = [
       _SummaryValue(
         icon: Icons.person,
-        label: 'Artists',
+        label: _t(context, 'Artists', 'アーティスト'),
         value: number.format(overview.totalArtists),
       ),
       _SummaryValue(
         icon: Icons.album,
-        label: 'Albums',
+        label: _t(context, 'Albums', 'アルバム'),
         value: number.format(overview.totalAlbums),
       ),
       _SummaryValue(
         icon: Icons.music_note,
-        label: 'Tracks',
+        label: _t(context, 'Tracks', '曲'),
         value: number.format(overview.totalTracks),
       ),
       _SummaryValue(
         icon: Icons.schedule,
-        label: 'Hours',
+        label: _t(context, 'Hours', '時間'),
         value: _hoursLabel(overview.totalListeningSeconds),
       ),
     ];
@@ -3238,7 +3457,7 @@ class _OverviewInsightPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     final topArtist = overview.topArtists.isEmpty
         ? null
         : overview.topArtists.first;
@@ -3263,43 +3482,55 @@ class _OverviewInsightPanel extends StatelessWidget {
     final insights = [
       _OverviewInsightValue(
         icon: Icons.person_pin_rounded,
-        label: 'Favorite artist',
-        value: topArtist?.title ?? 'None',
+        label: _t(context, 'Favorite artist', 'よく聴くアーティスト'),
+        value: topArtist?.title ?? _t(context, 'None', 'なし'),
         detail: topArtist == null
-            ? 'No plays yet'
-            : '${number.format(topArtist.playCount)} plays',
+            ? _t(context, 'No plays yet', 'まだ再生がありません')
+            : _playCountLabel(context, topArtist.playCount),
       ),
       _OverviewInsightValue(
         icon: Icons.album_rounded,
-        label: 'Favorite album',
-        value: topAlbum?.title ?? 'None',
+        label: _t(context, 'Favorite album', 'よく聴くアルバム'),
+        value: topAlbum?.title ?? _t(context, 'None', 'なし'),
         detail: topAlbum == null
-            ? 'No plays yet'
-            : '${number.format(topAlbum.playCount)} plays',
+            ? _t(context, 'No plays yet', 'まだ再生がありません')
+            : _playCountLabel(context, topAlbum.playCount),
       ),
       _OverviewInsightValue(
         icon: Icons.history_rounded,
-        label: 'Recent 30d',
+        label: _t(context, 'Recent 30d', '直近30日'),
         value: number.format(recentTrackCount),
-        detail: _percentageDetail(recentTrackCount, overview.totalTracks),
+        detail: _percentageDetail(
+          context,
+          recentTrackCount,
+          overview.totalTracks,
+        ),
       ),
       _OverviewInsightValue(
         icon: Icons.radio_button_unchecked_rounded,
-        label: 'Unplayed',
+        label: _t(context, 'Unplayed', '未再生'),
         value: number.format(unplayedTrackCount),
-        detail: _percentageDetail(unplayedTrackCount, overview.totalTracks),
+        detail: _percentageDetail(
+          context,
+          unplayedTrackCount,
+          overview.totalTracks,
+        ),
       ),
       _OverviewInsightValue(
         icon: Icons.repeat_rounded,
-        label: 'Avg plays',
+        label: _t(context, 'Avg plays', '平均再生'),
         value: averagePlays.toStringAsFixed(1),
-        detail: 'per track',
+        detail: _t(context, 'per track', '1曲あたり'),
       ),
       _OverviewInsightValue(
         icon: Icons.cloud_rounded,
-        label: 'Cloud items',
+        label: _t(context, 'Cloud items', 'クラウド項目'),
         value: number.format(cloudTrackCount),
-        detail: _percentageDetail(cloudTrackCount, overview.totalTracks),
+        detail: _percentageDetail(
+          context,
+          cloudTrackCount,
+          overview.totalTracks,
+        ),
       ),
     ];
 
@@ -3314,8 +3545,12 @@ class _OverviewInsightPanel extends StatelessWidget {
         children: [
           _PanelHeading(
             icon: Icons.insights_rounded,
-            title: 'Listening insights',
-            subtitle: 'Different cuts of the current library scan',
+            title: _t(context, 'Listening insights', 'リスニング洞察'),
+            subtitle: _t(
+              context,
+              'Different cuts of the current library scan',
+              '現在のライブラリスキャンを複数の視点で表示',
+            ),
           ),
           const SizedBox(height: 14),
           LayoutBuilder(
@@ -3355,11 +3590,12 @@ class _OverviewBreakdownPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final artistRows = _rankingBreakdownRows(
+      context,
       overview.topArtists,
       theme.colorScheme.primary,
     );
-    final genreRows = _genreBreakdownRows(overview.tracks, theme);
-    final sourceRows = _sourceBreakdownRows(overview.tracks, theme);
+    final genreRows = _genreBreakdownRows(context, overview.tracks, theme);
+    final sourceRows = _sourceBreakdownRows(context, overview.tracks, theme);
 
     return GlassSurface(
       padding: const EdgeInsets.all(18),
@@ -3372,26 +3608,42 @@ class _OverviewBreakdownPanel extends StatelessWidget {
         children: [
           _PanelHeading(
             icon: Icons.bar_chart_rounded,
-            title: 'Library distribution',
-            subtitle: 'Where plays and tracks are concentrated',
+            title: _t(context, 'Library distribution', 'ライブラリ分布'),
+            subtitle: _t(
+              context,
+              'Where plays and tracks are concentrated',
+              '再生と曲数がどこに集中しているか',
+            ),
           ),
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
               final sections = [
                 _BreakdownSection(
-                  title: 'Top artists',
-                  emptyLabel: 'No artist play data yet.',
+                  title: _t(context, 'Top artists', '上位アーティスト'),
+                  emptyLabel: _t(
+                    context,
+                    'No artist play data yet.',
+                    'アーティスト別の再生データはまだありません。',
+                  ),
                   rows: artistRows,
                 ),
                 _BreakdownSection(
-                  title: 'Genres',
-                  emptyLabel: 'No genre metadata was returned.',
+                  title: _t(context, 'Genres', 'ジャンル'),
+                  emptyLabel: _t(
+                    context,
+                    'No genre metadata was returned.',
+                    'ジャンル情報は取得されていません。',
+                  ),
                   rows: genreRows,
                 ),
                 _BreakdownSection(
-                  title: 'Source',
-                  emptyLabel: 'No source data yet.',
+                  title: _t(context, 'Source', 'ソース'),
+                  emptyLabel: _t(
+                    context,
+                    'No source data yet.',
+                    'ソース情報はまだありません。',
+                  ),
                   rows: sourceRows,
                 ),
               ];
@@ -3708,7 +3960,7 @@ class _RankingPanel extends ConsumerWidget {
                       .refreshStats();
                 },
                 icon: const Icon(Icons.refresh),
-                tooltip: 'Refresh',
+                tooltip: _t(context, 'Refresh', '更新'),
               ),
             ],
           ),
@@ -3860,7 +4112,7 @@ class _LibrarySectionState extends State<_LibrarySection> {
     if (_mode == _LibraryBrowseMode.songs) {
       return tracks.length;
     }
-    return _libraryGroupsForMode(_mode, tracks, _sort).length;
+    return _libraryGroupsForMode(context, _mode, tracks, _sort).length;
   }
 
   @override
@@ -3874,7 +4126,7 @@ class _LibrarySectionState extends State<_LibrarySection> {
     final sortedTracks = _sortLibraryTracks(filteredTracks, _sort);
     final groups = _mode == _LibraryBrowseMode.songs
         ? const <_LibraryGroupEntry>[]
-        : _libraryGroupsForMode(_mode, filteredTracks, _sort);
+        : _libraryGroupsForMode(context, _mode, filteredTracks, _sort);
     final totalCount = _mode == _LibraryBrowseMode.songs
         ? sortedTracks.length
         : groups.length;
@@ -3945,7 +4197,7 @@ class _LibrarySearchPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     return GlassSurface(
       padding: const EdgeInsets.all(18),
       radius: 24,
@@ -4111,13 +4363,21 @@ class _LibraryTrackPanel extends StatelessWidget {
         children: [
           _PanelHeading(
             icon: Icons.queue_music_rounded,
-            title: 'Songs',
-            subtitle: 'Searchable track details with play controls',
+            title: _t(context, 'Songs', '曲'),
+            subtitle: _t(
+              context,
+              'Searchable track details with play controls',
+              '検索可能な曲詳細と再生コントロール',
+            ),
           ),
           const SizedBox(height: 12),
           if (totalCount == 0)
             Text(
-              'No songs matched the current search.',
+              _t(
+                context,
+                'No songs matched the current search.',
+                '現在の検索に一致する曲はありません。',
+              ),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
@@ -4149,7 +4409,7 @@ class _LibraryTrackRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final playback = ref.watch(playbackControllerProvider);
     final busy = playback.isLoading;
@@ -4208,7 +4468,10 @@ class _LibraryTrackRow extends ConsumerWidget {
                         ),
                         _MiniStatLabel(
                           icon: Icons.schedule_rounded,
-                          value: _shortPlayedAtLabel(track.lastPlayedAt),
+                          value: _shortPlayedAtLabel(
+                            context,
+                            track.lastPlayedAt,
+                          ),
                         ),
                       ],
                     ),
@@ -4224,7 +4487,7 @@ class _LibraryTrackRow extends ConsumerWidget {
                             .read(playbackControllerProvider.notifier)
                             .playTrack(track.id);
                       },
-                tooltip: 'Play',
+                tooltip: _t(context, 'Play', '再生'),
                 icon: const Icon(Icons.play_arrow_rounded),
               ),
             ],
@@ -4309,7 +4572,7 @@ class _LibraryGroupRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     final representative = group.representativeTrack;
     final artwork = representative == null
         ? const AsyncData<Uint8List?>(null)
@@ -4391,7 +4654,7 @@ class _LibraryGroupRow extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    '${group.trackCount} tracks',
+                    _trackCountLabel(context, group.trackCount),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
@@ -4444,7 +4707,7 @@ class _LibraryStatsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     return GlassSurface(
       padding: const EdgeInsets.all(18),
       radius: 24,
@@ -4453,21 +4716,21 @@ class _LibraryStatsPanel extends StatelessWidget {
         children: [
           Expanded(
             child: _InlineMetric(
-              label: 'Artists',
+              label: _t(context, 'Artists', 'アーティスト'),
               value: number.format(overview.totalArtists),
               icon: Icons.person,
             ),
           ),
           Expanded(
             child: _InlineMetric(
-              label: 'Albums',
+              label: _t(context, 'Albums', 'アルバム'),
               value: number.format(overview.totalAlbums),
               icon: Icons.album,
             ),
           ),
           Expanded(
             child: _InlineMetric(
-              label: 'Tracks',
+              label: _t(context, 'Tracks', '曲'),
               value: number.format(overview.totalTracks),
               icon: Icons.music_note,
             ),
@@ -4594,7 +4857,7 @@ class _EntryPanelState extends State<_EntryPanel> {
           const SizedBox(height: 14),
           if (widget.entries.isEmpty)
             Text(
-              'No entries yet.',
+              _t(context, 'No entries yet.', 'まだ項目がありません。'),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -4629,7 +4892,7 @@ class _CompactEntryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
@@ -4695,7 +4958,7 @@ class _LoadMoreButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     final remainingCount = totalCount - shownCount;
     final actualNextCount = _clampInt(nextCount, 0, remainingCount);
 
@@ -4705,7 +4968,11 @@ class _LoadMoreButton extends StatelessWidget {
         onPressed: remainingCount <= 0 ? null : onPressed,
         icon: const Icon(Icons.add_rounded),
         label: Text(
-          'さらに${number.format(actualNextCount)}件表示',
+          _t(
+            context,
+            'Show ${number.format(actualNextCount)} more',
+            'さらに${number.format(actualNextCount)}件表示',
+          ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -4762,7 +5029,7 @@ class _SettingsSection extends ConsumerWidget {
                 label: _t(context, 'Authorization', '認証状態'),
                 value: overview.isDemo
                     ? _t(context, 'Demo mode', 'デモモード')
-                    : stats.authorizationStatus.label,
+                    : _authorizationLabel(context, stats.authorizationStatus),
               ),
               _SettingsRow(
                 icon: Icons.storage,
@@ -4774,7 +5041,7 @@ class _SettingsSection extends ConsumerWidget {
               _SettingsRow(
                 icon: Icons.update,
                 label: _t(context, 'Snapshot', 'スナップショット'),
-                value: DateFormat.yMMMd().add_Hm().format(overview.generatedAt),
+                value: _dateTimeFormat(context).format(overview.generatedAt),
               ),
               const SizedBox(height: 16),
               Text(
@@ -4790,7 +5057,7 @@ class _SettingsSection extends ConsumerWidget {
                       .map(
                         (style) => ButtonSegment<SongBriefThemeStyle>(
                           value: style,
-                          label: Text(style.label),
+                          label: Text(_themeStyleLabel(context, style)),
                         ),
                       )
                       .toList(),
@@ -4804,7 +5071,7 @@ class _SettingsSection extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                selectedTheme.description,
+                _themeStyleDescription(context, selectedTheme),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
@@ -4824,7 +5091,7 @@ class _SettingsSection extends ConsumerWidget {
                       .map(
                         (language) => ButtonSegment<AppLanguage>(
                           value: language,
-                          label: Text(language.label),
+                          label: Text(_languageLabel(context, language)),
                         ),
                       )
                       .toList(),
@@ -4937,7 +5204,11 @@ Future<void> _openExternalUrl(BuildContext context, String url) async {
     return;
   }
 
-  messenger?.showSnackBar(SnackBar(content: Text('Could not open $url')));
+  messenger?.showSnackBar(
+    SnackBar(
+      content: Text(_t(context, 'Could not open $url', '$url を開けませんでした')),
+    ),
+  );
 }
 
 void _showLibrariesSheet(BuildContext context) {
@@ -4962,7 +5233,10 @@ class _LibrariesSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Libraries', style: theme.textTheme.titleLarge),
+            Text(
+              _t(context, 'Libraries', 'ライブラリ'),
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: 12),
             ..._usedLibraries.map(
               (library) => Padding(
@@ -5179,7 +5453,7 @@ class _RankingRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final number = NumberFormat.decimalPattern();
+    final number = _numberFormat(context);
     final ratio = maxPlayCount == 0 ? 0.0 : entry.playCount / maxPlayCount;
     final barColor = Color.lerp(
       theme.colorScheme.primary,
@@ -5267,9 +5541,9 @@ class _RankingRow extends ConsumerWidget {
                           const SizedBox(height: 2),
                           Text(
                             showLastPlayedAt && entry.lastPlayedAt != null
-                                ? DateFormat.yMMMd().add_Hm().format(
-                                    entry.lastPlayedAt!,
-                                  )
+                                ? _dateTimeFormat(
+                                    context,
+                                  ).format(entry.lastPlayedAt!)
                                 : entry.subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -5386,7 +5660,11 @@ class _EmptyLibraryPanel extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'No Music library songs were returned by iOS.',
+              _t(
+                context,
+                'No Music library songs were returned by iOS.',
+                'iOSからミュージックライブラリの曲が返されませんでした。',
+              ),
               style: theme.textTheme.bodyMedium,
             ),
           ),
@@ -5423,7 +5701,11 @@ class _ErrorState extends StatelessWidget {
               Icon(Icons.error_outline, color: theme.colorScheme.error),
               const SizedBox(height: 12),
               Text(
-                'Could not load the music library.',
+                _t(
+                  context,
+                  'Could not load the music library.',
+                  'ミュージックライブラリを読み込めませんでした。',
+                ),
                 style: theme.textTheme.titleMedium,
                 textAlign: TextAlign.center,
               ),
@@ -5599,14 +5881,16 @@ int _recentlyPlayedCount(List<LibraryTrack> tracks, Duration window) {
   }).length;
 }
 
-String _percentageDetail(int value, int total) {
+String _percentageDetail(BuildContext context, int value, int total) {
   if (total <= 0) {
-    return '0% of tracks';
+    return _t(context, '0% of tracks', '曲の0%');
   }
-  return '${(value / total * 100).toStringAsFixed(1)}% of tracks';
+  final percentage = (value / total * 100).toStringAsFixed(1);
+  return _t(context, '$percentage% of tracks', '曲の$percentage%');
 }
 
 List<_BreakdownValue> _rankingBreakdownRows(
+  BuildContext context,
   List<RankingEntry> entries,
   Color baseColor,
 ) {
@@ -5622,7 +5906,7 @@ List<_BreakdownValue> _rankingBreakdownRows(
       .map(
         (indexed) => _BreakdownValue(
           label: indexed.$2.title,
-          trailing: '${_compactNumber(indexed.$2.playCount)} plays',
+          trailing: _playCountLabel(context, indexed.$2.playCount),
           ratio: maxValue == 0 ? 0 : indexed.$2.playCount / maxValue,
           color: Color.lerp(baseColor, Colors.white, indexed.$1 * 0.08)!,
         ),
@@ -5631,6 +5915,7 @@ List<_BreakdownValue> _rankingBreakdownRows(
 }
 
 List<_BreakdownValue> _genreBreakdownRows(
+  BuildContext context,
   List<LibraryTrack> tracks,
   ThemeData theme,
 ) {
@@ -5646,7 +5931,7 @@ List<_BreakdownValue> _genreBreakdownRows(
           () => _LibraryGroupAccumulator(
             key: genre,
             title: genre,
-            subtitle: 'Genre',
+            subtitle: _t(context, 'Genre', 'ジャンル'),
             icon: Icons.category_rounded,
           ),
         )
@@ -5677,8 +5962,8 @@ List<_BreakdownValue> _genreBreakdownRows(
         return _BreakdownValue(
           label: indexed.$2.title,
           trailing: indexed.$2.playCount == 0
-              ? '${indexed.$2.trackCount} tracks'
-              : '${_compactNumber(indexed.$2.playCount)} plays',
+              ? _trackCountLabel(context, indexed.$2.trackCount)
+              : _playCountLabel(context, indexed.$2.playCount),
           ratio: maxValue == 0 ? 0 : value / maxValue,
           color: Color.lerp(
             theme.colorScheme.secondary,
@@ -5691,6 +5976,7 @@ List<_BreakdownValue> _genreBreakdownRows(
 }
 
 List<_BreakdownValue> _sourceBreakdownRows(
+  BuildContext context,
   List<LibraryTrack> tracks,
   ThemeData theme,
 ) {
@@ -5701,15 +5987,15 @@ List<_BreakdownValue> _sourceBreakdownRows(
   final cloudCount = tracks.where((track) => track.isCloudItem).length;
   final localCount = tracks.length - cloudCount;
   final rows = [
-    ('Local', localCount, theme.colorScheme.tertiary),
-    ('Cloud', cloudCount, theme.colorScheme.primary),
+    (_t(context, 'Local', 'ローカル'), localCount, theme.colorScheme.tertiary),
+    (_t(context, 'Cloud', 'クラウド'), cloudCount, theme.colorScheme.primary),
   ].where((row) => row.$2 > 0).toList(growable: false);
 
   return rows
       .map(
         (row) => _BreakdownValue(
           label: row.$1,
-          trailing: '${row.$2} tracks',
+          trailing: _trackCountLabel(context, row.$2),
           ratio: row.$2 / tracks.length,
           color: row.$3,
         ),
@@ -5774,6 +6060,7 @@ List<LibraryTrack> _sortLibraryTracks(
 }
 
 List<_LibraryGroupEntry> _libraryGroupsForMode(
+  BuildContext context,
   _LibraryBrowseMode mode,
   List<LibraryTrack> tracks,
   _LibrarySortMode sort,
@@ -5791,7 +6078,7 @@ List<_LibraryGroupEntry> _libraryGroupsForMode(
         () => _LibraryGroupAccumulator(
           key: track.artist,
           title: track.artist,
-          subtitle: 'Artist',
+          subtitle: _t(context, 'Artist', 'アーティスト'),
           icon: Icons.person_rounded,
           rankingScope: RankingScope.artists,
           rankingTitle: track.artist,
@@ -5816,7 +6103,7 @@ List<_LibraryGroupEntry> _libraryGroupsForMode(
                 () => _LibraryGroupAccumulator(
                   key: track.genre!,
                   title: track.genre!,
-                  subtitle: 'Genre',
+                  subtitle: _t(context, 'Genre', 'ジャンル'),
                   icon: Icons.category_rounded,
                 ),
               ),
@@ -6021,10 +6308,10 @@ String _hoursLabel(int listeningSeconds) {
   return hours.toStringAsFixed(1);
 }
 
-String _snapshotSourceLabel(String source) {
+String _snapshotSourceLabel(BuildContext context, String source) {
   return switch (source) {
-    'background' => 'background refresh',
-    _ => 'app scan',
+    'background' => _t(context, 'background refresh', 'バックグラウンド更新'),
+    _ => _t(context, 'app scan', 'アプリスキャン'),
   };
 }
 
@@ -6037,22 +6324,26 @@ String _durationLabel(Duration duration) {
   return '$minutes:$seconds';
 }
 
-String _playedAtLabel(DateTime? dateTime) {
+String _playedAtLabel(BuildContext context, DateTime? dateTime) {
   if (dateTime == null) {
-    return 'なし';
+    return _t(context, 'None', 'なし');
   }
-  return DateFormat('yyyy/MM/dd HH:mm').format(dateTime);
+  return _dateTimeFormat(context).format(dateTime);
 }
 
-String _shortPlayedAtLabel(DateTime? dateTime) {
+String _shortPlayedAtLabel(BuildContext context, DateTime? dateTime) {
   if (dateTime == null) {
-    return 'なし';
+    return _t(context, 'None', 'なし');
   }
   final now = DateTime.now();
   if (dateTime.year == now.year &&
       dateTime.month == now.month &&
       dateTime.day == now.day) {
-    return '今日 ${DateFormat('HH:mm').format(dateTime)}';
+    return _t(
+      context,
+      'Today ${DateFormat('HH:mm').format(dateTime)}',
+      '今日 ${DateFormat('HH:mm').format(dateTime)}',
+    );
   }
   return DateFormat('M/d').format(dateTime);
 }
@@ -6069,19 +6360,35 @@ List<int> _trendValues(LibraryTrack track, TrendRange range) {
       .toList(growable: false);
 }
 
-List<String> _trendLabels(TrendRange range) {
+List<String> _trendLabels(BuildContext context, TrendRange range) {
   return switch (range) {
-    TrendRange.week => const [
+    TrendRange.week => [
       '5/15',
       '5/16',
       '5/17',
       '5/18',
       '5/19',
       '5/20',
-      '今日',
+      _t(context, 'Today', '今日'),
     ],
-    TrendRange.month => const ['1週', '2週', '3週', '4週', '5週', '6週', '今週'],
-    TrendRange.year => const ['1月', '2月', '3月', '4月', '5月', '6月', '今月'],
+    TrendRange.month => [
+      _t(context, '1w', '1週'),
+      _t(context, '2w', '2週'),
+      _t(context, '3w', '3週'),
+      _t(context, '4w', '4週'),
+      _t(context, '5w', '5週'),
+      _t(context, '6w', '6週'),
+      _t(context, 'This week', '今週'),
+    ],
+    TrendRange.year => [
+      _t(context, 'Jan', '1月'),
+      _t(context, 'Feb', '2月'),
+      _t(context, 'Mar', '3月'),
+      _t(context, 'Apr', '4月'),
+      _t(context, 'May', '5月'),
+      _t(context, 'Jun', '6月'),
+      _t(context, 'This month', '今月'),
+    ],
   };
 }
 
@@ -6230,17 +6537,5 @@ String _sectionSubtitle(
       'Access and scan settings',
       'アクセスとスキャン設定',
     ),
-  };
-}
-
-// ignore: unused_element
-String _legacySectionSubtitle(HomeSection section, bool isDemo) {
-  final source = isDemo ? 'デモライブラリ' : 'Musicライブラリ';
-  return switch (section) {
-    HomeSection.playing => '$source の直近再生トラック',
-    HomeSection.overview => '$source の概要',
-    HomeSection.rankings => '$source のランキング',
-    HomeSection.library => '$source のブラウズ',
-    HomeSection.settings => 'アクセスとスキャン設定',
   };
 }
