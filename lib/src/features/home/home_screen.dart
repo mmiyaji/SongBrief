@@ -576,9 +576,7 @@ class _NowPlayingSection extends ConsumerWidget {
         _TrendPanel(track: track),
         if (recentTracks.length > 1) ...[
           const SizedBox(height: 14),
-          _RecentTracksPanel(
-            tracks: recentTracks.take(4).toList(growable: false),
-          ),
+          _RecentTracksPanel(tracks: recentTracks),
         ],
       ],
     );
@@ -1079,14 +1077,50 @@ class _TrendBars extends StatelessWidget {
   }
 }
 
-class _RecentTracksPanel extends ConsumerWidget {
+class _RecentTracksPanel extends ConsumerStatefulWidget {
   const _RecentTracksPanel({required this.tracks});
 
   final List<LibraryTrack> tracks;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_RecentTracksPanel> createState() => _RecentTracksPanelState();
+}
+
+class _RecentTracksPanelState extends ConsumerState<_RecentTracksPanel> {
+  static const _initialVisibleCount = 4;
+  static const _loadMoreCount = 4;
+
+  int _visibleCount = _initialVisibleCount;
+
+  @override
+  void didUpdateWidget(covariant _RecentTracksPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tracks != widget.tracks &&
+        _visibleCount > widget.tracks.length) {
+      _visibleCount = _clampInt(
+        _visibleCount,
+        _initialVisibleCount,
+        widget.tracks.length,
+      );
+    }
+  }
+
+  void _loadMore() {
+    setState(() {
+      _visibleCount = _clampInt(
+        _visibleCount + _loadMoreCount,
+        _initialVisibleCount,
+        widget.tracks.length,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final visibleTracks = widget.tracks
+        .take(_visibleCount)
+        .toList(growable: false);
     return GlassSurface(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
       radius: 26,
@@ -1119,7 +1153,16 @@ class _RecentTracksPanel extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          ...tracks.map((track) => _RecentTrackRow(track: track)),
+          ...visibleTracks.map((track) => _RecentTrackRow(track: track)),
+          if (visibleTracks.length < widget.tracks.length) ...[
+            const SizedBox(height: 8),
+            _LoadMoreButton(
+              shownCount: visibleTracks.length,
+              totalCount: widget.tracks.length,
+              nextCount: _loadMoreCount,
+              onPressed: _loadMore,
+            ),
+          ],
         ],
       ),
     );
@@ -2505,9 +2548,18 @@ class _RankingPanel extends ConsumerWidget {
     final scope = ref.watch(rankingScopeProvider);
     final entries = overview.entriesFor(scope);
     final focus = ref.watch(rankingFocusProvider);
+    final visibleCount = ref.watch(
+      rankingVisibleCountProvider.select(
+        (counts) => counts[scope] ?? RankingVisibleCountController.initialCount,
+      ),
+    );
     final theme = Theme.of(context);
     final scopedFocus = focus?.scope == scope ? focus : null;
-    final visibleEntries = _visibleRankingEntries(entries, scopedFocus);
+    final visibleEntries = _visibleRankingEntries(
+      entries,
+      scopedFocus,
+      visibleCount,
+    );
 
     return GlassSurface(
       padding: const EdgeInsets.all(18),
@@ -2599,6 +2651,19 @@ class _RankingPanel extends ConsumerWidget {
             showLastPlayedAt: scope == RankingScope.recent,
             focus: scopedFocus,
           ),
+          if (visibleEntries.length < entries.length) ...[
+            const SizedBox(height: 12),
+            _LoadMoreButton(
+              shownCount: visibleEntries.length,
+              totalCount: entries.length,
+              nextCount: RankingVisibleCountController.loadMoreCount,
+              onPressed: () {
+                ref
+                    .read(rankingVisibleCountProvider.notifier)
+                    .loadMore(scope, entries.length);
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -2625,7 +2690,7 @@ class _LibrarySection extends StatelessWidget {
           title: 'Recently Played',
           subtitle: 'Latest tracks returned by iOS',
           icon: Icons.history,
-          entries: overview.recentTracks.take(6).toList(growable: false),
+          entries: overview.recentTracks,
           showLastPlayedAt: true,
         ),
         const SizedBox(height: 14),
@@ -2633,7 +2698,7 @@ class _LibrarySection extends StatelessWidget {
           title: 'Top Albums',
           subtitle: 'Albums aggregated by play count',
           icon: Icons.album,
-          entries: overview.topAlbums.take(6).toList(growable: false),
+          entries: overview.topAlbums,
         ),
       ],
     );
@@ -2713,7 +2778,7 @@ class _InlineMetric extends StatelessWidget {
   }
 }
 
-class _EntryPanel extends StatelessWidget {
+class _EntryPanel extends StatefulWidget {
   const _EntryPanel({
     required this.title,
     required this.subtitle,
@@ -2729,8 +2794,44 @@ class _EntryPanel extends StatelessWidget {
   final bool showLastPlayedAt;
 
   @override
+  State<_EntryPanel> createState() => _EntryPanelState();
+}
+
+class _EntryPanelState extends State<_EntryPanel> {
+  static const _initialVisibleCount = 6;
+  static const _loadMoreCount = 6;
+
+  int _visibleCount = _initialVisibleCount;
+
+  @override
+  void didUpdateWidget(covariant _EntryPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entries != widget.entries &&
+        _visibleCount > widget.entries.length) {
+      _visibleCount = _clampInt(
+        _visibleCount,
+        _initialVisibleCount,
+        widget.entries.length,
+      );
+    }
+  }
+
+  void _loadMore() {
+    setState(() {
+      _visibleCount = _clampInt(
+        _visibleCount + _loadMoreCount,
+        _initialVisibleCount,
+        widget.entries.length,
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final visibleEntries = widget.entries
+        .take(_visibleCount)
+        .toList(growable: false);
     return GlassSurface(
       padding: const EdgeInsets.all(18),
       radius: 24,
@@ -2740,16 +2841,16 @@ class _EntryPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: theme.colorScheme.primary),
+              Icon(widget.icon, color: theme.colorScheme.primary),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: theme.textTheme.titleLarge),
+                    Text(widget.title, style: theme.textTheme.titleLarge),
                     const SizedBox(height: 2),
                     Text(
-                      subtitle,
+                      widget.subtitle,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -2761,21 +2862,31 @@ class _EntryPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          if (entries.isEmpty)
+          if (widget.entries.isEmpty)
             Text(
               'No entries yet.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             )
-          else
-            ...entries.indexed.map(
+          else ...[
+            ...visibleEntries.indexed.map(
               (indexed) => _CompactEntryRow(
                 rank: indexed.$1 + 1,
                 entry: indexed.$2,
-                showLastPlayedAt: showLastPlayedAt,
+                showLastPlayedAt: widget.showLastPlayedAt,
               ),
             ),
+            if (visibleEntries.length < widget.entries.length) ...[
+              const SizedBox(height: 8),
+              _LoadMoreButton(
+                shownCount: visibleEntries.length,
+                totalCount: widget.entries.length,
+                nextCount: _loadMoreCount,
+                onPressed: _loadMore,
+              ),
+            ],
+          ],
         ],
       ),
     );
@@ -2843,6 +2954,54 @@ class _CompactEntryRow extends StatelessWidget {
             style: theme.textTheme.labelLarge,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LoadMoreButton extends StatelessWidget {
+  const _LoadMoreButton({
+    required this.shownCount,
+    required this.totalCount,
+    required this.nextCount,
+    required this.onPressed,
+  });
+
+  final int shownCount;
+  final int totalCount;
+  final int nextCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final number = NumberFormat.decimalPattern();
+    final remainingCount = totalCount - shownCount;
+    final actualNextCount = _clampInt(nextCount, 0, remainingCount);
+
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: remainingCount <= 0 ? null : onPressed,
+        icon: const Icon(Icons.add_rounded),
+        label: Text(
+          'さらに${number.format(actualNextCount)}件表示',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: theme.colorScheme.primary,
+          side: BorderSide(
+            color: theme.colorScheme.primary.withValues(alpha: 0.28),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          textStyle: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ),
     );
   }
@@ -3541,18 +3700,24 @@ void _focusRankingEntry(
 List<RankingEntry> _visibleRankingEntries(
   List<RankingEntry> entries,
   RankingFocus? focus,
+  int requestedCount,
 ) {
-  const minimumVisibleEntries = 12;
+  final minimumVisibleEntries = RankingVisibleCountController.initialCount;
+  final baseVisibleCount = _clampInt(
+    requestedCount,
+    minimumVisibleEntries,
+    entries.length,
+  );
   if (focus == null) {
-    return entries.take(minimumVisibleEntries).toList(growable: false);
+    return entries.take(baseVisibleCount).toList(growable: false);
   }
 
   final focusIndex = entries.indexWhere(
     (entry) => _entryMatchesFocus(entry, focus),
   );
   final visibleCount = focusIndex < 0
-      ? minimumVisibleEntries
-      : _clampInt(focusIndex + 1, minimumVisibleEntries, entries.length);
+      ? baseVisibleCount
+      : _clampInt(focusIndex + 1, baseVisibleCount, entries.length);
   return entries.take(visibleCount).toList(growable: false);
 }
 

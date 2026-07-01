@@ -77,6 +77,11 @@ final rankingFocusProvider =
       RankingFocusController.new,
     );
 
+final rankingVisibleCountProvider =
+    NotifierProvider<RankingVisibleCountController, Map<RankingScope, int>>(
+      RankingVisibleCountController.new,
+    );
+
 final trendRangeProvider = NotifierProvider<TrendRangeController, TrendRange>(
   TrendRangeController.new,
 );
@@ -104,6 +109,42 @@ class RankingFocusController extends Notifier<RankingFocus?> {
 
   void clear() {
     state = null;
+  }
+}
+
+class RankingVisibleCountController extends Notifier<Map<RankingScope, int>> {
+  static const initialCount = 12;
+  static const loadMoreCount = 12;
+
+  @override
+  Map<RankingScope, int> build() {
+    return {for (final scope in RankingScope.values) scope: initialCount};
+  }
+
+  int countFor(RankingScope scope) {
+    return state[scope] ?? initialCount;
+  }
+
+  void loadMore(RankingScope scope, int totalCount) {
+    final current = countFor(scope);
+    state = {
+      ...state,
+      scope: _clamp(current + loadMoreCount, initialCount, totalCount),
+    };
+  }
+
+  void reset(RankingScope scope) {
+    state = {...state, scope: initialCount};
+  }
+
+  int _clamp(int value, int minimum, int maximum) {
+    if (value < minimum) {
+      return minimum;
+    }
+    if (value > maximum) {
+      return maximum;
+    }
+    return value;
   }
 }
 

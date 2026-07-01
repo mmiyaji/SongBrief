@@ -94,16 +94,18 @@ class LibraryOverview {
   LibraryOverview markTrackPlayed(String trackId) {
     var changed = false;
     final now = DateTime.now();
-    final updatedTracks = tracks.map((track) {
-      if (track.id != trackId) {
-        return track;
-      }
-      changed = true;
-      return track.copyWith(
-        playCount: track.playCount + 1,
-        lastPlayedAt: now,
-      );
-    }).toList(growable: false);
+    final updatedTracks = tracks
+        .map((track) {
+          if (track.id != trackId) {
+            return track;
+          }
+          changed = true;
+          return track.copyWith(
+            playCount: track.playCount + 1,
+            lastPlayedAt: now,
+          );
+        })
+        .toList(growable: false);
 
     if (!changed) {
       return this;
@@ -216,22 +218,14 @@ class LibraryOverview {
 
     return LibraryOverview(
       tracks: List.unmodifiable(tracks),
-      topTracks: List.unmodifiable(trackEntries.take(100)),
+      topTracks: List.unmodifiable(trackEntries),
       topArtists: List.unmodifiable(
-        _groupTracks(
-          tracks,
-          _artistKey,
-          RankingEntryKind.artist,
-        ).take(100),
+        _groupTracks(tracks, _artistKey, RankingEntryKind.artist),
       ),
       topAlbums: List.unmodifiable(
-        _groupTracks(
-          tracks,
-          _albumKey,
-          RankingEntryKind.album,
-        ).take(100),
+        _groupTracks(tracks, _albumKey, RankingEntryKind.album),
       ),
-      recentTracks: List.unmodifiable(recentEntries.take(100)),
+      recentTracks: List.unmodifiable(recentEntries),
       totalPlayCount: totalPlayCount,
       totalSkipCount: totalSkipCount,
       totalListeningSeconds: totalListeningSeconds,
