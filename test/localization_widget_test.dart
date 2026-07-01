@@ -89,7 +89,10 @@ const _expectedEnglish = <HomeSection, List<String>>{
     'Music Access',
     'Theme',
     'Language',
+    'Security',
+    'App Lock',
     'App Info',
+    'Licenses',
   ],
 };
 
@@ -98,7 +101,16 @@ const _expectedJapanese = <HomeSection, List<String>>{
   HomeSection.overview: ['概要', '総再生回数', '日次スナップショット', 'リスニング洞察', 'ライブラリ分布'],
   HomeSection.rankings: ['ランキング', 'トップ曲', '再生回数順', '曲', 'アーティスト', 'アルバム', '最近'],
   HomeSection.library: ['ライブラリ', '曲', 'プレイリスト', '検索可能な曲詳細と再生コントロール', '並び替え'],
-  HomeSection.settings: ['設定', 'ミュージックアクセス', 'テーマ', '言語', 'アプリ情報'],
+  HomeSection.settings: [
+    '設定',
+    'ミュージックアクセス',
+    'テーマ',
+    '言語',
+    'セキュリティ',
+    'アプリロック',
+    'アプリ情報',
+    'ライセンス',
+  ],
 };
 
 Future<void> _pumpSection(

@@ -11,6 +11,7 @@ import '../../domain/library_snapshot.dart';
 import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
+import '../../settings/app_lock.dart';
 import '../../settings/app_preferences.dart';
 import '../../theme/app_theme.dart';
 import 'home_controller.dart';
@@ -5190,6 +5191,7 @@ class _SettingsSection extends ConsumerWidget {
     final overview = stats.overview;
     final selectedTheme = ref.watch(themeStyleProvider);
     final selectedLanguage = ref.watch(appLanguageProvider);
+    final appLock = ref.watch(appLockControllerProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -5290,6 +5292,13 @@ class _SettingsSection extends ConsumerWidget {
               ),
               const SizedBox(height: 18),
               Text(
+                _t(context, 'Security', 'セキュリティ'),
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 10),
+              _AppLockSetting(lockState: appLock),
+              const SizedBox(height: 18),
+              Text(
                 _t(context, 'App Info', 'アプリ情報'),
                 style: theme.textTheme.titleMedium,
               ),
@@ -5303,11 +5312,6 @@ class _SettingsSection extends ConsumerWidget {
                 icon: Icons.sell_outlined,
                 label: _t(context, 'Version', 'バージョン'),
                 value: _appVersionLabel,
-              ),
-              _SettingsRow(
-                icon: Icons.extension_outlined,
-                label: _t(context, 'Libraries', 'ライブラリ'),
-                value: _librarySummaryLabel,
               ),
               _SettingsRow(
                 icon: Icons.privacy_tip_outlined,
@@ -5327,13 +5331,6 @@ class _SettingsSection extends ConsumerWidget {
                 runSpacing: 10,
                 alignment: WrapAlignment.end,
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _showLibrariesSheet(context);
-                    },
-                    icon: const Icon(Icons.inventory_2_outlined),
-                    label: Text(_t(context, 'Libraries', 'ライブラリ')),
-                  ),
                   OutlinedButton.icon(
                     onPressed: () {
                       showLicensePage(
@@ -5372,6 +5369,118 @@ class _SettingsSection extends ConsumerWidget {
   }
 }
 
+class _AppLockSetting extends ConsumerWidget {
+  const _AppLockSetting({required this.lockState});
+
+  final AsyncValue<AppLockState> lockState;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+
+    return lockState.when(
+      loading: () => _SettingsRow(
+        icon: Icons.lock_outline,
+        label: _t(context, 'App Lock', 'アプリロック'),
+        value: _t(context, 'Checking...', '確認中...'),
+      ),
+      error: (_, _) => _SettingsRow(
+        icon: Icons.lock_outline,
+        label: _t(context, 'App Lock', 'アプリロック'),
+        value: _t(context, 'Unavailable', '利用不可'),
+      ),
+      data: (state) {
+        final enabled = state.enabled;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              secondary: Icon(
+                enabled ? Icons.lock_rounded : Icons.lock_open_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              title: Text(
+                _t(context, 'App Lock', 'アプリロック'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              subtitle: Text(
+                state.supported
+                    ? _t(
+                        context,
+                        'Require device authentication when opening SongBrief.',
+                        'SongBriefを開くときに端末認証を要求します。',
+                      )
+                    : _t(
+                        context,
+                        'Available on devices with Face ID, Touch ID, or passcode authentication.',
+                        'Face ID、Touch ID、またはパスコード認証に対応した端末で利用できます。',
+                      ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              value: enabled,
+              onChanged: !state.supported || state.authenticating
+                  ? null
+                  : (value) {
+                      ref
+                          .read(appLockControllerProvider.notifier)
+                          .setEnabled(
+                            value,
+                            localizedReason: _t(
+                              context,
+                              'Enable SongBrief app lock.',
+                              'SongBriefのアプリロックを有効にします。',
+                            ),
+                          );
+                    },
+            ),
+            if (state.errorMessage != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                state.errorMessage == 'device_authentication_unavailable'
+                    ? _t(
+                        context,
+                        'Device authentication is not available.',
+                        '端末認証を利用できません。',
+                      )
+                    : _t(
+                        context,
+                        'Authentication was not completed.',
+                        '認証が完了しませんでした。',
+                      ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            if (enabled) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: state.authenticating
+                      ? null
+                      : () {
+                          ref.read(appLockControllerProvider.notifier).lock();
+                        },
+                  icon: const Icon(Icons.lock_rounded),
+                  label: Text(_t(context, 'Lock now', '今すぐロック')),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
 Future<void> _openExternalUrl(BuildContext context, String url) async {
   final uri = Uri.parse(url);
   final messenger = ScaffoldMessenger.maybeOf(context);
@@ -5394,58 +5503,6 @@ Future<void> _openExternalUrl(BuildContext context, String url) async {
       content: Text(_t(context, 'Could not open $url', '$url を開けませんでした')),
     ),
   );
-}
-
-void _showLibrariesSheet(BuildContext context) {
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (context) => const _LibrariesSheet(),
-  );
-}
-
-class _LibrariesSheet extends StatelessWidget {
-  const _LibrariesSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _t(context, 'Libraries', 'ライブラリ'),
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            ..._usedLibraries.map(
-              (library) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(library, style: theme.textTheme.bodyMedium),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _SettingsRow extends StatelessWidget {
@@ -6502,22 +6559,6 @@ class _SummaryValue {
 }
 
 const _appVersionLabel = '1.0.0+1';
-
-const _librarySummaryLabel = 'Flutter, Riverpod, fl_chart, intl';
-
-const _usedLibraries = <String>[
-  'Flutter',
-  'flutter_riverpod',
-  'fl_chart',
-  'intl',
-  'liquid_glass_renderer',
-  'shared_preferences',
-  'url_launcher',
-  'cupertino_icons',
-  'flutter_lints',
-  'flutter_native_splash',
-  'flutter_launcher_icons',
-];
 
 String _hoursLabel(int listeningSeconds) {
   final hours = listeningSeconds / 3600;
