@@ -352,7 +352,7 @@ class _BottomTabs extends ConsumerWidget {
   }
 }
 
-class _MobilePlaybackChrome extends StatelessWidget {
+class _MobilePlaybackChrome extends ConsumerWidget {
   const _MobilePlaybackChrome({
     required this.stats,
     required this.selectedSection,
@@ -362,9 +362,11 @@ class _MobilePlaybackChrome extends StatelessWidget {
   final HomeSection selectedSection;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final track = stats.overview.latestTrack;
+    final playback = ref.watch(playbackControllerProvider);
+    final activeTrack = stats.overview.trackById(playback.activeTrackId);
+    final track = activeTrack ?? stats.overview.latestTrack;
     return SafeArea(
       top: false,
       child: Padding(
@@ -424,7 +426,9 @@ class _MiniPlayerBar extends ConsumerWidget {
     final theme = Theme.of(context);
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final playback = ref.watch(playbackControllerProvider);
-    final busy = playback.isLoading;
+    final busy = playback.isBusy;
+    final isActive = playback.isTrackActive(track.id);
+    final isPlaying = playback.isTrackPlaying(track.id);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -439,14 +443,36 @@ class _MiniPlayerBar extends ConsumerWidget {
             _MiniArtwork(track: track, artwork: artwork),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                track.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.w800,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    track.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (isActive) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      isPlaying
+                          ? _t(context, 'Playing now', '再生中')
+                          : _t(context, 'Paused', '一時停止中'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: isPlaying
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             IconButton(
@@ -455,10 +481,14 @@ class _MiniPlayerBar extends ConsumerWidget {
                   : () {
                       ref
                           .read(playbackControllerProvider.notifier)
-                          .playTrack(track.id);
+                          .toggleTrack(track.id);
                     },
-              tooltip: _t(context, 'Play', '再生'),
-              icon: const Icon(Icons.play_arrow_rounded),
+              tooltip: isPlaying
+                  ? _t(context, 'Pause', '一時停止')
+                  : _t(context, 'Play', '再生'),
+              icon: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              ),
             ),
             IconButton(
               onPressed: busy
@@ -845,7 +875,9 @@ class _HeroTrackPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final playback = ref.watch(playbackControllerProvider);
-    final busy = playback.isLoading;
+    final busy = playback.isBusy;
+    final isActive = playback.isTrackActive(track.id);
+    final isPlaying = playback.isTrackPlaying(track.id);
     final number = _numberFormat(context);
 
     return GlassSurface(
@@ -866,10 +898,12 @@ class _HeroTrackPanel extends ConsumerWidget {
                     artwork: artwork,
                     number: number,
                     busy: busy,
-                    onPlay: () {
+                    isActive: isActive,
+                    isPlaying: isPlaying,
+                    onTogglePlayback: () {
                       ref
                           .read(playbackControllerProvider.notifier)
-                          .playTrack(track.id);
+                          .toggleTrack(track.id);
                     },
                   );
                 }
@@ -904,10 +938,17 @@ class _HeroTrackPanel extends ConsumerWidget {
                               : () {
                                   ref
                                       .read(playbackControllerProvider.notifier)
-                                      .playTrack(track.id);
+                                      .toggleTrack(track.id);
                                 },
-                          tooltip: _t(context, 'Play this track', 'この曲を再生'),
-                          icon: const Icon(Icons.play_arrow_rounded, size: 28),
+                          tooltip: isPlaying
+                              ? _t(context, 'Pause', '一時停止')
+                              : _t(context, 'Play this track', 'この曲を再生'),
+                          icon: Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: 28,
+                          ),
                         ),
                       ),
                       Positioned(
@@ -946,6 +987,13 @@ class _HeroTrackPanel extends ConsumerWidget {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
+                                  if (isActive) ...[
+                                    const SizedBox(height: 10),
+                                    _PlaybackStatusChip(
+                                      isPlaying: isPlaying,
+                                      onDark: true,
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -990,14 +1038,18 @@ class _HeroTrackWideHeader extends StatelessWidget {
     required this.artwork,
     required this.number,
     required this.busy,
-    required this.onPlay,
+    required this.isActive,
+    required this.isPlaying,
+    required this.onTogglePlayback,
   });
 
   final LibraryTrack track;
   final AsyncValue<Uint8List?> artwork;
   final NumberFormat number;
   final bool busy;
-  final VoidCallback onPlay;
+  final bool isActive;
+  final bool isPlaying;
+  final VoidCallback onTogglePlayback;
 
   @override
   Widget build(BuildContext context) {
@@ -1047,6 +1099,7 @@ class _HeroTrackWideHeader extends StatelessWidget {
                           icon: Icons.graphic_eq_rounded,
                           label: _t(context, 'Recent play', '直近再生'),
                         ),
+                        if (isActive) _PlaybackStatusChip(isPlaying: isPlaying),
                         if (track.isCloudItem)
                           _TrackChip(
                             icon: Icons.cloud_rounded,
@@ -1097,9 +1150,16 @@ class _HeroTrackWideHeader extends StatelessWidget {
                             foregroundColor: Colors.black,
                             minimumSize: const Size.square(54),
                           ),
-                          onPressed: busy ? null : onPlay,
-                          tooltip: _t(context, 'Play this track', 'この曲を再生'),
-                          icon: const Icon(Icons.play_arrow_rounded, size: 31),
+                          onPressed: busy ? null : onTogglePlayback,
+                          tooltip: isPlaying
+                              ? _t(context, 'Pause', '一時停止')
+                              : _t(context, 'Play this track', 'この曲を再生'),
+                          icon: Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: 31,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Column(
@@ -1190,6 +1250,64 @@ class _SmallMetricPill extends StatelessWidget {
             color: theme.colorScheme.primary,
             fontWeight: FontWeight.w900,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaybackStatusChip extends StatelessWidget {
+  const _PlaybackStatusChip({required this.isPlaying, this.onDark = false});
+
+  final bool isPlaying;
+  final bool onDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final activeColor = isPlaying
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+    final darkColor = isPlaying
+        ? theme.colorScheme.primary
+        : Colors.white.withValues(alpha: 0.78);
+    final foreground = onDark ? darkColor : activeColor;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: onDark
+            ? Colors.black.withValues(alpha: 0.42)
+            : theme.colorScheme.primary.withValues(
+                alpha: isPlaying ? 0.14 : 0.08,
+              ),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: foreground.withValues(alpha: onDark ? 0.42 : 0.28),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPlaying
+                  ? Icons.graphic_eq_rounded
+                  : Icons.pause_circle_outline_rounded,
+              size: 16,
+              color: foreground,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isPlaying
+                  ? _t(context, 'Playing now', '再生中')
+                  : _t(context, 'Paused', '一時停止中'),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1677,6 +1795,8 @@ class _TrackActionSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final playback = ref.watch(playbackControllerProvider);
+    final isPlaying = playback.isTrackPlaying(track.id);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       child: Column(
@@ -1693,12 +1813,22 @@ class _TrackActionSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              ref.read(playbackControllerProvider.notifier).playTrack(track.id);
-            },
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: Text(_t(context, 'Play', '再生')),
+            onPressed: playback.isBusy
+                ? null
+                : () {
+                    Navigator.of(context).pop();
+                    ref
+                        .read(playbackControllerProvider.notifier)
+                        .toggleTrack(track.id);
+                  },
+            icon: Icon(
+              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            ),
+            label: Text(
+              isPlaying
+                  ? _t(context, 'Pause', '一時停止')
+                  : _t(context, 'Play', '再生'),
+            ),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
@@ -2235,13 +2365,16 @@ class _PlaybackControls extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final state = ref.watch(playbackControllerProvider);
-    final busy = state.isLoading;
+    final busy = state.isBusy;
+    final isActive = state.isTrackActive(track.id);
+    final isPlaying = state.isTrackPlaying(track.id);
 
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        if (isActive) _PlaybackStatusChip(isPlaying: isPlaying),
         IconButton.filledTonal(
           onPressed: busy
               ? null
@@ -2264,13 +2397,18 @@ class _PlaybackControls extends ConsumerWidget {
               : () {
                   ref
                       .read(playbackControllerProvider.notifier)
-                      .playTrack(track.id);
+                      .toggleTrack(track.id);
                 },
-          tooltip: _t(context, 'Play this track', 'この曲を再生'),
-          icon: const Icon(Icons.play_arrow_rounded, size: 32),
+          tooltip: isPlaying
+              ? _t(context, 'Pause', '一時停止')
+              : _t(context, 'Play this track', 'この曲を再生'),
+          icon: Icon(
+            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            size: 32,
+          ),
         ),
         IconButton.filledTonal(
-          onPressed: busy
+          onPressed: busy || !state.isPlaying
               ? null
               : () {
                   ref.read(playbackControllerProvider.notifier).pause();
@@ -4412,7 +4550,8 @@ class _LibraryTrackRow extends ConsumerWidget {
     final number = _numberFormat(context);
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final playback = ref.watch(playbackControllerProvider);
-    final busy = playback.isLoading;
+    final busy = playback.isBusy;
+    final isPlaying = playback.isTrackPlaying(track.id);
 
     return Material(
       color: Colors.transparent,
@@ -4485,10 +4624,14 @@ class _LibraryTrackRow extends ConsumerWidget {
                     : () {
                         ref
                             .read(playbackControllerProvider.notifier)
-                            .playTrack(track.id);
+                            .toggleTrack(track.id);
                       },
-                tooltip: _t(context, 'Play', '再生'),
-                icon: const Icon(Icons.play_arrow_rounded),
+                tooltip: isPlaying
+                    ? _t(context, 'Pause', '一時停止')
+                    : _t(context, 'Play', '再生'),
+                icon: Icon(
+                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                ),
               ),
             ],
           ),

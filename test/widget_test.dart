@@ -29,6 +29,24 @@ void main() {
     expect(find.text('最近再生した曲'), findsOneWidget);
     expect(find.text('デモ'), findsOneWidget);
   });
+
+  testWidgets('shows playback feedback and allows pausing from the player', (
+    tester,
+  ) async {
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Play this track').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Playing now'), findsWidgets);
+    expect(find.byTooltip('Pause'), findsWidgets);
+
+    await tester.tap(find.byTooltip('Pause').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paused'), findsWidgets);
+  });
 }
 
 Future<void> _pumpApp(WidgetTester tester, AppLanguage language) {

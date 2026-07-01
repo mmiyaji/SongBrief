@@ -172,7 +172,44 @@ final trackArtworkProvider = FutureProvider.family<Uint8List?, String>((
 });
 
 final playbackControllerProvider =
-    AsyncNotifierProvider<PlaybackController, void>(PlaybackController.new);
+    NotifierProvider<PlaybackController, PlaybackState>(PlaybackController.new);
+
+class PlaybackState {
+  const PlaybackState({
+    this.activeTrackId,
+    this.isPlaying = false,
+    this.isBusy = false,
+    this.errorMessage,
+  });
+
+  final String? activeTrackId;
+  final bool isPlaying;
+  final bool isBusy;
+  final String? errorMessage;
+
+  bool get hasActiveTrack => activeTrackId != null;
+
+  bool isTrackActive(String trackId) => activeTrackId == trackId;
+
+  bool isTrackPlaying(String trackId) => isPlaying && isTrackActive(trackId);
+
+  PlaybackState copyWith({
+    String? activeTrackId,
+    bool keepActiveTrack = true,
+    bool? isPlaying,
+    bool? isBusy,
+    String? errorMessage,
+  }) {
+    return PlaybackState(
+      activeTrackId: keepActiveTrack
+          ? activeTrackId ?? this.activeTrackId
+          : activeTrackId,
+      isPlaying: isPlaying ?? this.isPlaying,
+      isBusy: isBusy ?? this.isBusy,
+      errorMessage: errorMessage,
+    );
+  }
+}
 
 class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   @override
@@ -227,53 +264,84 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   }
 }
 
-class PlaybackController extends AsyncNotifier<void> {
+class PlaybackController extends Notifier<PlaybackState> {
   @override
-  Future<void> build() async {}
-
-  Future<void> playTrack(String trackId) {
-    return _run(
-      (repository) => repository.playTrack(trackId),
-      playedTrackId: trackId,
-    );
+  PlaybackState build() {
+    return const PlaybackState();
   }
 
-  Future<void> play() {
-    return _run((repository) => repository.play());
+  Future<void> playTrack(String trackId) async {
+    final previous = state;
+    state = PlaybackState(activeTrackId: trackId, isBusy: true);
+    try {
+      await ref.read(musicStatsRepositoryProvider).playTrack(trackId);
+      state = PlaybackState(activeTrackId: trackId, isPlaying: true);
+      await ref
+          .read(musicStatsControllerProvider.notifier)
+          .markTrackPlayed(trackId);
+    } on Object catch (error) {
+      state = previous.copyWith(isBusy: false, errorMessage: error.toString());
+    }
   }
 
-  Future<void> pause() {
-    return _run((repository) => repository.pause());
+  Future<void> toggleTrack(String trackId) {
+    if (state.isTrackPlaying(trackId)) {
+      return pause();
+    }
+    return playTrack(trackId);
+  }
+
+  Future<void> play() async {
+    final previous = state;
+    state = previous.copyWith(isBusy: true);
+    try {
+      await ref.read(musicStatsRepositoryProvider).play();
+      state = previous.copyWith(
+        isPlaying: previous.hasActiveTrack,
+        isBusy: false,
+      );
+    } on Object catch (error) {
+      state = previous.copyWith(isBusy: false, errorMessage: error.toString());
+    }
+  }
+
+  Future<void> pause() async {
+    final previous = state;
+    state = previous.copyWith(isBusy: true);
+    try {
+      await ref.read(musicStatsRepositoryProvider).pause();
+      state = previous.copyWith(isPlaying: false, isBusy: false);
+    } on Object catch (error) {
+      state = previous.copyWith(isBusy: false, errorMessage: error.toString());
+    }
   }
 
   Future<void> skipToNext() {
-    return _run((repository) => repository.skipToNext());
+    return _runTransport((repository) => repository.skipToNext());
   }
 
   Future<void> skipToPrevious() {
-    return _run((repository) => repository.skipToPrevious());
+    return _runTransport((repository) => repository.skipToPrevious());
   }
 
-  Future<void> _run(
+  Future<void> _runTransport(
     Future<void> Function(MusicStatsRepository repository) action, {
-    String? playedTrackId,
+    bool keepPlaying = true,
   }) async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => action(ref.read(musicStatsRepositoryProvider)),
-    );
-    if (state.hasError) {
-      return;
-    }
-    if (playedTrackId != null) {
+    final previous = state;
+    state = previous.copyWith(isBusy: true);
+    try {
+      await action(ref.read(musicStatsRepositoryProvider));
+      state = previous.copyWith(
+        isPlaying: previous.isPlaying && keepPlaying,
+        isBusy: false,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       await ref
           .read(musicStatsControllerProvider.notifier)
-          .markTrackPlayed(playedTrackId);
-      return;
+          .refreshStatsSilently();
+    } on Object catch (error) {
+      state = previous.copyWith(isBusy: false, errorMessage: error.toString());
     }
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    await ref
-        .read(musicStatsControllerProvider.notifier)
-        .refreshStatsSilently();
   }
 }
