@@ -494,22 +494,6 @@ class _MiniPlayerBar extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         child: Row(
           children: [
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () {
-                  ref
-                      .read(homeSectionProvider.notifier)
-                      .setSection(HomeSection.playing);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: _MiniArtwork(track: track, artwork: artwork),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
             Expanded(
               child: Material(
                 color: Colors.transparent,
@@ -523,36 +507,47 @@ class _MiniPlayerBar extends ConsumerWidget {
                           .setSection(HomeSection.playing);
                     },
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 2,
+                        vertical: 2,
+                      ),
+                      child: Row(
                         children: [
-                          Text(
-                            track.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: theme.colorScheme.onSurface,
-                              fontWeight: FontWeight.w800,
+                          _MiniArtwork(track: track, artwork: artwork),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  track.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                if (isActive) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isPlaying
+                                        ? _t(context, 'Playing now', '再生中')
+                                        : _t(context, 'Paused', '一時停止中'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: isPlaying
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                          if (isActive) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              isPlaying
-                                  ? _t(context, 'Playing now', '再生中')
-                                  : _t(context, 'Paused', '一時停止中'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: isPlaying
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
