@@ -3409,16 +3409,27 @@ class _SignalTile extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 118),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.36),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.78,
+          ),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+          border: Border.all(
+            color: theme.colorScheme.primary.withValues(alpha: 0.22),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.16),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 18, color: theme.colorScheme.secondary),
+              Icon(icon, size: 18, color: theme.colorScheme.primary),
               const SizedBox(height: 10),
               Text(value, style: theme.textTheme.titleLarge),
               const SizedBox(height: 2),
