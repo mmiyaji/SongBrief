@@ -448,39 +448,70 @@ class _MiniPlayerBar extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         child: Row(
           children: [
-            _MiniArtwork(track: track, artwork: artwork),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  ref
+                      .read(homeSectionProvider.notifier)
+                      .setSection(HomeSection.playing);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: _MiniArtwork(track: track, artwork: artwork),
+                ),
+              ),
+            ),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    track.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  if (isActive) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      isPlaying
-                          ? _t(context, 'Playing now', '再生中')
-                          : _t(context, 'Paused', '一時停止中'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: isPlaying
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w800,
+              child: Material(
+                color: Colors.transparent,
+                child: Tooltip(
+                  message: _t(context, 'Open current track', '再生中の曲を開く'),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      ref
+                          .read(homeSectionProvider.notifier)
+                          .setSection(HomeSection.playing);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            track.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (isActive) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              isPlaying
+                                  ? _t(context, 'Playing now', '再生中')
+                                  : _t(context, 'Paused', '一時停止中'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: isPlaying
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  ],
-                ],
+                  ),
+                ),
               ),
             ),
             IconButton(
@@ -836,7 +867,9 @@ class _NowPlayingSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = stats.overview;
-    final track = overview.latestTrack;
+    final playback = ref.watch(playbackControllerProvider);
+    final activeTrack = overview.trackById(playback.activeTrackId);
+    final track = activeTrack ?? overview.latestTrack;
 
     if (track == null) {
       return Column(
@@ -864,11 +897,60 @@ class _NowPlayingSection extends ConsumerWidget {
         _HeroTrackPanel(track: track, artwork: artwork),
         const SizedBox(height: 14),
         _TrendPanel(track: track),
+        const SizedBox(height: 14),
+        _NowPlayingLyricsPanel(track: track),
         if (recentTracks.length > 1) ...[
           const SizedBox(height: 14),
           _RecentTracksPanel(tracks: recentTracks),
         ],
       ],
+    );
+  }
+}
+
+class _NowPlayingLyricsPanel extends StatelessWidget {
+  const _NowPlayingLyricsPanel({required this.track});
+
+  final LibraryTrack track;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lyrics = track.lyrics?.trim();
+
+    return GlassSurface(
+      padding: const EdgeInsets.all(18),
+      radius: 24,
+      tint: const Color(0x22FFFFFF),
+      borderOpacity: 0.12,
+      shadowOpacity: 0.08,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _TrackContextTitle(
+            icon: Icons.lyrics_outlined,
+            title: _t(context, 'Lyrics', '歌詞'),
+          ),
+          const SizedBox(height: 12),
+          if (lyrics == null || lyrics.isEmpty)
+            _TrackContextEmptyText(
+              text: _t(
+                context,
+                'No local lyrics were found for this song.',
+                'この曲のローカル歌詞は見つかりませんでした。',
+              ),
+            )
+          else
+            SelectableText(
+              lyrics,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                height: 1.55,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

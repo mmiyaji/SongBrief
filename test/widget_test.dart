@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:songbrief/src/app.dart';
@@ -12,6 +14,8 @@ void main() {
     expect(find.text('Skyline Echo'), findsWidgets);
     expect(find.text('Plays'), findsWidgets);
     expect(find.text('This week trend'), findsOneWidget);
+    expect(find.text('Lyrics'), findsOneWidget);
+    expect(find.textContaining('City lights are waking slow'), findsOneWidget);
     expect(find.text('Recently played songs'), findsOneWidget);
     expect(find.text('Demo'), findsOneWidget);
   });
@@ -46,6 +50,27 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Paused'), findsWidgets);
+  });
+
+  testWidgets('opens the playing tab from the mini player', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Rankings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Top Songs'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Open current track'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('This week trend'), findsOneWidget);
+    expect(find.text('Lyrics'), findsOneWidget);
   });
 }
 

@@ -23,6 +23,6 @@ void main() {
 
     expect(find.text('Late Night Focus'), findsOneWidget);
     expect(find.text('Recently Played'), findsOneWidget);
-    expect(find.textContaining('City lights are waking slow'), findsOneWidget);
+    expect(find.textContaining('City lights are waking slow'), findsWidgets);
   });
 }
