@@ -4694,14 +4694,24 @@ class _RankingPanel extends ConsumerWidget {
                   return BorderSide(
                     color: selected
                         ? theme.colorScheme.primary.withValues(alpha: 0.55)
-                        : theme.colorScheme.outlineVariant,
+                        : theme.colorScheme.outlineVariant.withValues(
+                            alpha: 0.48,
+                          ),
                   );
                 }),
                 backgroundColor: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.selected)) {
-                    return theme.colorScheme.primary.withValues(alpha: 0.12);
+                    return theme.colorScheme.primary.withValues(alpha: 0.18);
                   }
-                  return Colors.white.withValues(alpha: 0.22);
+                  return theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.72,
+                  );
+                }),
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return theme.colorScheme.primary;
+                  }
+                  return theme.colorScheme.onSurfaceVariant;
                 }),
               ),
               segments: RankingScope.values
