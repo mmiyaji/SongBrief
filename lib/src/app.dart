@@ -15,6 +15,7 @@ class SongBriefApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeStyle = ref.watch(themeStyleProvider);
+    final themeBrightness = ref.watch(themeBrightnessProvider);
     final appLanguage = ref.watch(appLanguageProvider);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -26,7 +27,15 @@ class SongBriefApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
-      theme: buildSongBriefTheme(style: themeStyle),
+      theme: buildSongBriefTheme(
+        style: themeStyle,
+        brightness: Brightness.light,
+      ),
+      darkTheme: buildSongBriefTheme(
+        style: themeStyle,
+        brightness: Brightness.dark,
+      ),
+      themeMode: themeBrightness.themeMode,
       home: const AppLockGate(child: HomeScreen()),
     );
   }

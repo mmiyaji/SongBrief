@@ -31,9 +31,28 @@ enum SongBriefThemeStyle {
   }
 }
 
+enum SongBriefThemeBrightness {
+  dark,
+  light,
+  system;
+
+  ThemeMode get themeMode {
+    return switch (this) {
+      SongBriefThemeBrightness.dark => ThemeMode.dark,
+      SongBriefThemeBrightness.light => ThemeMode.light,
+      SongBriefThemeBrightness.system => ThemeMode.system,
+    };
+  }
+}
+
 final themeStyleProvider =
     NotifierProvider<ThemeStyleController, SongBriefThemeStyle>(
       ThemeStyleController.new,
+    );
+
+final themeBrightnessProvider =
+    NotifierProvider<ThemeBrightnessController, SongBriefThemeBrightness>(
+      ThemeBrightnessController.new,
     );
 
 class ThemeStyleController extends Notifier<SongBriefThemeStyle> {
@@ -47,16 +66,31 @@ class ThemeStyleController extends Notifier<SongBriefThemeStyle> {
   }
 }
 
-ThemeData buildSongBriefTheme({required SongBriefThemeStyle style}) {
-  final tokens = _ThemeTokens.forStyle(style);
+class ThemeBrightnessController extends Notifier<SongBriefThemeBrightness> {
+  @override
+  SongBriefThemeBrightness build() {
+    return SongBriefThemeBrightness.dark;
+  }
+
+  void setBrightness(SongBriefThemeBrightness brightness) {
+    state = brightness;
+  }
+}
+
+ThemeData buildSongBriefTheme({
+  required SongBriefThemeStyle style,
+  required Brightness brightness,
+}) {
+  final tokens = _ThemeTokens.forStyle(style, brightness);
   final scheme =
       ColorScheme.fromSeed(
         seedColor: tokens.primary,
-        brightness: Brightness.dark,
+        brightness: brightness,
       ).copyWith(
         surface: tokens.surface,
         surfaceContainerHighest: tokens.surfaceHigh,
         primary: tokens.primary,
+        onPrimary: tokens.onPrimary,
         secondary: tokens.secondary,
         tertiary: tokens.tertiary,
         onSurface: tokens.onSurface,
@@ -79,7 +113,7 @@ ThemeData buildSongBriefTheme({required SongBriefThemeStyle style}) {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        foregroundColor: Colors.white,
+        foregroundColor: tokens.onPrimary,
         backgroundColor: tokens.primary,
       ),
     ),
@@ -121,6 +155,7 @@ class _ThemeTokens {
     required this.surface,
     required this.surfaceHigh,
     required this.primary,
+    required this.onPrimary,
     required this.secondary,
     required this.tertiary,
     required this.onSurface,
@@ -131,18 +166,61 @@ class _ThemeTokens {
   final Color surface;
   final Color surfaceHigh;
   final Color primary;
+  final Color onPrimary;
   final Color secondary;
   final Color tertiary;
   final Color onSurface;
   final Color onSurfaceVariant;
   final Color outline;
 
-  static _ThemeTokens forStyle(SongBriefThemeStyle style) {
+  static _ThemeTokens forStyle(
+    SongBriefThemeStyle style,
+    Brightness brightness,
+  ) {
+    if (brightness == Brightness.light) {
+      return switch (style) {
+        SongBriefThemeStyle.prism => const _ThemeTokens(
+          surface: Color(0xFFF6FAF8),
+          surfaceHigh: Color(0xFFEAF3F0),
+          primary: Color(0xFF006E5F),
+          onPrimary: Color(0xFFFFFFFF),
+          secondary: Color(0xFF657500),
+          tertiary: Color(0xFF5262D7),
+          onSurface: Color(0xFF10201C),
+          onSurfaceVariant: Color(0xFF58706A),
+          outline: Color(0xFFC6D7D2),
+        ),
+        SongBriefThemeStyle.ember => const _ThemeTokens(
+          surface: Color(0xFFFFF8FA),
+          surfaceHigh: Color(0xFFF9ECF1),
+          primary: Color(0xFFC51F57),
+          onPrimary: Color(0xFFFFFFFF),
+          secondary: Color(0xFFA44F00),
+          tertiary: Color(0xFF007A68),
+          onSurface: Color(0xFF231319),
+          onSurfaceVariant: Color(0xFF735E67),
+          outline: Color(0xFFE2CCD4),
+        ),
+        SongBriefThemeStyle.mono => const _ThemeTokens(
+          surface: Color(0xFFFAFAFA),
+          surfaceHigh: Color(0xFFEDEDED),
+          primary: Color(0xFF171717),
+          onPrimary: Color(0xFFFFFFFF),
+          secondary: Color(0xFF246487),
+          tertiary: Color(0xFF4D6F00),
+          onSurface: Color(0xFF121212),
+          onSurfaceVariant: Color(0xFF606060),
+          outline: Color(0xFFD4D4D4),
+        ),
+      };
+    }
+
     return switch (style) {
       SongBriefThemeStyle.prism => const _ThemeTokens(
         surface: Color(0xFF040708),
         surfaceHigh: Color(0xFF151C1F),
         primary: Color(0xFF4DECC7),
+        onPrimary: Color(0xFF001F1A),
         secondary: Color(0xFFE0FF67),
         tertiary: Color(0xFF7B8CFF),
         onSurface: Color(0xFFF5FCF8),
@@ -153,6 +231,7 @@ class _ThemeTokens {
         surface: Color(0xFF050507),
         surfaceHigh: Color(0xFF1B1B20),
         primary: Color(0xFFFF3D78),
+        onPrimary: Color(0xFFFFFFFF),
         secondary: Color(0xFFFF9B52),
         tertiary: Color(0xFF6FE5C4),
         onSurface: Color(0xFFF8F7FA),
@@ -163,6 +242,7 @@ class _ThemeTokens {
         surface: Color(0xFF050505),
         surfaceHigh: Color(0xFF1A1A1A),
         primary: Color(0xFFEDEDED),
+        onPrimary: Color(0xFF080808),
         secondary: Color(0xFF9FD8FF),
         tertiary: Color(0xFFC4FF8C),
         onSurface: Color(0xFFF7F7F7),

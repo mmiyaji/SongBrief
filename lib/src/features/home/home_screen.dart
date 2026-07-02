@@ -174,6 +174,40 @@ String _themeStyleDescription(BuildContext context, SongBriefThemeStyle style) {
   };
 }
 
+String _themeBrightnessLabel(
+  BuildContext context,
+  SongBriefThemeBrightness brightness,
+) {
+  return switch (brightness) {
+    SongBriefThemeBrightness.dark => _t(context, 'Dark', 'ダーク'),
+    SongBriefThemeBrightness.light => _t(context, 'Light', 'ライト'),
+    SongBriefThemeBrightness.system => _t(context, 'System', 'システム'),
+  };
+}
+
+String _themeBrightnessDescription(
+  BuildContext context,
+  SongBriefThemeBrightness brightness,
+) {
+  return switch (brightness) {
+    SongBriefThemeBrightness.dark => _t(
+      context,
+      'Uses the original dark SongBrief surface.',
+      '従来のSongBriefのダーク表示を使用します。',
+    ),
+    SongBriefThemeBrightness.light => _t(
+      context,
+      'Uses a brighter surface for daylight viewing.',
+      '明るい場所でも見やすいライト表示を使用します。',
+    ),
+    SongBriefThemeBrightness.system => _t(
+      context,
+      'Follows the device appearance setting.',
+      '端末の外観設定に合わせます。',
+    ),
+  };
+}
+
 String _languageLabel(BuildContext context, AppLanguage language) {
   return switch (language) {
     AppLanguage.system => _t(context, 'System', 'システム'),
@@ -439,12 +473,19 @@ class _MiniPlayerBar extends ConsumerWidget {
     final busy = playback.isBusy;
     final isActive = playback.isTrackActive(track.id);
     final isPlaying = playback.isTrackPlaying(track.id);
+    final isLight = theme.colorScheme.brightness == Brightness.light;
+    final barColor = isLight
+        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.82)
+        : Colors.black.withValues(alpha: 0.36);
+    final borderColor = isLight
+        ? theme.colorScheme.outlineVariant.withValues(alpha: 0.55)
+        : Colors.white.withValues(alpha: 0.1);
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.36),
+        color: barColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: borderColor),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
@@ -5872,6 +5913,7 @@ class _SettingsSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final overview = stats.overview;
     final selectedTheme = ref.watch(themeStyleProvider);
+    final selectedBrightness = ref.watch(themeBrightnessProvider);
     final selectedLanguage = ref.watch(appLanguageProvider);
     final appLock = ref.watch(appLockControllerProvider);
     final premium = ref.watch(premiumControllerProvider);
@@ -5942,6 +5984,37 @@ class _SettingsSection extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 _themeStyleDescription(context, selectedTheme),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<SongBriefThemeBrightness>(
+                  showSelectedIcon: false,
+                  segments: SongBriefThemeBrightness.values
+                      .map(
+                        (brightness) => ButtonSegment<SongBriefThemeBrightness>(
+                          value: brightness,
+                          label: Text(
+                            _themeBrightnessLabel(context, brightness),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  selected: {selectedBrightness},
+                  onSelectionChanged: (selection) {
+                    ref
+                        .read(themeBrightnessProvider.notifier)
+                        .setBrightness(selection.first);
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _themeBrightnessDescription(context, selectedBrightness),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
