@@ -1002,6 +1002,11 @@ class _HeroTrackPanel extends ConsumerWidget {
                                       onDark: true,
                                     ),
                                   ],
+                                  const SizedBox(height: 10),
+                                  _OpenInAppleMusicButton(
+                                    track: track,
+                                    onDark: true,
+                                  ),
                                 ],
                               ),
                             ),
@@ -1187,6 +1192,8 @@ class _HeroTrackWideHeader extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    _OpenInAppleMusicButton(track: track),
                   ],
                 ),
               ),
@@ -1911,6 +1918,8 @@ class _TrackDetailSheet extends ConsumerWidget {
               ),
               const SizedBox(height: 18),
               _PlaybackControls(track: track),
+              const SizedBox(height: 10),
+              _OpenInAppleMusicButton(track: track),
               const SizedBox(height: 18),
               _TrackDetailsPanel(track: track),
               const SizedBox(height: 18),
@@ -2426,6 +2435,8 @@ class _NowTrackCopy extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         _PlaybackControls(track: track),
+        const SizedBox(height: 10),
+        _OpenInAppleMusicButton(track: track),
       ],
     );
   }
@@ -2585,6 +2596,37 @@ class _PlaybackControls extends ConsumerWidget {
           icon: const Icon(Icons.skip_next_rounded),
         ),
       ],
+    );
+  }
+}
+
+class _OpenInAppleMusicButton extends StatelessWidget {
+  const _OpenInAppleMusicButton({required this.track, this.onDark = false});
+
+  final LibraryTrack track;
+  final bool onDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          backgroundColor: onDark
+              ? Colors.black.withValues(alpha: 0.36)
+              : Colors.transparent,
+          foregroundColor: onDark ? Colors.white : theme.colorScheme.primary,
+          side: BorderSide(
+            color: onDark
+                ? Colors.white.withValues(alpha: 0.28)
+                : theme.colorScheme.primary.withValues(alpha: 0.42),
+          ),
+        ),
+        onPressed: () => _openAppleMusicTrack(context, track),
+        icon: const Icon(Icons.open_in_new_rounded),
+        label: Text(_t(context, 'Open in Apple Music', 'Apple Musicで開く')),
+      ),
     );
   }
 }
@@ -6333,6 +6375,22 @@ Future<void> _copyLibraryExport(
       ),
     ),
   );
+}
+
+Future<void> _openAppleMusicTrack(
+  BuildContext context,
+  LibraryTrack track,
+) async {
+  await _openExternalUrl(context, _appleMusicUrlForTrack(track).toString());
+}
+
+Uri _appleMusicUrlForTrack(LibraryTrack track) {
+  final query = [
+    track.title,
+    track.artist,
+    track.albumTitle,
+  ].where((value) => value.trim().isNotEmpty).join(' ');
+  return Uri.https('music.apple.com', '/search', {'term': query});
 }
 
 Future<void> _openExternalUrl(BuildContext context, String url) async {

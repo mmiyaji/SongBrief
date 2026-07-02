@@ -171,6 +171,10 @@ final class MusicLibraryBridge {
     if let genre = nonEmpty(item.genre) {
       track["genre"] = genre
     }
+    if item.playbackStoreID != "0",
+       let appleMusicStoreID = nonEmpty(item.playbackStoreID) {
+      track["appleMusicStoreId"] = appleMusicStoreID
+    }
     if let lyrics = nonEmpty(
       item.value(forProperty: MPMediaItemPropertyLyrics) as? String
     ) {

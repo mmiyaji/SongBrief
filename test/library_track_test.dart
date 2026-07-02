@@ -12,10 +12,12 @@ void main() {
       'playCount': 12,
       'skipCount': 1,
       'isCloudItem': false,
+      'appleMusicStoreId': '123456789',
       'lyrics': '  line one\nline two  ',
       'playlistNames': ['Focus', '', 'Recently Played', 'Focus', 99],
     });
 
+    expect(track.appleMusicStoreId, '123456789');
     expect(track.lyrics, 'line one\nline two');
     expect(track.playlistNames, ['Focus', 'Recently Played']);
   });
