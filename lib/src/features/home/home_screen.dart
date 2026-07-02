@@ -956,7 +956,6 @@ class _NowPlayingLyricsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final lyrics = track.lyrics?.trim();
 
     return GlassSurface(
@@ -982,14 +981,7 @@ class _NowPlayingLyricsPanel extends StatelessWidget {
               ),
             )
           else
-            SelectableText(
-              lyrics,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-                height: 1.55,
-              ),
-            ),
+            _CollapsibleLyricsText(lyrics: lyrics),
         ],
       ),
     );
@@ -2931,7 +2923,6 @@ class _TrackLibraryContextPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final overview = ref
         .watch(musicStatsControllerProvider)
         .asData
@@ -3010,16 +3001,80 @@ class _TrackLibraryContextPanel extends ConsumerWidget {
               ),
             )
           else
-            SelectableText(
-              lyrics,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-                height: 1.55,
-              ),
-            ),
+            _CollapsibleLyricsText(lyrics: lyrics),
         ],
       ),
+    );
+  }
+}
+
+class _CollapsibleLyricsText extends StatefulWidget {
+  const _CollapsibleLyricsText({required this.lyrics});
+
+  final String lyrics;
+
+  @override
+  State<_CollapsibleLyricsText> createState() => _CollapsibleLyricsTextState();
+}
+
+class _CollapsibleLyricsTextState extends State<_CollapsibleLyricsText> {
+  static const _collapsedLineCount = 3;
+
+  bool _expanded = false;
+
+  bool get _shouldCollapse {
+    final explicitLines = widget.lyrics.split('\n').length;
+    return explicitLines > _collapsedLineCount || widget.lyrics.length > 160;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final shouldCollapse = _shouldCollapse;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SelectableText(
+          widget.lyrics,
+          maxLines: shouldCollapse && !_expanded ? _collapsedLineCount : null,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            height: 1.55,
+          ),
+        ),
+        if (shouldCollapse) ...[
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _expanded = !_expanded;
+              });
+            },
+            icon: Icon(
+              _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              size: 18,
+            ),
+            label: Text(
+              _t(
+                context,
+                _expanded ? 'Show less' : 'Show all lyrics',
+                _expanded ? '閉じる' : '歌詞をすべて表示',
+              ),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

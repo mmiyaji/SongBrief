@@ -15,8 +15,30 @@ void main() {
     expect(find.text('This week trend'), findsOneWidget);
     expect(find.text('Lyrics'), findsOneWidget);
     expect(find.textContaining('City lights are waking slow'), findsOneWidget);
+    expect(find.text('Show all lyrics'), findsOneWidget);
     expect(find.text('Recently played songs'), findsOneWidget);
     expect(find.text('Demo'), findsOneWidget);
+  });
+
+  testWidgets('expands and collapses long lyrics', (tester) async {
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Show all lyrics'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Show all lyrics'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show all lyrics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Show less'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Show less'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show less'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Show all lyrics'), findsOneWidget);
   });
 
   testWidgets('shows the SongBrief dashboard shell in Japanese', (
