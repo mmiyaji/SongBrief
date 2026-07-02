@@ -168,6 +168,9 @@ enum SongBriefSnapshotRefresh {
     if let genre = nonEmpty(item.genre) {
       track["genre"] = genre
     }
+    if let releaseDate = item.value(forProperty: MPMediaItemPropertyReleaseDate) as? Date {
+      track["releaseDateMillis"] = Int(releaseDate.timeIntervalSince1970 * 1000)
+    }
     if let lastPlayedDate = item.lastPlayedDate {
       track["lastPlayedAtMillis"] = Int(lastPlayedDate.timeIntervalSince1970 * 1000)
     }

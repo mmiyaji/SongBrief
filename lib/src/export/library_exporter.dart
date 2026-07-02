@@ -48,6 +48,7 @@ String buildLibraryCsv(MusicStatsState stats) {
         'genre',
         'appleMusicStoreId',
         'durationSeconds',
+        'releaseDate',
         'playCount',
         'skipCount',
         'listeningSeconds',
@@ -69,6 +70,7 @@ String buildLibraryCsv(MusicStatsState stats) {
         track.genre ?? '',
         track.appleMusicStoreId ?? '',
         track.duration.inSeconds.toString(),
+        track.releaseDate?.toIso8601String() ?? '',
         track.playCount.toString(),
         track.skipCount.toString(),
         track.listeningSeconds.toString(),
@@ -110,6 +112,8 @@ String buildLibraryJson(MusicStatsState stats, {DateTime? exportedAt}) {
             if (track.appleMusicStoreId != null)
               'appleMusicStoreId': track.appleMusicStoreId,
             'durationSeconds': track.duration.inSeconds,
+            if (track.releaseDate != null)
+              'releaseDate': track.releaseDate!.toIso8601String(),
             'playCount': track.playCount,
             'skipCount': track.skipCount,
             'listeningSeconds': track.listeningSeconds,

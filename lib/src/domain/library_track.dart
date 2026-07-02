@@ -12,6 +12,7 @@ class LibraryTrack {
     this.genre,
     this.artworkAsset,
     this.appleMusicStoreId,
+    this.releaseDate,
     this.lastPlayedAt,
     this.lyrics,
     this.playlistNames = const <String>[],
@@ -25,6 +26,7 @@ class LibraryTrack {
   final String? genre;
   final String? artworkAsset;
   final String? appleMusicStoreId;
+  final DateTime? releaseDate;
   final Duration duration;
   final int playCount;
   final int skipCount;
@@ -49,6 +51,7 @@ class LibraryTrack {
       genre: genre,
       artworkAsset: artworkAsset,
       appleMusicStoreId: appleMusicStoreId,
+      releaseDate: releaseDate,
       duration: duration,
       playCount: playCount ?? this.playCount,
       skipCount: skipCount ?? this.skipCount,
@@ -68,6 +71,7 @@ class LibraryTrack {
       albumArtist: _readNullableString(map, 'albumArtist'),
       genre: _readNullableString(map, 'genre'),
       appleMusicStoreId: _readNullableString(map, 'appleMusicStoreId'),
+      releaseDate: _readDateTime(map, 'releaseDateMillis'),
       duration: Duration(seconds: _readInt(map, 'durationSeconds')),
       playCount: _readInt(map, 'playCount'),
       skipCount: _readInt(map, 'skipCount'),

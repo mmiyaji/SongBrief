@@ -175,6 +175,9 @@ final class MusicLibraryBridge {
        let appleMusicStoreID = nonEmpty(item.playbackStoreID) {
       track["appleMusicStoreId"] = appleMusicStoreID
     }
+    if let releaseDate = item.value(forProperty: MPMediaItemPropertyReleaseDate) as? Date {
+      track["releaseDateMillis"] = Int(releaseDate.timeIntervalSince1970 * 1000)
+    }
     if let lyrics = nonEmpty(
       item.value(forProperty: MPMediaItemPropertyLyrics) as? String
     ) {

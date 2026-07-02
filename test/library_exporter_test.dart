@@ -15,6 +15,7 @@ void main() {
     expect(csv, contains('"Song ""Brief"""'));
     expect(csv, contains('"Focus|Favorites"'));
     expect(csv, contains('"987654321"'));
+    expect(csv, contains('"2020-01-02T00:00:00.000"'));
     expect(csv, contains('"true"'));
   });
 
@@ -32,6 +33,11 @@ void main() {
           as Map<String, Object?>)['appleMusicStoreId'],
       '987654321',
     );
+    expect(
+      ((json['tracks'] as List<Object?>).single
+          as Map<String, Object?>)['releaseDate'],
+      '2020-01-02T00:00:00.000',
+    );
     expect((json['snapshots'] as List<Object?>).single, isA<Map>());
   });
 }
@@ -46,6 +52,7 @@ MusicStatsState _stats() {
       albumArtist: 'Album Artist',
       genre: 'Pop',
       appleMusicStoreId: '987654321',
+      releaseDate: DateTime(2020, 1, 2),
       duration: const Duration(minutes: 3, seconds: 30),
       playCount: 10,
       skipCount: 2,

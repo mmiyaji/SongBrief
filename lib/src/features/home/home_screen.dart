@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:ui' as ui show TextDirection;
 import 'dart:ui' show ImageFilter;
 
 import 'package:file_saver/file_saver.dart';
@@ -3361,6 +3363,11 @@ class _OverviewSection extends StatelessWidget {
         const SizedBox(height: 14),
         _SummaryGrid(overview: overview),
         const SizedBox(height: 14),
+        _OverviewAnalyticsPanel(
+          overview: overview,
+          history: stats.snapshotHistory,
+        ),
+        const SizedBox(height: 14),
         _OverviewInsightPanel(overview: overview),
         const SizedBox(height: 14),
         _SmartListsPanel(overview: overview),
@@ -4211,6 +4218,576 @@ class _SummaryCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _OverviewAnalyticsPanel extends StatelessWidget {
+  const _OverviewAnalyticsPanel({
+    required this.overview,
+    required this.history,
+  });
+
+  final LibraryOverview overview;
+  final SnapshotHistory history;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassSurface(
+      padding: const EdgeInsets.all(18),
+      radius: 24,
+      tint: const Color(0x4FFFFFFF),
+      borderOpacity: 0.34,
+      shadowOpacity: 0.045,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PanelHeading(
+            icon: Icons.scatter_plot_rounded,
+            title: _t(context, 'Listening maps', 'リスニングマップ'),
+            subtitle: _t(
+              context,
+              'Release-year concentration and daily play activity',
+              '発売年ごとの集中度と日別の再生活動',
+            ),
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final releaseCard = _ReleaseYearPlayMapCard(overview: overview);
+              final heatmapCard = _ActivityHeatmapCard(
+                overview: overview,
+                history: history,
+              );
+
+              if (constraints.maxWidth >= 760) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: releaseCard),
+                    const SizedBox(width: 14),
+                    Expanded(child: heatmapCard),
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  releaseCard,
+                  const SizedBox(height: 12),
+                  heatmapCard,
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReleaseYearPlayMapCard extends StatelessWidget {
+  const _ReleaseYearPlayMapCard({required this.overview});
+
+  final LibraryOverview overview;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final number = _numberFormat(context);
+    final buckets = _releaseYearBuckets(overview.tracks);
+    final topBucket = buckets.isEmpty
+        ? null
+        : buckets.reduce(
+            (current, next) =>
+                next.playCount > current.playCount ? next : current,
+          );
+
+    return _OverviewAnalysisCard(
+      icon: Icons.timeline_rounded,
+      title: _t(context, 'Release year x plays', '発売年 x 再生数'),
+      subtitle: topBucket == null
+          ? _t(
+              context,
+              'Release dates are not available yet.',
+              '発売日の情報がまだありません。',
+            )
+          : _t(
+              context,
+              '${topBucket.year} has the highest concentration',
+              '${topBucket.year}年の集中度が最も高いです',
+            ),
+      child: buckets.isEmpty
+          ? _AnalyticsEmptyState(
+              label: _t(
+                context,
+                'Songs without release dates are excluded.',
+                '発売日がない曲は集計対象外です。',
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 190,
+                  child: CustomPaint(
+                    painter: _ReleaseYearCorrelationPainter(
+                      buckets: buckets,
+                      primary: theme.colorScheme.primary,
+                      secondary: theme.colorScheme.tertiary,
+                      gridColor: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                      labelColor: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _AnalysisPill(
+                      label: _t(context, 'Years', '年数'),
+                      value: number.format(buckets.length),
+                    ),
+                    if (topBucket != null)
+                      _AnalysisPill(
+                        label: _t(context, 'Top year', '最多年'),
+                        value:
+                            '${topBucket.year} / ${number.format(topBucket.playCount)}',
+                      ),
+                    _AnalysisPill(
+                      label: _t(context, 'Avg / song', '曲平均'),
+                      value: topBucket == null
+                          ? '0'
+                          : topBucket.averagePlays.toStringAsFixed(1),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _ActivityHeatmapCard extends StatelessWidget {
+  const _ActivityHeatmapCard({required this.overview, required this.history});
+
+  final LibraryOverview overview;
+  final SnapshotHistory history;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final days = _activityHeatmapDays(overview: overview, history: history);
+    final maxValue = days.fold<int>(
+      0,
+      (current, day) => math.max(current, day.playCount),
+    );
+    final activeDays = days.where((day) => day.playCount > 0).length;
+    final weeks = _activityHeatmapWeeks(days);
+    final sourceLabel = history.snapshotCount >= 2
+        ? _t(context, 'Snapshot deltas', 'スナップショット差分')
+        : _t(context, 'Recent-track estimate', '最近再生からの推定');
+
+    return _OverviewAnalysisCard(
+      icon: Icons.grid_on_rounded,
+      title: _t(context, 'Activity heatmap', '再生ヒートマップ'),
+      subtitle: sourceLabel,
+      child: maxValue == 0
+          ? _AnalyticsEmptyState(
+              label: _t(
+                context,
+                'Activity appears after daily snapshots are recorded.',
+                '日次スナップショットが記録されると活動量を表示します。',
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cellSize = constraints.maxWidth >= 360 ? 13.0 : 11.0;
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: weeks
+                            .map(
+                              (week) => Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Column(
+                                  children: week
+                                      .map(
+                                        (day) => _ActivityHeatmapCell(
+                                          day: day,
+                                          maxValue: maxValue,
+                                          size: cellSize,
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _AnalysisPill(
+                      label: _t(context, 'Active days', '再生日'),
+                      value: _numberFormat(context).format(activeDays),
+                    ),
+                    const Spacer(),
+                    Text(
+                      _t(context, 'Less', '少'),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    for (var index = 0; index < 4; index++)
+                      Container(
+                        width: 11,
+                        height: 11,
+                        margin: const EdgeInsets.only(right: 3),
+                        decoration: BoxDecoration(
+                          color: _activityHeatmapColor(theme, index + 1, 4),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    const SizedBox(width: 3),
+                    Text(
+                      _t(context, 'More', '多'),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _ActivityHeatmapCell extends StatelessWidget {
+  const _ActivityHeatmapCell({
+    required this.day,
+    required this.maxValue,
+    required this.size,
+  });
+
+  final _ActivityHeatmapDay day;
+  final int maxValue;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = _t(
+      context,
+      '${DateFormat.MMMd(_localeName(context)).format(day.date)}: '
+          '${_playCountLabel(context, day.playCount)}',
+      '${DateFormat.MMMd(_localeName(context)).format(day.date)}: '
+          '${_playCountLabel(context, day.playCount)}',
+    );
+
+    return Tooltip(
+      message: label,
+      child: Container(
+        width: size,
+        height: size,
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: _activityHeatmapColor(theme, day.playCount, maxValue),
+          borderRadius: BorderRadius.circular(3.5),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.28),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OverviewAnalysisCard extends StatelessWidget {
+  const _OverviewAnalysisCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.36,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalysisPill extends StatelessWidget {
+  const _AnalysisPill({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          '$label  $value',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurface,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalyticsEmptyState extends StatelessWidget {
+  const _AnalyticsEmptyState({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.32),
+        ),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReleaseYearCorrelationPainter extends CustomPainter {
+  const _ReleaseYearCorrelationPainter({
+    required this.buckets,
+    required this.primary,
+    required this.secondary,
+    required this.gridColor,
+    required this.labelColor,
+  });
+
+  final List<_ReleaseYearBucket> buckets;
+  final Color primary;
+  final Color secondary;
+  final Color gridColor;
+  final Color labelColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (buckets.isEmpty || size.width <= 80 || size.height <= 80) {
+      return;
+    }
+
+    final chart = Rect.fromLTWH(38, 10, size.width - 48, size.height - 38);
+    final minYear = buckets.first.year;
+    final maxYear = buckets.last.year;
+    final yearSpan = math.max(1, maxYear - minYear);
+    final maxAverage = buckets.fold<double>(
+      1,
+      (current, bucket) => math.max(current, bucket.averagePlays),
+    );
+    final maxPlays = buckets.fold<int>(
+      1,
+      (current, bucket) => math.max(current, bucket.playCount),
+    );
+
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1;
+    for (var index = 0; index <= 3; index++) {
+      final y = chart.bottom - chart.height * index / 3;
+      canvas.drawLine(Offset(chart.left, y), Offset(chart.right, y), gridPaint);
+      _paintSmallLabel(
+        canvas,
+        _compactNumber((maxAverage * index / 3).round()),
+        Offset(0, y - 7),
+      );
+    }
+
+    final pointOffsets = <Offset>[];
+    final linePaint = Paint()
+      ..color = primary.withValues(alpha: 0.52)
+      ..strokeWidth = 2.2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final fillPaint = Paint()..color = primary.withValues(alpha: 0.72);
+    final haloPaint = Paint()..color = primary.withValues(alpha: 0.15);
+    final playPaint = Paint()
+      ..color = secondary.withValues(alpha: 0.2)
+      ..strokeWidth = 7
+      ..strokeCap = StrokeCap.round;
+
+    for (final bucket in buckets) {
+      final x = chart.left + (bucket.year - minYear) / yearSpan * chart.width;
+      final y = chart.bottom - bucket.averagePlays / maxAverage * chart.height;
+      final totalHeight = bucket.playCount / maxPlays * chart.height;
+      canvas.drawLine(
+        Offset(x, chart.bottom),
+        Offset(x, chart.bottom - totalHeight),
+        playPaint,
+      );
+      pointOffsets.add(Offset(x, y));
+    }
+
+    if (pointOffsets.length > 1) {
+      final path = Path()..moveTo(pointOffsets.first.dx, pointOffsets.first.dy);
+      for (final offset in pointOffsets.skip(1)) {
+        path.lineTo(offset.dx, offset.dy);
+      }
+      canvas.drawPath(path, linePaint);
+    }
+
+    for (var index = 0; index < buckets.length; index++) {
+      final bucket = buckets[index];
+      final offset = pointOffsets[index];
+      final radius = 5.0 + math.min(bucket.trackCount, 5) * 1.05;
+      canvas.drawCircle(offset, radius + 4, haloPaint);
+      canvas.drawCircle(offset, radius, fillPaint);
+    }
+
+    _paintSmallLabel(
+      canvas,
+      minYear.toString(),
+      Offset(chart.left - 2, chart.bottom + 10),
+      alignment: TextAlign.left,
+    );
+    _paintSmallLabel(
+      canvas,
+      maxYear.toString(),
+      Offset(chart.right - 34, chart.bottom + 10),
+      alignment: TextAlign.right,
+    );
+  }
+
+  void _paintSmallLabel(
+    Canvas canvas,
+    String text,
+    Offset offset, {
+    TextAlign alignment = TextAlign.left,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: labelColor,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textAlign: alignment,
+      textDirection: ui.TextDirection.ltr,
+    )..layout(maxWidth: 40);
+    painter.paint(canvas, offset);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReleaseYearCorrelationPainter oldDelegate) {
+    return oldDelegate.buckets != buckets ||
+        oldDelegate.primary != primary ||
+        oldDelegate.secondary != secondary ||
+        oldDelegate.gridColor != gridColor ||
+        oldDelegate.labelColor != labelColor;
   }
 }
 
@@ -7946,6 +8523,48 @@ class _SummaryValue {
   final String value;
 }
 
+class _ReleaseYearBucket {
+  const _ReleaseYearBucket({
+    required this.year,
+    required this.trackCount,
+    required this.playCount,
+  });
+
+  final int year;
+  final int trackCount;
+  final int playCount;
+
+  double get averagePlays => trackCount == 0 ? 0 : playCount / trackCount;
+}
+
+class _ReleaseYearAccumulator {
+  _ReleaseYearAccumulator(this.year);
+
+  final int year;
+  int trackCount = 0;
+  int playCount = 0;
+
+  void add(LibraryTrack track) {
+    trackCount += 1;
+    playCount += track.playCount;
+  }
+
+  _ReleaseYearBucket toBucket() {
+    return _ReleaseYearBucket(
+      year: year,
+      trackCount: trackCount,
+      playCount: playCount,
+    );
+  }
+}
+
+class _ActivityHeatmapDay {
+  const _ActivityHeatmapDay({required this.date, required this.playCount});
+
+  final DateTime date;
+  final int playCount;
+}
+
 class _GroupSummaryValue {
   const _GroupSummaryValue({
     required this.icon,
@@ -8006,6 +8625,98 @@ String _shortPlayedAtLabel(BuildContext context, DateTime? dateTime) {
     );
   }
   return DateFormat('M/d').format(dateTime);
+}
+
+List<_ReleaseYearBucket> _releaseYearBuckets(List<LibraryTrack> tracks) {
+  final currentYear = DateTime.now().year + 1;
+  final buckets = <int, _ReleaseYearAccumulator>{};
+  for (final track in tracks) {
+    final year = track.releaseDate?.toLocal().year;
+    if (year == null || year < 1900 || year > currentYear) {
+      continue;
+    }
+    buckets.putIfAbsent(year, () => _ReleaseYearAccumulator(year)).add(track);
+  }
+
+  final values = buckets.values.map((bucket) => bucket.toBucket()).toList()
+    ..sort((a, b) => a.year.compareTo(b.year));
+  return List.unmodifiable(values);
+}
+
+List<_ActivityHeatmapDay> _activityHeatmapDays({
+  required LibraryOverview overview,
+  required SnapshotHistory history,
+}) {
+  final today = _localDateOnly(DateTime.now());
+  final rawStart = today.subtract(const Duration(days: 83));
+  final start = rawStart.subtract(Duration(days: rawStart.weekday % 7));
+  final valuesByDay = <String, int>{};
+
+  if (history.snapshots.length >= 2) {
+    for (var index = 1; index < history.snapshots.length; index++) {
+      final delta = SnapshotDelta.compare(
+        previous: history.snapshots[index - 1],
+        current: history.snapshots[index],
+      );
+      final key = snapshotDateKey(delta.current.capturedAt);
+      valuesByDay[key] = (valuesByDay[key] ?? 0) + delta.totalPlayDelta;
+    }
+  } else {
+    for (final track in overview.tracks) {
+      final playedAt = track.lastPlayedAt;
+      if (playedAt == null) {
+        continue;
+      }
+      final day = _localDateOnly(playedAt);
+      if (day.isBefore(start) || day.isAfter(today)) {
+        continue;
+      }
+      final estimatedPlays = math.max(1, (track.playCount / 16).round());
+      final key = snapshotDateKey(day);
+      valuesByDay[key] = (valuesByDay[key] ?? 0) + estimatedPlays;
+    }
+  }
+
+  final days = <_ActivityHeatmapDay>[];
+  for (
+    var day = start;
+    !day.isAfter(today);
+    day = day.add(const Duration(days: 1))
+  ) {
+    days.add(
+      _ActivityHeatmapDay(
+        date: day,
+        playCount: valuesByDay[snapshotDateKey(day)] ?? 0,
+      ),
+    );
+  }
+  return List.unmodifiable(days);
+}
+
+List<List<_ActivityHeatmapDay>> _activityHeatmapWeeks(
+  List<_ActivityHeatmapDay> days,
+) {
+  final weeks = <List<_ActivityHeatmapDay>>[];
+  for (var index = 0; index < days.length; index += 7) {
+    weeks.add(
+      List.unmodifiable(days.skip(index).take(7).toList(growable: false)),
+    );
+  }
+  return List.unmodifiable(weeks);
+}
+
+Color _activityHeatmapColor(ThemeData theme, int value, int maxValue) {
+  if (value <= 0 || maxValue <= 0) {
+    return theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.48);
+  }
+  final normalized = (value / maxValue).clamp(0.0, 1.0);
+  final base = theme.colorScheme.primary.withValues(alpha: 0.28);
+  return Color.lerp(base, theme.colorScheme.primary, 0.32 + normalized * 0.68)!;
+}
+
+DateTime _localDateOnly(DateTime date) {
+  final local = date.toLocal();
+  return DateTime(local.year, local.month, local.day);
 }
 
 List<int> _trendValues(LibraryTrack track, TrendRange range) {
