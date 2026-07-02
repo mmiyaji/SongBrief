@@ -1289,7 +1289,7 @@ class _HeroTrackWideHeader extends StatelessWidget {
                         IconButton.filled(
                           style: IconButton.styleFrom(
                             backgroundColor: theme.colorScheme.primary,
-                            foregroundColor: Colors.black,
+                            foregroundColor: theme.colorScheme.onPrimary,
                             minimumSize: const Size.square(54),
                           ),
                           onPressed: busy ? null : onTogglePlayback,
@@ -1664,7 +1664,7 @@ class _TrendPanel extends ConsumerWidget {
                 }),
                 foregroundColor: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.selected)) {
-                    return Colors.black;
+                    return theme.colorScheme.onPrimary;
                   }
                   return theme.colorScheme.onSurfaceVariant;
                 }),
