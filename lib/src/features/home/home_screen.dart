@@ -411,6 +411,7 @@ class _MobilePlaybackChrome extends ConsumerWidget {
     final playback = ref.watch(playbackControllerProvider);
     final activeTrack = stats.overview.trackById(playback.activeTrackId);
     final track = activeTrack ?? stats.overview.latestTrack;
+    final isLight = theme.colorScheme.brightness == Brightness.light;
     return SafeArea(
       top: false,
       child: Padding(
@@ -432,7 +433,9 @@ class _MobilePlaybackChrome extends ConsumerWidget {
               filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surface.withValues(alpha: 0.86),
+                  color: theme.colorScheme.surface.withValues(
+                    alpha: isLight ? 0.97 : 0.86,
+                  ),
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
                     color: theme.colorScheme.primary.withValues(alpha: 0.14),
@@ -475,7 +478,7 @@ class _MiniPlayerBar extends ConsumerWidget {
     final isPlaying = playback.isTrackPlaying(track.id);
     final isLight = theme.colorScheme.brightness == Brightness.light;
     final barColor = isLight
-        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.82)
+        ? theme.colorScheme.surfaceContainerHighest
         : Colors.black.withValues(alpha: 0.36);
     final borderColor = isLight
         ? theme.colorScheme.outlineVariant.withValues(alpha: 0.55)
@@ -1151,6 +1154,7 @@ class _HeroTrackPanel extends ConsumerWidget {
                                 const SizedBox(height: 4),
                                 _SmallMetricPill(
                                   label: _t(context, 'Plays', '再生回数'),
+                                  onDark: true,
                                 ),
                               ],
                             ),
@@ -1357,7 +1361,7 @@ class _HeroBadge extends StatelessWidget {
         child: Text(
           label,
           style: theme.textTheme.titleSmall?.copyWith(
-            color: Colors.black,
+            color: theme.colorScheme.onPrimary,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1367,27 +1371,33 @@ class _HeroBadge extends StatelessWidget {
 }
 
 class _SmallMetricPill extends StatelessWidget {
-  const _SmallMetricPill({required this.label});
+  const _SmallMetricPill({required this.label, this.onDark = false});
 
   final String label;
+  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final foreground = theme.colorScheme.primary;
+    final background = onDark
+        ? Colors.black.withValues(alpha: 0.42)
+        : theme.colorScheme.primary.withValues(alpha: 0.1);
+    final border = onDark
+        ? foreground.withValues(alpha: 0.42)
+        : foreground.withValues(alpha: 0.28);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.42),
+        color: background,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.42),
-        ),
+        border: Border.all(color: border),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         child: Text(
           label,
           style: theme.textTheme.labelLarge?.copyWith(
-            color: theme.colorScheme.primary,
+            color: foreground,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1462,12 +1472,17 @@ class _HeroStatStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isLight = theme.colorScheme.brightness == Brightness.light;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.24),
+        color: isLight
+            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.84)
+            : Colors.black.withValues(alpha: 0.24),
         border: Border(
           top: BorderSide(
-            color: theme.colorScheme.primary.withValues(alpha: 0.32),
+            color: isLight
+                ? theme.colorScheme.outlineVariant.withValues(alpha: 0.7)
+                : theme.colorScheme.primary.withValues(alpha: 0.32),
           ),
         ),
       ),
