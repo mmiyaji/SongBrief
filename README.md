@@ -70,7 +70,7 @@ Ads are opt-in by launch mode. The default mode is ad-free:
 flutter run --dart-define=SONGBRIEF_AD_MODE=off
 flutter run --dart-define=SONGBRIEF_AD_MODE=admobTest
 flutter run --dart-define=SONGBRIEF_AD_MODE=admobLive \
-  --dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID=ca-app-pub-.../... \
+  --dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID=ca-app-pub-5321136982470738/2315074663 \
   --dart-define=SONGBRIEF_ADMOB_ANDROID_BANNER_AD_UNIT_ID=ca-app-pub-.../...
 ```
 
@@ -83,9 +83,9 @@ flutter run --dart-define=SONGBRIEF_AD_MODE=admobTest \
   --dart-define=SONGBRIEF_PREMIUM_UNLOCKED=true
 ```
 
-Before release, replace the native AdMob App IDs as well:
+The iOS native AdMob App ID is configured in `ios/Flutter/AdMob.xcconfig`.
+Android still uses Google's sample App ID until an Android AdMob app is created:
 
-- iOS: `ios/Flutter/AdMob.xcconfig`
 - Android: pass `-PSONGBRIEF_ADMOB_ANDROID_APP_ID=ca-app-pub-...~...` to Gradle
   or update the default manifest placeholder in `android/app/build.gradle.kts`
 

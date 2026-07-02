@@ -25,6 +25,8 @@ env:
   APPLE_TEAM_ID: "B8LGAS7YHH"
   BUNDLE_ID: "app.songbrief.songbrief"
   KEYCHAIN_NAME: "songbrief-build.keychain-db"
+  SONGBRIEF_AD_MODE: "admobLive"
+  SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID: "ca-app-pub-5321136982470738/2315074663"
 
 jobs:
   build-and-upload:
@@ -241,6 +243,8 @@ jobs:
           flutter build ipa --release \
             --build-name="$VERSION_NAME" \
             --build-number="$BUILD_NUMBER" \
+            --dart-define=SONGBRIEF_AD_MODE="$SONGBRIEF_AD_MODE" \
+            --dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID="$SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID" \
             --export-options-plist="$RUNNER_TEMP/ExportOptions.plist"
 
       - name: Verify IPA

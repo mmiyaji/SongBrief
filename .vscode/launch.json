@@ -48,7 +48,7 @@
       "toolArgs": [
         "--dart-define=SONGBRIEF_AD_MODE=admobLive",
         "--dart-define=SONGBRIEF_ADMOB_ANDROID_BANNER_AD_UNIT_ID=ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy",
-        "--dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID=ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy"
+        "--dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID=ca-app-pub-5321136982470738/2315074663"
       ]
     }
   ]
