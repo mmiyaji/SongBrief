@@ -19,6 +19,8 @@ class PremiumState {
     required this.productId,
     this.storeSupported = false,
     this.productLoaded = false,
+    this.productTitle,
+    this.productDescription,
     this.price,
     this.busy = false,
     this.message,
@@ -29,6 +31,8 @@ class PremiumState {
   final String productId;
   final bool storeSupported;
   final bool productLoaded;
+  final String? productTitle;
+  final String? productDescription;
   final String? price;
   final bool busy;
   final String? message;
@@ -43,6 +47,10 @@ class PremiumState {
     String? productId,
     bool? storeSupported,
     bool? productLoaded,
+    String? productTitle,
+    bool clearProductTitle = false,
+    String? productDescription,
+    bool clearProductDescription = false,
     String? price,
     bool clearPrice = false,
     bool? busy,
@@ -54,6 +62,12 @@ class PremiumState {
       productId: productId ?? this.productId,
       storeSupported: storeSupported ?? this.storeSupported,
       productLoaded: productLoaded ?? this.productLoaded,
+      productTitle: clearProductTitle
+          ? null
+          : productTitle ?? this.productTitle,
+      productDescription: clearProductDescription
+          ? null
+          : productDescription ?? this.productDescription,
       price: clearPrice ? null : price ?? this.price,
       busy: busy ?? this.busy,
       message: message,
@@ -94,17 +108,18 @@ class PremiumController extends AsyncNotifier<PremiumState> {
       return base;
     }
 
-    final product = await client.queryProduct(
-      MonetizationConfig.premiumProductId,
+    return _queryProduct(base);
+  }
+
+  Future<void> reloadProduct() async {
+    final current = state.value;
+    if (current == null || current.entitled || current.busy) {
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(busy: true, message: null, errorMessage: null),
     );
-    return base.copyWith(
-      storeSupported: await client.isAvailable(),
-      productLoaded: product != null,
-      price: product?.price,
-      message: product == null
-          ? 'Configure the premium product in App Store Connect.'
-          : null,
-    );
+    state = AsyncData(await _queryProduct(current.copyWith(busy: false)));
   }
 
   Future<void> purchaseRemoveAds() async {
@@ -212,5 +227,45 @@ class PremiumController extends AsyncNotifier<PremiumState> {
     }
 
     state = AsyncData(next);
+  }
+
+  Future<PremiumState> _queryProduct(PremiumState base) async {
+    final client = _client;
+    if (client == null || !client.isSupported) {
+      return base.copyWith(
+        storeSupported: false,
+        productLoaded: false,
+        clearProductTitle: true,
+        clearProductDescription: true,
+        clearPrice: true,
+      );
+    }
+
+    final storeAvailable = await client.isAvailable();
+    if (!storeAvailable) {
+      return base.copyWith(
+        storeSupported: false,
+        productLoaded: false,
+        clearProductTitle: true,
+        clearProductDescription: true,
+        clearPrice: true,
+        message: 'Store is not available.',
+      );
+    }
+
+    final product = await client.queryProduct(base.productId);
+    return base.copyWith(
+      storeSupported: true,
+      productLoaded: product != null,
+      productTitle: product?.title,
+      clearProductTitle: product == null,
+      productDescription: product?.description,
+      clearProductDescription: product == null,
+      price: product?.price,
+      clearPrice: product == null,
+      message: product == null
+          ? 'Configure the premium product in App Store Connect.'
+          : null,
+    );
   }
 }

@@ -1,8 +1,8 @@
-import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -11,6 +11,7 @@ import '../../domain/library_snapshot.dart';
 import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
+import '../../export/library_exporter.dart';
 import '../../monetization/ad_banner_slot.dart';
 import '../../monetization/monetization_config.dart';
 import '../../monetization/premium_controller.dart';
@@ -1970,6 +1971,16 @@ class _TrackGroupSheet extends ConsumerWidget {
       0,
       (total, track) => total + track.playCount,
     );
+    final totalSkipCount = tracks.fold<int>(
+      0,
+      (total, track) => total + track.skipCount,
+    );
+    final totalListeningSeconds = tracks.fold<int>(
+      0,
+      (total, track) => total + track.listeningSeconds,
+    );
+    final latestTrack = _latestPlayedTrack(tracks);
+    final topTrack = tracks.isEmpty ? null : tracks.first;
     final height = MediaQuery.sizeOf(context).height;
 
     return SafeArea(
@@ -2032,6 +2043,15 @@ class _TrackGroupSheet extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: 14),
+              _TrackGroupSummary(
+                trackCount: tracks.length,
+                totalPlayCount: totalPlayCount,
+                totalSkipCount: totalSkipCount,
+                totalListeningSeconds: totalListeningSeconds,
+                topTrack: topTrack,
+                latestTrack: latestTrack,
+              ),
+              const SizedBox(height: 14),
               Flexible(
                 child: ListView.separated(
                   shrinkWrap: true,
@@ -2046,6 +2066,138 @@ class _TrackGroupSheet extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TrackGroupSummary extends StatelessWidget {
+  const _TrackGroupSummary({
+    required this.trackCount,
+    required this.totalPlayCount,
+    required this.totalSkipCount,
+    required this.totalListeningSeconds,
+    required this.topTrack,
+    required this.latestTrack,
+  });
+
+  final int trackCount;
+  final int totalPlayCount;
+  final int totalSkipCount;
+  final int totalListeningSeconds;
+  final LibraryTrack? topTrack;
+  final LibraryTrack? latestTrack;
+
+  @override
+  Widget build(BuildContext context) {
+    final values = [
+      _GroupSummaryValue(
+        icon: Icons.music_note_rounded,
+        label: _t(context, 'Tracks', '曲'),
+        value: _numberFormat(context).format(trackCount),
+      ),
+      _GroupSummaryValue(
+        icon: Icons.play_arrow_rounded,
+        label: _t(context, 'Plays', '再生回数'),
+        value: _numberFormat(context).format(totalPlayCount),
+      ),
+      _GroupSummaryValue(
+        icon: Icons.fast_forward_rounded,
+        label: _t(context, 'Skips', 'スキップ'),
+        value: _numberFormat(context).format(totalSkipCount),
+      ),
+      _GroupSummaryValue(
+        icon: Icons.schedule_rounded,
+        label: _t(context, 'Hours', '時間'),
+        value: _hoursLabel(totalListeningSeconds),
+      ),
+      _GroupSummaryValue(
+        icon: Icons.leaderboard_rounded,
+        label: _t(context, 'Top song', '上位の曲'),
+        value: topTrack?.title ?? _t(context, 'None', 'なし'),
+      ),
+      _GroupSummaryValue(
+        icon: Icons.history_rounded,
+        label: _t(context, 'Latest', '直近'),
+        value: latestTrack == null
+            ? _t(context, 'None', 'なし')
+            : latestTrack!.title,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 560 ? 3 : 2;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: values.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: columns == 3 ? 2.35 : 2.05,
+          ),
+          itemBuilder: (context, index) =>
+              _TrackGroupSummaryTile(value: values[index]),
+        );
+      },
+    );
+  }
+}
+
+class _TrackGroupSummaryTile extends StatelessWidget {
+  const _TrackGroupSummaryTile({required this.value});
+
+  final _GroupSummaryValue value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.44,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.34),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          children: [
+            Icon(value.icon, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value.value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2971,12 +3123,15 @@ class _OverviewSection extends StatelessWidget {
         const SizedBox(height: 14),
         _SnapshotStatusPanel(
           history: stats.snapshotHistory,
+          overview: overview,
           isDemo: overview.isDemo,
         ),
         const SizedBox(height: 14),
         _SummaryGrid(overview: overview),
         const SizedBox(height: 14),
         _OverviewInsightPanel(overview: overview),
+        const SizedBox(height: 14),
+        _SmartListsPanel(overview: overview),
         const SizedBox(height: 14),
         _OverviewBreakdownPanel(overview: overview),
         const SizedBox(height: 14),
@@ -3241,9 +3396,14 @@ class _SignalTile extends StatelessWidget {
 }
 
 class _SnapshotStatusPanel extends StatelessWidget {
-  const _SnapshotStatusPanel({required this.history, required this.isDemo});
+  const _SnapshotStatusPanel({
+    required this.history,
+    required this.overview,
+    required this.isDemo,
+  });
 
   final SnapshotHistory history;
+  final LibraryOverview overview;
   final bool isDemo;
 
   @override
@@ -3399,6 +3559,8 @@ class _SnapshotStatusPanel extends StatelessWidget {
               );
             },
           ),
+          const SizedBox(height: 14),
+          _SnapshotTrendChart(history: history),
           if (topDeltas.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
@@ -3412,27 +3574,9 @@ class _SnapshotStatusPanel extends StatelessWidget {
             ...topDeltas.map(
               (track) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        track.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      '+${number.format(track.playDelta)}',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+                child: _SnapshotDeltaRow(
+                  delta: track,
+                  track: overview.trackById(track.id),
                 ),
               ),
             ),
@@ -3486,6 +3630,225 @@ class _SnapshotMetric extends StatelessWidget {
             ),
             Text(value, style: theme.textTheme.titleSmall),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SnapshotTrendChart extends StatelessWidget {
+  const _SnapshotTrendChart({required this.history});
+
+  final SnapshotHistory history;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final number = _numberFormat(context);
+    final values = _snapshotTrendValues(context, history);
+    final maxPlayDelta = values.fold<int>(
+      0,
+      (current, value) => value.playDelta > current ? value.playDelta : current,
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.38,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.34),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.stacked_bar_chart_rounded,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _t(context, 'Snapshot trend', '日次スナップショット推移'),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (values.isEmpty)
+              Text(
+                _t(
+                  context,
+                  'Trend bars appear after two or more snapshots.',
+                  '2件以上のスナップショットが保存されると推移を表示します。',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            else
+              ...values.map(
+                (value) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _SnapshotTrendBar(
+                    value: value,
+                    maxPlayDelta: maxPlayDelta,
+                    trailing: '+${number.format(value.playDelta)}',
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SnapshotTrendBar extends StatelessWidget {
+  const _SnapshotTrendBar({
+    required this.value,
+    required this.maxPlayDelta,
+    required this.trailing,
+  });
+
+  final _SnapshotTrendValue value;
+  final int maxPlayDelta;
+  final String trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ratio = maxPlayDelta <= 0 ? 0.0 : value.playDelta / maxPlayDelta;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 58,
+          child: Text(
+            value.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: ColoredBox(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.32),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: ratio.clamp(0.0, 1.0),
+                  child: SizedBox(
+                    height: 9,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 54,
+          child: Text(
+            trailing,
+            textAlign: TextAlign.end,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SnapshotDeltaRow extends StatelessWidget {
+  const _SnapshotDeltaRow({required this.delta, required this.track});
+
+  final TrackCounterDelta delta;
+  final LibraryTrack? track;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final number = _numberFormat(context);
+    final content = Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                delta.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                delta.artist,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          '+${number.format(delta.playDelta)}',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        if (track != null)
+          Icon(
+            Icons.chevron_right_rounded,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+      ],
+    );
+
+    if (track == null) {
+      return content;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showTrackDetailSheet(context, track!),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+          child: content,
         ),
       ),
     );
@@ -3943,6 +4306,158 @@ class _OverviewInsightTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SmartListsPanel extends StatelessWidget {
+  const _SmartListsPanel({required this.overview});
+
+  final LibraryOverview overview;
+
+  @override
+  Widget build(BuildContext context) {
+    final lists = _smartListsFor(context, overview);
+    return GlassSurface(
+      padding: const EdgeInsets.all(18),
+      radius: 24,
+      tint: const Color(0x4FFFFFFF),
+      borderOpacity: 0.34,
+      shadowOpacity: 0.045,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PanelHeading(
+            icon: Icons.auto_awesome_motion_rounded,
+            title: _t(context, 'Smart lists', 'スマートリスト'),
+            subtitle: _t(
+              context,
+              'Auto-generated views from play counts and metadata',
+              '再生回数とメタデータから自動で作る切り口',
+            ),
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 720
+                  ? 4
+                  : constraints.maxWidth >= 460
+                  ? 2
+                  : 1;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: lists.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: columns == 1 ? 3.0 : 1.55,
+                ),
+                itemBuilder: (context, index) => _SmartListCard(
+                  list: lists[index],
+                  onTap: lists[index].tracks.isEmpty
+                      ? null
+                      : () => _showTrackGroupSheet(
+                          context,
+                          title: lists[index].title,
+                          subtitle: lists[index].subtitle,
+                          icon: lists[index].icon,
+                          tracks: lists[index].tracks,
+                        ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmartListCard extends StatelessWidget {
+  const _SmartListCard({required this.list, required this.onTap});
+
+  final _SmartListDefinition list;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final preview = list.tracks.take(2).map((track) => track.title).join(', ');
+    final radius = BorderRadius.circular(16);
+    final content = DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.44,
+        ),
+        borderRadius: radius,
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(list.icon, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    list.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  _numberFormat(context).format(list.tracks.length),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              list.subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              preview.isEmpty ? list.emptyLabel : preview,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: preview.isEmpty
+                    ? theme.colorScheme.onSurfaceVariant
+                    : theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(borderRadius: radius, onTap: onTap, child: content),
     );
   }
 }
@@ -5309,6 +5824,13 @@ class _SettingsSection extends ConsumerWidget {
               _AppLockSetting(lockState: appLock),
               const SizedBox(height: 18),
               Text(
+                _t(context, 'Export', 'エクスポート'),
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 10),
+              _ExportSetting(stats: stats),
+              const SizedBox(height: 18),
+              Text(
                 _t(context, 'Monetization', '収益化'),
                 style: theme.textTheme.titleMedium,
               ),
@@ -5382,6 +5904,64 @@ class _SettingsSection extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ExportSetting extends StatelessWidget {
+  const _ExportSetting({required this.stats});
+
+  final MusicStatsState stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingsRow(
+          icon: Icons.table_chart_outlined,
+          label: _t(context, 'Library rows', 'ライブラリ行'),
+          value: _trackCountLabel(context, stats.overview.totalTracks),
+        ),
+        _SettingsRow(
+          icon: Icons.calendar_month_outlined,
+          label: _t(context, 'Snapshots', 'スナップショット'),
+          value: _dayCountLabel(context, stats.snapshotHistory.snapshotCount),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _t(
+            context,
+            'CSV is suited for spreadsheets. JSON includes snapshot summaries for backup or analysis.',
+            'CSVは表計算向け、JSONはスナップショット概要も含む分析・バックアップ向けです。',
+          ),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          alignment: WrapAlignment.end,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () =>
+                  _copyLibraryExport(context, stats, LibraryExportFormat.csv),
+              icon: const Icon(Icons.grid_on_rounded),
+              label: Text(_t(context, 'Copy CSV', 'CSVをコピー')),
+            ),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  _copyLibraryExport(context, stats, LibraryExportFormat.json),
+              icon: const Icon(Icons.data_object_rounded),
+              label: Text(_t(context, 'Copy JSON', 'JSONをコピー')),
+            ),
+          ],
         ),
       ],
     );
@@ -5542,6 +6122,22 @@ class _PremiumSetting extends ConsumerWidget {
                 label: _t(context, 'Product ID', '商品ID'),
                 value: state.productId,
               ),
+            if (!state.entitled && state.productTitle != null)
+              _SettingsRow(
+                icon: Icons.local_offer_outlined,
+                label: _t(context, 'Store product', 'ストア商品'),
+                value: state.productTitle!,
+              ),
+            if (!state.entitled && state.productDescription != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                state.productDescription!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             if (state.message != null || state.errorMessage != null) ...[
               const SizedBox(height: 6),
               Text(
@@ -5587,6 +6183,17 @@ class _PremiumSetting extends ConsumerWidget {
                               'プレミアムを購入 ${state.price}',
                             ),
                     ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: state.busy
+                        ? null
+                        : () {
+                            ref
+                                .read(premiumControllerProvider.notifier)
+                                .reloadProduct();
+                          },
+                    icon: const Icon(Icons.sync_rounded),
+                    label: Text(_t(context, 'Reload product', '商品を再取得')),
                   ),
                   OutlinedButton.icon(
                     onPressed: state.canRestore
@@ -5654,6 +6261,11 @@ String _premiumMessageLabel(BuildContext context, String message) {
       'Configure the premium product in App Store Connect.',
       'App Store Connectでプレミアム商品を設定してください。',
     ),
+    'Store is not available.' => _t(
+      context,
+      'Store is not available.',
+      'ストアを利用できません。',
+    ),
     'Purchase is waiting for store confirmation.' => _t(
       context,
       'Purchase is waiting for store confirmation.',
@@ -5677,6 +6289,50 @@ String _premiumMessageLabel(BuildContext context, String message) {
     'Purchase failed.' => _t(context, 'Purchase failed.', '購入に失敗しました。'),
     _ => message,
   };
+}
+
+Future<void> _copyLibraryExport(
+  BuildContext context,
+  MusicStatsState stats,
+  LibraryExportFormat format,
+) async {
+  final payload = buildLibraryExportPayload(stats, format);
+  final messenger = ScaffoldMessenger.maybeOf(context);
+
+  try {
+    await Clipboard.setData(ClipboardData(text: payload.content));
+  } on Exception {
+    if (!context.mounted) {
+      return;
+    }
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(
+          _t(
+            context,
+            'Could not copy the export data.',
+            'エクスポートデータをコピーできませんでした。',
+          ),
+        ),
+      ),
+    );
+    return;
+  }
+
+  if (!context.mounted) {
+    return;
+  }
+  messenger?.showSnackBar(
+    SnackBar(
+      content: Text(
+        _t(
+          context,
+          'Copied ${payload.fileName} to the clipboard.',
+          '${payload.fileName} をクリップボードにコピーしました。',
+        ),
+      ),
+    ),
+  );
 }
 
 Future<void> _openExternalUrl(BuildContext context, String url) async {
@@ -6621,8 +7277,195 @@ int _compareDateDesc(DateTime? a, DateTime? b) {
   return b.compareTo(a);
 }
 
+LibraryTrack? _latestPlayedTrack(List<LibraryTrack> tracks) {
+  LibraryTrack? latest;
+  for (final track in tracks) {
+    final playedAt = track.lastPlayedAt;
+    if (playedAt == null) {
+      continue;
+    }
+    final current = latest?.lastPlayedAt;
+    if (current == null || playedAt.isAfter(current)) {
+      latest = track;
+    }
+  }
+  return latest;
+}
+
 String _normalizeSearchText(String value) {
   return value.trim().toLowerCase();
+}
+
+List<_SnapshotTrendValue> _snapshotTrendValues(
+  BuildContext context,
+  SnapshotHistory history,
+) {
+  final snapshots = history.snapshots;
+  if (snapshots.length < 2) {
+    return const [];
+  }
+
+  final start = _clampInt(snapshots.length - 8, 1, snapshots.length - 1);
+  final dateFormat = DateFormat.Md(_localeName(context));
+  return [
+    for (var index = start; index < snapshots.length; index++)
+      _SnapshotTrendValue.fromDelta(
+        label: dateFormat.format(snapshots[index].capturedAt),
+        delta: SnapshotDelta.compare(
+          previous: snapshots[index - 1],
+          current: snapshots[index],
+        ),
+      ),
+  ];
+}
+
+class _SnapshotTrendValue {
+  const _SnapshotTrendValue({
+    required this.label,
+    required this.playDelta,
+    required this.skipDelta,
+  });
+
+  final String label;
+  final int playDelta;
+  final int skipDelta;
+
+  factory _SnapshotTrendValue.fromDelta({
+    required String label,
+    required SnapshotDelta delta,
+  }) {
+    return _SnapshotTrendValue(
+      label: label,
+      playDelta: delta.totalPlayDelta,
+      skipDelta: delta.totalSkipDelta,
+    );
+  }
+}
+
+List<_SmartListDefinition> _smartListsFor(
+  BuildContext context,
+  LibraryOverview overview,
+) {
+  final now = overview.generatedAt;
+  final averagePlays = overview.totalTracks == 0
+      ? 0
+      : (overview.totalPlayCount / overview.totalTracks).ceil();
+  final favoriteThreshold = averagePlays < 5 ? 5 : averagePlays;
+  final sleepingFavorites =
+      overview.tracks
+          .where((track) {
+            final lastPlayedAt = track.lastPlayedAt;
+            if (lastPlayedAt == null) {
+              return false;
+            }
+            return track.playCount >= favoriteThreshold &&
+                now.difference(lastPlayedAt).inDays >= 30;
+          })
+          .toList(growable: false)
+        ..sort((a, b) => b.playCount.compareTo(a.playCount));
+
+  final highSkipRate =
+      overview.tracks
+          .where((track) {
+            final interactions = track.playCount + track.skipCount;
+            if (interactions < 4) {
+              return false;
+            }
+            return track.skipCount / interactions >= 0.2;
+          })
+          .toList(growable: false)
+        ..sort(_compareSkipPressureDesc);
+
+  final underplayed =
+      overview.tracks
+          .where((track) => track.playCount <= 1)
+          .toList(growable: false)
+        ..sort(
+          (a, b) => _normalizeSearchText(
+            a.title,
+          ).compareTo(_normalizeSearchText(b.title)),
+        );
+
+  final notInPlaylists =
+      overview.tracks
+          .where((track) => track.playlistNames.isEmpty)
+          .toList(growable: false)
+        ..sort((a, b) => b.playCount.compareTo(a.playCount));
+
+  return [
+    _SmartListDefinition(
+      icon: Icons.nights_stay_outlined,
+      title: _t(context, 'Sleeping favorites', '眠っているお気に入り'),
+      subtitle: _t(
+        context,
+        'Often played, not heard in 30+ days',
+        'よく聴いたまま30日以上再生していない曲',
+      ),
+      emptyLabel: _t(context, 'No dormant favorites', '該当する曲はありません'),
+      tracks: sleepingFavorites,
+    ),
+    _SmartListDefinition(
+      icon: Icons.trending_down_rounded,
+      title: _t(context, 'High skip rate', 'スキップ率が高い曲'),
+      subtitle: _t(
+        context,
+        'Songs with repeated skips versus plays',
+        '再生に対してスキップが目立つ曲',
+      ),
+      emptyLabel: _t(context, 'No high-skip songs', '該当する曲はありません'),
+      tracks: highSkipRate,
+    ),
+    _SmartListDefinition(
+      icon: Icons.radio_button_unchecked_rounded,
+      title: _t(context, 'Underplayed', '未再生・低再生'),
+      subtitle: _t(context, 'Songs with one play or less', '再生回数が1回以下の曲'),
+      emptyLabel: _t(context, 'No underplayed songs', '該当する曲はありません'),
+      tracks: underplayed,
+    ),
+    _SmartListDefinition(
+      icon: Icons.playlist_remove_rounded,
+      title: _t(context, 'Not in playlists', 'プレイリスト未所属'),
+      subtitle: _t(
+        context,
+        'Songs without returned playlist membership',
+        '取得できたプレイリストに含まれていない曲',
+      ),
+      emptyLabel: _t(context, 'All songs are in playlists', '該当する曲はありません'),
+      tracks: notInPlaylists,
+    ),
+  ];
+}
+
+int _compareSkipPressureDesc(LibraryTrack a, LibraryTrack b) {
+  final aInteractions = a.playCount + a.skipCount;
+  final bInteractions = b.playCount + b.skipCount;
+  final aRate = aInteractions == 0 ? 0.0 : a.skipCount / aInteractions;
+  final bRate = bInteractions == 0 ? 0.0 : b.skipCount / bInteractions;
+  final byRate = bRate.compareTo(aRate);
+  if (byRate != 0) {
+    return byRate;
+  }
+  final bySkips = b.skipCount.compareTo(a.skipCount);
+  if (bySkips != 0) {
+    return bySkips;
+  }
+  return _normalizeSearchText(a.title).compareTo(_normalizeSearchText(b.title));
+}
+
+class _SmartListDefinition {
+  const _SmartListDefinition({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.emptyLabel,
+    required this.tracks,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String emptyLabel;
+  final List<LibraryTrack> tracks;
 }
 
 class _OverviewInsightValue {
@@ -6746,6 +7589,18 @@ class _LibraryGroupAccumulator {
 
 class _SummaryValue {
   const _SummaryValue({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+}
+
+class _GroupSummaryValue {
+  const _GroupSummaryValue({
     required this.icon,
     required this.label,
     required this.value,

@@ -91,6 +91,9 @@ Android still uses Google's sample App ID until an Android AdMob app is created:
 
 The premium product ID defaults to `songbrief_premium_lifetime` and can be
 changed with `--dart-define=SONGBRIEF_PREMIUM_PRODUCT_ID=...`.
+Create the matching non-consumable product in App Store Connect before
+TestFlight purchase testing. The app settings screen shows the loaded store
+product title, price, and a reload action for checking configuration changes.
 
 ## Legal Pages
 
