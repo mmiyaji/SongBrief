@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:ui' show ImageFilter;
 
+import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -6107,15 +6109,15 @@ class _ExportSetting extends StatelessWidget {
           children: [
             OutlinedButton.icon(
               onPressed: () =>
-                  _copyLibraryExport(context, stats, LibraryExportFormat.csv),
+                  _saveLibraryExport(context, stats, LibraryExportFormat.csv),
               icon: const Icon(Icons.grid_on_rounded),
-              label: Text(_t(context, 'Copy CSV', 'CSVをコピー')),
+              label: Text(_t(context, 'Save CSV', 'CSVを保存')),
             ),
             OutlinedButton.icon(
               onPressed: () =>
-                  _copyLibraryExport(context, stats, LibraryExportFormat.json),
+                  _saveLibraryExport(context, stats, LibraryExportFormat.json),
               icon: const Icon(Icons.data_object_rounded),
-              label: Text(_t(context, 'Copy JSON', 'JSONをコピー')),
+              label: Text(_t(context, 'Save JSON', 'JSONを保存')),
             ),
           ],
         ),
@@ -6447,16 +6449,41 @@ String _premiumMessageLabel(BuildContext context, String message) {
   };
 }
 
-Future<void> _copyLibraryExport(
+Future<void> _saveLibraryExport(
   BuildContext context,
   MusicStatsState stats,
   LibraryExportFormat format,
 ) async {
   final payload = buildLibraryExportPayload(stats, format);
   final messenger = ScaffoldMessenger.maybeOf(context);
+  final extension = _libraryExportExtension(format);
+  final fileName = payload.fileName;
+  final baseName = fileName.endsWith('.$extension')
+      ? fileName.substring(0, fileName.length - extension.length - 1)
+      : fileName;
 
   try {
-    await Clipboard.setData(ClipboardData(text: payload.content));
+    final savedPath = await FileSaver.instance.saveAs(
+      name: baseName,
+      bytes: Uint8List.fromList(utf8.encode(payload.content)),
+      fileExtension: extension,
+      mimeType: _libraryExportMimeType(format),
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (savedPath == null) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(context, 'Export was cancelled.', 'エクスポートをキャンセルしました。'),
+          ),
+        ),
+      );
+      return;
+    }
   } on Exception {
     if (!context.mounted) {
       return;
@@ -6466,8 +6493,8 @@ Future<void> _copyLibraryExport(
         content: Text(
           _t(
             context,
-            'Could not copy the export data.',
-            'エクスポートデータをコピーできませんでした。',
+            'Could not save the export file.',
+            'エクスポートファイルを保存できませんでした。',
           ),
         ),
       ),
@@ -6483,13 +6510,23 @@ Future<void> _copyLibraryExport(
       content: Text(
         _t(
           context,
-          'Copied ${payload.fileName} to the clipboard.',
-          '${payload.fileName} をクリップボードにコピーしました。',
+          'Saved ${payload.fileName}.',
+          '${payload.fileName} を保存しました。',
         ),
       ),
     ),
   );
 }
+
+String _libraryExportExtension(LibraryExportFormat format) => switch (format) {
+  LibraryExportFormat.csv => 'csv',
+  LibraryExportFormat.json => 'json',
+};
+
+MimeType _libraryExportMimeType(LibraryExportFormat format) => switch (format) {
+  LibraryExportFormat.csv => MimeType.csv,
+  LibraryExportFormat.json => MimeType.json,
+};
 
 Future<void> _openAppleMusicTrack(
   BuildContext context,

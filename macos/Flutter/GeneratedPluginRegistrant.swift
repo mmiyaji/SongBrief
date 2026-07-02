@@ -5,6 +5,7 @@
 import FlutterMacOS
 import Foundation
 
+import file_saver
 import in_app_purchase_storekit
 import local_auth_darwin
 import shared_preferences_foundation
@@ -12,6 +13,7 @@ import url_launcher_macos
 import webview_flutter_wkwebview
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
+  FileSaverPlugin.register(with: registry.registrar(forPlugin: "FileSaverPlugin"))
   InAppPurchasePlugin.register(with: registry.registrar(forPlugin: "InAppPurchasePlugin"))
   LocalAuthPlugin.register(with: registry.registrar(forPlugin: "LocalAuthPlugin"))
   SharedPreferencesPlugin.register(with: registry.registrar(forPlugin: "SharedPreferencesPlugin"))
