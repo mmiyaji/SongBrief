@@ -1317,7 +1317,7 @@ class _SettingsSection extends ConsumerWidget {
               _DataManagementSetting(stats: stats),
               const SizedBox(height: 18),
               Text(
-                _t(context, 'Monetization', '収益化'),
+                _t(context, 'Premium', 'プレミアム'),
                 style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 10),
