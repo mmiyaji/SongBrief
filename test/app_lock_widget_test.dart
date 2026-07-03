@@ -9,6 +9,7 @@ void main() {
     tester,
   ) async {
     var sheetActions = 0;
+    final protector = _FakeAppLockPrivacyProtector();
 
     await tester.pumpWidget(
       ProviderScope(
@@ -18,6 +19,7 @@ void main() {
               const AppLockState(enabled: true, locked: false, supported: true),
             ),
           ),
+          appLockPrivacyProtectorProvider.overrideWithValue(protector),
         ],
         child: MaterialApp(
           builder: (context, child) =>
@@ -64,6 +66,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('SongBrief is locked'), findsOneWidget);
+    expect(protector.lockStates, contains(true));
 
     await tester.tap(
       find.byKey(const ValueKey('sheet-action')),
@@ -73,6 +76,15 @@ void main() {
 
     expect(sheetActions, 0);
   });
+}
+
+class _FakeAppLockPrivacyProtector extends AppLockPrivacyProtector {
+  final lockStates = <bool>[];
+
+  @override
+  Future<void> setLocked(bool locked) async {
+    lockStates.add(locked);
+  }
 }
 
 class _TestAppLockController extends AppLockController {

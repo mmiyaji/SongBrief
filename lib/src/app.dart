@@ -58,14 +58,19 @@ class AppLockGate extends ConsumerStatefulWidget {
 
 class _AppLockGateState extends ConsumerState<AppLockGate>
     with WidgetsBindingObserver {
+  bool? _lastProtectedLockState;
+  late final AppLockPrivacyProtector _privacyProtector;
+
   @override
   void initState() {
     super.initState();
+    _privacyProtector = ref.read(appLockPrivacyProtectorProvider);
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    unawaited(_privacyProtector.setLocked(false));
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -75,6 +80,7 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
+      unawaited(_privacyProtector.setLocked(true));
       unawaited(ref.read(appLockControllerProvider.notifier).lock());
     }
   }
@@ -82,12 +88,27 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(appLockControllerProvider).value;
+    final locked = state?.locked ?? false;
+    _syncPrivacyProtection(locked);
     return Stack(
       children: [
         widget.child,
-        if (state?.locked ?? false) _AppLockScreen(state: state!),
+        if (locked) _AppLockScreen(state: state!),
       ],
     );
+  }
+
+  void _syncPrivacyProtection(bool locked) {
+    if (_lastProtectedLockState == locked) {
+      return;
+    }
+    _lastProtectedLockState = locked;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_privacyProtector.setLocked(locked));
+    });
   }
 }
 

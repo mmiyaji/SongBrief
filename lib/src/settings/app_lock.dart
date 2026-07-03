@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:screen_protector/screen_protector.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _appLockEnabledKey = 'songbrief_app_lock_enabled_v1';
@@ -15,6 +17,10 @@ final appLockControllerProvider =
     AsyncNotifierProvider<AppLockController, AppLockState>(
       AppLockController.new,
     );
+
+final appLockPrivacyProtectorProvider = Provider<AppLockPrivacyProtector>(
+  (ref) => const AppLockPrivacyProtector(),
+);
 
 class AppLockState {
   const AppLockState({
@@ -46,6 +52,34 @@ class AppLockState {
       errorMessage: errorMessage,
     );
   }
+}
+
+class AppLockPrivacyProtector {
+  const AppLockPrivacyProtector();
+
+  Future<void> setLocked(bool locked) async {
+    if (!_supportsLockPreviewProtection) {
+      return;
+    }
+
+    try {
+      if (locked) {
+        await ScreenProtector.protectDataLeakageWithColor(
+          const Color(0xFF040708),
+        );
+      } else {
+        await ScreenProtector.protectDataLeakageWithColorOff();
+      }
+    } on MissingPluginException {
+      // Preview protection is best-effort and should not block app locking.
+    } on PlatformException {
+      // Keep the visual lock active even if native secure preview setup fails.
+    }
+  }
+}
+
+bool get _supportsLockPreviewProtection {
+  return !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 }
 
 class AppLockController extends AsyncNotifier<AppLockState> {
