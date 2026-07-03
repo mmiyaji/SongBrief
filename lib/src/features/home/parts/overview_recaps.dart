@@ -209,6 +209,7 @@ class _PeriodRecapCard extends StatefulWidget {
 
 class _PeriodRecapCardState extends State<_PeriodRecapCard> {
   final _captureKey = GlobalKey();
+  bool _isExporting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -227,10 +228,22 @@ class _PeriodRecapCardState extends State<_PeriodRecapCard> {
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
-            child: FilledButton.tonalIcon(
-              onPressed: _saveImage,
-              icon: const Icon(Icons.image_outlined, size: 18),
-              label: Text(_t(context, 'Save PNG', 'PNG保存')),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _isExporting ? null : _saveImage,
+                  icon: const Icon(Icons.image_outlined, size: 18),
+                  label: Text(_t(context, 'Save PNG', 'PNG保存')),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _isExporting ? null : _shareImage,
+                  icon: const Icon(Icons.ios_share_rounded, size: 18),
+                  label: Text(_t(context, 'Share', '共有')),
+                ),
+              ],
             ),
           ),
         ],
@@ -238,56 +251,133 @@ class _PeriodRecapCardState extends State<_PeriodRecapCard> {
     );
   }
 
-  Future<void> _saveImage() async {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    try {
-      await WidgetsBinding.instance.endOfFrame;
-      final boundary =
-          _captureKey.currentContext?.findRenderObject()
-              as RenderRepaintBoundary?;
-      if (boundary == null) {
-        throw StateError('Recap card is not ready.');
-      }
-      final image = await boundary.toImage(pixelRatio: 3);
-      final byteData = await image.toByteData(format: ImageByteFormat.png);
-      if (byteData == null) {
-        throw StateError('Could not encode recap image.');
-      }
-      final savedPath = await FileSaver.instance.saveAs(
-        name: widget.fileStem,
-        bytes: byteData.buffer.asUint8List(),
-        fileExtension: 'png',
-        mimeType: MimeType.png,
-      );
-
-      if (!mounted) {
-        return;
-      }
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            savedPath == null
-                ? _t(context, 'Image save was cancelled.', '画像保存をキャンセルしました。')
-                : _t(context, 'Recap image saved.', 'リキャップ画像を保存しました。'),
-          ),
-        ),
-      );
-    } on Object {
-      if (!mounted) {
-        return;
-      }
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            _t(
-              context,
-              'Could not save the recap image.',
-              'リキャップ画像を保存できませんでした。',
-            ),
-          ),
-        ),
-      );
+  Future<Uint8List> _captureImageBytes() async {
+    await WidgetsBinding.instance.endOfFrame;
+    final boundary =
+        _captureKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
+    if (boundary == null) {
+      throw StateError('Recap card is not ready.');
     }
+    final image = await boundary.toImage(pixelRatio: 3);
+    final byteData = await image.toByteData(format: ImageByteFormat.png);
+    if (byteData == null) {
+      throw StateError('Could not encode recap image.');
+    }
+    return byteData.buffer.asUint8List(
+      byteData.offsetInBytes,
+      byteData.lengthInBytes,
+    );
+  }
+
+  Rect? _shareOrigin() {
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) {
+      return null;
+    }
+    return renderObject.localToGlobal(Offset.zero) & renderObject.size;
+  }
+
+  Future<void> _withExportFeedback({
+    required Future<void> Function() action,
+    required String failureEn,
+    required String failureJa,
+  }) async {
+    if (_isExporting) {
+      return;
+    }
+    setState(() {
+      _isExporting = true;
+    });
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final failureMessage = _t(context, failureEn, failureJa);
+    try {
+      await action();
+    } on Object {
+      if (mounted) {
+        messenger?.showSnackBar(SnackBar(content: Text(failureMessage)));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveImage() {
+    return _withExportFeedback(
+      failureEn: 'Could not save the recap image.',
+      failureJa: 'リキャップ画像を保存できませんでした。',
+      action: () async {
+        final cancelledMessage = _t(
+          context,
+          'Image save was cancelled.',
+          '画像保存をキャンセルしました。',
+        );
+        final savedMessage = _t(
+          context,
+          'Recap image saved.',
+          'リキャップ画像を保存しました。',
+        );
+        final bytes = await _captureImageBytes();
+        final savedPath = await FileSaver.instance.saveAs(
+          name: widget.fileStem,
+          bytes: bytes,
+          fileExtension: 'png',
+          mimeType: MimeType.png,
+        );
+
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            content: Text(savedPath == null ? cancelledMessage : savedMessage),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _shareImage() {
+    return _withExportFeedback(
+      failureEn: 'Could not share the recap image.',
+      failureJa: 'リキャップ画像を共有できませんでした。',
+      action: () async {
+        final shareText = _t(context, 'SongBrief recap', 'SongBriefのリキャップ');
+        final unavailableMessage = _t(
+          context,
+          'Sharing is not available on this device.',
+          'この端末では共有を利用できません。',
+        );
+        final shareOrigin = _shareOrigin();
+        final bytes = await _captureImageBytes();
+        final result = await SharePlus.instance.share(
+          ShareParams(
+            title: widget.title,
+            text: shareText,
+            files: [
+              XFile.fromData(
+                bytes,
+                mimeType: 'image/png',
+                name: '${widget.fileStem}.png',
+              ),
+            ],
+            fileNameOverrides: ['${widget.fileStem}.png'],
+            sharePositionOrigin: shareOrigin,
+          ),
+        );
+
+        if (!mounted || result.status != ShareResultStatus.unavailable) {
+          return;
+        }
+        ScaffoldMessenger.maybeOf(
+          context,
+        )?.showSnackBar(SnackBar(content: Text(unavailableMessage)));
+      },
+    );
   }
 }
 
