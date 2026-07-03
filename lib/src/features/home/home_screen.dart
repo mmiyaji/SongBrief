@@ -3257,9 +3257,12 @@ class _CollapsibleLyricsTextState extends State<_CollapsibleLyricsText> {
 
   bool _expanded = false;
 
+  String get _lyrics => _normalizeLyricsText(widget.lyrics);
+
   bool get _shouldCollapse {
-    final explicitLines = widget.lyrics.split('\n').length;
-    return explicitLines > _collapsedLineCount || widget.lyrics.length > 160;
+    final lyrics = _lyrics;
+    final explicitLines = lyrics.split('\n').length;
+    return explicitLines > _collapsedLineCount || lyrics.length > 160;
   }
 
   @override
@@ -3271,7 +3274,7 @@ class _CollapsibleLyricsTextState extends State<_CollapsibleLyricsText> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SelectableText(
-          widget.lyrics,
+          _lyrics,
           maxLines: shouldCollapse && !_expanded ? _collapsedLineCount : null,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -10514,6 +10517,10 @@ String _compactNumber(int value) {
     return '${compact.toStringAsFixed(compact >= 10 ? 0 : 1)}K';
   }
   return NumberFormat.decimalPattern().format(value);
+}
+
+String _normalizeLyricsText(String lyrics) {
+  return lyrics.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
 }
 
 String _trendRangeLabel(BuildContext context, TrendRange range) {

@@ -14,13 +14,13 @@ void main() {
       'isCloudItem': false,
       'appleMusicStoreId': '123456789',
       'releaseDateMillis': DateTime(2020, 1, 2).millisecondsSinceEpoch,
-      'lyrics': '  line one\nline two  ',
+      'lyrics': '  line one\r\nline two\rline three  ',
       'playlistNames': ['Focus', '', 'Recently Played', 'Focus', 99],
     });
 
     expect(track.appleMusicStoreId, '123456789');
     expect(track.releaseDate, DateTime(2020, 1, 2));
-    expect(track.lyrics, 'line one\nline two');
+    expect(track.lyrics, 'line one\nline two\nline three');
     expect(track.playlistNames, ['Focus', 'Recently Played']);
   });
 }

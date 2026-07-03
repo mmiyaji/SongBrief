@@ -77,7 +77,7 @@ class LibraryTrack {
       skipCount: _readInt(map, 'skipCount'),
       lastPlayedAt: _readDateTime(map, 'lastPlayedAtMillis'),
       isCloudItem: _readBool(map, 'isCloudItem'),
-      lyrics: _readNullableString(map, 'lyrics'),
+      lyrics: _readLyrics(map, 'lyrics'),
       playlistNames: _readStringList(map, 'playlistNames'),
     );
   }
@@ -100,6 +100,16 @@ class LibraryTrack {
       return value.trim();
     }
     return null;
+  }
+
+  static String? _readLyrics(Map<Object?, Object?> map, String key) {
+    final value = _readNullableString(map, key);
+    if (value == null) {
+      return null;
+    }
+    final normalized = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final trimmed = normalized.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   static int _readInt(Map<Object?, Object?> map, String key) {
