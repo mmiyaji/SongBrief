@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:ui' as ui show TextDirection;
 import 'dart:ui' show ImageFilter;
 
 import 'package:file_saver/file_saver.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -4713,53 +4713,146 @@ class _InteractiveReleaseYearChartState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final buckets = widget.buckets;
     final selectedBucket = _selectedBucket;
+    final selectedIndex = selectedBucket == null
+        ? -1
+        : buckets.indexWhere((bucket) => bucket.year == selectedBucket.year);
+    final maxAverage = buckets.fold<double>(
+      1,
+      (current, bucket) => math.max(current, bucket.averagePlays),
+    );
+    final maxY = maxAverage <= 1 ? 1.0 : maxAverage * 1.18;
+    final spots = buckets.indexed
+        .map((entry) => FlSpot(entry.$1.toDouble(), entry.$2.averagePlays))
+        .toList(growable: false);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final size = Size(constraints.maxWidth, widget.height);
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapDown: (details) {
-                final bucket = _nearestReleaseYearBucket(
-                  widget.buckets,
-                  details.localPosition,
-                  size,
-                );
-                if (bucket == null) {
-                  return;
-                }
-                setState(() {
-                  _selectedBucket = bucket;
-                });
-              },
-              child: Tooltip(
-                triggerMode: TooltipTriggerMode.tap,
-                message: _t(
-                  context,
-                  'Tap a point to inspect the year.',
-                  '点をタップすると年別の数値を確認できます。',
-                ),
-                child: SizedBox(
-                  height: widget.height,
-                  child: CustomPaint(
-                    painter: _ReleaseYearCorrelationPainter(
-                      buckets: widget.buckets,
-                      selectedYear: selectedBucket?.year,
-                      primary: theme.colorScheme.primary,
-                      secondary: theme.colorScheme.tertiary,
-                      gridColor: theme.colorScheme.outlineVariant.withValues(
-                        alpha: 0.5,
-                      ),
-                      labelColor: theme.colorScheme.onSurfaceVariant,
-                    ),
+        SizedBox(
+          height: widget.height,
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: math.max(1, buckets.length - 1).toDouble(),
+              minY: 0,
+              maxY: maxY,
+              clipData: const FlClipData.all(),
+              borderData: FlBorderData(show: false),
+              gridData: FlGridData(
+                drawVerticalLine: false,
+                horizontalInterval: maxY / 3,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.42,
                   ),
+                  strokeWidth: 1,
                 ),
               ),
-            );
-          },
+              titlesData: _releaseYearTitlesData(
+                context: context,
+                buckets: buckets,
+                selectedIndex: selectedIndex,
+              ),
+              lineTouchData: LineTouchData(
+                touchSpotThreshold: 18,
+                touchCallback: (event, response) {
+                  if (event is! FlTapUpEvent) {
+                    return;
+                  }
+                  final spots = response?.lineBarSpots;
+                  if (spots == null || spots.isEmpty) {
+                    return;
+                  }
+                  final spot = spots.first;
+                  if (spot.spotIndex >= buckets.length) {
+                    return;
+                  }
+                  setState(() {
+                    _selectedBucket = buckets[spot.spotIndex];
+                  });
+                },
+                touchTooltipData: LineTouchTooltipData(
+                  tooltipBorderRadius: BorderRadius.circular(10),
+                  tooltipPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  tooltipMargin: 12,
+                  fitInsideHorizontally: true,
+                  fitInsideVertically: true,
+                  getTooltipColor: (spot) => theme.colorScheme.inverseSurface,
+                  getTooltipItems: (spots) => spots
+                      .map((spot) {
+                        final bucket = buckets[spot.spotIndex];
+                        return LineTooltipItem(
+                          '${bucket.year}\n'
+                          '${_playCountLabel(context, bucket.playCount)} / '
+                          '${_trackCountLabel(context, bucket.trackCount)}',
+                          theme.textTheme.labelSmall!.copyWith(
+                            color: theme.colorScheme.onInverseSurface,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        );
+                      })
+                      .toList(growable: false),
+                ),
+                getTouchedSpotIndicator: (barData, indicators) => indicators
+                    .map(
+                      (index) => TouchedSpotIndicatorData(
+                        FlLine(
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.42,
+                          ),
+                          strokeWidth: 2,
+                        ),
+                        FlDotData(
+                          getDotPainter: (spot, percent, barData, index) =>
+                              FlDotCirclePainter(
+                                radius: 7,
+                                color: theme.colorScheme.primary,
+                                strokeWidth: 3,
+                                strokeColor: theme.colorScheme.surface,
+                              ),
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  preventCurveOverShooting: true,
+                  color: theme.colorScheme.primary,
+                  barWidth: 3,
+                  isStrokeCapRound: true,
+                  isStrokeJoinRound: true,
+                  showingIndicators: selectedIndex < 0
+                      ? const []
+                      : [selectedIndex],
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                  ),
+                  dotData: FlDotData(
+                    getDotPainter: (spot, percent, barData, index) {
+                      final bucket = buckets[index];
+                      return FlDotCirclePainter(
+                        radius: 4.8 + math.min(bucket.trackCount, 6) * 0.42,
+                        color: theme.colorScheme.primary,
+                        strokeWidth: 2,
+                        strokeColor: theme.colorScheme.surface,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+          ),
         ),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
@@ -4791,6 +4884,71 @@ class _InteractiveReleaseYearChartState
       ],
     );
   }
+}
+
+FlTitlesData _releaseYearTitlesData({
+  required BuildContext context,
+  required List<_ReleaseYearBucket> buckets,
+  required int selectedIndex,
+}) {
+  final theme = Theme.of(context);
+  final labelStyle = theme.textTheme.labelSmall?.copyWith(
+    color: theme.colorScheme.onSurfaceVariant,
+    fontWeight: FontWeight.w800,
+  );
+  final yearStep = math.max(1, (buckets.length / 4).ceil());
+
+  Widget bottomTitle(double value, TitleMeta meta) {
+    final index = value.round();
+    if ((value - index).abs() > 0.01 || index < 0 || index >= buckets.length) {
+      return const SizedBox.shrink();
+    }
+    final shouldShow =
+        index == 0 ||
+        index == buckets.length - 1 ||
+        index == selectedIndex ||
+        index % yearStep == 0;
+    if (!shouldShow) {
+      return const SizedBox.shrink();
+    }
+    return SideTitleWidget(
+      meta: meta,
+      space: 7,
+      child: Text(buckets[index].year.toString(), style: labelStyle),
+    );
+  }
+
+  Widget leftTitle(double value, TitleMeta meta) {
+    if (value < 0) {
+      return const SizedBox.shrink();
+    }
+    return SideTitleWidget(
+      meta: meta,
+      space: 7,
+      child: Text(_compactNumber(value.round()), style: labelStyle),
+    );
+  }
+
+  return FlTitlesData(
+    topTitles: const AxisTitles(sideTitles: SideTitles()),
+    rightTitles: const AxisTitles(sideTitles: SideTitles()),
+    bottomTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 30,
+        interval: 1,
+        getTitlesWidget: bottomTitle,
+      ),
+    ),
+    leftTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 38,
+        maxIncluded: false,
+        getTitlesWidget: leftTitle,
+      ),
+    ),
+  );
 }
 
 class _ActivityHeatmapCard extends StatelessWidget {
@@ -4921,10 +5079,6 @@ class _GenreStackedReleaseBarsCard extends StatelessWidget {
     final stacks = _genreYearStacks(overview.tracks);
     final colors = _analysisPalette(theme);
     final legendItems = _genreLegendItems(stacks);
-    final maxPlays = stacks.fold<int>(
-      0,
-      (current, stack) => math.max(current, stack.playCount),
-    );
 
     return _OverviewAnalysisCard(
       icon: Icons.stacked_bar_chart_rounded,
@@ -4958,17 +5112,28 @@ class _GenreStackedReleaseBarsCard extends StatelessWidget {
                       .toList(),
                 ),
                 const SizedBox(height: 14),
-                ...stacks.map(
-                  (stack) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _GenreStackedYearRow(
-                      overview: overview,
-                      stack: stack,
-                      maxPlays: maxPlays,
-                      colors: colors,
-                      legendItems: legendItems,
-                    ),
-                  ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final chartWidth = math.max(
+                      constraints.maxWidth,
+                      stacks.length * 46.0,
+                    );
+                    return SizedBox(
+                      height: 260,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: chartWidth,
+                          child: _GenreStackedReleaseBarChart(
+                            overview: overview,
+                            stacks: stacks,
+                            colors: colors,
+                            legendItems: legendItems,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -4976,128 +5141,207 @@ class _GenreStackedReleaseBarsCard extends StatelessWidget {
   }
 }
 
-class _GenreStackedYearRow extends StatelessWidget {
-  const _GenreStackedYearRow({
+class _GenreStackedReleaseBarChart extends StatelessWidget {
+  const _GenreStackedReleaseBarChart({
     required this.overview,
-    required this.stack,
-    required this.maxPlays,
+    required this.stacks,
     required this.colors,
     required this.legendItems,
   });
 
   final LibraryOverview overview;
-  final _GenreYearStack stack;
-  final int maxPlays;
+  final List<_GenreYearStack> stacks;
   final List<Color> colors;
   final List<String> legendItems;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final totalRatio = maxPlays == 0 ? 0.0 : stack.playCount / maxPlays;
-    return Row(
-      children: [
-        SizedBox(
-          width: 44,
-          child: Text(
-            stack.year.toString(),
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w900,
+    final maxPlays = stacks.fold<int>(
+      1,
+      (current, stack) => math.max(current, stack.playCount),
+    );
+    final labelStyle = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w800,
+    );
+
+    return BarChart(
+      BarChartData(
+        minY: 0,
+        maxY: maxPlays * 1.15,
+        alignment: BarChartAlignment.spaceAround,
+        gridData: FlGridData(
+          drawVerticalLine: false,
+          horizontalInterval: math.max(1, maxPlays / 3),
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.36),
+            strokeWidth: 1,
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(sideTitles: SideTitles()),
+          rightTitles: const AxisTitles(sideTitles: SideTitles()),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 32,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final index = value.round();
+                if ((value - index).abs() > 0.01 ||
+                    index < 0 ||
+                    index >= stacks.length) {
+                  return const SizedBox.shrink();
+                }
+                final step = math.max(1, (stacks.length / 6).ceil());
+                if (index != 0 &&
+                    index != stacks.length - 1 &&
+                    index % step != 0) {
+                  return const SizedBox.shrink();
+                }
+                return SideTitleWidget(
+                  meta: meta,
+                  space: 8,
+                  child: Text(stacks[index].year.toString(), style: labelStyle),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 38,
+              maxIncluded: false,
+              getTitlesWidget: (value, meta) => SideTitleWidget(
+                meta: meta,
+                space: 7,
+                child: Text(_compactNumber(value.round()), style: labelStyle),
+              ),
             ),
           ),
         ),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final width = math.max(42.0, constraints.maxWidth * totalRatio);
-              return Align(
-                alignment: Alignment.centerLeft,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: SizedBox(
-                    width: width,
-                    height: 20,
-                    child: Row(
-                      children: stack.segments.indexed
-                          .map(
-                            (segment) => Expanded(
-                              flex: math.max(1, segment.$2.playCount),
-                              child: Tooltip(
-                                triggerMode: TooltipTriggerMode.tap,
-                                message:
-                                    '${stack.year} / ${segment.$2.genre}: '
-                                    '${_playCountLabel(context, segment.$2.playCount)}',
-                                child: GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: () {
-                                    final tracks = segment.$2.genre == 'Other'
-                                        ? _tracksByReleaseYearExcludingGenres(
-                                            overview,
-                                            year: stack.year,
-                                            excludedGenres: legendItems
-                                                .where(
-                                                  (genre) => genre != 'Other',
-                                                )
-                                                .toSet(),
-                                          )
-                                        : _tracksByReleaseYearAndGenre(
-                                            overview,
-                                            year: stack.year,
-                                            genre: segment.$2.genre,
-                                          );
-                                    if (tracks.isEmpty) {
-                                      return;
-                                    }
-                                    _showTrackGroupSheet(
-                                      context,
-                                      title:
-                                          '${stack.year} / ${segment.$2.genre}',
-                                      subtitle: _t(
-                                        context,
-                                        'Release-year genre songs',
-                                        '発売年とジャンルの曲',
-                                      ),
-                                      icon: Icons.stacked_bar_chart_rounded,
-                                      tracks: tracks,
-                                    );
-                                  },
-                                  child: ColoredBox(
-                                    color:
-                                        colors[math.max(
-                                              0,
-                                              legendItems.indexOf(
-                                                segment.$2.genre,
-                                              ),
-                                            ) %
-                                            colors.length],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
+        barTouchData: BarTouchData(
+          touchCallback: (event, response) {
+            if (event is! FlTapUpEvent) {
+              return;
+            }
+            final spot = response?.spot;
+            if (spot == null ||
+                spot.touchedBarGroupIndex < 0 ||
+                spot.touchedBarGroupIndex >= stacks.length) {
+              return;
+            }
+            final stack = stacks[spot.touchedBarGroupIndex];
+            final segmentIndex = spot.touchedStackItemIndex;
+            final segment =
+                segmentIndex >= 0 && segmentIndex < stack.segments.length
+                ? stack.segments[segmentIndex]
+                : null;
+            _showGenreYearTracks(
+              context: context,
+              overview: overview,
+              stack: stack,
+              segment: segment,
+              legendItems: legendItems,
+            );
+          },
+          touchTooltipData: BarTouchTooltipData(
+            tooltipBorderRadius: BorderRadius.circular(10),
+            tooltipPadding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 8,
+            ),
+            tooltipMargin: 12,
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            getTooltipColor: (group) => theme.colorScheme.inverseSurface,
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final stack = stacks[group.x];
+              return BarTooltipItem(
+                '${stack.year}\n${_playCountLabel(context, stack.playCount)}',
+                theme.textTheme.labelSmall!.copyWith(
+                  color: theme.colorScheme.onInverseSurface,
+                  fontWeight: FontWeight.w900,
                 ),
               );
             },
           ),
         ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 56,
-          child: Text(
-            _compactNumber(stack.playCount),
-            textAlign: TextAlign.right,
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
+        barGroups: stacks.indexed
+            .map((entry) {
+              final stack = entry.$2;
+              var start = 0.0;
+              final segments = stack.segments
+                  .map((segment) {
+                    final end = start + segment.playCount;
+                    final color =
+                        colors[math.max(0, legendItems.indexOf(segment.genre)) %
+                            colors.length];
+                    final item = BarChartRodStackItem(start, end, color);
+                    start = end;
+                    return item;
+                  })
+                  .toList(growable: false);
+
+              return BarChartGroupData(
+                x: entry.$1,
+                barRods: [
+                  BarChartRodData(
+                    toY: stack.playCount.toDouble(),
+                    width: 22,
+                    borderRadius: BorderRadius.circular(8),
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    rodStackItems: segments,
+                  ),
+                ],
+              );
+            })
+            .toList(growable: false),
+      ),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
     );
   }
+}
+
+void _showGenreYearTracks({
+  required BuildContext context,
+  required LibraryOverview overview,
+  required _GenreYearStack stack,
+  required _GenreStackSegment? segment,
+  required List<String> legendItems,
+}) {
+  final tracks = switch (segment?.genre) {
+    null => _tracksByReleaseYear(overview, stack.year),
+    'Other' => _tracksByReleaseYearExcludingGenres(
+      overview,
+      year: stack.year,
+      excludedGenres: legendItems.where((genre) => genre != 'Other').toSet(),
+    ),
+    final genre => _tracksByReleaseYearAndGenre(
+      overview,
+      year: stack.year,
+      genre: genre,
+    ),
+  };
+  if (tracks.isEmpty) {
+    return;
+  }
+  _showTrackGroupSheet(
+    context,
+    title: segment == null
+        ? stack.year.toString()
+        : '${stack.year} / ${segment.genre}',
+    subtitle: _t(
+      context,
+      segment == null ? 'Release-year songs' : 'Release-year genre songs',
+      segment == null ? '発売年の曲' : '発売年とジャンルの曲',
+    ),
+    icon: Icons.stacked_bar_chart_rounded,
+    tracks: tracks,
+  );
 }
 
 class _DecadeMixCard extends StatelessWidget {
@@ -5566,156 +5810,6 @@ class _AnalyticsEmptyState extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _ReleaseYearCorrelationPainter extends CustomPainter {
-  const _ReleaseYearCorrelationPainter({
-    required this.buckets,
-    required this.selectedYear,
-    required this.primary,
-    required this.secondary,
-    required this.gridColor,
-    required this.labelColor,
-  });
-
-  final List<_ReleaseYearBucket> buckets;
-  final int? selectedYear;
-  final Color primary;
-  final Color secondary;
-  final Color gridColor;
-  final Color labelColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (buckets.isEmpty || size.width <= 80 || size.height <= 80) {
-      return;
-    }
-
-    final chart = _releaseYearChartRect(size);
-    final minYear = buckets.first.year;
-    final maxYear = buckets.last.year;
-    final yearSpan = math.max(1, maxYear - minYear);
-    final maxAverage = buckets.fold<double>(
-      1,
-      (current, bucket) => math.max(current, bucket.averagePlays),
-    );
-    final maxPlays = buckets.fold<int>(
-      1,
-      (current, bucket) => math.max(current, bucket.playCount),
-    );
-
-    final gridPaint = Paint()
-      ..color = gridColor
-      ..strokeWidth = 1;
-    for (var index = 0; index <= 3; index++) {
-      final y = chart.bottom - chart.height * index / 3;
-      canvas.drawLine(Offset(chart.left, y), Offset(chart.right, y), gridPaint);
-      _paintSmallLabel(
-        canvas,
-        _compactNumber((maxAverage * index / 3).round()),
-        Offset(0, y - 7),
-      );
-    }
-
-    final pointOffsets = <Offset>[];
-    final linePaint = Paint()
-      ..color = primary.withValues(alpha: 0.52)
-      ..strokeWidth = 2.2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    final fillPaint = Paint()..color = primary.withValues(alpha: 0.72);
-    final haloPaint = Paint()..color = primary.withValues(alpha: 0.15);
-    final playPaint = Paint()
-      ..color = secondary.withValues(alpha: 0.2)
-      ..strokeWidth = 7
-      ..strokeCap = StrokeCap.round;
-
-    for (final bucket in buckets) {
-      final offset = _releaseYearPointForBucket(
-        bucket: bucket,
-        chart: chart,
-        minYear: minYear,
-        yearSpan: yearSpan,
-        maxAverage: maxAverage,
-      );
-      final x = offset.dx;
-      final totalHeight = bucket.playCount / maxPlays * chart.height;
-      canvas.drawLine(
-        Offset(x, chart.bottom),
-        Offset(x, chart.bottom - totalHeight),
-        playPaint,
-      );
-      pointOffsets.add(offset);
-    }
-
-    if (pointOffsets.length > 1) {
-      final path = Path()..moveTo(pointOffsets.first.dx, pointOffsets.first.dy);
-      for (final offset in pointOffsets.skip(1)) {
-        path.lineTo(offset.dx, offset.dy);
-      }
-      canvas.drawPath(path, linePaint);
-    }
-
-    for (var index = 0; index < buckets.length; index++) {
-      final bucket = buckets[index];
-      final offset = pointOffsets[index];
-      final radius = 5.0 + math.min(bucket.trackCount, 5) * 1.05;
-      canvas.drawCircle(offset, radius + 4, haloPaint);
-      canvas.drawCircle(offset, radius, fillPaint);
-      if (bucket.year == selectedYear) {
-        final selectedPaint = Paint()
-          ..color = primary
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4;
-        canvas.drawCircle(offset, radius + 7, selectedPaint);
-      }
-    }
-
-    _paintSmallLabel(
-      canvas,
-      minYear.toString(),
-      Offset(chart.left - 2, chart.bottom + 10),
-      alignment: TextAlign.left,
-    );
-    _paintSmallLabel(
-      canvas,
-      maxYear.toString(),
-      Offset(chart.right - 34, chart.bottom + 10),
-      alignment: TextAlign.right,
-    );
-  }
-
-  void _paintSmallLabel(
-    Canvas canvas,
-    String text,
-    Offset offset, {
-    TextAlign alignment = TextAlign.left,
-  }) {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: labelColor,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      textAlign: alignment,
-      textDirection: ui.TextDirection.ltr,
-    )..layout(maxWidth: 40);
-    painter.paint(canvas, offset);
-  }
-
-  @override
-  bool shouldRepaint(covariant _ReleaseYearCorrelationPainter oldDelegate) {
-    return oldDelegate.buckets != buckets ||
-        oldDelegate.selectedYear != selectedYear ||
-        oldDelegate.primary != primary ||
-        oldDelegate.secondary != secondary ||
-        oldDelegate.gridColor != gridColor ||
-        oldDelegate.labelColor != labelColor;
   }
 }
 
@@ -10066,60 +10160,6 @@ List<Color> _analysisPalette(ThemeData theme) {
     Color.lerp(theme.colorScheme.primary, theme.colorScheme.secondary, 0.5)!,
     Color.lerp(theme.colorScheme.secondary, theme.colorScheme.tertiary, 0.55)!,
   ];
-}
-
-Rect _releaseYearChartRect(Size size) {
-  return Rect.fromLTWH(38, 10, size.width - 48, size.height - 38);
-}
-
-Offset _releaseYearPointForBucket({
-  required _ReleaseYearBucket bucket,
-  required Rect chart,
-  required int minYear,
-  required int yearSpan,
-  required double maxAverage,
-}) {
-  final x = chart.left + (bucket.year - minYear) / yearSpan * chart.width;
-  final y = chart.bottom - bucket.averagePlays / maxAverage * chart.height;
-  return Offset(x, y);
-}
-
-_ReleaseYearBucket? _nearestReleaseYearBucket(
-  List<_ReleaseYearBucket> buckets,
-  Offset position,
-  Size size,
-) {
-  if (buckets.isEmpty || size.width <= 80 || size.height <= 80) {
-    return null;
-  }
-
-  final chart = _releaseYearChartRect(size);
-  final minYear = buckets.first.year;
-  final maxYear = buckets.last.year;
-  final yearSpan = math.max(1, maxYear - minYear);
-  final maxAverage = buckets.fold<double>(
-    1,
-    (current, bucket) => math.max(current, bucket.averagePlays),
-  );
-
-  _ReleaseYearBucket? nearest;
-  var nearestDistance = double.infinity;
-  for (final bucket in buckets) {
-    final point = _releaseYearPointForBucket(
-      bucket: bucket,
-      chart: chart,
-      minYear: minYear,
-      yearSpan: yearSpan,
-      maxAverage: maxAverage,
-    );
-    final distance = (point - position).distance;
-    if (distance < nearestDistance) {
-      nearest = bucket;
-      nearestDistance = distance;
-    }
-  }
-
-  return nearestDistance <= 42 ? nearest : null;
 }
 
 List<_ActivityHeatmapDay> _activityHeatmapDays({
