@@ -136,7 +136,7 @@ void main() {
     );
   });
 
-  testWidgets('switches to the cyan theme from settings', (tester) async {
+  testWidgets('switches to the flux theme from settings', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -148,12 +148,12 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Cyan'));
+    await tester.tap(find.text('Flux'));
     await tester.pumpAndSettle();
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.theme?.colorScheme.primary, const Color(0xFF007486));
-    expect(find.textContaining('Cool cyan'), findsOneWidget);
+    expect(find.textContaining('Cool blue'), findsOneWidget);
   });
 }
 

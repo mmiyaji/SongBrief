@@ -15,7 +15,7 @@ const _appFontFallback = <String>[
   'sans-serif',
 ];
 
-enum SongBriefThemeStyle { prism, cyan, ember, mono }
+enum SongBriefThemeStyle { prism, flux, ember, mono }
 
 enum SongBriefThemeBrightness {
   dark,
@@ -246,7 +246,7 @@ class _ThemeTokens {
           onSurfaceVariant: Color(0xFF58706A),
           outline: Color(0xFFC6D7D2),
         ),
-        SongBriefThemeStyle.cyan => const _ThemeTokens(
+        SongBriefThemeStyle.flux => const _ThemeTokens(
           surface: Color(0xFFF4FBFC),
           surfaceHigh: Color(0xFFE5F4F7),
           primary: Color(0xFF007486),
@@ -294,7 +294,7 @@ class _ThemeTokens {
         onSurfaceVariant: Color(0xFF9DB1AD),
         outline: Color(0xFF263538),
       ),
-      SongBriefThemeStyle.cyan => const _ThemeTokens(
+      SongBriefThemeStyle.flux => const _ThemeTokens(
         surface: Color(0xFF03090C),
         surfaceHigh: Color(0xFF102127),
         primary: Color(0xFF55DDF7),

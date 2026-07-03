@@ -160,7 +160,7 @@ String _authorizationLabel(
 String _themeStyleLabel(BuildContext context, SongBriefThemeStyle style) {
   return switch (style) {
     SongBriefThemeStyle.prism => _t(context, 'Prism', 'プリズム'),
-    SongBriefThemeStyle.cyan => _t(context, 'Cyan', 'シアン'),
+    SongBriefThemeStyle.flux => _t(context, 'Flux', 'フラックス'),
     SongBriefThemeStyle.ember => _t(context, 'Ember', 'エンバー'),
     SongBriefThemeStyle.mono => _t(context, 'Mono', 'モノ'),
   };
@@ -170,13 +170,13 @@ String _themeStyleDescription(BuildContext context, SongBriefThemeStyle style) {
   return switch (style) {
     SongBriefThemeStyle.prism => _t(
       context,
-      'Cyan and lime data-first theme.',
-      'シアンとライムを基調にしたデータ重視のテーマです。',
+      'Light-split accents for a data-first surface.',
+      '光の分解をイメージしたデータ重視のテーマです。',
     ),
-    SongBriefThemeStyle.cyan => _t(
+    SongBriefThemeStyle.flux => _t(
       context,
-      'Cool cyan with blue accents for a quiet stats surface.',
-      'クールなシアンとブルーを基調にした落ち着いた統計テーマです。',
+      'Cool blue and mint accents for flowing playback stats.',
+      'ブルーとミントを基調に、再生統計の流れを見せるテーマです。',
     ),
     SongBriefThemeStyle.ember => _t(
       context,
