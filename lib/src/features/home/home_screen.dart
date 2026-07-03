@@ -4227,6 +4227,101 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
+void _showListeningMapsDetailSheet(
+  BuildContext context, {
+  required LibraryOverview overview,
+  required SnapshotHistory history,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (context) =>
+        _ListeningMapsDetailSheet(overview: overview, history: history),
+  );
+}
+
+class _ListeningMapsDetailSheet extends StatelessWidget {
+  const _ListeningMapsDetailSheet({
+    required this.overview,
+    required this.history,
+  });
+
+  final LibraryOverview overview;
+  final SnapshotHistory history;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final height = MediaQuery.sizeOf(context).height;
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: height * 0.9),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.scatter_plot_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _t(context, 'Listening maps', 'リスニングマップ'),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _t(
+                            context,
+                            'Inspect playback patterns by year, day, and genre',
+                            '発売年・日別・ジャンル別に再生傾向を確認',
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: MaterialLocalizations.of(context).closeButtonLabel,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _ReleaseYearPlayMapCard(overview: overview, expanded: true),
+              const SizedBox(height: 14),
+              _GenreStackedReleaseBarsCard(overview: overview),
+              const SizedBox(height: 14),
+              _ActivityHeatmapCard(
+                overview: overview,
+                history: history,
+                expanded: true,
+              ),
+              const SizedBox(height: 14),
+              _DecadeMixCard(overview: overview),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _OverviewAnalyticsPanel extends StatelessWidget {
   const _OverviewAnalyticsPanel({
     required this.overview,
@@ -4254,6 +4349,15 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
               context,
               'Release-year concentration and daily play activity',
               '発売年ごとの集中度と日別の再生活動',
+            ),
+            trailing: IconButton.filledTonal(
+              onPressed: () => _showListeningMapsDetailSheet(
+                context,
+                overview: overview,
+                history: history,
+              ),
+              icon: const Icon(Icons.open_in_full_rounded),
+              tooltip: _t(context, 'Expand listening maps', 'リスニングマップを拡大'),
             ),
           ),
           const SizedBox(height: 14),
@@ -4293,13 +4397,16 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
 }
 
 class _ReleaseYearPlayMapCard extends StatelessWidget {
-  const _ReleaseYearPlayMapCard({required this.overview});
+  const _ReleaseYearPlayMapCard({
+    required this.overview,
+    this.expanded = false,
+  });
 
   final LibraryOverview overview;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final number = _numberFormat(context);
     final buckets = _releaseYearBuckets(overview.tracks);
     final topBucket = buckets.isEmpty
@@ -4334,19 +4441,9 @@ class _ReleaseYearPlayMapCard extends StatelessWidget {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(
-                  height: 190,
-                  child: CustomPaint(
-                    painter: _ReleaseYearCorrelationPainter(
-                      buckets: buckets,
-                      primary: theme.colorScheme.primary,
-                      secondary: theme.colorScheme.tertiary,
-                      gridColor: theme.colorScheme.outlineVariant.withValues(
-                        alpha: 0.5,
-                      ),
-                      labelColor: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                _InteractiveReleaseYearChart(
+                  buckets: buckets,
+                  height: expanded ? 250 : 190,
                 ),
                 const SizedBox(height: 10),
                 Wrap(
@@ -4377,11 +4474,114 @@ class _ReleaseYearPlayMapCard extends StatelessWidget {
   }
 }
 
+class _InteractiveReleaseYearChart extends StatefulWidget {
+  const _InteractiveReleaseYearChart({
+    required this.buckets,
+    required this.height,
+  });
+
+  final List<_ReleaseYearBucket> buckets;
+  final double height;
+
+  @override
+  State<_InteractiveReleaseYearChart> createState() =>
+      _InteractiveReleaseYearChartState();
+}
+
+class _InteractiveReleaseYearChartState
+    extends State<_InteractiveReleaseYearChart> {
+  _ReleaseYearBucket? _selectedBucket;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final selectedBucket = _selectedBucket;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final size = Size(constraints.maxWidth, widget.height);
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) {
+                final bucket = _nearestReleaseYearBucket(
+                  widget.buckets,
+                  details.localPosition,
+                  size,
+                );
+                if (bucket == null) {
+                  return;
+                }
+                setState(() {
+                  _selectedBucket = bucket;
+                });
+              },
+              child: Tooltip(
+                triggerMode: TooltipTriggerMode.tap,
+                message: _t(
+                  context,
+                  'Tap a point to inspect the year.',
+                  '点をタップすると年別の数値を確認できます。',
+                ),
+                child: SizedBox(
+                  height: widget.height,
+                  child: CustomPaint(
+                    painter: _ReleaseYearCorrelationPainter(
+                      buckets: widget.buckets,
+                      selectedYear: selectedBucket?.year,
+                      primary: theme.colorScheme.primary,
+                      secondary: theme.colorScheme.tertiary,
+                      gridColor: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.5,
+                      ),
+                      labelColor: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: selectedBucket == null
+              ? _AnalysisInlineTooltip(
+                  key: const ValueKey('release-year-hint'),
+                  icon: Icons.touch_app_rounded,
+                  label: _t(context, 'Tap a year point', '年の点をタップ'),
+                  value: _t(context, 'Show plays and song count', '再生数と曲数を表示'),
+                )
+              : _AnalysisInlineTooltip(
+                  key: ValueKey(selectedBucket.year),
+                  icon: Icons.info_outline_rounded,
+                  label: selectedBucket.year.toString(),
+                  value: _t(
+                    context,
+                    '${_trackCountLabel(context, selectedBucket.trackCount)} / '
+                        '${_playCountLabel(context, selectedBucket.playCount)} / '
+                        '${selectedBucket.averagePlays.toStringAsFixed(1)} avg',
+                    '${_trackCountLabel(context, selectedBucket.trackCount)} / '
+                        '${_playCountLabel(context, selectedBucket.playCount)} / '
+                        '平均${selectedBucket.averagePlays.toStringAsFixed(1)}',
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ActivityHeatmapCard extends StatelessWidget {
-  const _ActivityHeatmapCard({required this.overview, required this.history});
+  const _ActivityHeatmapCard({
+    required this.overview,
+    required this.history,
+    this.expanded = false,
+  });
 
   final LibraryOverview overview;
   final SnapshotHistory history;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -4414,7 +4614,13 @@ class _ActivityHeatmapCard extends StatelessWidget {
               children: [
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final cellSize = constraints.maxWidth >= 360 ? 13.0 : 11.0;
+                    final cellSize = expanded
+                        ? constraints.maxWidth >= 520
+                              ? 16.0
+                              : 13.0
+                        : constraints.maxWidth >= 360
+                        ? 13.0
+                        : 11.0;
                     return SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
@@ -4483,6 +4689,326 @@ class _ActivityHeatmapCard extends StatelessWidget {
   }
 }
 
+class _GenreStackedReleaseBarsCard extends StatelessWidget {
+  const _GenreStackedReleaseBarsCard({required this.overview});
+
+  final LibraryOverview overview;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final stacks = _genreYearStacks(overview.tracks);
+    final colors = _analysisPalette(theme);
+    final legendItems = _genreLegendItems(stacks);
+    final maxPlays = stacks.fold<int>(
+      0,
+      (current, stack) => math.max(current, stack.playCount),
+    );
+
+    return _OverviewAnalysisCard(
+      icon: Icons.stacked_bar_chart_rounded,
+      title: _t(context, 'Genre stack by release year', '発売年別ジャンル積み上げ'),
+      subtitle: _t(
+        context,
+        'Play counts split by the strongest genres',
+        '再生数を主要ジャンル別に分解',
+      ),
+      child: stacks.isEmpty
+          ? _AnalyticsEmptyState(
+              label: _t(
+                context,
+                'Genre and release date metadata are required.',
+                'ジャンルと発売日のメタデータが必要です。',
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: legendItems.indexed
+                      .map(
+                        (item) => _LegendChip(
+                          label: item.$2,
+                          color: colors[item.$1 % colors.length],
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 14),
+                ...stacks.map(
+                  (stack) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _GenreStackedYearRow(
+                      stack: stack,
+                      maxPlays: maxPlays,
+                      colors: colors,
+                      legendItems: legendItems,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _GenreStackedYearRow extends StatelessWidget {
+  const _GenreStackedYearRow({
+    required this.stack,
+    required this.maxPlays,
+    required this.colors,
+    required this.legendItems,
+  });
+
+  final _GenreYearStack stack;
+  final int maxPlays;
+  final List<Color> colors;
+  final List<String> legendItems;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final totalRatio = maxPlays == 0 ? 0.0 : stack.playCount / maxPlays;
+    return Row(
+      children: [
+        SizedBox(
+          width: 44,
+          child: Text(
+            stack.year.toString(),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = math.max(42.0, constraints.maxWidth * totalRatio);
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: SizedBox(
+                    width: width,
+                    height: 20,
+                    child: Row(
+                      children: stack.segments.indexed
+                          .map(
+                            (segment) => Expanded(
+                              flex: math.max(1, segment.$2.playCount),
+                              child: Tooltip(
+                                triggerMode: TooltipTriggerMode.tap,
+                                message:
+                                    '${stack.year} / ${segment.$2.genre}: '
+                                    '${_playCountLabel(context, segment.$2.playCount)}',
+                                child: ColoredBox(
+                                  color:
+                                      colors[math.max(
+                                            0,
+                                            legendItems.indexOf(
+                                              segment.$2.genre,
+                                            ),
+                                          ) %
+                                          colors.length],
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 56,
+          child: Text(
+            _compactNumber(stack.playCount),
+            textAlign: TextAlign.right,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DecadeMixCard extends StatelessWidget {
+  const _DecadeMixCard({required this.overview});
+
+  final LibraryOverview overview;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final buckets = _decadePlayBuckets(overview.tracks);
+    final maxPlays = buckets.fold<int>(
+      0,
+      (current, bucket) => math.max(current, bucket.playCount),
+    );
+
+    return _OverviewAnalysisCard(
+      icon: Icons.view_timeline_rounded,
+      title: _t(context, 'Era mix', '年代ミックス'),
+      subtitle: _t(
+        context,
+        'Which release decades dominate the library',
+        'どの年代の曲がライブラリを占めているか',
+      ),
+      child: buckets.isEmpty
+          ? _AnalyticsEmptyState(
+              label: _t(
+                context,
+                'Release dates are not available yet.',
+                '発売日の情報がまだありません。',
+              ),
+            )
+          : Column(
+              children: buckets
+                  .map(
+                    (bucket) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _DecadeMixRow(
+                        bucket: bucket,
+                        maxPlays: maxPlays,
+                        color: Color.lerp(
+                          theme.colorScheme.primary,
+                          theme.colorScheme.tertiary,
+                          buckets.length <= 1
+                              ? 0
+                              : buckets.indexOf(bucket) / (buckets.length - 1),
+                        )!,
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+    );
+  }
+}
+
+class _DecadeMixRow extends StatelessWidget {
+  const _DecadeMixRow({
+    required this.bucket,
+    required this.maxPlays,
+    required this.color,
+  });
+
+  final _DecadePlayBucket bucket;
+  final int maxPlays;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ratio = maxPlays == 0 ? 0.0 : bucket.playCount / maxPlays;
+    return Tooltip(
+      triggerMode: TooltipTriggerMode.tap,
+      message:
+          '${bucket.label}: ${_trackCountLabel(context, bucket.trackCount)} / '
+          '${_playCountLabel(context, bucket.playCount)}',
+      child: Row(
+        children: [
+          SizedBox(
+            width: 64,
+            child: Text(
+              bucket.label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: ColoredBox(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.34),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: ratio.clamp(0.04, 1.0),
+                    child: SizedBox(
+                      height: 18,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(color: color),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 60,
+            child: Text(
+              _compactNumber(bucket.playCount),
+              textAlign: TextAlign.right,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegendChip extends StatelessWidget {
+  const _LegendChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ActivityHeatmapCell extends StatelessWidget {
   const _ActivityHeatmapCell({
     required this.day,
@@ -4507,6 +5033,8 @@ class _ActivityHeatmapCell extends StatelessWidget {
 
     return Tooltip(
       message: label,
+      triggerMode: TooltipTriggerMode.tap,
+      showDuration: const Duration(seconds: 3),
       child: Container(
         width: size,
         height: size,
@@ -4602,6 +5130,61 @@ class _OverviewAnalysisCard extends StatelessWidget {
   }
 }
 
+class _AnalysisInlineTooltip extends StatelessWidget {
+  const _AnalysisInlineTooltip({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 17, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AnalysisPill extends StatelessWidget {
   const _AnalysisPill({required this.label, required this.value});
 
@@ -4666,6 +5249,7 @@ class _AnalyticsEmptyState extends StatelessWidget {
 class _ReleaseYearCorrelationPainter extends CustomPainter {
   const _ReleaseYearCorrelationPainter({
     required this.buckets,
+    required this.selectedYear,
     required this.primary,
     required this.secondary,
     required this.gridColor,
@@ -4673,6 +5257,7 @@ class _ReleaseYearCorrelationPainter extends CustomPainter {
   });
 
   final List<_ReleaseYearBucket> buckets;
+  final int? selectedYear;
   final Color primary;
   final Color secondary;
   final Color gridColor;
@@ -4684,7 +5269,7 @@ class _ReleaseYearCorrelationPainter extends CustomPainter {
       return;
     }
 
-    final chart = Rect.fromLTWH(38, 10, size.width - 48, size.height - 38);
+    final chart = _releaseYearChartRect(size);
     final minYear = buckets.first.year;
     final maxYear = buckets.last.year;
     final yearSpan = math.max(1, maxYear - minYear);
@@ -4725,15 +5310,21 @@ class _ReleaseYearCorrelationPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     for (final bucket in buckets) {
-      final x = chart.left + (bucket.year - minYear) / yearSpan * chart.width;
-      final y = chart.bottom - bucket.averagePlays / maxAverage * chart.height;
+      final offset = _releaseYearPointForBucket(
+        bucket: bucket,
+        chart: chart,
+        minYear: minYear,
+        yearSpan: yearSpan,
+        maxAverage: maxAverage,
+      );
+      final x = offset.dx;
       final totalHeight = bucket.playCount / maxPlays * chart.height;
       canvas.drawLine(
         Offset(x, chart.bottom),
         Offset(x, chart.bottom - totalHeight),
         playPaint,
       );
-      pointOffsets.add(Offset(x, y));
+      pointOffsets.add(offset);
     }
 
     if (pointOffsets.length > 1) {
@@ -4750,6 +5341,13 @@ class _ReleaseYearCorrelationPainter extends CustomPainter {
       final radius = 5.0 + math.min(bucket.trackCount, 5) * 1.05;
       canvas.drawCircle(offset, radius + 4, haloPaint);
       canvas.drawCircle(offset, radius, fillPaint);
+      if (bucket.year == selectedYear) {
+        final selectedPaint = Paint()
+          ..color = primary
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4;
+        canvas.drawCircle(offset, radius + 7, selectedPaint);
+      }
     }
 
     _paintSmallLabel(
@@ -4790,6 +5388,7 @@ class _ReleaseYearCorrelationPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ReleaseYearCorrelationPainter oldDelegate) {
     return oldDelegate.buckets != buckets ||
+        oldDelegate.selectedYear != selectedYear ||
         oldDelegate.primary != primary ||
         oldDelegate.secondary != secondary ||
         oldDelegate.gridColor != gridColor ||
@@ -5034,11 +5633,13 @@ class _PanelHeading extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.trailing,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -5063,6 +5664,7 @@ class _PanelHeading extends StatelessWidget {
             ],
           ),
         ),
+        if (trailing != null) ...[const SizedBox(width: 10), trailing!],
       ],
     );
   }
@@ -8608,6 +9210,37 @@ class _ActivityHeatmapDay {
   final int playCount;
 }
 
+class _GenreYearStack {
+  const _GenreYearStack({
+    required this.year,
+    required this.segments,
+    required this.playCount,
+  });
+
+  final int year;
+  final List<_GenreStackSegment> segments;
+  final int playCount;
+}
+
+class _GenreStackSegment {
+  const _GenreStackSegment({required this.genre, required this.playCount});
+
+  final String genre;
+  final int playCount;
+}
+
+class _DecadePlayBucket {
+  const _DecadePlayBucket({
+    required this.label,
+    required this.trackCount,
+    required this.playCount,
+  });
+
+  final String label;
+  final int trackCount;
+  final int playCount;
+}
+
 class _GroupSummaryValue {
   const _GroupSummaryValue({
     required this.icon,
@@ -8671,11 +9304,10 @@ String _shortPlayedAtLabel(BuildContext context, DateTime? dateTime) {
 }
 
 List<_ReleaseYearBucket> _releaseYearBuckets(List<LibraryTrack> tracks) {
-  final currentYear = DateTime.now().year + 1;
   final buckets = <int, _ReleaseYearAccumulator>{};
   for (final track in tracks) {
-    final year = track.releaseDate?.toLocal().year;
-    if (year == null || year < 1900 || year > currentYear) {
+    final year = _releaseYearForTrack(track);
+    if (year == null) {
       continue;
     }
     buckets.putIfAbsent(year, () => _ReleaseYearAccumulator(year)).add(track);
@@ -8684,6 +9316,209 @@ List<_ReleaseYearBucket> _releaseYearBuckets(List<LibraryTrack> tracks) {
   final values = buckets.values.map((bucket) => bucket.toBucket()).toList()
     ..sort((a, b) => a.year.compareTo(b.year));
   return List.unmodifiable(values);
+}
+
+List<_GenreYearStack> _genreYearStacks(List<LibraryTrack> tracks) {
+  final genreTotals = <String, int>{};
+  final yearGenreTotals = <int, Map<String, int>>{};
+  for (final track in tracks) {
+    final year = _releaseYearForTrack(track);
+    if (year == null) {
+      continue;
+    }
+    final genre = _genreName(track);
+    genreTotals[genre] = (genreTotals[genre] ?? 0) + track.playCount;
+    final byGenre = yearGenreTotals.putIfAbsent(year, () => <String, int>{});
+    byGenre[genre] = (byGenre[genre] ?? 0) + track.playCount;
+  }
+
+  if (yearGenreTotals.isEmpty) {
+    return const [];
+  }
+
+  final topGenres = genreTotals.entries.toList()
+    ..sort((a, b) {
+      final byPlays = b.value.compareTo(a.value);
+      if (byPlays != 0) {
+        return byPlays;
+      }
+      return a.key.compareTo(b.key);
+    });
+  final allowedGenres = topGenres.take(4).map((entry) => entry.key).toSet();
+  const otherGenre = 'Other';
+
+  final stacks = yearGenreTotals.entries.map((entry) {
+    final segmentsByGenre = <String, int>{};
+    for (final genreEntry in entry.value.entries) {
+      final genre = allowedGenres.contains(genreEntry.key)
+          ? genreEntry.key
+          : otherGenre;
+      segmentsByGenre[genre] = (segmentsByGenre[genre] ?? 0) + genreEntry.value;
+    }
+    final segments =
+        segmentsByGenre.entries
+            .map(
+              (segment) => _GenreStackSegment(
+                genre: segment.key,
+                playCount: segment.value,
+              ),
+            )
+            .toList()
+          ..sort((a, b) {
+            final aIndex = _genreSortIndex(a.genre, allowedGenres);
+            final bIndex = _genreSortIndex(b.genre, allowedGenres);
+            final byIndex = aIndex.compareTo(bIndex);
+            if (byIndex != 0) {
+              return byIndex;
+            }
+            return b.playCount.compareTo(a.playCount);
+          });
+    final total = segments.fold<int>(
+      0,
+      (sum, segment) => sum + segment.playCount,
+    );
+    return _GenreYearStack(
+      year: entry.key,
+      segments: List.unmodifiable(segments),
+      playCount: total,
+    );
+  }).toList()..sort((a, b) => a.year.compareTo(b.year));
+
+  return List.unmodifiable(stacks);
+}
+
+List<String> _genreLegendItems(List<_GenreYearStack> stacks) {
+  final genres = <String>[];
+  for (final stack in stacks) {
+    for (final segment in stack.segments) {
+      if (!genres.contains(segment.genre)) {
+        genres.add(segment.genre);
+      }
+    }
+  }
+  genres.sort((a, b) {
+    if (a == 'Other') {
+      return 1;
+    }
+    if (b == 'Other') {
+      return -1;
+    }
+    return a.compareTo(b);
+  });
+  return List.unmodifiable(genres);
+}
+
+int _genreSortIndex(String genre, Set<String> allowedGenres) {
+  final ordered = allowedGenres.toList()..sort();
+  final index = ordered.indexOf(genre);
+  return index < 0 ? ordered.length + 1 : index;
+}
+
+List<_DecadePlayBucket> _decadePlayBuckets(List<LibraryTrack> tracks) {
+  final byDecade = <int, ({int trackCount, int playCount})>{};
+  for (final track in tracks) {
+    final year = _releaseYearForTrack(track);
+    if (year == null) {
+      continue;
+    }
+    final decade = year ~/ 10 * 10;
+    final current = byDecade[decade] ?? (trackCount: 0, playCount: 0);
+    byDecade[decade] = (
+      trackCount: current.trackCount + 1,
+      playCount: current.playCount + track.playCount,
+    );
+  }
+
+  final buckets =
+      byDecade.entries
+          .map(
+            (entry) => _DecadePlayBucket(
+              label: '${entry.key}s',
+              trackCount: entry.value.trackCount,
+              playCount: entry.value.playCount,
+            ),
+          )
+          .toList()
+        ..sort((a, b) => a.label.compareTo(b.label));
+  return List.unmodifiable(buckets);
+}
+
+int? _releaseYearForTrack(LibraryTrack track) {
+  final year = track.releaseDate?.toLocal().year;
+  final currentYear = DateTime.now().year + 1;
+  if (year == null || year < 1900 || year > currentYear) {
+    return null;
+  }
+  return year;
+}
+
+String _genreName(LibraryTrack track) {
+  final genre = track.genre?.trim();
+  return genre == null || genre.isEmpty ? 'Unknown' : genre;
+}
+
+List<Color> _analysisPalette(ThemeData theme) {
+  return [
+    theme.colorScheme.primary,
+    theme.colorScheme.secondary,
+    theme.colorScheme.tertiary,
+    Color.lerp(theme.colorScheme.primary, theme.colorScheme.secondary, 0.5)!,
+    Color.lerp(theme.colorScheme.secondary, theme.colorScheme.tertiary, 0.55)!,
+  ];
+}
+
+Rect _releaseYearChartRect(Size size) {
+  return Rect.fromLTWH(38, 10, size.width - 48, size.height - 38);
+}
+
+Offset _releaseYearPointForBucket({
+  required _ReleaseYearBucket bucket,
+  required Rect chart,
+  required int minYear,
+  required int yearSpan,
+  required double maxAverage,
+}) {
+  final x = chart.left + (bucket.year - minYear) / yearSpan * chart.width;
+  final y = chart.bottom - bucket.averagePlays / maxAverage * chart.height;
+  return Offset(x, y);
+}
+
+_ReleaseYearBucket? _nearestReleaseYearBucket(
+  List<_ReleaseYearBucket> buckets,
+  Offset position,
+  Size size,
+) {
+  if (buckets.isEmpty || size.width <= 80 || size.height <= 80) {
+    return null;
+  }
+
+  final chart = _releaseYearChartRect(size);
+  final minYear = buckets.first.year;
+  final maxYear = buckets.last.year;
+  final yearSpan = math.max(1, maxYear - minYear);
+  final maxAverage = buckets.fold<double>(
+    1,
+    (current, bucket) => math.max(current, bucket.averagePlays),
+  );
+
+  _ReleaseYearBucket? nearest;
+  var nearestDistance = double.infinity;
+  for (final bucket in buckets) {
+    final point = _releaseYearPointForBucket(
+      bucket: bucket,
+      chart: chart,
+      minYear: minYear,
+      yearSpan: yearSpan,
+      maxAverage: maxAverage,
+    );
+    final distance = (point - position).distance;
+    if (distance < nearestDistance) {
+      nearest = bucket;
+      nearestDistance = distance;
+    }
+  }
+
+  return nearestDistance <= 42 ? nearest : null;
 }
 
 List<_ActivityHeatmapDay> _activityHeatmapDays({
