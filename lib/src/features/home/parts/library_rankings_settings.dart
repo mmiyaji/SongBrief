@@ -2229,8 +2229,8 @@ class _PremiumSetting extends ConsumerWidget {
               Text(
                 _t(
                   context,
-                  'Purchases work after the non-consumable product is configured in App Store Connect.',
-                  'App Store Connectで非消耗型の商品を設定すると購入が有効になります。',
+                  'Premium purchase is not available yet. Once enabled, you can buy ad removal here.',
+                  'プレミアム購入は現在準備中です。利用可能になると、ここから広告非表示を購入できます。',
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -2275,8 +2275,8 @@ String _premiumMessageLabel(BuildContext context, String message) {
     ),
     'Configure the premium product in App Store Connect.' => _t(
       context,
-      'Configure the premium product in App Store Connect.',
-      'App Store Connectでプレミアム商品を設定してください。',
+      'Premium purchase is not available yet.',
+      'プレミアム購入は現在準備中です。',
     ),
     'Store is not available.' => _t(
       context,
