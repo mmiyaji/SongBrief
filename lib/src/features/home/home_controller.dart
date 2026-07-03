@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/music_stats_repository.dart';
+import '../../data/music_library_channel.dart';
 import '../../domain/library_overview.dart';
 import '../../domain/music_stats_state.dart';
 
@@ -222,6 +224,9 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     state = await AsyncValue.guard(
       () => ref.read(musicStatsRepositoryProvider).load(requestAccess: true),
     );
+    if (state.hasValue) {
+      await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
+    }
   }
 
   Future<void> refreshStats() async {
@@ -261,12 +266,31 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       AsyncError() when !showLoading && previous != null => AsyncData(previous),
       _ => next,
     };
+    if (state.hasValue) {
+      await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
+    }
   }
 }
 
 class PlaybackController extends Notifier<PlaybackState> {
   @override
   PlaybackState build() {
+    final subscription = ref
+        .watch(musicStatsRepositoryProvider)
+        .playbackEvents()
+        .listen(
+          _applyExternalPlayback,
+          onError: (Object error) {
+            state = state.copyWith(
+              isBusy: false,
+              errorMessage: error.toString(),
+            );
+          },
+        );
+    ref.onDispose(() {
+      unawaited(subscription.cancel());
+    });
+    unawaited(syncWithPlayer());
     return const PlaybackState();
   }
 
@@ -340,8 +364,30 @@ class PlaybackController extends Notifier<PlaybackState> {
       await ref
           .read(musicStatsControllerProvider.notifier)
           .refreshStatsSilently();
+      await syncWithPlayer();
     } on Object catch (error) {
       state = previous.copyWith(isBusy: false, errorMessage: error.toString());
     }
+  }
+
+  Future<void> syncWithPlayer() async {
+    try {
+      final snapshot = await ref
+          .read(musicStatsRepositoryProvider)
+          .currentPlayback();
+      if (snapshot == null) {
+        return;
+      }
+      _applyExternalPlayback(snapshot);
+    } on Object catch (error) {
+      state = state.copyWith(isBusy: false, errorMessage: error.toString());
+    }
+  }
+
+  void _applyExternalPlayback(MusicPlaybackSnapshot snapshot) {
+    state = PlaybackState(
+      activeTrackId: snapshot.trackId,
+      isPlaying: snapshot.isPlaying,
+    );
   }
 }

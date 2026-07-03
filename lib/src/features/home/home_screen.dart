@@ -292,6 +292,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       return;
     }
 
+    ref.read(playbackControllerProvider.notifier).syncWithPlayer();
     final now = DateTime.now();
     final lastRefresh = _lastResumeRefreshAt;
     if (lastRefresh != null &&

@@ -1,0 +1,118 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:songbrief/src/data/library_snapshot_repository.dart';
+import 'package:songbrief/src/data/music_library_channel.dart';
+import 'package:songbrief/src/data/music_stats_repository.dart';
+import 'package:songbrief/src/domain/library_track.dart';
+import 'package:songbrief/src/domain/music_library_authorization.dart';
+import 'package:songbrief/src/features/home/home_controller.dart';
+
+void main() {
+  test('syncs playback state from the native current item', () async {
+    final repository = _FakeMusicStatsRepository(
+      currentPlaybackOverride: const MusicPlaybackSnapshot(
+        trackId: 'track-2',
+        isPlaying: true,
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(playbackControllerProvider.notifier).syncWithPlayer();
+
+    final state = container.read(playbackControllerProvider);
+    expect(state.activeTrackId, 'track-2');
+    expect(state.isPlaying, isTrue);
+  });
+
+  test('updates playback state from native playback events', () async {
+    final events = StreamController<MusicPlaybackSnapshot>();
+    final repository = _FakeMusicStatsRepository(playbackEvents: events.stream);
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+    addTearDown(events.close);
+
+    container.read(playbackControllerProvider);
+    events.add(
+      const MusicPlaybackSnapshot(trackId: 'track-3', isPlaying: true),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    final state = container.read(playbackControllerProvider);
+    expect(state.activeTrackId, 'track-3');
+    expect(state.isPlaying, isTrue);
+  });
+}
+
+class _FakeMusicStatsRepository extends MusicStatsRepository {
+  _FakeMusicStatsRepository({
+    this.currentPlaybackOverride,
+    Stream<MusicPlaybackSnapshot>? playbackEvents,
+  }) : playbackEventsOverride =
+           playbackEvents ?? const Stream<MusicPlaybackSnapshot>.empty(),
+       super(_NoopMusicLibraryClient(), const LibrarySnapshotRepository());
+
+  final MusicPlaybackSnapshot? currentPlaybackOverride;
+  final Stream<MusicPlaybackSnapshot> playbackEventsOverride;
+
+  @override
+  Future<MusicPlaybackSnapshot?> currentPlayback() async {
+    return currentPlaybackOverride;
+  }
+
+  @override
+  Stream<MusicPlaybackSnapshot> playbackEvents() => playbackEventsOverride;
+}
+
+class _NoopMusicLibraryClient implements MusicLibraryClient {
+  @override
+  Future<MusicLibraryAuthorizationStatus> authorizationStatus() async {
+    return MusicLibraryAuthorizationStatus.unsupported;
+  }
+
+  @override
+  Future<MusicLibraryAuthorizationStatus> requestAuthorization() async {
+    return MusicLibraryAuthorizationStatus.unsupported;
+  }
+
+  @override
+  Future<List<LibraryTrack>> fetchTracks() async => const [];
+
+  @override
+  Future<MusicPlaybackSnapshot?> currentPlayback() async => null;
+
+  @override
+  Stream<MusicPlaybackSnapshot> playbackEvents() {
+    return const Stream<MusicPlaybackSnapshot>.empty();
+  }
+
+  @override
+  Future<Uint8List?> fetchArtwork(String trackId, {required int size}) async {
+    return null;
+  }
+
+  @override
+  Future<void> playTrack(String trackId) async {}
+
+  @override
+  Future<void> play() async {}
+
+  @override
+  Future<void> pause() async {}
+
+  @override
+  Future<void> skipToNext() async {}
+
+  @override
+  Future<void> skipToPrevious() async {}
+
+  @override
+  Future<void> scheduleSnapshotRefresh() async {}
+}

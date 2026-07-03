@@ -10,6 +10,10 @@ abstract class MusicLibraryClient {
 
   Future<List<LibraryTrack>> fetchTracks();
 
+  Future<MusicPlaybackSnapshot?> currentPlayback();
+
+  Stream<MusicPlaybackSnapshot> playbackEvents();
+
   Future<Uint8List?> fetchArtwork(String trackId, {required int size});
 
   Future<void> playTrack(String trackId);
@@ -31,6 +35,9 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
   static const MethodChannel _channel = MethodChannel(
     'app.songbrief/music_library',
   );
+  static const EventChannel _playbackEvents = EventChannel(
+    'app.songbrief/music_playback',
+  );
 
   @override
   Future<MusicLibraryAuthorizationStatus> authorizationStatus() async {
@@ -51,6 +58,21 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
         .whereType<Map<Object?, Object?>>()
         .map(LibraryTrack.fromPlatformMap)
         .toList(growable: false);
+  }
+
+  @override
+  Future<MusicPlaybackSnapshot?> currentPlayback() async {
+    final rawPlayback = await _channel.invokeMethod<Object?>('currentPlayback');
+    return MusicPlaybackSnapshot.fromPlatformValue(rawPlayback);
+  }
+
+  @override
+  Stream<MusicPlaybackSnapshot> playbackEvents() {
+    return _playbackEvents
+        .receiveBroadcastStream()
+        .map(MusicPlaybackSnapshot.fromPlatformValue)
+        .where((snapshot) => snapshot != null)
+        .cast<MusicPlaybackSnapshot>();
   }
 
   @override
@@ -89,5 +111,27 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
   @override
   Future<void> scheduleSnapshotRefresh() {
     return _channel.invokeMethod<void>('scheduleSnapshotRefresh');
+  }
+}
+
+class MusicPlaybackSnapshot {
+  const MusicPlaybackSnapshot({this.trackId, required this.isPlaying});
+
+  final String? trackId;
+  final bool isPlaying;
+
+  static MusicPlaybackSnapshot? fromPlatformValue(Object? value) {
+    if (value is! Map) {
+      return null;
+    }
+
+    final rawTrackId = value['trackId'];
+    final trackId = rawTrackId is String && rawTrackId.trim().isNotEmpty
+        ? rawTrackId.trim()
+        : null;
+    return MusicPlaybackSnapshot(
+      trackId: trackId,
+      isPlaying: value['isPlaying'] == true,
+    );
   }
 }

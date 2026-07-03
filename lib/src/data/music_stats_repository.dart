@@ -67,6 +67,20 @@ class MusicStatsRepository {
     return _client.fetchArtwork(trackId, size: size);
   }
 
+  Future<MusicPlaybackSnapshot?> currentPlayback() {
+    if (!_isIosMusicRuntime) {
+      return Future<MusicPlaybackSnapshot?>.value();
+    }
+    return _client.currentPlayback();
+  }
+
+  Stream<MusicPlaybackSnapshot> playbackEvents() {
+    if (!_isIosMusicRuntime) {
+      return const Stream<MusicPlaybackSnapshot>.empty();
+    }
+    return _client.playbackEvents();
+  }
+
   Future<void> playTrack(String trackId) {
     if (!_isIosMusicRuntime) {
       return Future.value();

@@ -1,8 +1,13 @@
 import Flutter
 import MediaPlayer
 
-final class MusicLibraryBridge {
-  private init() {}
+final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
+  private let player = MPMusicPlayerController.systemMusicPlayer
+  private var eventSink: FlutterEventSink?
+
+  private override init() {
+    super.init()
+  }
 
   static func register(with messenger: FlutterBinaryMessenger) {
     let bridge = MusicLibraryBridge()
@@ -14,6 +19,12 @@ final class MusicLibraryBridge {
     channel.setMethodCallHandler { call, result in
       bridge.handle(call, result: result)
     }
+
+    let eventChannel = FlutterEventChannel(
+      name: "app.songbrief/music_playback",
+      binaryMessenger: messenger
+    )
+    eventChannel.setStreamHandler(bridge)
   }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -28,6 +39,8 @@ final class MusicLibraryBridge {
       }
     case "fetchTracks":
       fetchTracks(result: result)
+    case "currentPlayback":
+      result(playbackMap())
     case "fetchArtwork":
       fetchArtwork(call, result: result)
     case "playTrack":
@@ -50,6 +63,60 @@ final class MusicLibraryBridge {
     default:
       result(FlutterMethodNotImplemented)
     }
+  }
+
+  func onListen(
+    withArguments arguments: Any?,
+    eventSink events: @escaping FlutterEventSink
+  ) -> FlutterError? {
+    eventSink = events
+    player.beginGeneratingPlaybackNotifications()
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(playbackDidChange),
+      name: .MPMusicPlayerControllerNowPlayingItemDidChange,
+      object: player
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(playbackDidChange),
+      name: .MPMusicPlayerControllerPlaybackStateDidChange,
+      object: player
+    )
+    events(playbackMap())
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    NotificationCenter.default.removeObserver(
+      self,
+      name: .MPMusicPlayerControllerNowPlayingItemDidChange,
+      object: player
+    )
+    NotificationCenter.default.removeObserver(
+      self,
+      name: .MPMusicPlayerControllerPlaybackStateDidChange,
+      object: player
+    )
+    player.endGeneratingPlaybackNotifications()
+    eventSink = nil
+    return nil
+  }
+
+  @objc private func playbackDidChange() {
+    eventSink?(playbackMap())
+  }
+
+  private func playbackMap() -> [String: Any] {
+    var playback: [String: Any] = [
+      "isPlaying": player.playbackState == .playing
+    ]
+
+    if let item = player.nowPlayingItem, item.persistentID != 0 {
+      playback["trackId"] = String(item.persistentID)
+    }
+
+    return playback
   }
 
   private func fetchTracks(result: @escaping FlutterResult) {
