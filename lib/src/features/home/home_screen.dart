@@ -4723,8 +4723,13 @@ class _InteractiveReleaseYearChartState
       (current, bucket) => math.max(current, bucket.averagePlays),
     );
     final maxY = maxAverage <= 1 ? 1.0 : maxAverage * 1.18;
-    final spots = buckets.indexed
-        .map((entry) => FlSpot(entry.$1.toDouble(), entry.$2.averagePlays))
+    final minYear = buckets.first.year;
+    final maxYear = buckets.last.year;
+    final yearSpan = maxYear - minYear;
+    final minX = (yearSpan == 0 ? minYear - 1 : minYear).toDouble();
+    final maxX = (yearSpan == 0 ? maxYear + 1 : maxYear).toDouble();
+    final spots = buckets
+        .map((bucket) => FlSpot(bucket.year.toDouble(), bucket.averagePlays))
         .toList(growable: false);
 
     return Column(
@@ -4734,14 +4739,21 @@ class _InteractiveReleaseYearChartState
           height: widget.height,
           child: LineChart(
             LineChartData(
-              minX: 0,
-              maxX: math.max(1, buckets.length - 1).toDouble(),
+              minX: minX,
+              maxX: maxX,
               minY: 0,
               maxY: maxY,
               clipData: const FlClipData.all(),
               borderData: FlBorderData(show: false),
               gridData: FlGridData(
-                drawVerticalLine: false,
+                drawVerticalLine: yearSpan <= 16,
+                verticalInterval: 1,
+                getDrawingVerticalLine: (value) => FlLine(
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.2,
+                  ),
+                  strokeWidth: 1,
+                ),
                 horizontalInterval: maxY / 3,
                 getDrawingHorizontalLine: (value) => FlLine(
                   color: theme.colorScheme.outlineVariant.withValues(
@@ -4754,6 +4766,8 @@ class _InteractiveReleaseYearChartState
                 context: context,
                 buckets: buckets,
                 selectedIndex: selectedIndex,
+                minYear: minYear,
+                maxYear: maxYear,
               ),
               lineTouchData: LineTouchData(
                 touchSpotThreshold: 18,
@@ -4890,31 +4904,36 @@ FlTitlesData _releaseYearTitlesData({
   required BuildContext context,
   required List<_ReleaseYearBucket> buckets,
   required int selectedIndex,
+  required int minYear,
+  required int maxYear,
 }) {
   final theme = Theme.of(context);
   final labelStyle = theme.textTheme.labelSmall?.copyWith(
     color: theme.colorScheme.onSurfaceVariant,
     fontWeight: FontWeight.w800,
   );
-  final yearStep = math.max(1, (buckets.length / 4).ceil());
+  final selectedYear = selectedIndex < 0 ? null : buckets[selectedIndex].year;
+  final yearSpan = maxYear - minYear;
+  final yearStep = yearSpan <= 16 ? 1 : math.max(1, (yearSpan / 8).ceil());
 
   Widget bottomTitle(double value, TitleMeta meta) {
-    final index = value.round();
-    if ((value - index).abs() > 0.01 || index < 0 || index >= buckets.length) {
+    final year = value.round();
+    if ((value - year).abs() > 0.01 || year < minYear || year > maxYear) {
       return const SizedBox.shrink();
     }
     final shouldShow =
-        index == 0 ||
-        index == buckets.length - 1 ||
-        index == selectedIndex ||
-        index % yearStep == 0;
+        yearSpan <= 16 ||
+        year == minYear ||
+        year == maxYear ||
+        year == selectedYear ||
+        (year - minYear) % yearStep == 0;
     if (!shouldShow) {
       return const SizedBox.shrink();
     }
     return SideTitleWidget(
       meta: meta,
       space: 7,
-      child: Text(buckets[index].year.toString(), style: labelStyle),
+      child: Text(year.toString(), style: labelStyle),
     );
   }
 
