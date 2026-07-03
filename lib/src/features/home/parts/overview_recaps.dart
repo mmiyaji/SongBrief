@@ -47,11 +47,13 @@ class _RecapHighlightsPanel extends StatelessWidget {
                   title: _t(context, 'This month', '今月'),
                   recap: month,
                   icon: Icons.calendar_view_month_rounded,
+                  fileStem: 'songbrief-monthly-recap',
                 ),
                 _PeriodRecapCard(
                   title: _t(context, 'This year', '今年'),
                   recap: year,
                   icon: Icons.event_available_rounded,
+                  fileStem: 'songbrief-yearly-recap',
                 ),
               ];
               final wide = constraints.maxWidth >= 700;
@@ -188,8 +190,109 @@ class _TasteAndCollectionPanel extends ConsumerWidget {
   }
 }
 
-class _PeriodRecapCard extends StatelessWidget {
+class _PeriodRecapCard extends StatefulWidget {
   const _PeriodRecapCard({
+    required this.title,
+    required this.recap,
+    required this.icon,
+    required this.fileStem,
+  });
+
+  final String title;
+  final _PeriodRecap recap;
+  final IconData icon;
+  final String fileStem;
+
+  @override
+  State<_PeriodRecapCard> createState() => _PeriodRecapCardState();
+}
+
+class _PeriodRecapCardState extends State<_PeriodRecapCard> {
+  final _captureKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        RepaintBoundary(
+          key: _captureKey,
+          child: _PeriodRecapCardContent(
+            title: widget.title,
+            recap: widget.recap,
+            icon: widget.icon,
+          ),
+        ),
+        if (widget.recap.hasData) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.tonalIcon(
+              onPressed: _saveImage,
+              icon: const Icon(Icons.image_outlined, size: 18),
+              label: Text(_t(context, 'Save PNG', 'PNG保存')),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _saveImage() async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary =
+          _captureKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw StateError('Recap card is not ready.');
+      }
+      final image = await boundary.toImage(pixelRatio: 3);
+      final byteData = await image.toByteData(format: ImageByteFormat.png);
+      if (byteData == null) {
+        throw StateError('Could not encode recap image.');
+      }
+      final savedPath = await FileSaver.instance.saveAs(
+        name: widget.fileStem,
+        bytes: byteData.buffer.asUint8List(),
+        fileExtension: 'png',
+        mimeType: MimeType.png,
+      );
+
+      if (!mounted) {
+        return;
+      }
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            savedPath == null
+                ? _t(context, 'Image save was cancelled.', '画像保存をキャンセルしました。')
+                : _t(context, 'Recap image saved.', 'リキャップ画像を保存しました。'),
+          ),
+        ),
+      );
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              context,
+              'Could not save the recap image.',
+              'リキャップ画像を保存できませんでした。',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+}
+
+class _PeriodRecapCardContent extends StatelessWidget {
+  const _PeriodRecapCardContent({
     required this.title,
     required this.recap,
     required this.icon,
