@@ -135,6 +135,26 @@ void main() {
       ThemeMode.light,
     );
   });
+
+  testWidgets('switches to the cyan theme from settings', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cyan'));
+    await tester.pumpAndSettle();
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.theme?.colorScheme.primary, const Color(0xFF007486));
+    expect(find.textContaining('Cool cyan'), findsOneWidget);
+  });
 }
 
 Future<void> _pumpApp(WidgetTester tester, AppLanguage language) {
