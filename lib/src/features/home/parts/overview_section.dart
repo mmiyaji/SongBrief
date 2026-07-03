@@ -34,6 +34,16 @@ class _OverviewSection extends StatelessWidget {
           history: stats.snapshotHistory,
         ),
         const SizedBox(height: 14),
+        _RecapHighlightsPanel(
+          overview: overview,
+          history: stats.snapshotHistory,
+        ),
+        const SizedBox(height: 14),
+        _TasteAndCollectionPanel(
+          overview: overview,
+          history: stats.snapshotHistory,
+        ),
+        const SizedBox(height: 14),
         _OverviewInsightPanel(overview: overview),
         const SizedBox(height: 14),
         _SmartListsPanel(overview: overview),

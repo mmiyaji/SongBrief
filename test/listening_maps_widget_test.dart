@@ -56,6 +56,46 @@ void main() {
     expect(find.text('Activity heatmap'), findsWidgets);
   });
 
+  testWidgets('shows recap and collection insight panels', (tester) async {
+    await _pumpOverview(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recap highlights'), findsOneWidget);
+    expect(find.text('This month'), findsOneWidget);
+    expect(find.text('This year'), findsOneWidget);
+    expect(find.text('Milestone countdown'), findsOneWidget);
+    expect(find.text('Burnout curve'), findsOneWidget);
+
+    final rediscovery = find.text('Rediscovery');
+    await tester.scrollUntilVisible(
+      rediscovery,
+      420,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Diversity score'), findsOneWidget);
+    expect(find.text('Album completion'), findsOneWidget);
+    expect(find.text('Late Bloom'), findsWidgets);
+  });
+
+  testWidgets('opens an album completion list', (tester) async {
+    await _pumpOverview(tester);
+    await tester.pumpAndSettle();
+
+    final album = find.text('Small Signals');
+    await tester.scrollUntilVisible(
+      album,
+      420,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(album);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Album songs'), findsOneWidget);
+  });
+
   testWidgets('opens a release decade list from expanded listening maps', (
     tester,
   ) async {

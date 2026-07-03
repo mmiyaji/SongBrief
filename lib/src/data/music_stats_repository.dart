@@ -210,7 +210,7 @@ class MusicStatsRepository {
         duration: const Duration(minutes: 4, seconds: 2),
         playCount: 116,
         skipCount: 5,
-        lastPlayedAt: now.subtract(const Duration(days: 5, hours: 6)),
+        lastPlayedAt: now.subtract(const Duration(days: 118)),
         lyrics:
             'Small signals find their way\n'
             'Through the ordinary day',
@@ -241,7 +241,7 @@ class MusicStatsRepository {
         duration: const Duration(minutes: 6, seconds: 18),
         playCount: 78,
         skipCount: 0,
-        lastPlayedAt: now.subtract(const Duration(days: 12)),
+        lastPlayedAt: now.subtract(const Duration(days: 142)),
         playlistNames: const ['Train Window'],
         isCloudItem: false,
       ),
