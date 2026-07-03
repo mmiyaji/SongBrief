@@ -684,8 +684,9 @@ class _StatsContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return RefreshIndicator.adaptive(
-      onRefresh: () =>
-          ref.read(musicStatsControllerProvider.notifier).refreshStats(),
+      onRefresh: () => ref
+          .read(musicStatsControllerProvider.notifier)
+          .refreshStatsSilently(),
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
