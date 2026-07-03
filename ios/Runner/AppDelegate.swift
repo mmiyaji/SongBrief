@@ -25,6 +25,7 @@ enum SongBriefSnapshotRefresh {
   private static let preferencesKey = "flutter.songbrief_daily_snapshots_v2"
   private static let maxSnapshots = 180
   private static let maxSnapshotTracks = 500
+  private static let maxStoredSnapshotCharacters = 1_500_000
 
   static func register() {
     BGTaskScheduler.shared.register(
@@ -122,6 +123,111 @@ enum SongBriefSnapshotRefresh {
       snapshots = Array(snapshots.suffix(maxSnapshots))
     }
 
+    guard let json = encodedPayloadWithinSize(from: snapshots) else {
+      return false
+    }
+
+    defaults.set(json, forKey: preferencesKey)
+    return true
+  }
+
+  private static func encodedPayloadWithinSize(from snapshots: [[String: Any]]) -> String? {
+    let cappedSnapshots: [[String: Any]]
+    if snapshots.count > maxSnapshots {
+      cappedSnapshots = Array(snapshots.suffix(maxSnapshots))
+    } else {
+      cappedSnapshots = snapshots
+    }
+
+    if let encoded = encodedPayload(from: cappedSnapshots),
+       encoded.utf16.count <= maxStoredSnapshotCharacters {
+      return encoded
+    }
+
+    if let encoded = largestRecentTrackCounterPayload(from: cappedSnapshots) {
+      return encoded
+    }
+
+    let totalsOnlySnapshots = snapshotsKeepingRecentTrackCounters(
+      cappedSnapshots,
+      recentSnapshotsWithCounters: 0
+    )
+    return largestSnapshotWindowPayload(from: totalsOnlySnapshots)
+  }
+
+  private static func largestRecentTrackCounterPayload(from snapshots: [[String: Any]]) -> String? {
+    var best: String?
+    var low = 0
+    var high = snapshots.count
+    while low <= high {
+      let midpoint = (low + high) / 2
+      let candidate = snapshotsKeepingRecentTrackCounters(
+        snapshots,
+        recentSnapshotsWithCounters: midpoint
+      )
+      guard let encoded = encodedPayload(from: candidate) else {
+        high = midpoint - 1
+        continue
+      }
+      if encoded.utf16.count <= maxStoredSnapshotCharacters {
+        best = encoded
+        low = midpoint + 1
+      } else {
+        high = midpoint - 1
+      }
+    }
+    return best
+  }
+
+  private static func largestSnapshotWindowPayload(from snapshots: [[String: Any]]) -> String? {
+    var best = encodedPayload(from: [])
+    var low = 0
+    var high = snapshots.count
+    while low <= high {
+      let midpoint = (low + high) / 2
+      let candidate: [[String: Any]]
+      if midpoint <= 0 {
+        candidate = []
+      } else {
+        candidate = Array(snapshots.suffix(midpoint))
+      }
+      guard let encoded = encodedPayload(from: candidate) else {
+        high = midpoint - 1
+        continue
+      }
+      if encoded.utf16.count <= maxStoredSnapshotCharacters {
+        best = encoded
+        low = midpoint + 1
+      } else {
+        high = midpoint - 1
+      }
+    }
+    return best
+  }
+
+  private static func snapshotsKeepingRecentTrackCounters(
+    _ snapshots: [[String: Any]],
+    recentSnapshotsWithCounters: Int
+  ) -> [[String: Any]] {
+    let firstDetailedIndex = snapshots.count - recentSnapshotsWithCounters
+    return snapshots.enumerated().map { index, snapshot in
+      if index < firstDetailedIndex {
+        return snapshotWithoutTrackCounters(snapshot)
+      }
+      return snapshot
+    }
+  }
+
+  private static func snapshotWithoutTrackCounters(_ snapshot: [String: Any]) -> [String: Any] {
+    guard let tracks = snapshot["tracks"] as? [Any], !tracks.isEmpty else {
+      return snapshot
+    }
+    var copy = snapshot
+    copy["tracks"] = [] as [Any]
+    return copy
+  }
+
+  private static func encodedPayload(from snapshots: [[String: Any]]) -> String? {
     let payload: [String: Any] = [
       "version": 1,
       "updatedAtMillis": Int(Date().timeIntervalSince1970 * 1000),
@@ -133,11 +239,9 @@ enum SongBriefSnapshotRefresh {
       let data = try? JSONSerialization.data(withJSONObject: payload),
       let json = String(data: data, encoding: .utf8)
     else {
-      return false
+      return nil
     }
-
-    defaults.set(json, forKey: preferencesKey)
-    return true
+    return json
   }
 
   private static func readSnapshots(from json: String?) -> [[String: Any]] {
