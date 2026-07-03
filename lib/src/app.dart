@@ -36,7 +36,9 @@ class SongBriefApp extends ConsumerWidget {
         brightness: Brightness.dark,
       ),
       themeMode: themeBrightness.themeMode,
-      home: const AppLockGate(child: HomeScreen()),
+      builder: (context, child) =>
+          AppLockGate(child: child ?? const SizedBox.shrink()),
+      home: const HomeScreen(),
     );
   }
 }
@@ -70,7 +72,8 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       unawaited(ref.read(appLockControllerProvider.notifier).lock());
     }
