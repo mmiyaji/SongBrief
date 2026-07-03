@@ -7481,6 +7481,7 @@ class _RankingRow extends ConsumerWidget {
     final artwork = track == null
         ? const AsyncData<Uint8List?>(null)
         : ref.watch(trackArtworkProvider(track.id));
+    final onTap = _rankingEntryTapHandler(context, overview, entry, track);
 
     return Padding(
       key: rowKey,
@@ -7500,9 +7501,7 @@ class _RankingRow extends ConsumerWidget {
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
-          onTap: track == null
-              ? null
-              : () => _showTrackDetailSheet(context, track),
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             child: Column(
@@ -7614,6 +7613,53 @@ class _RankingRow extends ConsumerWidget {
       ),
     );
   }
+}
+
+VoidCallback? _rankingEntryTapHandler(
+  BuildContext context,
+  LibraryOverview overview,
+  RankingEntry entry,
+  LibraryTrack? representativeTrack,
+) {
+  return switch (entry.kind) {
+    RankingEntryKind.track =>
+      representativeTrack == null
+          ? null
+          : () => _showTrackDetailSheet(context, representativeTrack),
+    RankingEntryKind.artist => () {
+      final tracks = _tracksByArtist(overview, entry.title);
+      if (tracks.isEmpty) {
+        return;
+      }
+      _showTrackGroupSheet(
+        context,
+        title: entry.title,
+        subtitle: _t(context, 'Artist songs', 'アーティストの曲'),
+        icon: Icons.person_pin_rounded,
+        tracks: tracks,
+        rankingScope: RankingScope.artists,
+        rankingTitle: entry.title,
+      );
+    },
+    RankingEntryKind.album =>
+      representativeTrack == null
+          ? null
+          : () {
+              final tracks = _tracksByAlbum(overview, representativeTrack);
+              if (tracks.isEmpty) {
+                return;
+              }
+              _showTrackGroupSheet(
+                context,
+                title: representativeTrack.albumTitle,
+                subtitle: _t(context, 'Album songs', 'アルバム内の曲'),
+                icon: Icons.album_rounded,
+                tracks: tracks,
+                rankingScope: RankingScope.albums,
+                rankingTitle: _albumRankingTitle(representativeTrack),
+              );
+            },
+  };
 }
 
 class _RankingArtwork extends StatelessWidget {
