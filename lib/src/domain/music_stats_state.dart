@@ -15,14 +15,6 @@ class MusicStatsState {
 
   bool get isDemo => overview.isDemo;
 
-  MusicStatsState markTrackPlayed(String trackId) {
-    return MusicStatsState(
-      authorizationStatus: authorizationStatus,
-      overview: overview.markTrackPlayed(trackId),
-      snapshotHistory: snapshotHistory,
-    );
-  }
-
   MusicStatsState withSnapshotHistory(SnapshotHistory snapshotHistory) {
     return MusicStatsState(
       authorizationStatus: authorizationStatus,

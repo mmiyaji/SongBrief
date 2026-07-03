@@ -219,10 +219,6 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     await _load(showLoading: false);
   }
 
-  Future<void> markTrackPlayed(String _) async {
-    await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
-  }
-
   Future<void> _load({required bool showLoading}) async {
     final previous = state.asData?.value;
     if (showLoading) {
