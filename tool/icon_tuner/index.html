@@ -231,13 +231,20 @@
       accent-color: var(--accent);
     }
 
-    input[type="color"] {
+    input[type="color"],
+    select {
       width: 100%;
       height: 38px;
       border: 1px solid rgba(149, 213, 213, 0.24);
       border-radius: 11px;
       padding: 3px;
       background: #071112;
+      color: var(--text);
+    }
+
+    select {
+      padding: 0 12px;
+      font-weight: 900;
     }
 
     .status {
@@ -378,6 +385,12 @@
       markY: 2,
       markScale: 1,
       markStroke: 28,
+      markPattern: 'noteZigzag',
+      arrowHeadStyle: 'filled',
+      arrowTipX: 0,
+      arrowTipY: 0,
+      trendBend: 0,
+      arrowAngle: 30,
       dotR: 31,
       arrowSize: 50,
       foregroundPad: 0,
@@ -447,12 +460,28 @@
       {
         root: 'markControls',
         controls: [
+          select('markPattern', 'パターン', [
+            ['noteZigzag', '音符 + 折れ線'],
+            ['noteStraight', '音符 + 直線'],
+            ['zigzagOnly', '折れ線のみ'],
+            ['cleanArrow', 'シンプル矢印'],
+            ['sparkline', 'スパークライン'],
+          ]),
+          select('arrowHeadStyle', '矢印の形状', [
+            ['filled', '塗りつぶし'],
+            ['open', '開いた矢印'],
+            ['notched', '切り欠き'],
+          ]),
           slider('markX', '横位置', -60, 60, 1),
           slider('markY', '縦位置', -60, 60, 1),
           slider('markScale', 'サイズ', 0.7, 1.35, 0.01),
           slider('markStroke', '線の太さ', 18, 40, 1),
           slider('dotR', '音符の丸', 18, 42, 1),
-          slider('arrowSize', '矢印サイズ', 30, 70, 1),
+          slider('arrowSize', '矢印の長さ', 24, 86, 1),
+          slider('arrowAngle', '矢印の開き', 16, 48, 1),
+          slider('arrowTipX', '先端 X', -42, 48, 1),
+          slider('arrowTipY', '先端 Y', -48, 42, 1),
+          slider('trendBend', '折れ線の強さ', -34, 34, 1),
         ],
       },
     ];
@@ -463,6 +492,10 @@
 
     function color(key, label) {
       return { type: 'color', key, label };
+    }
+
+    function select(key, label, options) {
+      return { type: 'select', key, label, options };
     }
 
     function roundedRect(ctx, x, y, w, h, r) {
@@ -558,26 +591,33 @@
       const s = p.markScale;
       const cx = p.badgeX + p.markX;
       const cy = p.badgeY + p.markY;
-      const points = [
-        [-58, 45],
-        [-18, 8],
-        [12, 25],
-        [48, -24],
-        [82, -12],
-        [102, -68],
-      ].map(([x, y]) => [cx + x * s, cy + y * s]);
+      const pattern = markPattern(p.markPattern);
+      const points = pattern.points.map(([x, y], index, source) => {
+        const isFirst = index === 0;
+        const isLast = index === source.length - 1;
+        const bend = isFirst || isLast ? 0 : p.trendBend * (index % 2 === 0 ? 1 : -1);
+        const tipX = isLast ? p.arrowTipX : 0;
+        const tipY = isLast ? p.arrowTipY : 0;
+        return [cx + (x + tipX) * s, cy + (y + tipY + bend) * s];
+      });
 
       ctx.fillStyle = '#071112';
-      ctx.beginPath();
-      ctx.arc(points[0][0], points[0][1], p.dotR * s, 0, Math.PI * 2);
-      ctx.fill();
+      if (pattern.hasDot) {
+        ctx.beginPath();
+        ctx.arc(points[0][0], points[0][1], p.dotR * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.strokeStyle = '#071112';
       ctx.lineWidth = p.markStroke * s;
       ctx.beginPath();
-      ctx.moveTo(points[0][0] + p.dotR * 0.55 * s, points[0][1] - p.dotR * 0.3 * s);
+      if (pattern.hasDot) {
+        ctx.moveTo(points[0][0] + p.dotR * 0.55 * s, points[0][1] - p.dotR * 0.3 * s);
+      } else {
+        ctx.moveTo(points[0][0], points[0][1]);
+      }
       for (let i = 1; i < points.length; i += 1) {
         ctx.lineTo(points[i][0], points[i][1]);
       }
@@ -585,18 +625,108 @@
 
       const end = points[points.length - 1];
       const prev = points[points.length - 2];
+      drawArrowHead(ctx, p, prev, end, s);
+    }
+
+    function markPattern(value) {
+      switch (value) {
+        case 'noteStraight':
+          return {
+            hasDot: true,
+            points: [
+              [-58, 45],
+              [-16, 18],
+              [34, -14],
+              [102, -68],
+            ],
+          };
+        case 'zigzagOnly':
+          return {
+            hasDot: false,
+            points: [
+              [-92, 50],
+              [-42, 8],
+              [-4, 28],
+              [42, -20],
+              [102, -68],
+            ],
+          };
+        case 'cleanArrow':
+          return {
+            hasDot: false,
+            points: [
+              [-78, 44],
+              [-22, 16],
+              [32, -16],
+              [102, -68],
+            ],
+          };
+        case 'sparkline':
+          return {
+            hasDot: false,
+            points: [
+              [-98, 42],
+              [-68, 18],
+              [-36, 34],
+              [-4, -4],
+              [30, 10],
+              [62, -30],
+              [102, -68],
+            ],
+          };
+        case 'noteZigzag':
+        default:
+          return {
+            hasDot: true,
+            points: [
+              [-58, 45],
+              [-18, 8],
+              [12, 25],
+              [48, -24],
+              [82, -12],
+              [102, -68],
+            ],
+          };
+      }
+    }
+
+    function drawArrowHead(ctx, p, prev, end, s) {
       const angle = Math.atan2(end[1] - prev[1], end[0] - prev[0]);
       const size = p.arrowSize * s;
+      const spread = (p.arrowAngle * Math.PI) / 180;
+      const left = [
+        end[0] - Math.cos(angle - spread) * size,
+        end[1] - Math.sin(angle - spread) * size,
+      ];
+      const right = [
+        end[0] - Math.cos(angle + spread) * size,
+        end[1] - Math.sin(angle + spread) * size,
+      ];
+
+      if (p.arrowHeadStyle === 'open') {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#071112';
+        ctx.lineWidth = p.markStroke * s;
+        ctx.beginPath();
+        ctx.moveTo(left[0], left[1]);
+        ctx.lineTo(end[0], end[1]);
+        ctx.lineTo(right[0], right[1]);
+        ctx.stroke();
+        return;
+      }
+
       ctx.beginPath();
       ctx.moveTo(end[0], end[1]);
-      ctx.lineTo(
-        end[0] - Math.cos(angle - Math.PI / 6) * size,
-        end[1] - Math.sin(angle - Math.PI / 6) * size,
-      );
-      ctx.lineTo(
-        end[0] - Math.cos(angle + Math.PI / 6) * size,
-        end[1] - Math.sin(angle + Math.PI / 6) * size,
-      );
+      ctx.lineTo(left[0], left[1]);
+      if (p.arrowHeadStyle === 'notched') {
+        const notch = [
+          end[0] - Math.cos(angle) * size * 0.54,
+          end[1] - Math.sin(angle) * size * 0.54,
+        ];
+        ctx.lineTo(notch[0], notch[1]);
+      }
+      ctx.lineTo(right[0], right[1]);
       ctx.closePath();
       ctx.fill();
     }
@@ -606,7 +736,7 @@
       renderSizes();
       for (const [key, control] of controls) {
         control.input.value = params[key];
-        control.value.textContent = formatValue(params[key]);
+        control.value.textContent = formatControlValue(control.item, params[key]);
       }
     }
 
@@ -636,8 +766,18 @@
           value.className = 'value';
           row.append(title, value);
 
-          const input = document.createElement('input');
-          input.type = item.type;
+          const input = document.createElement(item.type === 'select' ? 'select' : 'input');
+          if (item.type !== 'select') {
+            input.type = item.type;
+          }
+          if (item.type === 'select') {
+            for (const [optionValue, optionLabel] of item.options) {
+              const option = document.createElement('option');
+              option.value = optionValue;
+              option.textContent = optionLabel;
+              input.append(option);
+            }
+          }
           input.value = params[item.key];
           if (item.type === 'range') {
             input.min = item.min;
@@ -652,7 +792,7 @@
 
           field.append(row, input);
           root.append(field);
-          controls.set(item.key, { input, value });
+          controls.set(item.key, { input, value, item });
         }
       }
     }
@@ -677,6 +817,13 @@
 
     function formatValue(value) {
       return typeof value === 'number' ? Number(value.toFixed(2)).toString() : value;
+    }
+
+    function formatControlValue(item, value) {
+      if (item?.type !== 'select') {
+        return formatValue(value);
+      }
+      return item.options.find(([optionValue]) => optionValue === value)?.[1] ?? value;
     }
 
     async function loadParams() {
