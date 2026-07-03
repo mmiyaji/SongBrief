@@ -36,6 +36,8 @@
   "markStroke": 28,
   "markPattern": "noteZigzag",
   "arrowHeadStyle": "filled",
+  "arrowX": 0,
+  "arrowY": 0,
   "arrowTipX": 0,
   "arrowTipY": 0,
   "trendBend": 0,

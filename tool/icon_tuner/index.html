@@ -387,6 +387,8 @@
       markStroke: 28,
       markPattern: 'noteZigzag',
       arrowHeadStyle: 'filled',
+      arrowX: 0,
+      arrowY: 0,
       arrowTipX: 0,
       arrowTipY: 0,
       trendBend: 0,
@@ -477,10 +479,12 @@
           slider('markScale', 'サイズ', 0.7, 1.35, 0.01),
           slider('markStroke', '線の太さ', 18, 40, 1),
           slider('dotR', '音符の丸', 18, 42, 1),
+          slider('arrowX', '矢印位置 X', -60, 70, 1),
+          slider('arrowY', '矢印位置 Y', -70, 60, 1),
           slider('arrowSize', '矢印の長さ', 24, 86, 1),
           slider('arrowAngle', '矢印の開き', 16, 48, 1),
-          slider('arrowTipX', '先端 X', -42, 48, 1),
-          slider('arrowTipY', '先端 Y', -48, 42, 1),
+          slider('arrowTipX', '先端微調整 X', -42, 48, 1),
+          slider('arrowTipY', '先端微調整 Y', -48, 42, 1),
           slider('trendBend', '折れ線の強さ', -34, 34, 1),
         ],
       },
@@ -595,10 +599,13 @@
       const points = pattern.points.map(([x, y], index, source) => {
         const isFirst = index === 0;
         const isLast = index === source.length - 1;
+        const isArrowSegment = index >= source.length - 2;
         const bend = isFirst || isLast ? 0 : p.trendBend * (index % 2 === 0 ? 1 : -1);
+        const arrowX = isArrowSegment ? p.arrowX : 0;
+        const arrowY = isArrowSegment ? p.arrowY : 0;
         const tipX = isLast ? p.arrowTipX : 0;
         const tipY = isLast ? p.arrowTipY : 0;
-        return [cx + (x + tipX) * s, cy + (y + tipY + bend) * s];
+        return [cx + (x + arrowX + tipX) * s, cy + (y + arrowY + tipY + bend) * s];
       });
 
       ctx.fillStyle = '#071112';
