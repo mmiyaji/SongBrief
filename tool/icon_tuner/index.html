@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SongBrief Icon Tuner</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050909;
+      --panel: #0b1415;
+      --panel-2: #101d1f;
+      --line: rgba(149, 213, 213, 0.22);
+      --text: #f3ffff;
+      --muted: #9ebbbb;
+      --accent: #55e6dc;
+      --accent-2: #d9f53a;
+      --danger: #ff6b8a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(360px, 520px) minmax(440px, 1fr);
+      gap: 18px;
+      width: min(1480px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 22px 0 28px;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1;
+    }
+
+    .sub {
+      margin-top: 8px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.26);
+    }
+
+    .preview-panel {
+      position: sticky;
+      top: 16px;
+      align-self: start;
+      padding: 18px;
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 122px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .stage {
+      display: grid;
+      place-items: center;
+      aspect-ratio: 1;
+      border: 1px solid rgba(149, 213, 213, 0.16);
+      border-radius: 18px;
+      background: #020606;
+      overflow: hidden;
+    }
+
+    #mainCanvas {
+      width: min(100%, 460px);
+      height: auto;
+      display: block;
+    }
+
+    .reference {
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .reference img {
+      width: 100%;
+      border-radius: 20px;
+      border: 1px solid rgba(149, 213, 213, 0.18);
+      background: #020606;
+    }
+
+    .sizes {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(149, 213, 213, 0.13);
+    }
+
+    .size-swatch {
+      display: grid;
+      justify-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .size-swatch canvas {
+      border-radius: 14px;
+      background: #020606;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .button {
+      min-height: 40px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(149, 213, 213, 0.34);
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.04);
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .button.primary {
+      border-color: transparent;
+      color: #061112;
+      background: var(--accent);
+    }
+
+    .button.secondary {
+      color: var(--accent);
+    }
+
+    .button:disabled {
+      opacity: 0.46;
+      cursor: progress;
+    }
+
+    .controls {
+      padding: 18px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .group {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(149, 213, 213, 0.13);
+    }
+
+    .group h2 {
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 16px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .value {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 38px;
+      border: 1px solid rgba(149, 213, 213, 0.24);
+      border-radius: 11px;
+      padding: 3px;
+      background: #071112;
+    }
+
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 700;
+    }
+
+    @media (max-width: 980px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .preview-panel {
+        position: static;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .shell {
+        width: min(100vw - 20px, 1480px);
+      }
+
+      .preview-grid,
+      .control-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>SongBrief Icon Tuner</h1>
+        <p class="sub">棒グラフ、下線、右下バッジの位置とサイズを微調整します。</p>
+      </div>
+      <button class="button secondary" id="resetButton" type="button">初期値に戻す</button>
+    </header>
+
+    <section class="panel preview-panel" aria-label="Preview">
+      <div class="preview-grid">
+        <div class="stage">
+          <canvas id="mainCanvas" width="1024" height="1024"></canvas>
+        </div>
+        <div class="reference">
+          <span>現在のPNG</span>
+          <img src="/current-icon.png" alt="Current SongBrief icon">
+        </div>
+      </div>
+
+      <div class="sizes" id="sizes"></div>
+
+      <div class="actions">
+        <button class="button primary" id="saveButton" type="button">PNGを保存</button>
+        <button class="button" id="regenerateButton" type="button">各OS用に反映</button>
+        <button class="button secondary" id="downloadButton" type="button">PNGをダウンロード</button>
+        <button class="button secondary" id="copyButton" type="button">パラメータをコピー</button>
+      </div>
+      <p class="status" id="status">保存すると `assets/branding` と `tool/icon_tuner/icon_params.json` を更新します。</p>
+      <p class="hint">「各OS用に反映」は `flutter_launcher_icons` と `flutter_native_splash` を実行します。保存後に押してください。</p>
+    </section>
+
+    <section class="panel controls" aria-label="Controls">
+      <div class="group">
+        <h2>背景</h2>
+        <div class="control-grid" id="backgroundControls"></div>
+      </div>
+
+      <div class="group">
+        <h2>棒グラフ</h2>
+        <div class="control-grid" id="barControls"></div>
+      </div>
+
+      <div class="group">
+        <h2>下線</h2>
+        <div class="control-grid" id="baselineControls"></div>
+      </div>
+
+      <div class="group">
+        <h2>右下バッジ</h2>
+        <div class="control-grid" id="badgeControls"></div>
+      </div>
+
+      <div class="group">
+        <h2>中のマーク</h2>
+        <div class="control-grid" id="markControls"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    const fallbackParams = {
+      canvasSize: 1024,
+      panelInset: 74,
+      panelRadius: 128,
+      panelFill: '#071517',
+      panelBorder: '#24383b',
+      panelBorderWidth: 6,
+      panelShadow: 0.34,
+      barWidth: 106,
+      barRadius: 53,
+      bar1X: 232,
+      bar1Y: 430,
+      bar1H: 272,
+      bar1Color: '#667cff',
+      bar2X: 376,
+      bar2Y: 300,
+      bar2H: 402,
+      bar2Color: '#61dfd0',
+      bar3X: 522,
+      bar3Y: 150,
+      bar3H: 552,
+      bar3Color: '#d9f53a',
+      baselineX: 156,
+      baselineY: 794,
+      baselineHeight: 44,
+      baselineMintW: 488,
+      baselineGap: 30,
+      baselineLimeW: 222,
+      badgeX: 682,
+      badgeY: 622,
+      badgeR: 148,
+      badgeColor: '#6ee6dd',
+      markX: 0,
+      markY: 2,
+      markScale: 1,
+      markStroke: 28,
+      dotR: 31,
+      arrowSize: 50,
+      foregroundPad: 0,
+    };
+
+    let params = { ...fallbackParams };
+    const controls = new Map();
+    const mainCanvas = document.querySelector('#mainCanvas');
+    const statusEl = document.querySelector('#status');
+    const saveButton = document.querySelector('#saveButton');
+    const regenerateButton = document.querySelector('#regenerateButton');
+    const copyButton = document.querySelector('#copyButton');
+    const downloadButton = document.querySelector('#downloadButton');
+    const resetButton = document.querySelector('#resetButton');
+
+    const controlGroups = [
+      {
+        root: 'backgroundControls',
+        controls: [
+          slider('panelInset', '外側余白', 40, 120, 1),
+          slider('panelRadius', '角丸', 72, 180, 1),
+          color('panelFill', '背景色'),
+          color('panelBorder', '枠線色'),
+          slider('panelBorderWidth', '枠線幅', 0, 14, 1),
+          slider('panelShadow', '陰影', 0, 0.8, 0.01),
+        ],
+      },
+      {
+        root: 'barControls',
+        controls: [
+          slider('barWidth', '棒の幅', 70, 140, 1),
+          slider('barRadius', '棒の角丸', 20, 72, 1),
+          slider('bar1X', '左棒 X', 160, 310, 1),
+          slider('bar1Y', '左棒 Y', 340, 510, 1),
+          slider('bar1H', '左棒 高さ', 180, 360, 1),
+          color('bar1Color', '左棒 色'),
+          slider('bar2X', '中央棒 X', 300, 450, 1),
+          slider('bar2Y', '中央棒 Y', 210, 380, 1),
+          slider('bar2H', '中央棒 高さ', 300, 490, 1),
+          color('bar2Color', '中央棒 色'),
+          slider('bar3X', '右棒 X', 460, 610, 1),
+          slider('bar3Y', '右棒 Y', 90, 230, 1),
+          slider('bar3H', '右棒 高さ', 470, 650, 1),
+          color('bar3Color', '右棒 色'),
+        ],
+      },
+      {
+        root: 'baselineControls',
+        controls: [
+          slider('baselineX', '開始 X', 100, 230, 1),
+          slider('baselineY', '位置 Y', 730, 860, 1),
+          slider('baselineHeight', '太さ', 20, 64, 1),
+          slider('baselineMintW', 'ミント幅', 320, 600, 1),
+          slider('baselineGap', '色の間隔', 0, 60, 1),
+          slider('baselineLimeW', 'ライム幅', 120, 320, 1),
+        ],
+      },
+      {
+        root: 'badgeControls',
+        controls: [
+          slider('badgeX', '中心 X', 600, 790, 1),
+          slider('badgeY', '中心 Y', 540, 720, 1),
+          slider('badgeR', '半径', 100, 180, 1),
+          color('badgeColor', '色'),
+        ],
+      },
+      {
+        root: 'markControls',
+        controls: [
+          slider('markX', '横位置', -60, 60, 1),
+          slider('markY', '縦位置', -60, 60, 1),
+          slider('markScale', 'サイズ', 0.7, 1.35, 0.01),
+          slider('markStroke', '線の太さ', 18, 40, 1),
+          slider('dotR', '音符の丸', 18, 42, 1),
+          slider('arrowSize', '矢印サイズ', 30, 70, 1),
+        ],
+      },
+    ];
+
+    function slider(key, label, min, max, step) {
+      return { type: 'range', key, label, min, max, step };
+    }
+
+    function color(key, label) {
+      return { type: 'color', key, label };
+    }
+
+    function roundedRect(ctx, x, y, w, h, r) {
+      const rr = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.lineTo(x + w - rr, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+      ctx.lineTo(x + w, y + h - rr);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+      ctx.lineTo(x + rr, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+      ctx.lineTo(x, y + rr);
+      ctx.quadraticCurveTo(x, y, x + rr, y);
+      ctx.closePath();
+    }
+
+    function drawIcon(ctx, p, options = {}) {
+      const size = p.canvasSize;
+      ctx.clearRect(0, 0, size, size);
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      if (!options.foregroundOnly) {
+        ctx.fillStyle = '#22211f';
+        ctx.fillRect(0, 0, size, size);
+
+        const inset = p.panelInset;
+        const panelSize = size - inset * 2;
+        roundedRect(ctx, inset, inset, panelSize, panelSize, p.panelRadius);
+        ctx.shadowColor = `rgba(0, 0, 0, ${p.panelShadow})`;
+        ctx.shadowBlur = 38;
+        ctx.shadowOffsetY = 18;
+        ctx.fillStyle = p.panelFill;
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+
+        if (p.panelBorderWidth > 0) {
+          roundedRect(ctx, inset, inset, panelSize, panelSize, p.panelRadius);
+          ctx.lineWidth = p.panelBorderWidth;
+          ctx.strokeStyle = p.panelBorder;
+          ctx.stroke();
+        }
+      }
+
+      const pad = options.foregroundOnly ? p.foregroundPad : 0;
+      ctx.translate(pad, pad);
+      const scale = options.foregroundOnly ? (size - pad * 2) / size : 1;
+      ctx.scale(scale, scale);
+
+      drawBars(ctx, p);
+      drawBaseline(ctx, p);
+      drawBadge(ctx, p);
+      ctx.restore();
+    }
+
+    function drawBars(ctx, p) {
+      [
+        [p.bar1X, p.bar1Y, p.bar1H, p.bar1Color],
+        [p.bar2X, p.bar2Y, p.bar2H, p.bar2Color],
+        [p.bar3X, p.bar3Y, p.bar3H, p.bar3Color],
+      ].forEach(([x, y, h, fill]) => {
+        roundedRect(ctx, x, y, p.barWidth, h, p.barRadius);
+        ctx.fillStyle = fill;
+        ctx.fill();
+      });
+    }
+
+    function drawBaseline(ctx, p) {
+      roundedRect(ctx, p.baselineX, p.baselineY, p.baselineMintW, p.baselineHeight, p.baselineHeight / 2);
+      ctx.fillStyle = p.bar2Color;
+      ctx.fill();
+      const limeX = p.baselineX + p.baselineMintW + p.baselineGap;
+      roundedRect(ctx, limeX, p.baselineY, p.baselineLimeW, p.baselineHeight, p.baselineHeight / 2);
+      ctx.fillStyle = p.bar3Color;
+      ctx.fill();
+    }
+
+    function drawBadge(ctx, p) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(p.badgeX, p.badgeY, p.badgeR, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fillStyle = p.badgeColor;
+      ctx.fill();
+      ctx.clip();
+      drawTrendMark(ctx, p);
+      ctx.restore();
+    }
+
+    function drawTrendMark(ctx, p) {
+      const s = p.markScale;
+      const cx = p.badgeX + p.markX;
+      const cy = p.badgeY + p.markY;
+      const points = [
+        [-58, 45],
+        [-18, 8],
+        [12, 25],
+        [48, -24],
+        [82, -12],
+        [102, -68],
+      ].map(([x, y]) => [cx + x * s, cy + y * s]);
+
+      ctx.fillStyle = '#071112';
+      ctx.beginPath();
+      ctx.arc(points[0][0], points[0][1], p.dotR * s, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#071112';
+      ctx.lineWidth = p.markStroke * s;
+      ctx.beginPath();
+      ctx.moveTo(points[0][0] + p.dotR * 0.55 * s, points[0][1] - p.dotR * 0.3 * s);
+      for (let i = 1; i < points.length; i += 1) {
+        ctx.lineTo(points[i][0], points[i][1]);
+      }
+      ctx.stroke();
+
+      const end = points[points.length - 1];
+      const prev = points[points.length - 2];
+      const angle = Math.atan2(end[1] - prev[1], end[0] - prev[0]);
+      const size = p.arrowSize * s;
+      ctx.beginPath();
+      ctx.moveTo(end[0], end[1]);
+      ctx.lineTo(
+        end[0] - Math.cos(angle - Math.PI / 6) * size,
+        end[1] - Math.sin(angle - Math.PI / 6) * size,
+      );
+      ctx.lineTo(
+        end[0] - Math.cos(angle + Math.PI / 6) * size,
+        end[1] - Math.sin(angle + Math.PI / 6) * size,
+      );
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function render() {
+      drawIcon(mainCanvas.getContext('2d'), params);
+      renderSizes();
+      for (const [key, control] of controls) {
+        control.input.value = params[key];
+        control.value.textContent = formatValue(params[key]);
+      }
+    }
+
+    function renderSizes() {
+      document.querySelectorAll('[data-size-canvas]').forEach((canvas) => {
+        const previewSize = Number(canvas.dataset.sizeCanvas);
+        const ctx = canvas.getContext('2d');
+        ctx.save();
+        ctx.clearRect(0, 0, previewSize, previewSize);
+        ctx.scale(previewSize / params.canvasSize, previewSize / params.canvasSize);
+        drawIcon(ctx, params);
+        ctx.restore();
+      });
+    }
+
+    function createControls() {
+      for (const group of controlGroups) {
+        const root = document.querySelector(`#${group.root}`);
+        for (const item of group.controls) {
+          const field = document.createElement('label');
+          field.className = 'field';
+          const row = document.createElement('span');
+          row.className = 'label-row';
+          const title = document.createElement('span');
+          title.textContent = item.label;
+          const value = document.createElement('span');
+          value.className = 'value';
+          row.append(title, value);
+
+          const input = document.createElement('input');
+          input.type = item.type;
+          input.value = params[item.key];
+          if (item.type === 'range') {
+            input.min = item.min;
+            input.max = item.max;
+            input.step = item.step;
+          }
+
+          input.addEventListener('input', () => {
+            params[item.key] = item.type === 'range' ? Number(input.value) : input.value;
+            render();
+          });
+
+          field.append(row, input);
+          root.append(field);
+          controls.set(item.key, { input, value });
+        }
+      }
+    }
+
+    function createSizeSwatches() {
+      const root = document.querySelector('#sizes');
+      [256, 128, 80, 60, 40, 29, 20].forEach((size) => {
+        const item = document.createElement('div');
+        item.className = 'size-swatch';
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        canvas.style.width = `${size}px`;
+        canvas.style.height = `${size}px`;
+        canvas.dataset.sizeCanvas = String(size);
+        const label = document.createElement('span');
+        label.textContent = `${size}px`;
+        item.append(canvas, label);
+        root.append(item);
+      });
+    }
+
+    function formatValue(value) {
+      return typeof value === 'number' ? Number(value.toFixed(2)).toString() : value;
+    }
+
+    async function loadParams() {
+      try {
+        const response = await fetch('/icon_params.json', { cache: 'no-store' });
+        if (response.ok) {
+          params = { ...fallbackParams, ...(await response.json()) };
+        }
+      } catch (_) {
+        params = { ...fallbackParams };
+      }
+    }
+
+    function canvasDataUrl(options = {}) {
+      const canvas = document.createElement('canvas');
+      canvas.width = params.canvasSize;
+      canvas.height = params.canvasSize;
+      drawIcon(canvas.getContext('2d'), params, options);
+      return canvas.toDataURL('image/png');
+    }
+
+    function setBusy(isBusy) {
+      saveButton.disabled = isBusy;
+      regenerateButton.disabled = isBusy;
+      copyButton.disabled = isBusy;
+      downloadButton.disabled = isBusy;
+      resetButton.disabled = isBusy;
+    }
+
+    function setStatus(message, error = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('error', error);
+    }
+
+    saveButton.addEventListener('click', async () => {
+      setBusy(true);
+      setStatus('PNGを保存しています...');
+      try {
+        const response = await fetch('/api/save', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            params,
+            iconPng: canvasDataUrl(),
+            foregroundPng: canvasDataUrl({ foregroundOnly: true }),
+          }),
+        });
+        const result = await response.json();
+        if (!result.ok) {
+          throw new Error(result.error || '保存に失敗しました。');
+        }
+        document.querySelector('.reference img').src = `/current-icon.png?ts=${Date.now()}`;
+        setStatus('保存しました。必要なら「各OS用に反映」を押してください。');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error), true);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    regenerateButton.addEventListener('click', async () => {
+      setBusy(true);
+      setStatus('各OS用のアイコンとスプラッシュ画像へ反映しています...');
+      try {
+        const response = await fetch('/api/regenerate', { method: 'POST' });
+        const result = await response.json();
+        if (!result.ok) {
+          throw new Error(result.error || '反映に失敗しました。');
+        }
+        setStatus('反映しました。Codex側で差分確認とテストを実行してください。');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error), true);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    copyButton.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(JSON.stringify(params, null, 2));
+      setStatus('パラメータをコピーしました。');
+    });
+
+    downloadButton.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.href = canvasDataUrl();
+      link.download = 'songbrief-icon-tuned.png';
+      link.click();
+      setStatus('PNGを書き出しました。');
+    });
+
+    resetButton.addEventListener('click', () => {
+      params = { ...fallbackParams };
+      render();
+      setStatus('初期値に戻しました。');
+    });
+
+    await loadParams();
+    createSizeSwatches();
+    createControls();
+    render();
+  </script>
+</body>
+</html>
