@@ -129,6 +129,14 @@ class MusicStatsRepository {
     return _snapshotRepository.recordSnapshot(overview);
   }
 
+  Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) {
+    return _snapshotRepository.deleteSnapshotsOlderThan(cutoff);
+  }
+
+  Future<SnapshotHistory> clearSnapshotHistory() {
+    return _snapshotRepository.clearHistory();
+  }
+
   List<LibraryTrack> _sampleTracks() {
     final now = DateTime.now();
     return [

@@ -60,6 +60,65 @@ void main() {
       'newly-written-legacy-value',
     );
   });
+
+  test(
+    'deletes snapshots older than a cutoff and persists the result',
+    () async {
+      final history = SnapshotHistory(
+        snapshots: List.unmodifiable([
+          _snapshotOn(DateTime(2026, 1, 1)),
+          _snapshotOn(DateTime(2026, 1, 20)),
+          _snapshotOn(DateTime(2026, 2, 1)),
+        ]),
+      );
+      SharedPreferences.setMockInitialValues({
+        librarySnapshotPreferencesKey: jsonEncode(history.toJson()),
+      });
+
+      final repository = const LibrarySnapshotRepository();
+      final trimmed = await repository.deleteSnapshotsOlderThan(
+        DateTime(2026, 1, 15),
+      );
+      final preferences = await SharedPreferences.getInstance();
+      final reloaded = await repository.loadHistory();
+
+      expect(trimmed.snapshotCount, 2);
+      expect(trimmed.snapshots.first.dateKey, '2026-01-20');
+      expect(preferences.getString(librarySnapshotPreferencesKey), isNotNull);
+      expect(reloaded.snapshotCount, 2);
+      expect(reloaded.snapshots.first.dateKey, '2026-01-20');
+    },
+  );
+
+  test('clears stored snapshot history', () async {
+    final history = SnapshotHistory(
+      snapshots: List.unmodifiable([_snapshotOn(DateTime(2026, 1, 1))]),
+    );
+    SharedPreferences.setMockInitialValues({
+      librarySnapshotPreferencesKey: jsonEncode(history.toJson()),
+    });
+
+    final repository = const LibrarySnapshotRepository();
+    final cleared = await repository.clearHistory();
+    final preferences = await SharedPreferences.getInstance();
+
+    expect(cleared.snapshotCount, 0);
+    expect(preferences.getString(librarySnapshotPreferencesKey), isNull);
+    expect((await repository.loadHistory()).snapshotCount, 0);
+  });
+}
+
+DailyLibrarySnapshot _snapshotOn(DateTime capturedAt) {
+  return DailyLibrarySnapshot(
+    dateKey: snapshotDateKey(capturedAt),
+    capturedAt: capturedAt,
+    source: 'foreground',
+    trackCount: 10,
+    totalPlayCount: capturedAt.day,
+    totalSkipCount: 0,
+    totalListeningSeconds: capturedAt.day * 180,
+    tracks: const [],
+  );
 }
 
 DailyLibrarySnapshot _largeSnapshot(int index) {

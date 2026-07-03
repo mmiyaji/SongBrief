@@ -62,6 +62,22 @@ class LibrarySnapshotRepository {
     return _storeHistoryWithinSize(preferences, next);
   }
 
+  Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
+    final history = await loadHistory();
+    final snapshots = history.snapshots
+        .where((snapshot) => !snapshot.capturedAt.isBefore(cutoff))
+        .toList(growable: false);
+    final next = SnapshotHistory(snapshots: List.unmodifiable(snapshots));
+    final preferences = await SharedPreferences.getInstance();
+    return _storeHistoryWithinSize(preferences, next);
+  }
+
+  Future<SnapshotHistory> clearHistory() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(librarySnapshotPreferencesKey);
+    return SnapshotHistory.empty;
+  }
+
   Future<SnapshotHistory> _storeHistoryWithinSize(
     SharedPreferences preferences,
     SnapshotHistory history,

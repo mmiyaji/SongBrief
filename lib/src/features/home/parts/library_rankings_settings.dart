@@ -1310,6 +1310,13 @@ class _SettingsSection extends ConsumerWidget {
               _ExportSetting(stats: stats),
               const SizedBox(height: 18),
               Text(
+                _t(context, 'Data Management', 'データ管理'),
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 10),
+              _DataManagementSetting(stats: stats),
+              const SizedBox(height: 18),
+              Text(
                 _t(context, 'Monetization', '収益化'),
                 style: theme.textTheme.titleMedium,
               ),
@@ -1445,6 +1452,344 @@ class _ExportSetting extends StatelessWidget {
       ],
     );
   }
+}
+
+class _DataManagementSetting extends ConsumerWidget {
+  const _DataManagementSetting({required this.stats});
+
+  final MusicStatsState stats;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final history = stats.snapshotHistory;
+    final oldestSnapshot = history.snapshots.isEmpty
+        ? null
+        : history.snapshots.first;
+    final latestSnapshot = history.latest;
+    final rangeLabel = oldestSnapshot == null || latestSnapshot == null
+        ? _t(context, 'No history', '履歴なし')
+        : '${DateFormat.Md(_localeName(context)).format(oldestSnapshot.capturedAt)} - '
+              '${DateFormat.Md(_localeName(context)).format(latestSnapshot.capturedAt)}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingsRow(
+          icon: Icons.cleaning_services_outlined,
+          label: _t(context, 'Temporary caches', '一時キャッシュ'),
+          value: _t(context, 'Artwork / images', 'アートワーク・画像'),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            onPressed: () => _clearTemporaryCaches(context, ref),
+            icon: const Icon(Icons.delete_sweep_outlined),
+            label: Text(_t(context, 'Clear caches', 'キャッシュを削除')),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _SettingsRow(
+          icon: Icons.calendar_month_outlined,
+          label: _t(context, 'Snapshot history', 'スナップショット履歴'),
+          value:
+              '${_dayCountLabel(context, history.snapshotCount)} / $rangeLabel',
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _t(
+            context,
+            'Snapshot deletion requires confirmation. App settings and purchase status are kept.',
+            '履歴の削除には確認が必要です。設定と購入状態は保持します。',
+          ),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          alignment: WrapAlignment.end,
+          children: [
+            for (final retention in _SnapshotRetentionOption.values)
+              OutlinedButton.icon(
+                onPressed: history.snapshotCount == 0
+                    ? null
+                    : () => _deleteOldSnapshots(context, ref, stats, retention),
+                icon: const Icon(Icons.auto_delete_outlined),
+                label: Text(_snapshotRetentionLabel(context, retention)),
+              ),
+            OutlinedButton.icon(
+              onPressed: history.snapshotCount == 0
+                  ? null
+                  : () => _clearSnapshotHistory(context, ref, stats),
+              icon: const Icon(Icons.history_toggle_off_outlined),
+              label: Text(_t(context, 'Delete history', '履歴を削除')),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: () => _cleanGeneratedData(context, ref, stats),
+              icon: const Icon(Icons.cleaning_services_rounded),
+              label: Text(_t(context, 'Clean generated data', '生成データを全削除')),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+enum _SnapshotRetentionOption {
+  days30(30),
+  days90(90),
+  days180(180);
+
+  const _SnapshotRetentionOption(this.days);
+
+  final int days;
+}
+
+String _snapshotRetentionLabel(
+  BuildContext context,
+  _SnapshotRetentionOption option,
+) {
+  return switch (option) {
+    _SnapshotRetentionOption.days30 => _t(context, 'Keep 30 days', '30日分を保持'),
+    _SnapshotRetentionOption.days90 => _t(context, 'Keep 90 days', '90日分を保持'),
+    _SnapshotRetentionOption.days180 => _t(
+      context,
+      'Keep 180 days',
+      '180日分を保持',
+    ),
+  };
+}
+
+void _clearTemporaryCaches(
+  BuildContext context,
+  WidgetRef ref, {
+  bool showMessage = true,
+}) {
+  PaintingBinding.instance.imageCache.clear();
+  PaintingBinding.instance.imageCache.clearLiveImages();
+  ref.invalidate(trackArtworkProvider);
+  if (showMessage) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(
+          _t(context, 'Temporary caches were cleared.', '一時キャッシュを削除しました。'),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _deleteOldSnapshots(
+  BuildContext context,
+  WidgetRef ref,
+  MusicStatsState stats,
+  _SnapshotRetentionOption retention,
+) async {
+  final now = _localDateOnly(DateTime.now());
+  final cutoff = now.subtract(Duration(days: retention.days));
+  final cutoffLabel = DateFormat.yMMMd(_localeName(context)).format(cutoff);
+  final confirmed = await _confirmSnapshotDeletion(
+    context,
+    title: _t(context, 'Delete old snapshots?', '古いスナップショットを削除しますか？'),
+    message: _t(
+      context,
+      'Snapshots before $cutoffLabel will be deleted. This cannot be undone.',
+      '$cutoffLabel より前のスナップショットを削除します。この操作は元に戻せません。',
+    ),
+    confirmLabel: _t(context, 'Delete old snapshots', '古い履歴を削除'),
+  );
+  if (!confirmed || !context.mounted) {
+    return;
+  }
+
+  try {
+    final before = stats.snapshotHistory.snapshotCount;
+    final history = await ref
+        .read(musicStatsControllerProvider.notifier)
+        .deleteSnapshotsOlderThan(cutoff);
+    if (!context.mounted) {
+      return;
+    }
+    final removed = before - (history?.snapshotCount ?? before);
+    _showDataManagementResult(
+      context,
+      removed <= 0
+          ? _t(context, 'No matching snapshots were deleted.', '削除対象の履歴はありません。')
+          : _t(
+              context,
+              'Deleted $removed snapshots.',
+              '$removed件のスナップショットを削除しました。',
+            ),
+    );
+  } on Object {
+    if (context.mounted) {
+      _showDataManagementResult(
+        context,
+        _t(context, 'Could not delete snapshots.', 'スナップショットを削除できませんでした。'),
+      );
+    }
+  }
+}
+
+Future<void> _clearSnapshotHistory(
+  BuildContext context,
+  WidgetRef ref,
+  MusicStatsState stats,
+) async {
+  final confirmed = await _confirmSnapshotDeletion(
+    context,
+    title: _t(context, 'Delete all snapshot history?', '履歴をすべて削除しますか？'),
+    message: _t(
+      context,
+      'All saved snapshots will be deleted. This cannot be undone.',
+      '保存済みスナップショットをすべて削除します。この操作は元に戻せません。',
+    ),
+    confirmLabel: _t(context, 'Delete all history', 'すべての履歴を削除'),
+  );
+  if (!confirmed || !context.mounted) {
+    return;
+  }
+
+  try {
+    final before = stats.snapshotHistory.snapshotCount;
+    await ref
+        .read(musicStatsControllerProvider.notifier)
+        .clearSnapshotHistory();
+    if (!context.mounted) {
+      return;
+    }
+    _showDataManagementResult(
+      context,
+      _t(context, 'Deleted $before snapshots.', '$before件のスナップショットを削除しました。'),
+    );
+  } on Object {
+    if (context.mounted) {
+      _showDataManagementResult(
+        context,
+        _t(context, 'Could not delete snapshots.', 'スナップショットを削除できませんでした。'),
+      );
+    }
+  }
+}
+
+Future<void> _cleanGeneratedData(
+  BuildContext context,
+  WidgetRef ref,
+  MusicStatsState stats,
+) async {
+  final confirmed = await _confirmSnapshotDeletion(
+    context,
+    title: _t(context, 'Clean generated data?', '生成データを全削除しますか？'),
+    message: _t(
+      context,
+      'Artwork caches and all snapshot history will be cleared. App settings and purchase status are kept.',
+      'アートワークキャッシュとすべてのスナップショット履歴を削除します。設定と購入状態は保持します。',
+    ),
+    confirmLabel: _t(context, 'Clean data', '削除する'),
+  );
+  if (!confirmed || !context.mounted) {
+    return;
+  }
+
+  try {
+    final before = stats.snapshotHistory.snapshotCount;
+    _clearTemporaryCaches(context, ref, showMessage: false);
+    await ref
+        .read(musicStatsControllerProvider.notifier)
+        .clearSnapshotHistory();
+    if (!context.mounted) {
+      return;
+    }
+    _showDataManagementResult(
+      context,
+      _t(
+        context,
+        'Caches cleared and $before snapshots deleted.',
+        'キャッシュを削除し、$before件のスナップショットを削除しました。',
+      ),
+    );
+  } on Object {
+    if (context.mounted) {
+      _showDataManagementResult(
+        context,
+        _t(context, 'Could not clean generated data.', '生成データを削除できませんでした。'),
+      );
+    }
+  }
+}
+
+Future<bool> _confirmSnapshotDeletion(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+}) async {
+  var agreed = false;
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      final theme = Theme.of(dialogContext);
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Text(title),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(message),
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: agreed,
+                  onChanged: (value) {
+                    setState(() {
+                      agreed = value ?? false;
+                    });
+                  },
+                  title: Text(
+                    _t(
+                      context,
+                      'I understand this deletes snapshot history.',
+                      'スナップショット履歴が削除されることに同意します。',
+                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(_t(context, 'Cancel', 'キャンセル')),
+              ),
+              FilledButton(
+                onPressed: agreed
+                    ? () => Navigator.of(dialogContext).pop(true)
+                    : null,
+                child: Text(confirmLabel),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+  return result ?? false;
+}
+
+void _showDataManagementResult(BuildContext context, String message) {
+  ScaffoldMessenger.maybeOf(
+    context,
+  )?.showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _AppLockSetting extends ConsumerWidget {

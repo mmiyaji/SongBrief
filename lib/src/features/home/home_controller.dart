@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/music_stats_repository.dart';
 import '../../data/music_library_channel.dart';
 import '../../domain/library_overview.dart';
+import '../../domain/library_snapshot.dart';
 import '../../domain/music_stats_state.dart';
 
 enum TrendRange { week, month, year }
@@ -217,6 +218,30 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
 
   Future<void> refreshStatsSilently() async {
     await _load(showLoading: false);
+  }
+
+  Future<SnapshotHistory?> deleteSnapshotsOlderThan(DateTime cutoff) async {
+    final history = await ref
+        .read(musicStatsRepositoryProvider)
+        .deleteSnapshotsOlderThan(cutoff);
+    _replaceSnapshotHistory(history);
+    return history;
+  }
+
+  Future<SnapshotHistory?> clearSnapshotHistory() async {
+    final history = await ref
+        .read(musicStatsRepositoryProvider)
+        .clearSnapshotHistory();
+    _replaceSnapshotHistory(history);
+    return history;
+  }
+
+  void _replaceSnapshotHistory(SnapshotHistory history) {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+    state = AsyncData(current.withSnapshotHistory(history));
   }
 
   Future<void> _load({required bool showLoading}) async {
