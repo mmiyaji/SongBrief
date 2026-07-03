@@ -940,7 +940,7 @@ class _NowPlayingSection extends ConsumerWidget {
         ],
         _HeroTrackPanel(track: track, artwork: artwork),
         const SizedBox(height: 14),
-        _TrendPanel(track: track),
+        _TrendPanel(track: track, history: stats.snapshotHistory),
         const SizedBox(height: 14),
         _NowPlayingLyricsPanel(track: track),
         if (recentTracks.length > 1) ...[
@@ -1596,15 +1596,22 @@ class _HeroStat extends StatelessWidget {
 }
 
 class _TrendPanel extends ConsumerWidget {
-  const _TrendPanel({required this.track});
+  const _TrendPanel({required this.track, required this.history});
 
   final LibraryTrack track;
+  final SnapshotHistory history;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final range = ref.watch(trendRangeProvider);
-    final values = _trendValues(track, range);
+    final values = _trackTrendValues(
+      context: context,
+      trackId: track.id,
+      history: history,
+      range: range,
+    );
+    final hasSnapshotData = history.snapshots.length >= 2;
     return GlassSurface(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       radius: 26,
@@ -1629,12 +1636,35 @@ class _TrendPanel extends ConsumerWidget {
                   ),
                 ),
               ),
-              Icon(
-                Icons.info_outline_rounded,
-                color: theme.colorScheme.onSurfaceVariant,
-                size: 18,
+              IconButton(
+                tooltip: _t(context, 'About this trend', 'この傾向について'),
+                style: IconButton.styleFrom(
+                  foregroundColor: theme.colorScheme.onSurfaceVariant,
+                  minimumSize: const Size.square(36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => _showTrackTrendInfoSheet(context),
+                icon: const Icon(Icons.info_outline_rounded, size: 18),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hasSnapshotData
+                ? _t(
+                    context,
+                    'Play-count changes for this song from saved daily snapshots.',
+                    '保存済みの日次スナップショットから、この曲の再生回数の増分を表示します。',
+                  )
+                : _t(
+                    context,
+                    'At least two daily snapshots are required before this chart can show values.',
+                    '数値を表示するには日次スナップショットが2件以上必要です。',
+                  ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -1681,7 +1711,7 @@ class _TrendPanel extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 18),
-          _TrendBars(values: values, range: range),
+          _TrendBars(values: values, hasSnapshotData: hasSnapshotData),
         ],
       ),
     );
@@ -1689,16 +1719,33 @@ class _TrendPanel extends ConsumerWidget {
 }
 
 class _TrendBars extends StatelessWidget {
-  const _TrendBars({required this.values, required this.range});
+  const _TrendBars({required this.values, required this.hasSnapshotData});
 
-  final List<int> values;
-  final TrendRange range;
+  final List<_TrackTrendValue> values;
+  final bool hasSnapshotData;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final max = values.reduce((a, b) => a > b ? a : b);
-    final labels = _trendLabels(context, range);
+    if (!hasSnapshotData) {
+      return SizedBox(
+        height: 178,
+        child: Center(
+          child: _TrackContextEmptyText(
+            text: _t(
+              context,
+              'Scan the library on two different days to build a snapshot trend.',
+              'スナップショット傾向は、別日のライブラリスキャンが2件そろうと表示されます。',
+            ),
+          ),
+        ),
+      );
+    }
+
+    final max = values.fold<int>(
+      0,
+      (previous, value) => math.max(previous, value.playDelta),
+    );
 
     return SizedBox(
       height: 178,
@@ -1707,7 +1754,7 @@ class _TrendBars extends StatelessWidget {
         children: values.indexed.map((indexed) {
           final index = indexed.$1;
           final value = indexed.$2;
-          final ratio = max == 0 ? 0.0 : value / max;
+          final ratio = max == 0 ? 0.0 : value.playDelta / max;
           return Expanded(
             child: Padding(
               padding: EdgeInsets.only(left: index == 0 ? 0 : 5, right: 5),
@@ -1715,7 +1762,7 @@ class _TrendBars extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
-                    _compactNumber(value),
+                    _compactNumber(value.playDelta),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: index == values.length - 1
                           ? theme.colorScheme.primary
@@ -1728,7 +1775,7 @@ class _TrendBars extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.bottomCenter,
                       child: FractionallySizedBox(
-                        heightFactor: ratio.clamp(0.08, 1.0),
+                        heightFactor: max == 0 ? 0 : ratio.clamp(0.08, 1.0),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(9),
@@ -1745,7 +1792,7 @@ class _TrendBars extends StatelessWidget {
                   ),
                   const SizedBox(height: 9),
                   Text(
-                    labels[index],
+                    value.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelMedium?.copyWith(
@@ -1763,6 +1810,70 @@ class _TrendBars extends StatelessWidget {
       ),
     );
   }
+}
+
+void _showTrackTrendInfoSheet(BuildContext context) {
+  final theme = Theme.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 4, 22, 26),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _t(context, 'How this trend is calculated', 'この傾向の計算方法'),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _t(
+                  context,
+                  'SongBrief compares saved daily snapshots and charts the increase in play count for the selected song. Missing days are not estimated; they remain 0 until another snapshot pair is available.',
+                  'SongBriefは保存済みの日次スナップショット同士を比較し、選択中の曲の再生回数の増分を表示します。欠けている日は推定せず、差分を取れるスナップショットがそろうまで0として扱います。',
+                ),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                _t(
+                  context,
+                  '7 days uses daily buckets, 4 weeks uses weekly buckets, and 1 year uses monthly buckets.',
+                  '7日間は日別、4週間は週別、1年間は月別のバケットで集計します。',
+                ),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _RecentTracksPanel extends ConsumerStatefulWidget {
@@ -10257,48 +10368,143 @@ DateTime _localDateOnly(DateTime date) {
   return DateTime(local.year, local.month, local.day);
 }
 
-List<int> _trendValues(LibraryTrack track, TrendRange range) {
-  final base = (track.playCount * 92).clamp(1200, 42000);
-  final multipliers = switch (range) {
-    TrendRange.week => const [0.58, 0.69, 0.76, 0.62, 0.9, 1.0, 0.82],
-    TrendRange.month => const [0.66, 0.72, 0.94, 0.86, 0.78, 1.0, 0.91],
-    TrendRange.year => const [0.42, 0.55, 0.63, 0.74, 0.88, 0.96, 1.0],
-  };
-  return multipliers
-      .map((multiplier) => (base * multiplier).round())
-      .toList(growable: false);
+List<_TrackTrendValue> _trackTrendValues({
+  required BuildContext context,
+  required String trackId,
+  required SnapshotHistory history,
+  required TrendRange range,
+}) {
+  final buckets = _trackTrendBuckets(context, range);
+  final values = List<int>.filled(buckets.length, 0);
+  final snapshots = history.snapshots.toList(growable: false)
+    ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
+
+  if (snapshots.length >= 2) {
+    for (var index = 1; index < snapshots.length; index++) {
+      final current = snapshots[index];
+      final currentDay = _localDateOnly(current.capturedAt);
+      final bucketIndex = buckets.indexWhere(
+        (bucket) => bucket.contains(currentDay),
+      );
+      if (bucketIndex < 0) {
+        continue;
+      }
+
+      values[bucketIndex] += _trackPlayDeltaBetween(
+        previous: snapshots[index - 1],
+        current: current,
+        trackId: trackId,
+      );
+    }
+  }
+
+  return [
+    for (final indexed in buckets.indexed)
+      _TrackTrendValue(label: indexed.$2.label, playDelta: values[indexed.$1]),
+  ];
 }
 
-List<String> _trendLabels(BuildContext context, TrendRange range) {
+List<_TrackTrendBucket> _trackTrendBuckets(
+  BuildContext context,
+  TrendRange range,
+) {
+  final today = _localDateOnly(DateTime.now());
+  final dateFormat = DateFormat.Md(_localeName(context));
   return switch (range) {
     TrendRange.week => [
-      '5/15',
-      '5/16',
-      '5/17',
-      '5/18',
-      '5/19',
-      '5/20',
-      _t(context, 'Today', '今日'),
+      for (var offset = 6; offset >= 0; offset--)
+        _TrackTrendBucket(
+          start: today.subtract(Duration(days: offset)),
+          end: today.subtract(Duration(days: offset)),
+          label: offset == 0
+              ? _t(context, 'Today', '今日')
+              : dateFormat.format(today.subtract(Duration(days: offset))),
+        ),
     ],
     TrendRange.month => [
-      _t(context, '1w', '1週'),
-      _t(context, '2w', '2週'),
-      _t(context, '3w', '3週'),
-      _t(context, '4w', '4週'),
-      _t(context, '5w', '5週'),
-      _t(context, '6w', '6週'),
-      _t(context, 'This week', '今週'),
+      for (var offset = 3; offset >= 0; offset--)
+        _TrackTrendBucket(
+          start: today.subtract(Duration(days: offset * 7 + 6)),
+          end: today.subtract(Duration(days: offset * 7)),
+          label: offset == 0
+              ? _t(context, 'This week', '今週')
+              : _t(context, '${offset + 1}w', '${offset + 1}週'),
+        ),
     ],
     TrendRange.year => [
-      _t(context, 'Jan', '1月'),
-      _t(context, 'Feb', '2月'),
-      _t(context, 'Mar', '3月'),
-      _t(context, 'Apr', '4月'),
-      _t(context, 'May', '5月'),
-      _t(context, 'Jun', '6月'),
-      _t(context, 'This month', '今月'),
+      for (var offset = 11; offset >= 0; offset--)
+        _monthTrendBucket(
+          context: context,
+          monthStart: DateTime(today.year, today.month - offset),
+          isCurrentMonth: offset == 0,
+          today: today,
+        ),
     ],
   };
+}
+
+_TrackTrendBucket _monthTrendBucket({
+  required BuildContext context,
+  required DateTime monthStart,
+  required bool isCurrentMonth,
+  required DateTime today,
+}) {
+  final end = isCurrentMonth
+      ? today
+      : DateTime(monthStart.year, monthStart.month + 1, 0);
+  final label = isCurrentMonth
+      ? _t(context, 'This month', '今月')
+      : DateFormat.MMM(_localeName(context)).format(monthStart);
+  return _TrackTrendBucket(start: monthStart, end: end, label: label);
+}
+
+int _trackPlayDeltaBetween({
+  required DailyLibrarySnapshot previous,
+  required DailyLibrarySnapshot current,
+  required String trackId,
+}) {
+  final previousTrack = _trackSnapshotById(previous, trackId);
+  final currentTrack = _trackSnapshotById(current, trackId);
+  if (previousTrack == null || currentTrack == null) {
+    return 0;
+  }
+  final delta = currentTrack.playCount - previousTrack.playCount;
+  return delta < 0 ? 0 : delta;
+}
+
+TrackCounterSnapshot? _trackSnapshotById(
+  DailyLibrarySnapshot snapshot,
+  String trackId,
+) {
+  for (final track in snapshot.tracks) {
+    if (track.id == trackId) {
+      return track;
+    }
+  }
+  return null;
+}
+
+class _TrackTrendBucket {
+  const _TrackTrendBucket({
+    required this.start,
+    required this.end,
+    required this.label,
+  });
+
+  final DateTime start;
+  final DateTime end;
+  final String label;
+
+  bool contains(DateTime date) {
+    return !date.isBefore(start) && !date.isAfter(end);
+  }
+}
+
+class _TrackTrendValue {
+  const _TrackTrendValue({required this.label, required this.playDelta});
+
+  final String label;
+  final int playDelta;
 }
 
 String _compactNumber(int value) {

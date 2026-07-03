@@ -28,10 +28,12 @@ class MusicStatsRepository {
 
   Future<MusicStatsState> load({bool requestAccess = false}) async {
     if (!_isIosMusicRuntime) {
+      final tracks = _sampleTracks();
+      final overview = LibraryOverview.fromTracks(tracks, isDemo: true);
       return MusicStatsState(
         authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
-        overview: LibraryOverview.fromTracks(_sampleTracks(), isDemo: true),
-        snapshotHistory: SnapshotHistory.empty,
+        overview: overview,
+        snapshotHistory: _sampleSnapshotHistory(overview),
       );
     }
 
@@ -224,6 +226,68 @@ class MusicStatsRepository {
         isCloudItem: false,
       ),
     ];
+  }
+
+  SnapshotHistory _sampleSnapshotHistory(LibraryOverview overview) {
+    const playDeltasByTrack = <String, List<int>>{
+      'demo-1': [1, 0, 2, 1, 1, 2, 1],
+      'demo-2': [0, 1, 1, 0, 1, 1, 0],
+      'demo-3': [1, 0, 0, 1, 0, 0, 1],
+      'demo-4': [0, 0, 1, 0, 0, 1, 0],
+      'demo-5': [0, 1, 0, 0, 1, 0, 0],
+      'demo-6': [0, 0, 0, 1, 0, 0, 0],
+      'demo-7': [0, 0, 0, 0, 0, 1, 0],
+    };
+    const skipDeltasByTrack = <String, List<int>>{
+      'demo-1': [0, 0, 0, 1, 0, 0, 0],
+      'demo-2': [0, 1, 0, 0, 0, 1, 0],
+      'demo-4': [1, 0, 1, 0, 1, 0, 0],
+    };
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day, 6);
+    var history = SnapshotHistory.empty;
+
+    for (var snapshotIndex = 0; snapshotIndex <= 7; snapshotIndex++) {
+      final day = todayStart.subtract(Duration(days: 7 - snapshotIndex));
+      final tracks = [
+        for (final track in overview.tracks)
+          track.copyWith(
+            playCount: _demoCounterAtSnapshot(
+              current: track.playCount,
+              deltas: playDeltasByTrack[track.id] ?? const <int>[],
+              snapshotIndex: snapshotIndex,
+            ),
+            skipCount: _demoCounterAtSnapshot(
+              current: track.skipCount,
+              deltas: skipDeltasByTrack[track.id] ?? const <int>[],
+              snapshotIndex: snapshotIndex,
+            ),
+            lastPlayedAt: track.lastPlayedAt,
+          ),
+      ];
+      history = history.withSnapshot(
+        DailyLibrarySnapshot.fromOverview(
+          LibraryOverview.fromTracks(tracks, isDemo: true),
+          capturedAt: day,
+          source: 'demo',
+        ),
+      );
+    }
+
+    return history;
+  }
+
+  int _demoCounterAtSnapshot({
+    required int current,
+    required List<int> deltas,
+    required int snapshotIndex,
+  }) {
+    var remaining = 0;
+    for (var index = snapshotIndex; index < deltas.length; index++) {
+      remaining += deltas[index];
+    }
+    final value = current - remaining;
+    return value < 0 ? 0 : value;
   }
 }
 

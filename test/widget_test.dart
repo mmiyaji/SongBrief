@@ -94,6 +94,22 @@ void main() {
     expect(find.text('Lyrics'), findsOneWidget);
   });
 
+  testWidgets('opens trend calculation details from the info button', (
+    tester,
+  ) async {
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('About this trend'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('How this trend is calculated'), findsOneWidget);
+    expect(
+      find.textContaining('compares saved daily snapshots'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('switches to the light appearance from settings', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
