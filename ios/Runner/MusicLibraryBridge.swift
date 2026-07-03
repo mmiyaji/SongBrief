@@ -298,10 +298,19 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
 
   private static func persistentID(from value: Any?) -> UInt64? {
     if let value = value as? String {
-      return UInt64(value)
+      return UInt64(value.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+    if let value = value as? UInt64 {
+      return value
+    }
+    if let value = value as? Int64 {
+      return UInt64(exactly: value)
     }
     if let value = value as? Int {
-      return UInt64(value)
+      return UInt64(exactly: value)
+    }
+    if let value = value as? NSNumber {
+      return UInt64(exactly: value.int64Value)
     }
     return nil
   }

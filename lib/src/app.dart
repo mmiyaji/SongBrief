@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/home/home_screen.dart';
+import 'localization/app_text.dart';
 import 'settings/app_lock.dart';
 import 'settings/app_preferences.dart';
 import 'theme/app_theme.dart';
@@ -43,10 +44,6 @@ class SongBriefApp extends ConsumerWidget {
   }
 }
 
-String _appText(BuildContext context, String en, String ja) {
-  return Localizations.localeOf(context).languageCode == 'ja' ? ja : en;
-}
-
 class AppLockGate extends ConsumerStatefulWidget {
   const AppLockGate({required this.child, super.key});
 
@@ -80,19 +77,32 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
-      unawaited(_privacyProtector.setLocked(true));
-      unawaited(ref.read(appLockControllerProvider.notifier).lock());
+      final lockState = ref.read(appLockControllerProvider).value;
+      if (lockState?.enabled == true && lockState?.supported == true) {
+        unawaited(_privacyProtector.setLocked(true));
+        unawaited(ref.read(appLockControllerProvider.notifier).lock());
+      } else {
+        unawaited(_privacyProtector.setLocked(false));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(appLockControllerProvider).value;
+    final asyncState = ref.watch(appLockControllerProvider);
+    final initialLockEnabled = ref.watch(initialAppLockEnabledProvider);
+    final state = asyncState.value;
+    final initializing =
+        initialLockEnabled && asyncState.isLoading && state == null;
     final locked = state?.locked ?? false;
-    _syncPrivacyProtection(locked);
+    final protectionActive =
+        initializing ||
+        (state?.enabled == true && state?.supported == true && locked);
+    _syncPrivacyProtection(protectionActive);
     return Stack(
       children: [
         widget.child,
+        if (initializing) const _AppLockInitializingScreen(),
         if (locked) _AppLockScreen(state: state!),
       ],
     );
@@ -109,6 +119,22 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
       }
       unawaited(_privacyProtector.setLocked(locked));
     });
+  }
+}
+
+class _AppLockInitializingScreen extends StatelessWidget {
+  const _AppLockInitializingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: AbsorbPointer(
+        child: ColoredBox(
+          key: const ValueKey('app-lock-initializing'),
+          color: Theme.of(context).colorScheme.surface,
+        ),
+      ),
+    );
   }
 }
 
@@ -153,7 +179,7 @@ class _AppLockScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 14),
                         Text(
-                          _appText(
+                          appText(
                             context,
                             'SongBrief is locked',
                             'SongBriefはロック中です',
@@ -163,7 +189,7 @@ class _AppLockScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _appText(
+                          appText(
                             context,
                             'Unlock with your device authentication.',
                             '端末認証でロックを解除してください。',
@@ -177,7 +203,7 @@ class _AppLockScreen extends ConsumerWidget {
                         if (state.errorMessage != null) ...[
                           const SizedBox(height: 12),
                           Text(
-                            _appText(
+                            appText(
                               context,
                               'Authentication failed.',
                               '認証に失敗しました。',
@@ -201,7 +227,7 @@ class _AppLockScreen extends ConsumerWidget {
                                           appLockControllerProvider.notifier,
                                         )
                                         .unlock(
-                                          localizedReason: _appText(
+                                          localizedReason: appText(
                                             context,
                                             'Unlock SongBrief.',
                                             'SongBriefのロックを解除します。',
@@ -216,7 +242,7 @@ class _AppLockScreen extends ConsumerWidget {
                                     ),
                                   )
                                 : const Icon(Icons.lock_open_rounded),
-                            label: Text(_appText(context, 'Unlock', 'ロック解除')),
+                            label: Text(appText(context, 'Unlock', 'ロック解除')),
                           ),
                         ),
                       ],

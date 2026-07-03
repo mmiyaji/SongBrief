@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../localization/app_text.dart';
 import 'ad_runtime.dart';
 import 'monetization_config.dart';
 import 'premium_controller.dart';
 
 String _adText(BuildContext context, String en, String ja) {
-  return Localizations.localeOf(context).languageCode == 'ja' ? ja : en;
+  return appText(context, en, ja);
 }
 
 final adDisplayConfigProvider = Provider<AdDisplayConfig>((ref) {

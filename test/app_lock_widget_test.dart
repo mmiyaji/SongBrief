@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,73 @@ import 'package:songbrief/src/app.dart';
 import 'package:songbrief/src/settings/app_lock.dart';
 
 void main() {
+  testWidgets('does not keep preview protection enabled when app lock is off', (
+    tester,
+  ) async {
+    final protector = _FakeAppLockPrivacyProtector();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLockControllerProvider.overrideWith(
+            () => _TestAppLockController(
+              const AppLockState(
+                enabled: false,
+                locked: false,
+                supported: true,
+              ),
+            ),
+          ),
+          appLockPrivacyProtectorProvider.overrideWithValue(protector),
+        ],
+        child: const MaterialApp(home: AppLockGate(child: Text('Unlocked'))),
+      ),
+    );
+    await tester.pumpAndSettle();
+    protector.lockStates.clear();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pumpAndSettle();
+
+    expect(protector.lockStates.last, isFalse);
+  });
+
+  testWidgets('blocks content while app lock state initializes', (
+    tester,
+  ) async {
+    var taps = 0;
+    final protector = _FakeAppLockPrivacyProtector();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          initialAppLockEnabledProvider.overrideWithValue(true),
+          appLockControllerProvider.overrideWith(_LoadingAppLockController.new),
+          appLockPrivacyProtectorProvider.overrideWithValue(protector),
+        ],
+        child: MaterialApp(
+          home: AppLockGate(
+            child: TextButton(
+              onPressed: () {
+                taps += 1;
+              },
+              child: const Text('Private action'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('app-lock-initializing')), findsOneWidget);
+
+    await tester.tap(find.text('Private action'), warnIfMissed: false);
+    await tester.pump();
+
+    expect(taps, 0);
+    expect(protector.lockStates, contains(true));
+  });
+
   testWidgets('locks above modal sheets and blocks sheet actions', (
     tester,
   ) async {
@@ -76,6 +145,13 @@ void main() {
 
     expect(sheetActions, 0);
   });
+}
+
+class _LoadingAppLockController extends AppLockController {
+  @override
+  Future<AppLockState> build() {
+    return Completer<AppLockState>().future;
+  }
 }
 
 class _FakeAppLockPrivacyProtector extends AppLockPrivacyProtector {

@@ -144,8 +144,18 @@ String buildLibraryJson(MusicStatsState stats, {DateTime? exportedAt}) {
 }
 
 String _csvCell(String value) {
-  final escaped = value.replaceAll('"', '""');
+  final escaped = _escapeSpreadsheetFormula(value).replaceAll('"', '""');
   return '"$escaped"';
+}
+
+String _escapeSpreadsheetFormula(String value) {
+  if (value.isEmpty) {
+    return value;
+  }
+  return switch (value[0]) {
+    '=' || '+' || '-' || '@' => "'$value",
+    _ => value,
+  };
 }
 
 String _compactTimestamp(DateTime dateTime) {

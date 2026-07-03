@@ -17,6 +17,7 @@ import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
 import '../../export/library_exporter.dart';
+import '../../localization/app_text.dart';
 import '../../monetization/ad_banner_slot.dart';
 import '../../monetization/monetization_config.dart';
 import '../../monetization/premium_controller.dart';
@@ -30,7 +31,7 @@ const _privacyPolicyUrl = 'https://mmiyaji.github.io/SongBrief/privacy/';
 const _termsOfUseUrl = 'https://mmiyaji.github.io/SongBrief/terms/';
 
 String _t(BuildContext context, String en, String ja) {
-  return Localizations.localeOf(context).languageCode == 'ja' ? ja : en;
+  return appText(context, en, ja);
 }
 
 String _localeName(BuildContext context) {

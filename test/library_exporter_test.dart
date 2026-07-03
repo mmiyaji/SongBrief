@@ -19,6 +19,12 @@ void main() {
     expect(csv, contains('"true"'));
   });
 
+  test('escapes spreadsheet formulas in CSV cells', () {
+    final csv = buildLibraryCsv(_stats(title: '=HYPERLINK("https://x")'));
+
+    expect(csv, contains('"\'=HYPERLINK(""https://x"")"'));
+  });
+
   test('builds JSON with totals and snapshot summaries', () {
     final json =
         jsonDecode(
@@ -42,11 +48,11 @@ void main() {
   });
 }
 
-MusicStatsState _stats() {
+MusicStatsState _stats({String title = 'Song "Brief"'}) {
   final overview = LibraryOverview.fromTracks([
     LibraryTrack(
       id: 'track-1',
-      title: 'Song "Brief"',
+      title: title,
       artist: 'Artist',
       albumTitle: 'Album',
       albumArtist: 'Album Artist',

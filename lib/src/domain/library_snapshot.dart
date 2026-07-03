@@ -1,7 +1,10 @@
 import 'library_overview.dart';
 import 'library_track.dart';
 
-const librarySnapshotPreferencesKey = 'songbrief_daily_snapshots_v1';
+const librarySnapshotPreferencesKey = 'songbrief_daily_snapshots_v2';
+const legacyLibrarySnapshotPreferencesKeys = ['songbrief_daily_snapshots_v1'];
+const maxSnapshotTrackCounters = 500;
+const maxSnapshotHistoryEntries = 180;
 
 class TrackCounterSnapshot {
   const TrackCounterSnapshot({
@@ -102,11 +105,7 @@ class DailyLibrarySnapshot {
     String source = 'foreground',
   }) {
     final now = capturedAt ?? DateTime.now();
-    final tracks =
-        overview.tracks
-            .map(TrackCounterSnapshot.fromTrack)
-            .toList(growable: false)
-          ..sort((a, b) => a.id.compareTo(b.id));
+    final tracks = _snapshotTrackCounters(overview);
     return DailyLibrarySnapshot(
       dateKey: snapshotDateKey(now),
       capturedAt: now,
@@ -131,9 +130,11 @@ class DailyLibrarySnapshot {
       totalListeningSeconds: _readInt(json, 'totalListeningSeconds'),
       tracks: rawTracks is List
           ? List.unmodifiable(
-              rawTracks.whereType<Map>().map(
-                (track) => TrackCounterSnapshot.fromJson(
-                  track.cast<String, Object?>(),
+              _compactTrackCounters(
+                rawTracks.whereType<Map>().map(
+                  (track) => TrackCounterSnapshot.fromJson(
+                    track.cast<String, Object?>(),
+                  ),
                 ),
               ),
             )
@@ -193,10 +194,9 @@ class SnapshotHistory {
       snapshot,
     ]..sort((a, b) => a.dateKey.compareTo(b.dateKey));
 
-    const maxSnapshots = 180;
-    final trimmed = next.length <= maxSnapshots
+    final trimmed = next.length <= maxSnapshotHistoryEntries
         ? next
-        : next.sublist(next.length - maxSnapshots);
+        : next.sublist(next.length - maxSnapshotHistoryEntries);
     return SnapshotHistory(snapshots: List.unmodifiable(trimmed));
   }
 
@@ -216,7 +216,10 @@ class SnapshotHistory {
             )
             .toList()
           ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
-    return SnapshotHistory(snapshots: List.unmodifiable(snapshots));
+    final trimmed = snapshots.length <= maxSnapshotHistoryEntries
+        ? snapshots
+        : snapshots.sublist(snapshots.length - maxSnapshotHistoryEntries);
+    return SnapshotHistory(snapshots: List.unmodifiable(trimmed));
   }
 
   Map<String, Object?> toJson() {
@@ -228,6 +231,55 @@ class SnapshotHistory {
           .toList(growable: false),
     };
   }
+}
+
+List<TrackCounterSnapshot> _snapshotTrackCounters(LibraryOverview overview) {
+  final selected = <String, LibraryTrack>{};
+
+  void addTracks(Iterable<LibraryTrack> tracks, int limit) {
+    var added = 0;
+    for (final track in tracks) {
+      selected.putIfAbsent(track.id, () => track);
+      added += 1;
+      if (added >= limit || selected.length >= maxSnapshotTrackCounters) {
+        return;
+      }
+    }
+  }
+
+  addTracks(overview.tracksByPlayCount, 260);
+  addTracks(overview.recentTrackDetails, 160);
+  addTracks(overview.tracksBySkipCount, 80);
+  if (selected.length < maxSnapshotTrackCounters) {
+    addTracks(overview.tracksByTitle, maxSnapshotTrackCounters);
+  }
+
+  final tracks =
+      selected.values
+          .map(TrackCounterSnapshot.fromTrack)
+          .toList(growable: false)
+        ..sort((a, b) => a.id.compareTo(b.id));
+  return List.unmodifiable(tracks);
+}
+
+List<TrackCounterSnapshot> _compactTrackCounters(
+  Iterable<TrackCounterSnapshot> tracks,
+) {
+  final sorted = tracks.toList(growable: false)
+    ..sort((a, b) {
+      final byPlays = b.playCount.compareTo(a.playCount);
+      if (byPlays != 0) {
+        return byPlays;
+      }
+      final bySkips = b.skipCount.compareTo(a.skipCount);
+      if (bySkips != 0) {
+        return bySkips;
+      }
+      return a.id.compareTo(b.id);
+    });
+  final compacted = sorted.take(maxSnapshotTrackCounters).toList()
+    ..sort((a, b) => a.id.compareTo(b.id));
+  return compacted;
 }
 
 class SnapshotDelta {

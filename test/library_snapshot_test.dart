@@ -43,6 +43,31 @@ void main() {
     expect(delta?.totalSkipDelta, 1);
     expect(delta?.trackDeltas.single.playDelta, 5);
   });
+
+  test('limits stored track counters for large libraries', () {
+    final overview = LibraryOverview.fromTracks(
+      List.generate(
+        maxSnapshotTrackCounters + 100,
+        (index) => LibraryTrack(
+          id: 'track-${index.toString().padLeft(4, '0')}',
+          title: 'Snapshot Song $index',
+          artist: 'Snapshot Artist',
+          albumTitle: 'Snapshot Album',
+          duration: const Duration(minutes: 4),
+          playCount: index,
+          skipCount: index % 5,
+          lastPlayedAt: DateTime(2026, 7, 1).add(Duration(minutes: index)),
+          isCloudItem: false,
+        ),
+      ),
+      isDemo: false,
+    );
+
+    final snapshot = DailyLibrarySnapshot.fromOverview(overview);
+
+    expect(snapshot.trackCount, maxSnapshotTrackCounters + 100);
+    expect(snapshot.tracks, hasLength(maxSnapshotTrackCounters));
+  });
 }
 
 LibraryOverview _overview({required int playCount, int skipCount = 0}) {

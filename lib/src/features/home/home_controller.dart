@@ -166,12 +166,22 @@ final musicStatsControllerProvider =
       MusicStatsController.new,
     );
 
-final trackArtworkProvider = FutureProvider.family<Uint8List?, String>((
-  ref,
-  trackId,
-) {
-  return ref.watch(musicStatsRepositoryProvider).fetchArtwork(trackId);
-});
+final trackArtworkProvider = FutureProvider.autoDispose
+    .family<Uint8List?, String>((ref, trackId) {
+      final cacheLink = ref.keepAlive();
+      Timer? disposeTimer;
+      ref.onCancel(() {
+        disposeTimer = Timer(const Duration(minutes: 2), cacheLink.close);
+      });
+      ref.onResume(() {
+        disposeTimer?.cancel();
+        disposeTimer = null;
+      });
+      ref.onDispose(() {
+        disposeTimer?.cancel();
+      });
+      return ref.watch(musicStatsRepositoryProvider).fetchArtwork(trackId);
+    });
 
 final playbackControllerProvider =
     NotifierProvider<PlaybackController, PlaybackState>(PlaybackController.new);
@@ -237,20 +247,8 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     await _load(showLoading: false);
   }
 
-  Future<void> markTrackPlayed(String trackId) async {
-    final current = state.asData?.value;
-    if (current == null) {
-      return;
-    }
-    final next = current.markTrackPlayed(trackId);
-    state = AsyncData(next);
-    if (next.isDemo) {
-      return;
-    }
-    final snapshotHistory = await ref
-        .read(musicStatsRepositoryProvider)
-        .recordSnapshot(next.overview);
-    state = AsyncData(next.withSnapshotHistory(snapshotHistory));
+  Future<void> markTrackPlayed(String _) async {
+    await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
   }
 
   Future<void> _load({required bool showLoading}) async {
@@ -300,9 +298,6 @@ class PlaybackController extends Notifier<PlaybackState> {
     try {
       await ref.read(musicStatsRepositoryProvider).playTrack(trackId);
       state = PlaybackState(activeTrackId: trackId, isPlaying: true);
-      await ref
-          .read(musicStatsControllerProvider.notifier)
-          .markTrackPlayed(trackId);
     } on Object catch (error) {
       state = previous.copyWith(isBusy: false, errorMessage: error.toString());
     }
@@ -361,9 +356,6 @@ class PlaybackController extends Notifier<PlaybackState> {
         isBusy: false,
       );
       await Future<void>.delayed(const Duration(milliseconds: 900));
-      await ref
-          .read(musicStatsControllerProvider.notifier)
-          .refreshStatsSilently();
       await syncWithPlayer();
     } on Object catch (error) {
       state = previous.copyWith(isBusy: false, errorMessage: error.toString());

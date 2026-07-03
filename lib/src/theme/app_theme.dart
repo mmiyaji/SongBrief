@@ -1,5 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+const _themeStylePreferenceKey = 'songbrief_theme_style_v1';
+const _themeBrightnessPreferenceKey = 'songbrief_theme_brightness_v1';
 
 const _appFontFallback = <String>[
   'Yu Gothic',
@@ -56,25 +62,95 @@ final themeBrightnessProvider =
     );
 
 class ThemeStyleController extends Notifier<SongBriefThemeStyle> {
+  var _changedByUser = false;
+
   @override
   SongBriefThemeStyle build() {
+    _restore();
     return SongBriefThemeStyle.prism;
   }
 
   void setStyle(SongBriefThemeStyle style) {
+    _changedByUser = true;
     state = style;
+    unawaited(_save(style));
+  }
+
+  void _restore() {
+    var disposed = false;
+    ref.onDispose(() {
+      disposed = true;
+    });
+    unawaited(() async {
+      final preferences = await SharedPreferences.getInstance();
+      final style = _themeStyleFromName(
+        preferences.getString(_themeStylePreferenceKey),
+      );
+      if (!disposed && !_changedByUser && style != null) {
+        state = style;
+      }
+    }());
+  }
+
+  Future<void> _save(SongBriefThemeStyle style) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_themeStylePreferenceKey, style.name);
   }
 }
 
 class ThemeBrightnessController extends Notifier<SongBriefThemeBrightness> {
+  var _changedByUser = false;
+
   @override
   SongBriefThemeBrightness build() {
+    _restore();
     return SongBriefThemeBrightness.dark;
   }
 
   void setBrightness(SongBriefThemeBrightness brightness) {
+    _changedByUser = true;
     state = brightness;
+    unawaited(_save(brightness));
   }
+
+  void _restore() {
+    var disposed = false;
+    ref.onDispose(() {
+      disposed = true;
+    });
+    unawaited(() async {
+      final preferences = await SharedPreferences.getInstance();
+      final brightness = _themeBrightnessFromName(
+        preferences.getString(_themeBrightnessPreferenceKey),
+      );
+      if (!disposed && !_changedByUser && brightness != null) {
+        state = brightness;
+      }
+    }());
+  }
+
+  Future<void> _save(SongBriefThemeBrightness brightness) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_themeBrightnessPreferenceKey, brightness.name);
+  }
+}
+
+SongBriefThemeStyle? _themeStyleFromName(String? name) {
+  for (final style in SongBriefThemeStyle.values) {
+    if (style.name == name) {
+      return style;
+    }
+  }
+  return null;
+}
+
+SongBriefThemeBrightness? _themeBrightnessFromName(String? name) {
+  for (final brightness in SongBriefThemeBrightness.values) {
+    if (brightness.name == name) {
+      return brightness;
+    }
+  }
+  return null;
 }
 
 ThemeData buildSongBriefTheme({

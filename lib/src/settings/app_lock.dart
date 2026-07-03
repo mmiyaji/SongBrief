@@ -7,7 +7,9 @@ import 'package:local_auth/local_auth.dart';
 import 'package:screen_protector/screen_protector.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const _appLockEnabledKey = 'songbrief_app_lock_enabled_v1';
+const appLockEnabledPreferenceKey = 'songbrief_app_lock_enabled_v1';
+
+final initialAppLockEnabledProvider = Provider<bool>((ref) => false);
 
 final localAuthenticationProvider = Provider<LocalAuthentication>(
   (ref) => LocalAuthentication(),
@@ -84,14 +86,13 @@ bool get _supportsLockPreviewProtection {
 
 class AppLockController extends AsyncNotifier<AppLockState> {
   @override
-  Future<AppLockState> build() async {
-    final preferences = await SharedPreferences.getInstance();
-    final supported = await _isSupported();
-    final enabled = preferences.getBool(_appLockEnabledKey) ?? false;
-    return AppLockState(
-      enabled: enabled && supported,
-      locked: enabled && supported,
-      supported: supported,
+  Future<AppLockState> build() {
+    final enabled = ref.watch(initialAppLockEnabledProvider);
+    if (enabled) {
+      unawaited(_verifySavedLockSupport());
+    }
+    return Future.value(
+      AppLockState(enabled: enabled, locked: enabled, supported: true),
     );
   }
 
@@ -184,7 +185,23 @@ class AppLockController extends AsyncNotifier<AppLockState> {
 
   Future<void> _saveEnabled(bool enabled) async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setBool(_appLockEnabledKey, enabled);
+    await preferences.setBool(appLockEnabledPreferenceKey, enabled);
+  }
+
+  Future<void> _verifySavedLockSupport() async {
+    final supported = await _isSupported();
+    final current = state.value;
+    if (current == null || !current.enabled) {
+      return;
+    }
+    if (!supported) {
+      await _saveEnabled(false);
+      state = AsyncData(
+        current.copyWith(enabled: false, locked: false, supported: false),
+      );
+      return;
+    }
+    state = AsyncData(current.copyWith(supported: true));
   }
 
   Future<bool> _isSupported() async {

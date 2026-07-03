@@ -6,8 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:songbrief/src/data/library_snapshot_repository.dart';
 import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/data/music_stats_repository.dart';
+import 'package:songbrief/src/domain/library_overview.dart';
+import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/domain/music_library_authorization.dart';
+import 'package:songbrief/src/domain/music_stats_state.dart';
 import 'package:songbrief/src/features/home/home_controller.dart';
 
 void main() {
@@ -49,6 +52,27 @@ void main() {
     expect(state.activeTrackId, 'track-3');
     expect(state.isPlaying, isTrue);
   });
+
+  test('skip syncs playback without reloading the library', () async {
+    final repository = _FakeMusicStatsRepository(
+      currentPlaybackOverride: const MusicPlaybackSnapshot(
+        trackId: 'track-9',
+        isPlaying: true,
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(playbackControllerProvider.notifier).skipToNext();
+
+    final state = container.read(playbackControllerProvider);
+    expect(repository.skipToNextCalls, 1);
+    expect(repository.loadCalls, 0);
+    expect(state.activeTrackId, 'track-9');
+    expect(state.isPlaying, isTrue);
+  });
 }
 
 class _FakeMusicStatsRepository extends MusicStatsRepository {
@@ -61,6 +85,18 @@ class _FakeMusicStatsRepository extends MusicStatsRepository {
 
   final MusicPlaybackSnapshot? currentPlaybackOverride;
   final Stream<MusicPlaybackSnapshot> playbackEventsOverride;
+  var loadCalls = 0;
+  var skipToNextCalls = 0;
+
+  @override
+  Future<MusicStatsState> load({bool requestAccess = false}) async {
+    loadCalls += 1;
+    return MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
+      overview: LibraryOverview.empty(isDemo: true),
+      snapshotHistory: SnapshotHistory.empty,
+    );
+  }
 
   @override
   Future<MusicPlaybackSnapshot?> currentPlayback() async {
@@ -69,6 +105,11 @@ class _FakeMusicStatsRepository extends MusicStatsRepository {
 
   @override
   Stream<MusicPlaybackSnapshot> playbackEvents() => playbackEventsOverride;
+
+  @override
+  Future<void> skipToNext() async {
+    skipToNextCalls += 1;
+  }
 }
 
 class _NoopMusicLibraryClient implements MusicLibraryClient {

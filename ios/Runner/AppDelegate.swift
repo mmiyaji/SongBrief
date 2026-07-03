@@ -22,8 +22,9 @@ import UIKit
 
 enum SongBriefSnapshotRefresh {
   private static let taskIdentifier = "app.songbrief.snapshot-refresh"
-  private static let preferencesKey = "flutter.songbrief_daily_snapshots_v1"
+  private static let preferencesKey = "flutter.songbrief_daily_snapshots_v2"
   private static let maxSnapshots = 180
+  private static let maxSnapshotTracks = 500
 
   static func register() {
     BGTaskScheduler.shared.register(
@@ -53,13 +54,13 @@ enum SongBriefSnapshotRefresh {
   private static func handle(_ task: BGAppRefreshTask) {
     schedule()
 
-    var expired = false
+    let expiration = SnapshotRefreshExpiration()
     task.expirationHandler = {
-      expired = true
+      expiration.expire()
     }
 
     DispatchQueue.global(qos: .utility).async {
-      let success = !expired && captureSnapshot()
+      let success = !expiration.isExpired && captureSnapshot()
       DispatchQueue.main.async {
         task.setTaskCompleted(success: success)
       }
@@ -77,7 +78,7 @@ enum SongBriefSnapshotRefresh {
     }
 
     let now = Date()
-    let tracks = items.map(trackSnapshot)
+    let tracks = compactTrackSnapshots(from: items)
     let totalPlayCount = items.reduce(0) { total, item in
       total + item.playCount
     }
@@ -178,6 +179,63 @@ enum SongBriefSnapshotRefresh {
     return track
   }
 
+  private static func compactTrackSnapshots(from items: [MPMediaItem]) -> [[String: Any]] {
+    var selected: [UInt64: MPMediaItem] = [:]
+
+    func add(_ candidates: [MPMediaItem], limit: Int) {
+      var added = 0
+      for item in candidates {
+        selected[item.persistentID] = selected[item.persistentID] ?? item
+        added += 1
+        if added >= limit || selected.count >= maxSnapshotTracks {
+          return
+        }
+      }
+    }
+
+    add(
+      items.sorted {
+        if $0.playCount != $1.playCount {
+          return $0.playCount > $1.playCount
+        }
+        return ($0.title ?? "").localizedCaseInsensitiveCompare($1.title ?? "") == .orderedAscending
+      },
+      limit: 260
+    )
+    add(
+      items.sorted {
+        let lhs = $0.lastPlayedDate ?? Date.distantPast
+        let rhs = $1.lastPlayedDate ?? Date.distantPast
+        if lhs != rhs {
+          return lhs > rhs
+        }
+        return ($0.title ?? "").localizedCaseInsensitiveCompare($1.title ?? "") == .orderedAscending
+      },
+      limit: 160
+    )
+    add(
+      items.sorted {
+        if $0.skipCount != $1.skipCount {
+          return $0.skipCount > $1.skipCount
+        }
+        return ($0.title ?? "").localizedCaseInsensitiveCompare($1.title ?? "") == .orderedAscending
+      },
+      limit: 80
+    )
+    if selected.count < maxSnapshotTracks {
+      add(
+        items.sorted {
+          ($0.title ?? "").localizedCaseInsensitiveCompare($1.title ?? "") == .orderedAscending
+        },
+        limit: maxSnapshotTracks
+      )
+    }
+
+    return selected.values
+      .sorted { $0.persistentID < $1.persistentID }
+      .map(trackSnapshot)
+  }
+
   private static func dateKey(for date: Date) -> String {
     let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
     return String(
@@ -194,5 +252,22 @@ enum SongBriefSnapshotRefresh {
     }
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+private final class SnapshotRefreshExpiration {
+  private let lock = NSLock()
+  private var expired = false
+
+  var isExpired: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return expired
+  }
+
+  func expire() {
+    lock.lock()
+    expired = true
+    lock.unlock()
   }
 }
