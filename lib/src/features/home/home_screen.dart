@@ -175,8 +175,8 @@ String _themeStyleDescription(BuildContext context, SongBriefThemeStyle style) {
     ),
     SongBriefThemeStyle.flux => _t(
       context,
-      'Cool blue and mint accents for flowing playback stats.',
-      'ブルーとミントを基調に、再生統計の流れを見せるテーマです。',
+      'Blue and mint accents with a crisp, calm look.',
+      'ブルーとミントを基調にした、すっきりしたテーマです。',
     ),
     SongBriefThemeStyle.ember => _t(
       context,
@@ -209,13 +209,13 @@ String _themeBrightnessDescription(
   return switch (brightness) {
     SongBriefThemeBrightness.dark => _t(
       context,
-      'Uses the original dark SongBrief surface.',
-      '従来のSongBriefのダーク表示を使用します。',
+      'Uses a dark appearance.',
+      '暗い配色で表示します。',
     ),
     SongBriefThemeBrightness.light => _t(
       context,
-      'Uses a brighter surface for daylight viewing.',
-      '明るい場所でも見やすいライト表示を使用します。',
+      'Uses a light appearance.',
+      '明るい配色で表示します。',
     ),
     SongBriefThemeBrightness.system => _t(
       context,

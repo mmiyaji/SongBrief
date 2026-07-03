@@ -153,7 +153,7 @@ void main() {
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.theme?.colorScheme.primary, const Color(0xFF007486));
-    expect(find.textContaining('Cool blue'), findsOneWidget);
+    expect(find.textContaining('Blue and mint'), findsOneWidget);
   });
 }
 
