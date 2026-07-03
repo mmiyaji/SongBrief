@@ -232,16 +232,6 @@ enum _LibraryBrowseMode {
   genres,
   playlists;
 
-  String get label {
-    return switch (this) {
-      _LibraryBrowseMode.songs => 'Songs',
-      _LibraryBrowseMode.artists => 'Artists',
-      _LibraryBrowseMode.albums => 'Albums',
-      _LibraryBrowseMode.genres => 'Genres',
-      _LibraryBrowseMode.playlists => 'Playlists',
-    };
-  }
-
   IconData get icon {
     return switch (this) {
       _LibraryBrowseMode.songs => Icons.music_note_rounded,
@@ -253,21 +243,7 @@ enum _LibraryBrowseMode {
   }
 }
 
-enum _LibrarySortMode {
-  recent,
-  plays,
-  skips,
-  title;
-
-  String get label {
-    return switch (this) {
-      _LibrarySortMode.recent => 'Recently played',
-      _LibrarySortMode.plays => 'Most played',
-      _LibrarySortMode.skips => 'Most skipped',
-      _LibrarySortMode.title => 'Title',
-    };
-  }
-}
+enum _LibrarySortMode { recent, plays, skips, title }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});

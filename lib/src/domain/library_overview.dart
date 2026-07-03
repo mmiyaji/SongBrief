@@ -1,20 +1,6 @@
 import 'library_track.dart';
 
-enum RankingScope {
-  tracks,
-  artists,
-  albums,
-  recent;
-
-  String get label {
-    return switch (this) {
-      RankingScope.tracks => 'Songs',
-      RankingScope.artists => 'Artists',
-      RankingScope.albums => 'Albums',
-      RankingScope.recent => 'Recent',
-    };
-  }
-}
+enum RankingScope { tracks, artists, albums, recent }
 
 enum RankingEntryKind { track, artist, album }
 

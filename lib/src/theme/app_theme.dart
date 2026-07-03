@@ -15,27 +15,7 @@ const _appFontFallback = <String>[
   'sans-serif',
 ];
 
-enum SongBriefThemeStyle {
-  prism,
-  ember,
-  mono;
-
-  String get label {
-    return switch (this) {
-      SongBriefThemeStyle.prism => 'Prism',
-      SongBriefThemeStyle.ember => 'Ember',
-      SongBriefThemeStyle.mono => 'Mono',
-    };
-  }
-
-  String get description {
-    return switch (this) {
-      SongBriefThemeStyle.prism => 'シアンとライムの独自テーマ',
-      SongBriefThemeStyle.ember => 'ピンクとアンバーの音楽テーマ',
-      SongBriefThemeStyle.mono => '黒と白を基調にした高コントラスト',
-    };
-  }
-}
+enum SongBriefThemeStyle { prism, ember, mono }
 
 enum SongBriefThemeBrightness {
   dark,

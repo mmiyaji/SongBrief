@@ -6,10 +6,6 @@ import 'ad_runtime.dart';
 import 'monetization_config.dart';
 import 'premium_controller.dart';
 
-String _adText(BuildContext context, String en, String ja) {
-  return appText(context, en, ja);
-}
-
 final adDisplayConfigProvider = Provider<AdDisplayConfig>((ref) {
   final premium = ref.watch(premiumControllerProvider);
   final premiumState = premium.value;
@@ -117,7 +113,7 @@ class _AdSlotFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Semantics(
-      label: _adText(context, 'Sponsored placement', '広告枠'),
+      label: appText(context, 'Sponsored placement', '広告枠'),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest.withValues(
@@ -143,7 +139,7 @@ class _AdSlotFrame extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    _adText(context, 'Sponsored', '広告'),
+                    appText(context, 'Sponsored', '広告'),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w800,
@@ -183,23 +179,23 @@ class _AdPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final message = switch (state) {
-      PlatformAdLoadState.loading => _adText(
+      PlatformAdLoadState.loading => appText(
         context,
         'Loading a small banner ad',
         '小さなバナー広告を読み込み中',
       ),
-      PlatformAdLoadState.loaded => _adText(context, 'Ad loaded', '広告を読み込みました'),
-      PlatformAdLoadState.failed when config.missingLiveAdUnit => _adText(
+      PlatformAdLoadState.loaded => appText(context, 'Ad loaded', '広告を読み込みました'),
+      PlatformAdLoadState.failed when config.missingLiveAdUnit => appText(
         context,
         'Set a live AdMob ad unit ID before release',
         '公開前に本番のAdMob広告ユニットIDを設定してください',
       ),
-      PlatformAdLoadState.failed when !config.platformCanLoadAds => _adText(
+      PlatformAdLoadState.failed when !config.platformCanLoadAds => appText(
         context,
         'Ad preview for this launch mode',
         'この起動モードの広告プレビュー',
       ),
-      PlatformAdLoadState.failed => _adText(
+      PlatformAdLoadState.failed => appText(
         context,
         'Ad is temporarily unavailable',
         '広告を一時的に表示できません',

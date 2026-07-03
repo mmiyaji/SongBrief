@@ -8,19 +8,7 @@ import '../../data/music_library_channel.dart';
 import '../../domain/library_overview.dart';
 import '../../domain/music_stats_state.dart';
 
-enum TrendRange {
-  week,
-  month,
-  year;
-
-  String get label {
-    return switch (this) {
-      TrendRange.week => '7日間',
-      TrendRange.month => '4週間',
-      TrendRange.year => '1年間',
-    };
-  }
-}
+enum TrendRange { week, month, year }
 
 class RankingFocus {
   const RankingFocus.track(this.trackId)
@@ -35,23 +23,7 @@ class RankingFocus {
   final String? title;
 }
 
-enum HomeSection {
-  playing,
-  overview,
-  rankings,
-  library,
-  settings;
-
-  String get label {
-    return switch (this) {
-      HomeSection.playing => '再生中',
-      HomeSection.overview => '概要',
-      HomeSection.rankings => 'ランク',
-      HomeSection.library => 'ライブラリ',
-      HomeSection.settings => '設定',
-    };
-  }
-}
+enum HomeSection { playing, overview, rankings, library, settings }
 
 final homeSectionProvider =
     NotifierProvider<HomeSectionController, HomeSection>(

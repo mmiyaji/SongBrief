@@ -11,14 +11,6 @@ enum AppLanguage {
   japanese,
   english;
 
-  String get label {
-    return switch (this) {
-      AppLanguage.system => 'System',
-      AppLanguage.japanese => '日本語',
-      AppLanguage.english => 'English',
-    };
-  }
-
   Locale? get locale {
     return switch (this) {
       AppLanguage.system => null,
