@@ -29,6 +29,8 @@ import 'widgets/glass_surface.dart';
 
 part 'parts/playing_section.dart';
 part 'parts/overview_section.dart';
+part 'parts/overview_listening_maps.dart';
+part 'parts/overview_insights.dart';
 part 'parts/library_rankings_settings.dart';
 part 'parts/shared_helpers.dart';
 
