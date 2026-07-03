@@ -51,6 +51,27 @@ void main() {
     expect(find.text('Recently Played'), findsOneWidget);
     expect(find.text('Playlist'), findsWidgets);
   });
+
+  testWidgets('stacks library sort below mode selector on tablet width', (
+    tester,
+  ) async {
+    await _pumpSection(
+      tester,
+      language: AppLanguage.english,
+      section: HomeSection.library,
+    );
+    await tester.pumpAndSettle();
+
+    final playlistMode = find.text('Playlists').last;
+    final sortLabel = find.text('Sort').last;
+
+    expect(playlistMode, findsOneWidget);
+    expect(sortLabel, findsOneWidget);
+    expect(
+      tester.getTopLeft(sortLabel).dy,
+      greaterThan(tester.getTopLeft(playlistMode).dy + 28),
+    );
+  });
 }
 
 const _expectedEnglish = <HomeSection, List<String>>{

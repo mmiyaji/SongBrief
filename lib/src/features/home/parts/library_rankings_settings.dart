@@ -387,25 +387,34 @@ class _LibrarySearchPanel extends StatelessWidget {
           const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, constraints) {
-              final modeControl = SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SegmentedButton<_LibraryBrowseMode>(
-                  showSelectedIcon: false,
-                  segments: _LibraryBrowseMode.values
-                      .map(
-                        (value) => ButtonSegment<_LibraryBrowseMode>(
-                          value: value,
-                          icon: Icon(value.icon, size: 18),
-                          label: Text(_libraryBrowseModeLabel(context, value)),
-                        ),
-                      )
-                      .toList(),
-                  selected: {mode},
-                  onSelectionChanged: (selection) {
-                    onModeChanged(selection.first);
-                  },
-                ),
-              );
+              Widget modeControl({required double minWidth}) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.hardEdge,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: minWidth),
+                    child: SegmentedButton<_LibraryBrowseMode>(
+                      showSelectedIcon: false,
+                      segments: _LibraryBrowseMode.values
+                          .map(
+                            (value) => ButtonSegment<_LibraryBrowseMode>(
+                              value: value,
+                              icon: Icon(value.icon, size: 18),
+                              label: Text(
+                                _libraryBrowseModeLabel(context, value),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      selected: {mode},
+                      onSelectionChanged: (selection) {
+                        onModeChanged(selection.first);
+                      },
+                    ),
+                  ),
+                );
+              }
+
               final sortControl = DropdownButtonFormField<_LibrarySortMode>(
                 initialValue: sort,
                 isExpanded: true,
@@ -437,13 +446,21 @@ class _LibrarySearchPanel extends StatelessWidget {
                 },
               );
 
-              if (constraints.maxWidth < 620) {
+              final shouldStackControls = constraints.maxWidth < 940;
+              if (shouldStackControls) {
+                final sortWidth = constraints.maxWidth < 620
+                    ? constraints.maxWidth
+                    : 260.0;
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    modeControl,
+                    modeControl(minWidth: constraints.maxWidth),
                     const SizedBox(height: 12),
-                    sortControl,
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox(width: sortWidth, child: sortControl),
+                    ),
                   ],
                 );
               }
@@ -451,7 +468,9 @@ class _LibrarySearchPanel extends StatelessWidget {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: modeControl),
+                  Expanded(
+                    child: modeControl(minWidth: constraints.maxWidth - 234),
+                  ),
                   const SizedBox(width: 14),
                   SizedBox(width: 220, child: sortControl),
                 ],
