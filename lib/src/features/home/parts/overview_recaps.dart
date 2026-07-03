@@ -40,70 +40,12 @@ class _RecapHighlightsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final recapCards = [
-                _PeriodRecapCard(
-                  title: _t(context, 'This month', '今月'),
-                  recap: month,
-                  icon: Icons.calendar_view_month_rounded,
-                  fileStem: 'songbrief-monthly-recap',
-                ),
-                _PeriodRecapCard(
-                  title: _t(context, 'This year', '今年'),
-                  recap: year,
-                  icon: Icons.event_available_rounded,
-                  fileStem: 'songbrief-yearly-recap',
-                ),
-              ];
-              final wide = constraints.maxWidth >= 700;
-              if (wide) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: recapCards[0]),
-                    const SizedBox(width: 12),
-                    Expanded(child: recapCards[1]),
-                  ],
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  recapCards[0],
-                  const SizedBox(height: 12),
-                  recapCards[1],
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 700;
-              final milestoneCard = _MilestoneCountdownCard(
-                forecasts: milestones,
-              );
-              final burnoutCard = _BurnoutSummaryCard(summary: burnout);
-              if (wide) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: milestoneCard),
-                    const SizedBox(width: 12),
-                    Expanded(child: burnoutCard),
-                  ],
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  milestoneCard,
-                  const SizedBox(height: 12),
-                  burnoutCard,
-                ],
-              );
-            },
+          _RecapSummaryCard(
+            overview: overview,
+            month: month,
+            year: year,
+            milestones: milestones,
+            burnout: burnout,
           ),
         ],
       ),
@@ -190,26 +132,36 @@ class _TasteAndCollectionPanel extends ConsumerWidget {
   }
 }
 
-class _PeriodRecapCard extends StatefulWidget {
-  const _PeriodRecapCard({
-    required this.title,
-    required this.recap,
-    required this.icon,
-    required this.fileStem,
+class _RecapSummaryCard extends StatefulWidget {
+  const _RecapSummaryCard({
+    required this.overview,
+    required this.month,
+    required this.year,
+    required this.milestones,
+    required this.burnout,
   });
 
-  final String title;
-  final _PeriodRecap recap;
-  final IconData icon;
-  final String fileStem;
+  final LibraryOverview overview;
+  final _PeriodRecap month;
+  final _PeriodRecap year;
+  final List<_MilestoneForecast> milestones;
+  final _BurnoutSummary burnout;
+
+  bool get hasExportData =>
+      month.hasData ||
+      year.hasData ||
+      milestones.isNotEmpty ||
+      burnout.burnoutTrack != null ||
+      burnout.evergreenTrack != null;
 
   @override
-  State<_PeriodRecapCard> createState() => _PeriodRecapCardState();
+  State<_RecapSummaryCard> createState() => _RecapSummaryCardState();
 }
 
-class _PeriodRecapCardState extends State<_PeriodRecapCard> {
+class _RecapSummaryCardState extends State<_RecapSummaryCard> {
   final _captureKey = GlobalKey();
   bool _isExporting = false;
+  static const _fileStem = 'songbrief-recap-summary';
 
   @override
   Widget build(BuildContext context) {
@@ -218,13 +170,15 @@ class _PeriodRecapCardState extends State<_PeriodRecapCard> {
       children: [
         RepaintBoundary(
           key: _captureKey,
-          child: _PeriodRecapCardContent(
-            title: widget.title,
-            recap: widget.recap,
-            icon: widget.icon,
+          child: _RecapSummaryCardContent(
+            overview: widget.overview,
+            month: widget.month,
+            year: widget.year,
+            milestones: widget.milestones,
+            burnout: widget.burnout,
           ),
         ),
-        if (widget.recap.hasData) ...[
+        if (widget.hasExportData) ...[
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
@@ -323,7 +277,7 @@ class _PeriodRecapCardState extends State<_PeriodRecapCard> {
         );
         final bytes = await _captureImageBytes();
         final savedPath = await FileSaver.instance.saveAs(
-          name: widget.fileStem,
+          name: _fileStem,
           bytes: bytes,
           fileExtension: 'png',
           mimeType: MimeType.png,
@@ -346,7 +300,12 @@ class _PeriodRecapCardState extends State<_PeriodRecapCard> {
       failureEn: 'Could not share the recap image.',
       failureJa: 'リキャップ画像を共有できませんでした。',
       action: () async {
-        final shareText = _t(context, 'SongBrief recap', 'SongBriefのリキャップ');
+        final title = _t(context, 'SongBrief Recap', 'SongBriefリキャップ');
+        final shareText = _t(
+          context,
+          'My SongBrief listening recap',
+          'SongBriefのリスニングリキャップ',
+        );
         final unavailableMessage = _t(
           context,
           'Sharing is not available on this device.',
@@ -356,16 +315,16 @@ class _PeriodRecapCardState extends State<_PeriodRecapCard> {
         final bytes = await _captureImageBytes();
         final result = await SharePlus.instance.share(
           ShareParams(
-            title: widget.title,
+            title: title,
             text: shareText,
             files: [
               XFile.fromData(
                 bytes,
                 mimeType: 'image/png',
-                name: '${widget.fileStem}.png',
+                name: '$_fileStem.png',
               ),
             ],
-            fileNameOverrides: ['${widget.fileStem}.png'],
+            fileNameOverrides: ['$_fileStem.png'],
             sharePositionOrigin: shareOrigin,
           ),
         );
@@ -381,160 +340,331 @@ class _PeriodRecapCardState extends State<_PeriodRecapCard> {
   }
 }
 
-class _PeriodRecapCardContent extends StatelessWidget {
-  const _PeriodRecapCardContent({
-    required this.title,
-    required this.recap,
-    required this.icon,
+class _RecapSummaryCardContent extends StatelessWidget {
+  const _RecapSummaryCardContent({
+    required this.overview,
+    required this.month,
+    required this.year,
+    required this.milestones,
+    required this.burnout,
   });
 
-  final String title;
-  final _PeriodRecap recap;
-  final IconData icon;
+  final LibraryOverview overview;
+  final _PeriodRecap month;
+  final _PeriodRecap year;
+  final List<_MilestoneForecast> milestones;
+  final _BurnoutSummary burnout;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final number = _numberFormat(context);
-    final topTrack = recap.topTrack;
-    return _OverviewAnalysisCard(
-      icon: icon,
-      title: title,
-      subtitle: recap.hasData
-          ? _t(
-              context,
-              '${_dayCountLabel(context, recap.observedDays)} observed',
-              '${_dayCountLabel(context, recap.observedDays)}分の変化',
-            )
-          : _t(context, 'Needs two or more snapshots', '2件以上のスナップショットが必要です'),
-      child: recap.hasData
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final topRecapTrack = _strongestRecapTrack(month, year);
+    final borderColor = Color.lerp(
+      theme.colorScheme.outlineVariant,
+      theme.colorScheme.primary,
+      0.24,
+    )!;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _recapPosterBackground(theme),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: borderColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  number.format(recap.playDelta),
-                  style: theme.textTheme.headlineMedium?.copyWith(
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: _recapPosterAccentFill(theme),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.34),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
                     color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _t(context, 'SongBrief Recap', 'SongBriefリキャップ'),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _t(context, 'Snapshot summary', 'スナップショットサマリー'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Text(
-                  _t(context, 'new plays', '増加再生'),
+                  DateFormat.yMMMd(
+                    _localeName(context),
+                  ).format(overview.generatedAt),
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 12),
+              ],
+            ),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final periodCards = [
+                  _RecapPeriodSummaryTile(
+                    title: _t(context, 'This month', '今月'),
+                    icon: Icons.calendar_view_month_rounded,
+                    recap: month,
+                  ),
+                  _RecapPeriodSummaryTile(
+                    title: _t(context, 'This year', '今年'),
+                    icon: Icons.event_available_rounded,
+                    recap: year,
+                  ),
+                ];
+                if (constraints.maxWidth >= 620) {
+                  return Row(
+                    children: [
+                      Expanded(child: periodCards[0]),
+                      const SizedBox(width: 10),
+                      Expanded(child: periodCards[1]),
+                    ],
+                  );
+                }
+                return Column(
+                  children: [
+                    periodCards[0],
+                    const SizedBox(height: 10),
+                    periodCards[1],
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 14),
+            _RecapPosterSection(
+              title: _t(context, 'Highlights', 'ハイライト'),
+              children: [
                 _RecapLine(
                   icon: Icons.music_note_rounded,
                   label: _t(context, 'Top song', 'トップ曲'),
-                  value: topTrack == null
-                      ? _t(context, 'None', 'なし')
-                      : '${topTrack.title} +${number.format(topTrack.playDelta)}',
+                  value: topRecapTrack == null
+                      ? _t(context, 'None yet', 'まだありません')
+                      : '${topRecapTrack.title} +${number.format(topRecapTrack.playDelta)}',
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 _RecapLine(
                   icon: Icons.person_add_alt_rounded,
                   label: _t(context, 'New artists', '新しく聴いたアーティスト'),
-                  value: number.format(recap.newArtistCount),
+                  value: number.format(
+                    math.max(month.newArtistCount, year.newArtistCount),
+                  ),
+                ),
+                if (milestones.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _RecapLine(
+                    icon: milestones.first.icon,
+                    label: _t(context, 'Next milestone', '次の節目'),
+                    value:
+                        '${milestones.first.label} / ${milestones.first.daysLabel}',
+                  ),
+                ],
+                const SizedBox(height: 10),
+                _RecapLine(
+                  icon: Icons.local_fire_department_rounded,
+                  label: _t(context, 'Listening curve', '聴き方の変化'),
+                  value:
+                      burnout.burnoutTrack?.title ??
+                      burnout.evergreenTrack?.title ??
+                      _t(context, 'No sharp change', '大きな変化なし'),
                 ),
               ],
-            )
-          : _AnalyticsEmptyState(
-              label: _t(
-                context,
-                'Recaps appear after daily snapshots accumulate.',
-                '日次スナップショットが貯まるとリキャップを表示します。',
-              ),
             ),
+            if (!month.hasData && !year.hasData) ...[
+              const SizedBox(height: 14),
+              _AnalyticsEmptyState(
+                label: _t(
+                  context,
+                  'Recaps appear after daily snapshots accumulate.',
+                  '日次スナップショットが貯まるとリキャップを表示します。',
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _MilestoneCountdownCard extends StatelessWidget {
-  const _MilestoneCountdownCard({required this.forecasts});
+class _RecapPeriodSummaryTile extends StatelessWidget {
+  const _RecapPeriodSummaryTile({
+    required this.title,
+    required this.icon,
+    required this.recap,
+  });
 
-  final List<_MilestoneForecast> forecasts;
+  final String title;
+  final IconData icon;
+  final _PeriodRecap recap;
 
   @override
   Widget build(BuildContext context) {
-    return _OverviewAnalysisCard(
-      icon: Icons.flag_rounded,
-      title: _t(context, 'Milestone countdown', 'マイルストーン予測'),
-      subtitle: _t(
-        context,
-        'Estimated from recent snapshot pace',
-        '直近スナップショットのペースから推定',
+    final theme = Theme.of(context);
+    final number = _numberFormat(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _recapPosterTileFill(theme),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Color.lerp(
+            theme.colorScheme.outlineVariant,
+            theme.colorScheme.primary,
+            0.18,
+          )!,
+        ),
       ),
-      child: forecasts.isEmpty
-          ? _AnalyticsEmptyState(
-              label: _t(
-                context,
-                'Needs at least two snapshots with movement.',
-                '変化のあるスナップショットが2件以上必要です。',
-              ),
-            )
-          : Column(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                for (final forecast in forecasts)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _RecapLine(
-                      icon: forecast.icon,
-                      label: forecast.label,
-                      value: forecast.daysLabel,
+                Icon(icon, size: 19, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
+                ),
               ],
             ),
+            const SizedBox(height: 12),
+            Text(
+              number.format(recap.playDelta),
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Text(
+              _t(context, 'new plays', '増加再生'),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _RecapLine(
+              icon: Icons.timer_rounded,
+              label: _t(context, 'Observed', '集計期間'),
+              value: recap.hasData
+                  ? _dayCountLabel(context, recap.observedDays)
+                  : _t(context, 'Waiting', '待機中'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _BurnoutSummaryCard extends StatelessWidget {
-  const _BurnoutSummaryCard({required this.summary});
+class _RecapPosterSection extends StatelessWidget {
+  const _RecapPosterSection({required this.title, required this.children});
 
-  final _BurnoutSummary summary;
+  final String title;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    final burnout = summary.burnoutTrack;
-    final evergreen = summary.evergreenTrack;
-    return _OverviewAnalysisCard(
-      icon: Icons.local_fire_department_rounded,
-      title: _t(context, 'Burnout curve', '聴き飽き曲線'),
-      subtitle: _t(
-        context,
-        'Detects spikes and steady favorites',
-        '急上昇曲と安定して聴く曲を検出',
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _recapPosterTileFill(theme),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _RecapLine(
-            icon: Icons.trending_down_rounded,
-            label: _t(context, 'Cooling down', '落ち着いた曲'),
-            value: burnout?.title ?? _t(context, 'None yet', 'まだありません'),
-          ),
-          const SizedBox(height: 10),
-          _RecapLine(
-            icon: Icons.workspace_premium_rounded,
-            label: _t(context, 'Hall of fame', '殿堂入り'),
-            value: evergreen?.title ?? _t(context, 'None yet', 'まだありません'),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            summary.description,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
       ),
     );
   }
+}
+
+Color _recapPosterBackground(ThemeData theme) {
+  return Color.lerp(
+    theme.colorScheme.surface,
+    theme.colorScheme.primary,
+    theme.brightness == Brightness.dark ? 0.06 : 0.025,
+  )!;
+}
+
+Color _recapPosterTileFill(ThemeData theme) {
+  return Color.lerp(
+    theme.colorScheme.surfaceContainerHighest,
+    theme.colorScheme.primary,
+    theme.brightness == Brightness.dark ? 0.08 : 0.035,
+  )!;
+}
+
+Color _recapPosterAccentFill(ThemeData theme) {
+  return Color.lerp(
+    theme.colorScheme.surfaceContainerHighest,
+    theme.colorScheme.primary,
+    theme.brightness == Brightness.dark ? 0.18 : 0.1,
+  )!;
+}
+
+_TrackDeltaSummary? _strongestRecapTrack(
+  _PeriodRecap month,
+  _PeriodRecap year,
+) {
+  final tracks = [month.topTrack, year.topTrack].nonNulls.toList();
+  if (tracks.isEmpty) {
+    return null;
+  }
+  tracks.sort((a, b) => b.playDelta.compareTo(a.playDelta));
+  return tracks.first;
 }
 
 class _RediscoveryCard extends StatelessWidget {

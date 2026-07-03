@@ -61,10 +61,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Recap highlights'), findsOneWidget);
+    expect(find.text('SongBrief Recap'), findsOneWidget);
     expect(find.text('This month'), findsOneWidget);
     expect(find.text('This year'), findsOneWidget);
-    expect(find.text('Milestone countdown'), findsOneWidget);
-    expect(find.text('Burnout curve'), findsOneWidget);
+    expect(find.text('Highlights'), findsOneWidget);
+    expect(find.text('Next milestone'), findsOneWidget);
+    expect(find.text('Listening curve'), findsOneWidget);
 
     final rediscovery = find.text('Rediscovery');
     await tester.scrollUntilVisible(
