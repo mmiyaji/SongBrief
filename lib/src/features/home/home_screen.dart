@@ -6905,7 +6905,7 @@ class _LibrarySectionState extends State<_LibrarySection> {
   }
 
   int _currentResultCount(LibraryOverview overview) {
-    final tracks = _filteredLibraryTracks(overview.tracks, _query);
+    final tracks = overview.filteredTracks(_query);
     if (_mode == _LibraryBrowseMode.songs) {
       return tracks.length;
     }
@@ -6919,8 +6919,8 @@ class _LibrarySectionState extends State<_LibrarySection> {
       return const _EmptyLibraryPanel();
     }
 
-    final filteredTracks = _filteredLibraryTracks(overview.tracks, _query);
-    final sortedTracks = _sortLibraryTracks(filteredTracks, _sort);
+    final filteredTracks = overview.filteredTracks(_query);
+    final sortedTracks = _libraryTracksForSort(overview, filteredTracks, _sort);
     final groups = _mode == _LibraryBrowseMode.songs
         ? const <_LibraryGroupEntry>[]
         : _libraryGroupsForMode(context, _mode, filteredTracks, _sort);
@@ -9159,51 +9159,32 @@ bool _entryMatchesFocus(RankingEntry entry, RankingFocus focus) {
 }
 
 List<LibraryTrack> _tracksByArtist(LibraryOverview overview, String artist) {
-  return _sortedDrilldownTracks(
-    overview.tracks.where((track) => track.artist == artist),
-  );
+  return overview.tracksForArtist(artist);
 }
 
 List<LibraryTrack> _tracksByAlbumArtist(
   LibraryOverview overview,
   String albumArtist,
 ) {
-  return _sortedDrilldownTracks(
-    overview.tracks.where(
-      (track) => (track.albumArtist ?? track.artist) == albumArtist,
-    ),
-  );
+  return overview.tracksForAlbumArtist(albumArtist);
 }
 
 List<LibraryTrack> _tracksByAlbum(
   LibraryOverview overview,
   LibraryTrack album,
 ) {
-  final albumArtist = album.albumArtist ?? album.artist;
-  return _sortedDrilldownTracks(
-    overview.tracks.where(
-      (track) =>
-          track.albumTitle == album.albumTitle &&
-          (track.albumArtist ?? track.artist) == albumArtist,
-    ),
-  );
+  return overview.tracksForAlbum(album);
 }
 
 List<LibraryTrack> _tracksByGenre(LibraryOverview overview, String genre) {
-  return _sortedDrilldownTracks(
-    overview.tracks.where((track) => track.genre == genre),
-  );
+  return overview.tracksForGenre(genre);
 }
 
 List<LibraryTrack> _tracksByPlaylist(
   LibraryOverview overview,
   String playlistName,
 ) {
-  return _sortedDrilldownTracks(
-    overview.tracks.where(
-      (track) => track.playlistNames.contains(playlistName),
-    ),
-  );
+  return overview.tracksForPlaylist(playlistName);
 }
 
 List<LibraryTrack> _tracksByReleaseYear(LibraryOverview overview, int year) {
@@ -9496,30 +9477,20 @@ List<_BreakdownValue> _sourceBreakdownRows(
       .toList(growable: false);
 }
 
-List<LibraryTrack> _filteredLibraryTracks(
+List<LibraryTrack> _libraryTracksForSort(
+  LibraryOverview overview,
   List<LibraryTrack> tracks,
-  String query,
+  _LibrarySortMode sort,
 ) {
-  final normalizedQuery = _normalizeSearchText(query);
-  if (normalizedQuery.isEmpty) {
-    return tracks;
+  if (identical(tracks, overview.tracks)) {
+    return switch (sort) {
+      _LibrarySortMode.recent => overview.tracksByRecent,
+      _LibrarySortMode.plays => overview.tracksByPlayCount,
+      _LibrarySortMode.skips => overview.tracksBySkipCount,
+      _LibrarySortMode.title => overview.tracksByTitle,
+    };
   }
-
-  return tracks
-      .where((track) {
-        final fields = [
-          track.title,
-          track.artist,
-          track.albumTitle,
-          track.albumArtist,
-          track.genre,
-          ...track.playlistNames,
-        ];
-        return fields.whereType<String>().any(
-          (field) => _normalizeSearchText(field).contains(normalizedQuery),
-        );
-      })
-      .toList(growable: false);
+  return _sortLibraryTracks(tracks, sort);
 }
 
 List<LibraryTrack> _sortLibraryTracks(

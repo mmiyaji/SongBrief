@@ -9,6 +9,8 @@ import '../domain/music_stats_state.dart';
 import 'library_snapshot_repository.dart';
 import 'music_library_channel.dart';
 
+const _largeDemoTrackCount = int.fromEnvironment('SONGBRIEF_DEMO_TRACK_COUNT');
+
 final musicLibraryClientProvider = Provider<MusicLibraryClient>(
   (ref) => const PlatformMusicLibraryClient(),
 );
@@ -28,12 +30,16 @@ class MusicStatsRepository {
 
   Future<MusicStatsState> load({bool requestAccess = false}) async {
     if (!_isIosMusicRuntime) {
-      final tracks = _sampleTracks();
+      final tracks = _largeDemoTrackCount > 0
+          ? _largeSampleTracks(_largeDemoTrackCount)
+          : _sampleTracks();
       final overview = LibraryOverview.fromTracks(tracks, isDemo: true);
       return MusicStatsState(
         authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
         overview: overview,
-        snapshotHistory: _sampleSnapshotHistory(overview),
+        snapshotHistory: _largeDemoTrackCount > 0
+            ? SnapshotHistory.empty
+            : _sampleSnapshotHistory(overview),
       );
     }
 
@@ -240,6 +246,56 @@ class MusicStatsRepository {
         isCloudItem: false,
       ),
     ];
+  }
+
+  List<LibraryTrack> _largeSampleTracks(int count) {
+    final safeCount = count < 1 ? 1 : count;
+    final now = DateTime.now();
+    final artists = safeCount < 20 ? safeCount : safeCount ~/ 20;
+    final albums = safeCount < 10 ? safeCount : safeCount ~/ 10;
+    const genres = [
+      'Electronic',
+      'Indie Rock',
+      'Pop',
+      'Ambient',
+      'Jazz',
+      'Classical',
+      'Hip-Hop',
+      'Soundtrack',
+      'Folk',
+      'Metal',
+    ];
+
+    return List.generate(safeCount, (index) {
+      final artistIndex = index % artists;
+      final albumIndex = index % albums;
+      final genre = genres[index % genres.length];
+      final playCount = (safeCount - index) % 400 + (index % 17);
+      final skipCount = index % 31;
+      final playlistBase = index % 1000;
+      return LibraryTrack(
+        id: 'large-demo-$index',
+        title: 'Demo Track ${index.toString().padLeft(5, '0')}',
+        artist: 'Demo Artist ${artistIndex.toString().padLeft(4, '0')}',
+        albumTitle: 'Demo Album ${albumIndex.toString().padLeft(4, '0')}',
+        albumArtist: 'Demo Artist ${artistIndex.toString().padLeft(4, '0')}',
+        genre: genre,
+        releaseDate: DateTime(1975 + index % 50, index % 12 + 1, 1),
+        duration: Duration(minutes: 2 + index % 5, seconds: index % 60),
+        playCount: playCount,
+        skipCount: skipCount,
+        lastPlayedAt: index % 5 == 0
+            ? null
+            : now.subtract(Duration(hours: index % 720)),
+        playlistNames: [
+          'Playlist ${playlistBase.toString().padLeft(4, '0')}',
+          'Mood ${(playlistBase % 80).toString().padLeft(2, '0')}',
+          if (index % 3 == 0)
+            'Rotation ${(playlistBase % 40).toString().padLeft(2, '0')}',
+        ],
+        isCloudItem: index % 7 == 0,
+      );
+    }, growable: false);
   }
 
   SnapshotHistory _sampleSnapshotHistory(LibraryOverview overview) {
