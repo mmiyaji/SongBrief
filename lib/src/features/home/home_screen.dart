@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../domain/apple_music_link.dart';
 import '../../domain/library_overview.dart';
 import '../../domain/library_snapshot.dart';
 import '../../domain/library_track.dart';
@@ -2738,6 +2739,7 @@ class _OpenInAppleMusicButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final exactSongLink = hasAppleMusicSongLink(track);
     return Align(
       alignment: Alignment.centerLeft,
       child: OutlinedButton.icon(
@@ -2754,7 +2756,11 @@ class _OpenInAppleMusicButton extends StatelessWidget {
         ),
         onPressed: () => _openAppleMusicTrack(context, track),
         icon: const Icon(Icons.open_in_new_rounded),
-        label: Text(_t(context, 'Open in Apple Music', 'Apple Musicで開く')),
+        label: Text(
+          exactSongLink
+              ? _t(context, 'Open song in Apple Music', '曲をApple Musicで開く')
+              : _t(context, 'Search in Apple Music', 'Apple Musicで検索'),
+        ),
       ),
     );
   }
@@ -7247,16 +7253,7 @@ Future<void> _openAppleMusicTrack(
   BuildContext context,
   LibraryTrack track,
 ) async {
-  await _openExternalUrl(context, _appleMusicUrlForTrack(track).toString());
-}
-
-Uri _appleMusicUrlForTrack(LibraryTrack track) {
-  final query = [
-    track.title,
-    track.artist,
-    track.albumTitle,
-  ].where((value) => value.trim().isNotEmpty).join(' ');
-  return Uri.https('music.apple.com', '/search', {'term': query});
+  await _openExternalUrl(context, appleMusicUrlForTrack(track).toString());
 }
 
 Future<void> _openExternalUrl(BuildContext context, String url) async {
