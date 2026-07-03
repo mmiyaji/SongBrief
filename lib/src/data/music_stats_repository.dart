@@ -173,7 +173,7 @@ class MusicStatsRepository {
         releaseDate: DateTime(2018, 10, 2),
         duration: const Duration(minutes: 3, seconds: 28),
         playCount: 121,
-        skipCount: 4,
+        skipCount: 40,
         lastPlayedAt: now.subtract(const Duration(days: 4)),
         playlistNames: const ['City Pop Tests'],
         isCloudItem: false,

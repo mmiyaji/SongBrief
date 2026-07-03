@@ -6,6 +6,39 @@ import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
 
 void main() {
+  testWidgets('opens stat-backed track lists from overview cards', (
+    tester,
+  ) async {
+    await _pumpOverview(tester);
+    await tester.pumpAndSettle();
+
+    final tracksCard = find.text('Tracks').first;
+    await tester.ensureVisible(tracksCard);
+    await tester.tap(tracksCard);
+    await tester.pumpAndSettle();
+
+    expect(find.text('All songs'), findsOneWidget);
+    expect(find.textContaining('Library tracks'), findsOneWidget);
+  });
+
+  testWidgets('opens a smart list as a track list', (tester) async {
+    await _pumpOverview(tester);
+    await tester.pumpAndSettle();
+
+    final smartList = find.text('High skip rate');
+    await tester.scrollUntilVisible(
+      smartList,
+      420,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(smartList);
+    await tester.pumpAndSettle();
+
+    expect(find.text('High skip rate'), findsNWidgets(2));
+    expect(find.textContaining('Songs with repeated skips'), findsWidgets);
+  });
+
   testWidgets('opens the expanded listening maps view', (tester) async {
     await _pumpOverview(tester);
     await tester.pumpAndSettle();
@@ -21,6 +54,25 @@ void main() {
     expect(find.text('Genre stack by release year'), findsOneWidget);
     expect(find.text('Era mix'), findsOneWidget);
     expect(find.text('Activity heatmap'), findsWidgets);
+  });
+
+  testWidgets('opens a release decade list from expanded listening maps', (
+    tester,
+  ) async {
+    await _pumpOverview(tester);
+    await tester.pumpAndSettle();
+
+    final expandButton = find.byTooltip('Expand listening maps');
+    await tester.ensureVisible(expandButton);
+    await tester.tap(expandButton);
+    await tester.pumpAndSettle();
+
+    final decadeRow = find.text('2010s');
+    await tester.ensureVisible(decadeRow);
+    await tester.tap(decadeRow);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Release decade songs'), findsOneWidget);
   });
 }
 

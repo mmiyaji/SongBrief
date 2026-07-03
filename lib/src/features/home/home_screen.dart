@@ -2086,6 +2086,121 @@ void _showTrackGroupSheet(
   );
 }
 
+void _showLibraryGroupListSheet(
+  BuildContext context, {
+  required String title,
+  required String subtitle,
+  required IconData icon,
+  required List<_LibraryGroupEntry> groups,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (context) => _LibraryGroupListSheet(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      groups: groups,
+    ),
+  );
+}
+
+class _LibraryGroupListSheet extends StatelessWidget {
+  const _LibraryGroupListSheet({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.groups,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<_LibraryGroupEntry> groups;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final height = MediaQuery.sizeOf(context).height;
+    final totalPlayCount = groups.fold<int>(
+      0,
+      (total, group) => total + group.playCount,
+    );
+    final totalTracks = groups.fold<int>(
+      0,
+      (total, group) => total + group.trackCount,
+    );
+
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: height * 0.86),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: theme.colorScheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$subtitle ・ ${_countLabel(context, groups.length, singular: 'group', plural: 'groups', jaUnit: '件')} ・ ${_trackCountLabel(context, totalTracks)} ・ ${_playCountLabel(context, totalPlayCount)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (groups.isEmpty)
+                Text(
+                  _t(context, 'No entries yet.', '項目はまだありません。'),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: groups.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 8),
+                    itemBuilder: (context, index) =>
+                        _LibraryGroupRow(group: groups[index]),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TrackGroupSheet extends ConsumerWidget {
   const _TrackGroupSheet({
     required this.title,
@@ -4135,21 +4250,82 @@ class _SummaryGrid extends StatelessWidget {
         icon: Icons.person,
         label: _t(context, 'Artists', 'アーティスト'),
         value: number.format(overview.totalArtists),
+        onTap: overview.tracks.isEmpty
+            ? null
+            : () => _showLibraryGroupListSheet(
+                context,
+                title: _t(context, 'Artists', 'アーティスト'),
+                subtitle: _t(
+                  context,
+                  'All artist groups in this scan',
+                  'このスキャン内のアーティスト一覧',
+                ),
+                icon: Icons.person_rounded,
+                groups: _libraryGroupsForMode(
+                  context,
+                  _LibraryBrowseMode.artists,
+                  overview.tracks,
+                  _LibrarySortMode.plays,
+                ),
+              ),
       ),
       _SummaryValue(
         icon: Icons.album,
         label: _t(context, 'Albums', 'アルバム'),
         value: number.format(overview.totalAlbums),
+        onTap: overview.tracks.isEmpty
+            ? null
+            : () => _showLibraryGroupListSheet(
+                context,
+                title: _t(context, 'Albums', 'アルバム'),
+                subtitle: _t(
+                  context,
+                  'All album groups in this scan',
+                  'このスキャン内のアルバム一覧',
+                ),
+                icon: Icons.album_rounded,
+                groups: _libraryGroupsForMode(
+                  context,
+                  _LibraryBrowseMode.albums,
+                  overview.tracks,
+                  _LibrarySortMode.plays,
+                ),
+              ),
       ),
       _SummaryValue(
         icon: Icons.music_note,
         label: _t(context, 'Tracks', '曲'),
         value: number.format(overview.totalTracks),
+        onTap: overview.tracks.isEmpty
+            ? null
+            : () => _showTrackGroupSheet(
+                context,
+                title: _t(context, 'All songs', 'すべての曲'),
+                subtitle: _t(context, 'Library tracks', 'ライブラリ内の曲'),
+                icon: Icons.music_note_rounded,
+                tracks: _sortLibraryTracks(
+                  overview.tracks,
+                  _LibrarySortMode.plays,
+                ),
+              ),
       ),
       _SummaryValue(
         icon: Icons.schedule,
         label: _t(context, 'Hours', '時間'),
         value: _hoursLabel(overview.totalListeningSeconds),
+        onTap: overview.tracks.isEmpty
+            ? null
+            : () => _showTrackGroupSheet(
+                context,
+                title: _t(context, 'Listening time', '再生時間'),
+                subtitle: _t(
+                  context,
+                  'Songs sorted by total listening time',
+                  '総再生時間が長い曲',
+                ),
+                icon: Icons.schedule_rounded,
+                tracks: _tracksByListeningTime(overview.tracks),
+              ),
       ),
     ];
 
@@ -4181,7 +4357,8 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GlassSurface(
+    final radius = BorderRadius.circular(18);
+    final content = GlassSurface(
       padding: const EdgeInsets.all(12),
       radius: 18,
       tint: const Color(0x55FFFFFF),
@@ -4221,8 +4398,25 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
           ),
+          if (value.onTap != null) ...[
+            const SizedBox(width: 6),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
         ],
       ),
+    );
+
+    if (value.onTap == null) {
+      return content;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: radius,
+      child: InkWell(borderRadius: radius, onTap: value.onTap, child: content),
     );
   }
 }
@@ -4444,6 +4638,28 @@ class _ReleaseYearPlayMapCard extends StatelessWidget {
                 _InteractiveReleaseYearChart(
                   buckets: buckets,
                   height: expanded ? 250 : 190,
+                  onOpenBucket: expanded
+                      ? (bucket) {
+                          final tracks = _tracksByReleaseYear(
+                            overview,
+                            bucket.year,
+                          );
+                          if (tracks.isEmpty) {
+                            return;
+                          }
+                          _showTrackGroupSheet(
+                            context,
+                            title: bucket.year.toString(),
+                            subtitle: _t(
+                              context,
+                              'Release-year songs',
+                              '発売年の曲',
+                            ),
+                            icon: Icons.event_rounded,
+                            tracks: tracks,
+                          );
+                        }
+                      : null,
                 ),
                 const SizedBox(height: 10),
                 Wrap(
@@ -4478,10 +4694,12 @@ class _InteractiveReleaseYearChart extends StatefulWidget {
   const _InteractiveReleaseYearChart({
     required this.buckets,
     required this.height,
+    this.onOpenBucket,
   });
 
   final List<_ReleaseYearBucket> buckets;
   final double height;
+  final ValueChanged<_ReleaseYearBucket>? onOpenBucket;
 
   @override
   State<_InteractiveReleaseYearChart> createState() =>
@@ -4565,6 +4783,9 @@ class _InteractiveReleaseYearChartState
                         '${_playCountLabel(context, selectedBucket.playCount)} / '
                         '平均${selectedBucket.averagePlays.toStringAsFixed(1)}',
                   ),
+                  onTap: widget.onOpenBucket == null
+                      ? null
+                      : () => widget.onOpenBucket!(selectedBucket),
                 ),
         ),
       ],
@@ -4741,6 +4962,7 @@ class _GenreStackedReleaseBarsCard extends StatelessWidget {
                   (stack) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _GenreStackedYearRow(
+                      overview: overview,
                       stack: stack,
                       maxPlays: maxPlays,
                       colors: colors,
@@ -4756,12 +4978,14 @@ class _GenreStackedReleaseBarsCard extends StatelessWidget {
 
 class _GenreStackedYearRow extends StatelessWidget {
   const _GenreStackedYearRow({
+    required this.overview,
     required this.stack,
     required this.maxPlays,
     required this.colors,
     required this.legendItems,
   });
 
+  final LibraryOverview overview;
   final _GenreYearStack stack;
   final int maxPlays;
   final List<Color> colors;
@@ -4804,15 +5028,50 @@ class _GenreStackedYearRow extends StatelessWidget {
                                 message:
                                     '${stack.year} / ${segment.$2.genre}: '
                                     '${_playCountLabel(context, segment.$2.playCount)}',
-                                child: ColoredBox(
-                                  color:
-                                      colors[math.max(
-                                            0,
-                                            legendItems.indexOf(
-                                              segment.$2.genre,
-                                            ),
-                                          ) %
-                                          colors.length],
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () {
+                                    final tracks = segment.$2.genre == 'Other'
+                                        ? _tracksByReleaseYearExcludingGenres(
+                                            overview,
+                                            year: stack.year,
+                                            excludedGenres: legendItems
+                                                .where(
+                                                  (genre) => genre != 'Other',
+                                                )
+                                                .toSet(),
+                                          )
+                                        : _tracksByReleaseYearAndGenre(
+                                            overview,
+                                            year: stack.year,
+                                            genre: segment.$2.genre,
+                                          );
+                                    if (tracks.isEmpty) {
+                                      return;
+                                    }
+                                    _showTrackGroupSheet(
+                                      context,
+                                      title:
+                                          '${stack.year} / ${segment.$2.genre}',
+                                      subtitle: _t(
+                                        context,
+                                        'Release-year genre songs',
+                                        '発売年とジャンルの曲',
+                                      ),
+                                      icon: Icons.stacked_bar_chart_rounded,
+                                      tracks: tracks,
+                                    );
+                                  },
+                                  child: ColoredBox(
+                                    color:
+                                        colors[math.max(
+                                              0,
+                                              legendItems.indexOf(
+                                                segment.$2.genre,
+                                              ),
+                                            ) %
+                                            colors.length],
+                                  ),
                                 ),
                               ),
                             ),
@@ -4886,6 +5145,26 @@ class _DecadeMixCard extends StatelessWidget {
                               ? 0
                               : buckets.indexOf(bucket) / (buckets.length - 1),
                         )!,
+                        onTap: () {
+                          final tracks = _tracksByDecade(
+                            overview,
+                            bucket.decade,
+                          );
+                          if (tracks.isEmpty) {
+                            return;
+                          }
+                          _showTrackGroupSheet(
+                            context,
+                            title: bucket.label,
+                            subtitle: _t(
+                              context,
+                              'Release decade songs',
+                              '発売年代の曲',
+                            ),
+                            icon: Icons.view_timeline_rounded,
+                            tracks: tracks,
+                          );
+                        },
                       ),
                     ),
                   )
@@ -4900,66 +5179,91 @@ class _DecadeMixRow extends StatelessWidget {
     required this.bucket,
     required this.maxPlays,
     required this.color,
+    this.onTap,
   });
 
   final _DecadePlayBucket bucket;
   final int maxPlays;
   final Color color;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ratio = maxPlays == 0 ? 0.0 : bucket.playCount / maxPlays;
-    return Tooltip(
-      triggerMode: TooltipTriggerMode.tap,
-      message:
-          '${bucket.label}: ${_trackCountLabel(context, bucket.trackCount)} / '
-          '${_playCountLabel(context, bucket.playCount)}',
-      child: Row(
-        children: [
-          SizedBox(
-            width: 64,
-            child: Text(
-              bucket.label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w900,
-              ),
+    final content = Row(
+      children: [
+        SizedBox(
+          width: 64,
+          child: Text(
+            bucket.label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: ColoredBox(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.34),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: FractionallySizedBox(
-                    widthFactor: ratio.clamp(0.04, 1.0),
-                    child: SizedBox(
-                      height: 18,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(color: color),
-                      ),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: ColoredBox(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.34),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: ratio.clamp(0.04, 1.0),
+                  child: SizedBox(
+                    height: 18,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(color: color),
                     ),
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 60,
-            child: Text(
-              _compactNumber(bucket.playCount),
-              textAlign: TextAlign.right,
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-              ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 60,
+          child: Text(
+            _compactNumber(bucket.playCount),
+            textAlign: TextAlign.right,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w900,
             ),
           ),
+        ),
+        if (onTap != null) ...[
+          const SizedBox(width: 2),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ],
-      ),
+      ],
+    );
+
+    final wrapped = onTap == null
+        ? content
+        : Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: content,
+              ),
+            ),
+          );
+
+    return Tooltip(
+      triggerMode: TooltipTriggerMode.tap,
+      message:
+          '${bucket.label}: ${_trackCountLabel(context, bucket.trackCount)} / '
+          '${_playCountLabel(context, bucket.playCount)}',
+      child: wrapped,
     );
   }
 }
@@ -5136,21 +5440,23 @@ class _AnalysisInlineTooltip extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
+    final radius = BorderRadius.circular(14);
+    final content = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: radius,
         border: Border.all(
           color: theme.colorScheme.primary.withValues(alpha: 0.16),
         ),
@@ -5179,9 +5485,26 @@ class _AnalysisInlineTooltip extends StatelessWidget {
               ),
             ),
           ),
+          if (onTap != null) ...[
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
         ],
       ),
     );
+
+    final wrapped = onTap == null
+        ? content
+        : Material(
+            color: Colors.transparent,
+            borderRadius: radius,
+            child: InkWell(borderRadius: radius, onTap: onTap, child: content),
+          );
+
+    return Padding(padding: const EdgeInsets.only(top: 8), child: wrapped);
   }
 }
 
@@ -5410,20 +5733,29 @@ class _OverviewInsightPanel extends StatelessWidget {
     final topAlbum = overview.topAlbums.isEmpty
         ? null
         : overview.topAlbums.first;
-    final recentTrackCount = _recentlyPlayedCount(
+    final topArtistTracks = topArtist == null
+        ? const <LibraryTrack>[]
+        : _tracksByArtist(overview, topArtist.title);
+    final topAlbumTrack = overview.trackById(topAlbum?.representativeTrackId);
+    final topAlbumTracks = topAlbumTrack == null
+        ? const <LibraryTrack>[]
+        : _tracksByAlbum(overview, topAlbumTrack);
+    final recentTracks = _recentlyPlayedTracks(
       overview.tracks,
       const Duration(days: 30),
     );
-    final playedTrackCount = overview.tracks
-        .where((track) => track.playCount > 0)
-        .length;
-    final unplayedTrackCount = overview.totalTracks - playedTrackCount;
-    final cloudTrackCount = overview.tracks
-        .where((track) => track.isCloudItem)
-        .length;
+    final recentTrackCount = recentTracks.length;
+    final unplayedTracks = _unplayedTracks(overview.tracks);
+    final unplayedTrackCount = unplayedTracks.length;
+    final cloudTracks = _tracksByCloudStatus(overview.tracks, isCloud: true);
+    final cloudTrackCount = cloudTracks.length;
     final averagePlays = overview.totalTracks == 0
         ? 0.0
         : overview.totalPlayCount / overview.totalTracks;
+    final aboveAverageTracks = _aboveAveragePlayTracks(
+      overview.tracks,
+      averagePlays,
+    );
 
     final insights = [
       _OverviewInsightValue(
@@ -5433,14 +5765,40 @@ class _OverviewInsightPanel extends StatelessWidget {
         detail: topArtist == null
             ? _t(context, 'No plays yet', 'まだ再生がありません')
             : _playCountLabel(context, topArtist.playCount),
+        onTap: topArtist == null || topArtistTracks.isEmpty
+            ? null
+            : () => _showTrackGroupSheet(
+                context,
+                title: topArtist.title,
+                subtitle: _t(context, 'Artist songs', 'アーティストの曲'),
+                icon: Icons.person_pin_rounded,
+                tracks: topArtistTracks,
+                rankingScope: RankingScope.artists,
+                rankingTitle: topArtist.title,
+              ),
       ),
       _OverviewInsightValue(
         icon: Icons.album_rounded,
         label: _t(context, 'Favorite album', 'よく聴くアルバム'),
-        value: topAlbum?.title ?? _t(context, 'None', 'なし'),
+        value:
+            topAlbumTrack?.albumTitle ??
+            topAlbum?.title ??
+            _t(context, 'None', 'なし'),
         detail: topAlbum == null
             ? _t(context, 'No plays yet', 'まだ再生がありません')
             : _playCountLabel(context, topAlbum.playCount),
+        onTap:
+            topAlbum == null || topAlbumTrack == null || topAlbumTracks.isEmpty
+            ? null
+            : () => _showTrackGroupSheet(
+                context,
+                title: topAlbumTrack.albumTitle,
+                subtitle: topAlbumTrack.albumArtist ?? topAlbumTrack.artist,
+                icon: Icons.album_rounded,
+                tracks: topAlbumTracks,
+                rankingScope: RankingScope.albums,
+                rankingTitle: _albumRankingTitle(topAlbumTrack),
+              ),
       ),
       _OverviewInsightValue(
         icon: Icons.history_rounded,
@@ -5451,6 +5809,19 @@ class _OverviewInsightPanel extends StatelessWidget {
           recentTrackCount,
           overview.totalTracks,
         ),
+        onTap: recentTracks.isEmpty
+            ? null
+            : () => _showTrackGroupSheet(
+                context,
+                title: _t(context, 'Recent 30 days', '直近30日'),
+                subtitle: _t(
+                  context,
+                  'Songs played in the last 30 days',
+                  '30日以内に再生した曲',
+                ),
+                icon: Icons.history_rounded,
+                tracks: recentTracks,
+              ),
       ),
       _OverviewInsightValue(
         icon: Icons.radio_button_unchecked_rounded,
@@ -5461,12 +5832,34 @@ class _OverviewInsightPanel extends StatelessWidget {
           unplayedTrackCount,
           overview.totalTracks,
         ),
+        onTap: unplayedTracks.isEmpty
+            ? null
+            : () => _showTrackGroupSheet(
+                context,
+                title: _t(context, 'Unplayed songs', '未再生の曲'),
+                subtitle: _t(context, 'Songs with zero plays', '再生回数が0回の曲'),
+                icon: Icons.radio_button_unchecked_rounded,
+                tracks: unplayedTracks,
+              ),
       ),
       _OverviewInsightValue(
         icon: Icons.repeat_rounded,
         label: _t(context, 'Avg plays', '平均再生'),
         value: averagePlays.toStringAsFixed(1),
         detail: _t(context, 'per track', '1曲あたり'),
+        onTap: aboveAverageTracks.isEmpty
+            ? null
+            : () => _showTrackGroupSheet(
+                context,
+                title: _t(context, 'Above average plays', '平均以上の再生曲'),
+                subtitle: _t(
+                  context,
+                  'Songs at or above the library average',
+                  'ライブラリ平均以上に再生された曲',
+                ),
+                icon: Icons.repeat_rounded,
+                tracks: aboveAverageTracks,
+              ),
       ),
       _OverviewInsightValue(
         icon: Icons.cloud_rounded,
@@ -5477,6 +5870,19 @@ class _OverviewInsightPanel extends StatelessWidget {
           cloudTrackCount,
           overview.totalTracks,
         ),
+        onTap: cloudTracks.isEmpty
+            ? null
+            : () => _showTrackGroupSheet(
+                context,
+                title: _t(context, 'Cloud items', 'クラウド項目'),
+                subtitle: _t(
+                  context,
+                  'Songs marked as cloud library items',
+                  'クラウド項目として返された曲',
+                ),
+                icon: Icons.cloud_rounded,
+                tracks: cloudTracks,
+              ),
       ),
     ];
 
@@ -5537,11 +5943,12 @@ class _OverviewBreakdownPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final artistRows = _rankingBreakdownRows(
       context,
+      overview,
       overview.topArtists,
       theme.colorScheme.primary,
     );
     final genreRows = _genreBreakdownRows(context, overview.tracks, theme);
-    final sourceRows = _sourceBreakdownRows(context, overview.tracks, theme);
+    final sourceRows = _sourceBreakdownRows(context, overview, theme);
 
     return GlassSurface(
       padding: const EdgeInsets.all(18),
@@ -5678,7 +6085,8 @@ class _OverviewInsightTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return DecoratedBox(
+    final radius = BorderRadius.circular(16);
+    final content = DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.48,
@@ -5742,9 +6150,26 @@ class _OverviewInsightTile extends StatelessWidget {
                 ],
               ),
             ),
+            if (value.onTap != null) ...[
+              const SizedBox(width: 6),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
           ],
         ),
       ),
+    );
+
+    if (value.onTap == null) {
+      return content;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: radius,
+      child: InkWell(borderRadius: radius, onTap: value.onTap, child: content),
     );
   }
 }
@@ -5861,6 +6286,13 @@ class _SmartListCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                if (onTap != null) ...[
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 8),
@@ -5953,7 +6385,7 @@ class _ProportionalBarRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -5976,6 +6408,14 @@ class _ProportionalBarRow extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (value.onTap != null) ...[
+              const SizedBox(width: 2),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 6),
@@ -5998,6 +6438,22 @@ class _ProportionalBarRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+
+    if (value.onTap == null) {
+      return content;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: value.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: content,
+        ),
+      ),
     );
   }
 }
@@ -8522,6 +8978,110 @@ List<LibraryTrack> _tracksByPlaylist(
   );
 }
 
+List<LibraryTrack> _tracksByReleaseYear(LibraryOverview overview, int year) {
+  return _sortedDrilldownTracks(
+    overview.tracks.where((track) => _releaseYearForTrack(track) == year),
+  );
+}
+
+List<LibraryTrack> _tracksByReleaseYearAndGenre(
+  LibraryOverview overview, {
+  required int year,
+  required String genre,
+}) {
+  return _sortedDrilldownTracks(
+    overview.tracks.where(
+      (track) =>
+          _releaseYearForTrack(track) == year && _genreName(track) == genre,
+    ),
+  );
+}
+
+List<LibraryTrack> _tracksByReleaseYearExcludingGenres(
+  LibraryOverview overview, {
+  required int year,
+  required Set<String> excludedGenres,
+}) {
+  return _sortedDrilldownTracks(
+    overview.tracks.where((track) {
+      return _releaseYearForTrack(track) == year &&
+          !excludedGenres.contains(_genreName(track));
+    }),
+  );
+}
+
+List<LibraryTrack> _tracksByDecade(LibraryOverview overview, int decade) {
+  return _sortedDrilldownTracks(
+    overview.tracks.where((track) {
+      final year = _releaseYearForTrack(track);
+      return year != null && year ~/ 10 * 10 == decade;
+    }),
+  );
+}
+
+List<LibraryTrack> _tracksByCloudStatus(
+  Iterable<LibraryTrack> tracks, {
+  required bool isCloud,
+}) {
+  return _sortedDrilldownTracks(
+    tracks.where((track) => track.isCloudItem == isCloud),
+  );
+}
+
+List<LibraryTrack> _recentlyPlayedTracks(
+  Iterable<LibraryTrack> tracks,
+  Duration window,
+) {
+  final threshold = DateTime.now().subtract(window);
+  final recent = tracks
+      .where((track) {
+        final playedAt = track.lastPlayedAt;
+        return playedAt != null && !playedAt.isBefore(threshold);
+      })
+      .toList(growable: false);
+  recent.sort((a, b) => b.lastPlayedAt!.compareTo(a.lastPlayedAt!));
+  return List.unmodifiable(recent);
+}
+
+List<LibraryTrack> _unplayedTracks(Iterable<LibraryTrack> tracks) {
+  final unplayed = tracks.where((track) => track.playCount <= 0).toList();
+  unplayed.sort(
+    (a, b) =>
+        _normalizeSearchText(a.title).compareTo(_normalizeSearchText(b.title)),
+  );
+  return List.unmodifiable(unplayed);
+}
+
+List<LibraryTrack> _aboveAveragePlayTracks(
+  Iterable<LibraryTrack> tracks,
+  double averagePlays,
+) {
+  if (averagePlays <= 0) {
+    return const [];
+  }
+  return _sortedDrilldownTracks(
+    tracks.where((track) => track.playCount >= averagePlays),
+  );
+}
+
+List<LibraryTrack> _tracksByListeningTime(Iterable<LibraryTrack> tracks) {
+  final sorted = tracks.toList(growable: false);
+  sorted.sort((a, b) {
+    final bySeconds = b.listeningSeconds.compareTo(a.listeningSeconds);
+    if (bySeconds != 0) {
+      return bySeconds;
+    }
+    final byPlays = b.playCount.compareTo(a.playCount);
+    if (byPlays != 0) {
+      return byPlays;
+    }
+    return _normalizeSearchText(
+      a.title,
+    ).compareTo(_normalizeSearchText(b.title));
+  });
+  return List.unmodifiable(sorted);
+}
+
 int _playlistCountForTracks(Iterable<LibraryTrack> tracks) {
   final names = <String>{};
   for (final track in tracks) {
@@ -8546,14 +9106,6 @@ String _albumRankingTitle(LibraryTrack track) {
   return '${track.albumArtist ?? track.artist} - ${track.albumTitle}';
 }
 
-int _recentlyPlayedCount(List<LibraryTrack> tracks, Duration window) {
-  final threshold = DateTime.now().subtract(window);
-  return tracks.where((track) {
-    final playedAt = track.lastPlayedAt;
-    return playedAt != null && !playedAt.isBefore(threshold);
-  }).length;
-}
-
 String _percentageDetail(BuildContext context, int value, int total) {
   if (total <= 0) {
     return _t(context, '0% of tracks', '曲の0%');
@@ -8564,6 +9116,7 @@ String _percentageDetail(BuildContext context, int value, int total) {
 
 List<_BreakdownValue> _rankingBreakdownRows(
   BuildContext context,
+  LibraryOverview overview,
   List<RankingEntry> entries,
   Color baseColor,
 ) {
@@ -8582,6 +9135,21 @@ List<_BreakdownValue> _rankingBreakdownRows(
           trailing: _playCountLabel(context, indexed.$2.playCount),
           ratio: maxValue == 0 ? 0 : indexed.$2.playCount / maxValue,
           color: Color.lerp(baseColor, Colors.white, indexed.$1 * 0.08)!,
+          onTap: () {
+            final tracks = _tracksByArtist(overview, indexed.$2.title);
+            if (tracks.isEmpty) {
+              return;
+            }
+            _showTrackGroupSheet(
+              context,
+              title: indexed.$2.title,
+              subtitle: _t(context, 'Artist songs', 'アーティストの曲'),
+              icon: Icons.person_pin_rounded,
+              tracks: tracks,
+              rankingScope: RankingScope.artists,
+              rankingTitle: indexed.$2.title,
+            );
+          },
         ),
       )
       .toList(growable: false);
@@ -8643,6 +9211,13 @@ List<_BreakdownValue> _genreBreakdownRows(
             Colors.white,
             indexed.$1 * 0.08,
           )!,
+          onTap: () => _showTrackGroupSheet(
+            context,
+            title: indexed.$2.title,
+            subtitle: _t(context, 'Genre songs', 'ジャンルの曲'),
+            icon: Icons.category_rounded,
+            tracks: indexed.$2.tracks,
+          ),
         );
       })
       .toList(growable: false);
@@ -8650,9 +9225,10 @@ List<_BreakdownValue> _genreBreakdownRows(
 
 List<_BreakdownValue> _sourceBreakdownRows(
   BuildContext context,
-  List<LibraryTrack> tracks,
+  LibraryOverview overview,
   ThemeData theme,
 ) {
+  final tracks = overview.tracks;
   if (tracks.isEmpty) {
     return const [];
   }
@@ -8665,14 +9241,30 @@ List<_BreakdownValue> _sourceBreakdownRows(
   ].where((row) => row.$2 > 0).toList(growable: false);
 
   return rows
-      .map(
-        (row) => _BreakdownValue(
+      .map((row) {
+        final isCloud = row.$1 == _t(context, 'Cloud', 'クラウド');
+        final sourceTracks = _tracksByCloudStatus(
+          overview.tracks,
+          isCloud: isCloud,
+        );
+        return _BreakdownValue(
           label: row.$1,
           trailing: _trackCountLabel(context, row.$2),
           ratio: row.$2 / tracks.length,
           color: row.$3,
-        ),
-      )
+          onTap: sourceTracks.isEmpty
+              ? null
+              : () => _showTrackGroupSheet(
+                  context,
+                  title: row.$1,
+                  subtitle: isCloud
+                      ? _t(context, 'Cloud library items', 'クラウド項目')
+                      : _t(context, 'Local library items', 'ローカル項目'),
+                  icon: isCloud ? Icons.cloud_rounded : Icons.storage_rounded,
+                  tracks: sourceTracks,
+                ),
+        );
+      })
       .toList(growable: false);
 }
 
@@ -9043,12 +9635,14 @@ class _OverviewInsightValue {
     required this.label,
     required this.value,
     required this.detail,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final String detail;
+  final VoidCallback? onTap;
 }
 
 class _BreakdownValue {
@@ -9057,12 +9651,14 @@ class _BreakdownValue {
     required this.trailing,
     required this.ratio,
     required this.color,
+    this.onTap,
   });
 
   final String label;
   final String trailing;
   final double ratio;
   final Color color;
+  final VoidCallback? onTap;
 }
 
 class _LibraryGroupEntry {
@@ -9161,11 +9757,13 @@ class _SummaryValue {
     required this.icon,
     required this.label,
     required this.value,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 }
 
 class _ReleaseYearBucket {
@@ -9231,11 +9829,13 @@ class _GenreStackSegment {
 
 class _DecadePlayBucket {
   const _DecadePlayBucket({
+    required this.decade,
     required this.label,
     required this.trackCount,
     required this.playCount,
   });
 
+  final int decade;
   final String label;
   final int trackCount;
   final int playCount;
@@ -9433,6 +10033,7 @@ List<_DecadePlayBucket> _decadePlayBuckets(List<LibraryTrack> tracks) {
       byDecade.entries
           .map(
             (entry) => _DecadePlayBucket(
+              decade: entry.key,
               label: '${entry.key}s',
               trackCount: entry.value.trackCount,
               playCount: entry.value.playCount,
