@@ -20,24 +20,29 @@ class _OverviewSection extends StatelessWidget {
           const SizedBox(height: 16),
         ],
         _OverviewPanel(overview: overview),
-        const SizedBox(height: 14),
-        _SnapshotStatusPanel(
-          history: stats.snapshotHistory,
-          overview: overview,
-          isDemo: overview.isDemo,
-        ),
+        if (stats.snapshotRecordingEnabled) ...[
+          const SizedBox(height: 14),
+          _SnapshotStatusPanel(
+            history: stats.snapshotHistory,
+            overview: overview,
+            isDemo: overview.isDemo,
+          ),
+        ],
         const SizedBox(height: 14),
         _SummaryGrid(overview: overview),
         const SizedBox(height: 14),
         _OverviewAnalyticsPanel(
           overview: overview,
           history: stats.snapshotHistory,
+          snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
         ),
-        const SizedBox(height: 14),
-        _RecapHighlightsPanel(
-          overview: overview,
-          history: stats.snapshotHistory,
-        ),
+        if (stats.snapshotRecordingEnabled) ...[
+          const SizedBox(height: 14),
+          _RecapHighlightsPanel(
+            overview: overview,
+            history: stats.snapshotHistory,
+          ),
+        ],
         const SizedBox(height: 14),
         _TasteAndCollectionPanel(
           overview: overview,

@@ -6,6 +6,7 @@ import '../domain/library_snapshot.dart';
 import '../domain/library_track.dart';
 import '../domain/music_library_authorization.dart';
 import '../domain/music_stats_state.dart';
+import '../settings/snapshot_preferences.dart';
 import 'library_snapshot_repository.dart';
 import 'music_library_channel.dart';
 
@@ -19,14 +20,20 @@ final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
   return MusicStatsRepository(
     ref.watch(musicLibraryClientProvider),
     ref.watch(librarySnapshotRepositoryProvider),
+    snapshotRecordingEnabled: ref.watch(snapshotRecordingProvider),
   );
 });
 
 class MusicStatsRepository {
-  const MusicStatsRepository(this._client, this._snapshotRepository);
+  const MusicStatsRepository(
+    this._client,
+    this._snapshotRepository, {
+    this.snapshotRecordingEnabled = true,
+  });
 
   final MusicLibraryClient _client;
   final LibrarySnapshotRepository _snapshotRepository;
+  final bool snapshotRecordingEnabled;
 
   Future<MusicStatsState> load({bool requestAccess = false}) async {
     if (!_isIosMusicRuntime) {
@@ -39,7 +46,10 @@ class MusicStatsRepository {
         overview: overview,
         snapshotHistory: _largeDemoTrackCount > 0
             ? SnapshotHistory.empty
-            : _sampleSnapshotHistory(overview),
+            : snapshotRecordingEnabled
+            ? _sampleSnapshotHistory(overview)
+            : SnapshotHistory.empty,
+        snapshotRecordingEnabled: snapshotRecordingEnabled,
       );
     }
 
@@ -52,17 +62,23 @@ class MusicStatsRepository {
         authorizationStatus: status,
         overview: LibraryOverview.empty(isDemo: false),
         snapshotHistory: await _snapshotRepository.loadHistory(),
+        snapshotRecordingEnabled: snapshotRecordingEnabled,
       );
     }
 
-    await _client.scheduleSnapshotRefresh();
+    if (snapshotRecordingEnabled) {
+      await _client.scheduleSnapshotRefresh();
+    }
     final tracks = await _client.fetchTracks();
     final overview = LibraryOverview.fromTracks(tracks, isDemo: false);
-    final snapshotHistory = await _snapshotRepository.recordSnapshot(overview);
+    final snapshotHistory = snapshotRecordingEnabled
+        ? await _snapshotRepository.recordSnapshot(overview)
+        : await _snapshotRepository.loadHistory();
     return MusicStatsState(
       authorizationStatus: status,
       overview: overview,
       snapshotHistory: snapshotHistory,
+      snapshotRecordingEnabled: snapshotRecordingEnabled,
     );
   }
 
@@ -123,6 +139,9 @@ class MusicStatsRepository {
   }
 
   Future<SnapshotHistory> recordSnapshot(LibraryOverview overview) {
+    if (!snapshotRecordingEnabled) {
+      return _snapshotRepository.loadHistory();
+    }
     if (!_isIosMusicRuntime || overview.isDemo) {
       return Future.value(SnapshotHistory.empty);
     }

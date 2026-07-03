@@ -36,8 +36,10 @@ class _NowPlayingSection extends ConsumerWidget {
           const SizedBox(height: 14),
         ],
         _HeroTrackPanel(track: track, artwork: artwork),
-        const SizedBox(height: 14),
-        _TrendPanel(track: track, history: stats.snapshotHistory),
+        if (stats.snapshotRecordingEnabled) ...[
+          const SizedBox(height: 14),
+          _TrendPanel(track: track, history: stats.snapshotHistory),
+        ],
         const SizedBox(height: 14),
         _NowPlayingLyricsPanel(track: track),
         if (recentTracks.length > 1) ...[

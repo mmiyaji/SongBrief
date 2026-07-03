@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:songbrief/src/app.dart';
+import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
+import 'package:songbrief/src/settings/snapshot_preferences.dart';
 
 void main() {
   testWidgets('shows the SongBrief dashboard shell in English', (tester) async {
@@ -155,14 +157,62 @@ void main() {
     expect(app.theme?.colorScheme.primary, const Color(0xFF007486));
     expect(find.textContaining('Blue and mint'), findsOneWidget);
   });
+
+  testWidgets('hides snapshot-based panels when snapshot saving is off', (
+    tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        appLanguageProvider.overrideWith(
+          () => _FixedLanguageController(AppLanguage.english),
+        ),
+        snapshotRecordingProvider.overrideWith(
+          () => _FixedSnapshotRecordingController(false),
+        ),
+      ],
+    );
+
+    try {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SongBriefApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('This week trend'), findsNothing);
+
+      container
+          .read(homeSectionProvider.notifier)
+          .setSection(HomeSection.overview);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Daily snapshots'), findsNothing);
+      expect(find.text('Recap highlights'), findsNothing);
+      expect(find.text('Activity heatmap'), findsNothing);
+      expect(find.text('Listening maps'), findsOneWidget);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      container.dispose();
+      await tester.pump();
+    }
+  });
 }
 
-Future<void> _pumpApp(WidgetTester tester, AppLanguage language) {
+Future<void> _pumpApp(
+  WidgetTester tester,
+  AppLanguage language, {
+  bool snapshotRecordingEnabled = true,
+}) {
   return tester.pumpWidget(
     ProviderScope(
       overrides: [
         appLanguageProvider.overrideWith(
           () => _FixedLanguageController(language),
+        ),
+        snapshotRecordingProvider.overrideWith(
+          () => _FixedSnapshotRecordingController(snapshotRecordingEnabled),
         ),
       ],
       child: const SongBriefApp(),
@@ -178,5 +228,16 @@ class _FixedLanguageController extends AppLanguageController {
   @override
   AppLanguage build() {
     return language;
+  }
+}
+
+class _FixedSnapshotRecordingController extends SnapshotRecordingController {
+  _FixedSnapshotRecordingController(this.enabled);
+
+  final bool enabled;
+
+  @override
+  bool build() {
+    return enabled;
   }
 }

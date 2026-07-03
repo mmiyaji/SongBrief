@@ -4,13 +4,17 @@ void _showListeningMapsDetailSheet(
   BuildContext context, {
   required LibraryOverview overview,
   required SnapshotHistory history,
+  required bool snapshotRecordingEnabled,
 }) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (context) =>
-        _ListeningMapsDetailSheet(overview: overview, history: history),
+    builder: (context) => _ListeningMapsDetailSheet(
+      overview: overview,
+      history: history,
+      snapshotRecordingEnabled: snapshotRecordingEnabled,
+    ),
   );
 }
 
@@ -18,10 +22,12 @@ class _ListeningMapsDetailSheet extends StatelessWidget {
   const _ListeningMapsDetailSheet({
     required this.overview,
     required this.history,
+    required this.snapshotRecordingEnabled,
   });
 
   final LibraryOverview overview;
   final SnapshotHistory history;
+  final bool snapshotRecordingEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -55,11 +61,17 @@ class _ListeningMapsDetailSheet extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          _t(
-                            context,
-                            'Inspect playback patterns by year, day, and genre',
-                            '発売年・日別・ジャンル別に再生傾向を確認',
-                          ),
+                          snapshotRecordingEnabled
+                              ? _t(
+                                  context,
+                                  'Inspect playback patterns by year, day, and genre',
+                                  '発売年・日別・ジャンル別に再生傾向を確認',
+                                )
+                              : _t(
+                                  context,
+                                  'Inspect playback patterns by year and genre',
+                                  '発売年・ジャンル別に再生傾向を確認',
+                                ),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w700,
@@ -79,12 +91,14 @@ class _ListeningMapsDetailSheet extends StatelessWidget {
               _ReleaseYearPlayMapCard(overview: overview, expanded: true),
               const SizedBox(height: 14),
               _GenreStackedReleaseBarsCard(overview: overview),
-              const SizedBox(height: 14),
-              _ActivityHeatmapCard(
-                overview: overview,
-                history: history,
-                expanded: true,
-              ),
+              if (snapshotRecordingEnabled) ...[
+                const SizedBox(height: 14),
+                _ActivityHeatmapCard(
+                  overview: overview,
+                  history: history,
+                  expanded: true,
+                ),
+              ],
               const SizedBox(height: 14),
               _DecadeMixCard(overview: overview),
             ],
@@ -99,10 +113,12 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
   const _OverviewAnalyticsPanel({
     required this.overview,
     required this.history,
+    required this.snapshotRecordingEnabled,
   });
 
   final LibraryOverview overview;
   final SnapshotHistory history;
+  final bool snapshotRecordingEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -118,16 +134,23 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
           _PanelHeading(
             icon: Icons.scatter_plot_rounded,
             title: _t(context, 'Listening maps', 'リスニングマップ'),
-            subtitle: _t(
-              context,
-              'Release-year concentration and daily play activity',
-              '発売年ごとの集中度と日別の再生活動',
-            ),
+            subtitle: snapshotRecordingEnabled
+                ? _t(
+                    context,
+                    'Release-year concentration and daily play activity',
+                    '発売年ごとの集中度と日別の再生活動',
+                  )
+                : _t(
+                    context,
+                    'Release-year concentration from the current library',
+                    '現在のライブラリから発売年ごとの集中度を表示',
+                  ),
             trailing: IconButton.filledTonal(
               onPressed: () => _showListeningMapsDetailSheet(
                 context,
                 overview: overview,
                 history: history,
+                snapshotRecordingEnabled: snapshotRecordingEnabled,
               ),
               icon: const Icon(Icons.open_in_full_rounded),
               tooltip: _t(context, 'Expand listening maps', 'リスニングマップを拡大'),
@@ -141,6 +164,10 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
                 overview: overview,
                 history: history,
               );
+
+              if (!snapshotRecordingEnabled) {
+                return releaseCard;
+              }
 
               if (constraints.maxWidth >= 760) {
                 return Row(

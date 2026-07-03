@@ -23,6 +23,8 @@ import UIKit
 enum SongBriefSnapshotRefresh {
   private static let taskIdentifier = "app.songbrief.snapshot-refresh"
   private static let preferencesKey = "flutter.songbrief_daily_snapshots_v2"
+  private static let recordingEnabledPreferenceKey =
+    "flutter.songbrief_snapshot_recording_enabled_v1"
   private static let maxSnapshots = 180
   private static let maxSnapshotTracks = 500
   private static let maxStoredSnapshotCharacters = 1_500_000
@@ -41,6 +43,10 @@ enum SongBriefSnapshotRefresh {
   }
 
   static func schedule() {
+    guard isRecordingEnabled else {
+      return
+    }
+
     let request = BGAppRefreshTaskRequest(identifier: taskIdentifier)
     request.earliestBeginDate = Date(timeIntervalSinceNow: 24 * 60 * 60)
     do {
@@ -69,6 +75,10 @@ enum SongBriefSnapshotRefresh {
   }
 
   private static func captureSnapshot() -> Bool {
+    guard isRecordingEnabled else {
+      return false
+    }
+
     guard MPMediaLibrary.authorizationStatus() == .authorized else {
       return false
     }
@@ -129,6 +139,14 @@ enum SongBriefSnapshotRefresh {
 
     defaults.set(json, forKey: preferencesKey)
     return true
+  }
+
+  private static var isRecordingEnabled: Bool {
+    let defaults = UserDefaults.standard
+    if defaults.object(forKey: recordingEnabledPreferenceKey) == nil {
+      return true
+    }
+    return defaults.bool(forKey: recordingEnabledPreferenceKey)
   }
 
   private static func encodedPayloadWithinSize(from snapshots: [[String: Any]]) -> String? {

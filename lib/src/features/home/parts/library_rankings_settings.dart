@@ -1,5 +1,19 @@
 part of '../home_screen.dart';
 
+final _cacheUsageRevisionProvider =
+    NotifierProvider<_CacheUsageRevisionController, int>(
+      _CacheUsageRevisionController.new,
+    );
+
+class _CacheUsageRevisionController extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void refresh() {
+    state += 1;
+  }
+}
+
 class _RankingPanel extends ConsumerWidget {
   const _RankingPanel({required this.overview});
 
@@ -1201,7 +1215,9 @@ class _SettingsSection extends ConsumerWidget {
               _SettingsRow(
                 icon: Icons.update,
                 label: _t(context, 'Snapshot', 'スナップショット'),
-                value: _dateTimeFormat(context).format(overview.generatedAt),
+                value: stats.snapshotRecordingEnabled
+                    ? _dateTimeFormat(context).format(overview.generatedAt)
+                    : _t(context, 'Off', 'オフ'),
               ),
               const SizedBox(height: 16),
               Text(
@@ -1462,6 +1478,9 @@ class _DataManagementSetting extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    ref.watch(_cacheUsageRevisionProvider);
+    final cacheUsage = _currentCacheUsage();
+    final snapshotRecordingEnabled = ref.watch(snapshotRecordingProvider);
     final history = stats.snapshotHistory;
     final oldestSnapshot = history.snapshots.isEmpty
         ? null
@@ -1475,15 +1494,21 @@ class _DataManagementSetting extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _SnapshotRecordingSetting(enabled: snapshotRecordingEnabled),
+        const SizedBox(height: 10),
         _SettingsRow(
           icon: Icons.cleaning_services_outlined,
           label: _t(context, 'Temporary caches', '一時キャッシュ'),
-          value: _t(context, 'Artwork / images', 'アートワーク・画像'),
+          value: _cacheUsageLabel(context, cacheUsage),
         ),
         Align(
           alignment: Alignment.centerRight,
           child: OutlinedButton.icon(
-            onPressed: () => _clearTemporaryCaches(context, ref),
+            onPressed: () => _confirmAndClearTemporaryCaches(
+              context,
+              ref,
+              cacheUsage: cacheUsage,
+            ),
             icon: const Icon(Icons.delete_sweep_outlined),
             label: Text(_t(context, 'Clear caches', 'キャッシュを削除')),
           ),
@@ -1540,6 +1565,74 @@ class _DataManagementSetting extends ConsumerWidget {
   }
 }
 
+class _SnapshotRecordingSetting extends ConsumerWidget {
+  const _SnapshotRecordingSetting({required this.enabled});
+
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.28,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.auto_graph_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _t(context, 'Save daily snapshots', '日次スナップショットを保存'),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    enabled
+                        ? _t(
+                            context,
+                            'Snapshot-based trends and recaps are visible.',
+                            '履歴ベースの傾向・リキャップを表示します。',
+                          )
+                        : _t(
+                            context,
+                            'Snapshot-based trends and recaps are hidden.',
+                            '履歴ベースの傾向・リキャップは非表示です。',
+                          ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: enabled,
+              onChanged: (value) {
+                ref.read(snapshotRecordingProvider.notifier).setEnabled(value);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 enum _SnapshotRetentionOption {
   days30(30),
   days90(90),
@@ -1565,6 +1658,89 @@ String _snapshotRetentionLabel(
   };
 }
 
+class _CacheUsage {
+  const _CacheUsage({
+    required this.bytes,
+    required this.imageCount,
+    required this.liveImageCount,
+    required this.pendingImageCount,
+  });
+
+  final int bytes;
+  final int imageCount;
+  final int liveImageCount;
+  final int pendingImageCount;
+}
+
+_CacheUsage _currentCacheUsage() {
+  final cache = PaintingBinding.instance.imageCache;
+  return _CacheUsage(
+    bytes: cache.currentSizeBytes,
+    imageCount: cache.currentSize,
+    liveImageCount: cache.liveImageCount,
+    pendingImageCount: cache.pendingImageCount,
+  );
+}
+
+String _cacheUsageLabel(BuildContext context, _CacheUsage usage) {
+  final imageCount = usage.imageCount + usage.liveImageCount;
+  final suffix = imageCount == 1 ? 'image' : 'images';
+  return _t(
+    context,
+    '${_byteSizeLabel(usage.bytes)} / $imageCount $suffix',
+    '${_byteSizeLabel(usage.bytes)} / $imageCount件',
+  );
+}
+
+String _cacheUsageDetailLabel(BuildContext context, _CacheUsage usage) {
+  final number = _numberFormat(context);
+  return _t(
+    context,
+    'Memory image cache: ${_byteSizeLabel(usage.bytes)}. Cached ${number.format(usage.imageCount)}, live ${number.format(usage.liveImageCount)}, pending ${number.format(usage.pendingImageCount)}.',
+    'メモリ画像キャッシュ: ${_byteSizeLabel(usage.bytes)}。保持 ${number.format(usage.imageCount)}件、表示中 ${number.format(usage.liveImageCount)}件、読込中 ${number.format(usage.pendingImageCount)}件。',
+  );
+}
+
+String _byteSizeLabel(int bytes) {
+  if (bytes < 1024) {
+    return '$bytes B';
+  }
+  const units = ['KB', 'MB', 'GB'];
+  var value = bytes / 1024;
+  var unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return '${value.toStringAsFixed(value >= 10 ? 1 : 2)} ${units[unitIndex]}';
+}
+
+Future<void> _confirmAndClearTemporaryCaches(
+  BuildContext context,
+  WidgetRef ref, {
+  required _CacheUsage cacheUsage,
+}) async {
+  final confirmed = await _confirmDataDeletion(
+    context,
+    title: _t(context, 'Clear temporary caches?', '一時キャッシュを削除しますか？'),
+    message: _t(
+      context,
+      '${_cacheUsageDetailLabel(context, cacheUsage)} This does not delete snapshot history or settings.',
+      '${_cacheUsageDetailLabel(context, cacheUsage)} スナップショット履歴や設定は削除しません。',
+    ),
+    consentLabel: _t(
+      context,
+      'I understand this clears temporary caches.',
+      '一時キャッシュが削除されることに同意します。',
+    ),
+    confirmLabel: _t(context, 'Clear caches', 'キャッシュを削除'),
+  );
+  if (!confirmed || !context.mounted) {
+    return;
+  }
+  _clearTemporaryCaches(context, ref);
+}
+
 void _clearTemporaryCaches(
   BuildContext context,
   WidgetRef ref, {
@@ -1573,6 +1749,7 @@ void _clearTemporaryCaches(
   PaintingBinding.instance.imageCache.clear();
   PaintingBinding.instance.imageCache.clearLiveImages();
   ref.invalidate(trackArtworkProvider);
+  ref.read(_cacheUsageRevisionProvider.notifier).refresh();
   if (showMessage) {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(
@@ -1728,6 +1905,26 @@ Future<bool> _confirmSnapshotDeletion(
   required String title,
   required String message,
   required String confirmLabel,
+}) {
+  return _confirmDataDeletion(
+    context,
+    title: title,
+    message: message,
+    consentLabel: _t(
+      context,
+      'I understand this deletes snapshot history.',
+      'スナップショット履歴が削除されることに同意します。',
+    ),
+    confirmLabel: confirmLabel,
+  );
+}
+
+Future<bool> _confirmDataDeletion(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String consentLabel,
+  required String confirmLabel,
 }) async {
   var agreed = false;
   final result = await showDialog<bool>(
@@ -1754,11 +1951,7 @@ Future<bool> _confirmSnapshotDeletion(
                     });
                   },
                   title: Text(
-                    _t(
-                      context,
-                      'I understand this deletes snapshot history.',
-                      'スナップショット履歴が削除されることに同意します。',
-                    ),
+                    consentLabel,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

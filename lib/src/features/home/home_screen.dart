@@ -25,6 +25,7 @@ import '../../monetization/monetization_config.dart';
 import '../../monetization/premium_controller.dart';
 import '../../settings/app_lock.dart';
 import '../../settings/app_preferences.dart';
+import '../../settings/snapshot_preferences.dart';
 import '../../theme/app_theme.dart';
 import 'home_controller.dart';
 import 'widgets/glass_surface.dart';
