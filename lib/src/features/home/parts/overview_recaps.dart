@@ -849,18 +849,54 @@ class _DiversityScoreCard extends StatelessWidget {
   }
 }
 
-class _AlbumCompletionCard extends StatelessWidget {
+class _AlbumCompletionCard extends StatefulWidget {
   const _AlbumCompletionCard({required this.albums});
 
   final List<_AlbumCompletionValue> albums;
 
   @override
+  State<_AlbumCompletionCard> createState() => _AlbumCompletionCardState();
+}
+
+class _AlbumCompletionCardState extends State<_AlbumCompletionCard> {
+  static const _initialVisibleCount = 4;
+  static const _loadMoreCount = 4;
+
+  int _visibleCount = _initialVisibleCount;
+
+  @override
+  void didUpdateWidget(covariant _AlbumCompletionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.albums != widget.albums &&
+        _visibleCount > widget.albums.length) {
+      _visibleCount = _clampInt(
+        _visibleCount,
+        _initialVisibleCount,
+        widget.albums.length,
+      );
+    }
+  }
+
+  void _loadMore() {
+    setState(() {
+      _visibleCount = _clampInt(
+        _visibleCount + _loadMoreCount,
+        _initialVisibleCount,
+        widget.albums.length,
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final visibleAlbums = widget.albums
+        .take(_visibleCount)
+        .toList(growable: false);
     return _OverviewAnalysisCard(
       icon: Icons.verified_rounded,
       title: _t(context, 'Album completion', 'アルバム制覇率'),
       subtitle: _t(context, 'Played-track coverage by album', 'アルバム内の再生済み曲の割合'),
-      child: albums.isEmpty
+      child: widget.albums.isEmpty
           ? _AnalyticsEmptyState(
               label: _t(
                 context,
@@ -870,10 +906,17 @@ class _AlbumCompletionCard extends StatelessWidget {
             )
           : Column(
               children: [
-                for (final album in albums.take(4))
+                for (final album in visibleAlbums)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _AlbumCompletionRow(album: album),
+                  ),
+                if (visibleAlbums.length < widget.albums.length)
+                  _LoadMoreButton(
+                    shownCount: visibleAlbums.length,
+                    totalCount: widget.albums.length,
+                    nextCount: _loadMoreCount,
+                    onPressed: _loadMore,
                   ),
               ],
             ),
@@ -1368,7 +1411,7 @@ List<_AlbumCompletionValue> _albumCompletionValues(
           }
           return a.title.compareTo(b.title);
         });
-  return List.unmodifiable(values.take(8));
+  return List.unmodifiable(values);
 }
 
 _SnapshotPace? _snapshotPace(SnapshotHistory history) {

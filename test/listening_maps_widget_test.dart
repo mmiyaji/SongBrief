@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:songbrief/src/app.dart';
+import 'package:songbrief/src/domain/library_overview.dart';
+import 'package:songbrief/src/domain/library_snapshot.dart';
+import 'package:songbrief/src/domain/library_track.dart';
+import 'package:songbrief/src/domain/music_library_authorization.dart';
+import 'package:songbrief/src/domain/music_stats_state.dart';
 import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
 
@@ -116,6 +121,30 @@ void main() {
     expect(find.textContaining('Album songs'), findsOneWidget);
   });
 
+  testWidgets('loads more album completion rows', (tester) async {
+    await _pumpOverview(tester, tracks: _albumCompletionTracks());
+    await tester.pumpAndSettle();
+
+    final albumCompletion = find.text('Album completion');
+    await tester.scrollUntilVisible(
+      albumCompletion,
+      420,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Album 05'), findsNothing);
+
+    final loadMoreButton = find.text('Show 3 more');
+    await tester.ensureVisible(loadMoreButton);
+    await tester.tap(loadMoreButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Album 05'), findsOneWidget);
+    expect(find.text('Album 07'), findsOneWidget);
+    expect(loadMoreButton, findsNothing);
+  });
+
   testWidgets('opens a release decade list from expanded listening maps', (
     tester,
   ) async {
@@ -136,7 +165,7 @@ void main() {
   });
 }
 
-Future<void> _pumpOverview(WidgetTester tester) {
+Future<void> _pumpOverview(WidgetTester tester, {List<LibraryTrack>? tracks}) {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(900, 1200);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -151,10 +180,30 @@ Future<void> _pumpOverview(WidgetTester tester) {
         homeSectionProvider.overrideWith(
           () => _FixedHomeSectionController(HomeSection.overview),
         ),
+        if (tracks != null)
+          musicStatsControllerProvider.overrideWith(
+            () => _FixedMusicStatsController(tracks),
+          ),
       ],
       child: const SongBriefApp(),
     ),
   );
+}
+
+class _FixedMusicStatsController extends MusicStatsController {
+  _FixedMusicStatsController(this.tracks);
+
+  final List<LibraryTrack> tracks;
+
+  @override
+  Future<MusicStatsState> build() async {
+    return MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
+      overview: LibraryOverview.fromTracks(tracks, isDemo: true),
+      snapshotHistory: SnapshotHistory.empty,
+      snapshotRecordingEnabled: false,
+    );
+  }
 }
 
 class _FixedLanguageController extends AppLanguageController {
@@ -177,4 +226,22 @@ class _FixedHomeSectionController extends HomeSectionController {
   HomeSection build() {
     return section;
   }
+}
+
+List<LibraryTrack> _albumCompletionTracks() {
+  return List.generate(7, (index) {
+    final number = index + 1;
+    return LibraryTrack(
+      id: 'album-completion-$number',
+      title: 'Track $number',
+      artist: 'Test Artist',
+      albumTitle: 'Album ${number.toString().padLeft(2, '0')}',
+      albumArtist: 'Test Artist',
+      playCount: 10 - index,
+      skipCount: index,
+      duration: const Duration(minutes: 3),
+      releaseDate: DateTime(2020, 1, number),
+      isCloudItem: false,
+    );
+  }, growable: false);
 }
