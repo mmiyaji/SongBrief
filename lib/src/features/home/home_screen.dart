@@ -256,15 +256,11 @@ String _themeBrightnessDescription(
 
 String _languageLabel(BuildContext context, AppLanguage language) {
   return switch (language) {
-    AppLanguage.system => _t(context, 'System', 'システム'),
-    AppLanguage.japanese => _t(context, 'Japanese', '日本語'),
-    AppLanguage.english => _t(context, 'English', '英語'),
-    AppLanguage.chineseSimplified => _t(
-      context,
-      'Simplified Chinese',
-      '簡体字中国語',
-    ),
-    AppLanguage.korean => _t(context, 'Korean', '韓国語'),
+    AppLanguage.system => _t(context, 'System', 'システム (System)'),
+    AppLanguage.japanese => '日本語 (Japanese)',
+    AppLanguage.english => 'English',
+    AppLanguage.chineseSimplified => '简体中文 (Simplified Chinese)',
+    AppLanguage.korean => '한국어 (Korean)',
   };
 }
 

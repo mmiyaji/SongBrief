@@ -2042,6 +2042,7 @@ class _SettingsSection extends ConsumerWidget {
                 icon: Icons.palette_outlined,
                 label: _t(context, 'Theme', 'テーマ'),
                 valueLabel: _themeStyleLabel(context, selectedTheme),
+                valueLeading: _ThemeStyleSwatch(style: selectedTheme),
                 description: _themeStyleDescription(context, selectedTheme),
                 selected: selectedTheme,
                 options: [
@@ -2050,6 +2051,7 @@ class _SettingsSection extends ConsumerWidget {
                       value: style,
                       label: _themeStyleLabel(context, style),
                       description: _themeStyleDescription(context, style),
+                      leading: _ThemeStyleSwatch(style: style),
                     ),
                 ],
                 onChanged: (style) {
@@ -2235,11 +2237,13 @@ class _PreferenceOption<T> {
     required this.value,
     required this.label,
     required this.description,
+    this.leading,
   });
 
   final T value;
   final String label;
   final String description;
+  final Widget? leading;
 }
 
 class _PreferenceSelectorTile<T> extends StatelessWidget {
@@ -2251,6 +2255,7 @@ class _PreferenceSelectorTile<T> extends StatelessWidget {
     required this.selected,
     required this.options,
     required this.onChanged,
+    this.valueLeading,
   });
 
   final IconData icon;
@@ -2260,6 +2265,7 @@ class _PreferenceSelectorTile<T> extends StatelessWidget {
   final T selected;
   final List<_PreferenceOption<T>> options;
   final ValueChanged<T> onChanged;
+  final Widget? valueLeading;
 
   @override
   Widget build(BuildContext context) {
@@ -2308,6 +2314,10 @@ class _PreferenceSelectorTile<T> extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 10),
+                          if (valueLeading != null) ...[
+                            valueLeading!,
+                            const SizedBox(width: 8),
+                          ],
                           Flexible(
                             child: Text(
                               valueLabel,
@@ -2446,12 +2456,22 @@ class _PreferenceOptionRow<T> extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        option.label,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      Row(
+                        children: [
+                          if (option.leading != null) ...[
+                            option.leading!,
+                            const SizedBox(width: 10),
+                          ],
+                          Expanded(
+                            child: Text(
+                              option.label,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -2477,6 +2497,114 @@ class _PreferenceOptionRow<T> extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ThemeStyleSwatch extends StatelessWidget {
+  const _ThemeStyleSwatch({required this.style});
+
+  final SongBriefThemeStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentTheme = Theme.of(context);
+    final colors = _themeStyleSwatchColors(style);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: currentTheme.colorScheme.outlineVariant.withValues(
+            alpha: 0.58,
+          ),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(5),
+        child: SizedBox(
+          width: 44,
+          height: 20,
+          child: CustomPaint(painter: _ThemeStyleSwatchPainter(colors)),
+        ),
+      ),
+    );
+  }
+}
+
+List<Color> _themeStyleSwatchColors(SongBriefThemeStyle style) {
+  return switch (style) {
+    SongBriefThemeStyle.prism => const [
+      Color(0xFF4DECC7),
+      Color(0xFFE0FF67),
+      Color(0xFF7B8CFF),
+    ],
+    SongBriefThemeStyle.flux => const [
+      Color(0xFF55DDF7),
+      Color(0xFF7EC8FF),
+      Color(0xFF8EE7B9),
+    ],
+    SongBriefThemeStyle.ember => const [
+      Color(0xFFFF3D78),
+      Color(0xFFFF9B52),
+      Color(0xFF6FE5C4),
+    ],
+    SongBriefThemeStyle.mono => const [
+      Color(0xFFEDEDED),
+      Color(0xFFA6A6A6),
+      Color(0xFF303030),
+    ],
+    SongBriefThemeStyle.aurora => const [
+      Color(0xFF66F0C5),
+      Color(0xFFE6F873),
+      Color(0xFFA9A4FF),
+    ],
+    SongBriefThemeStyle.grove => const [
+      Color(0xFFB6EC67),
+      Color(0xFF65E6D2),
+      Color(0xFFFF9A9C),
+    ],
+    SongBriefThemeStyle.pulse => const [
+      Color(0xFF8CB7FF),
+      Color(0xFF60E7D6),
+      Color(0xFFFF9AC2),
+    ],
+    SongBriefThemeStyle.muse => const [
+      Color(0xFFDDA8FF),
+      Color(0xFF71E4D8),
+      Color(0xFFFFB568),
+    ],
+  };
+}
+
+class _ThemeStyleSwatchPainter extends CustomPainter {
+  const _ThemeStyleSwatchPainter(this.colors);
+
+  final List<Color> colors;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    final segmentWidth = size.width / colors.length;
+    for (var index = 0; index < colors.length; index += 1) {
+      paint.color = colors[index];
+      final left = index * segmentWidth;
+      final right = index == colors.length - 1
+          ? size.width
+          : (index + 1) * segmentWidth;
+      canvas.drawRect(Rect.fromLTRB(left, 0, right, size.height), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ThemeStyleSwatchPainter oldDelegate) {
+    if (oldDelegate.colors.length != colors.length) {
+      return true;
+    }
+    for (var index = 0; index < colors.length; index += 1) {
+      if (oldDelegate.colors[index] != colors[index]) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 

@@ -1789,15 +1789,48 @@ class _MissingArtworkPlaceholder extends StatelessWidget {
             constraints.maxWidth,
             constraints.maxHeight,
           );
-          final iconSize = (shortestSide * 0.56).clamp(20.0, 76.0);
+          final recordSize = (shortestSide * 1.18).clamp(58.0, 190.0);
+          final holeSize = recordSize * 0.22;
+          final ringWidth = (recordSize * 0.075).clamp(3.0, 12.0);
+          final recordColor = isLight
+              ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.20)
+              : Colors.white.withValues(alpha: 0.22);
+          final ringColor = isLight
+              ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.08)
+              : Colors.white.withValues(alpha: 0.10);
+          final holeColor = theme.colorScheme.surfaceContainerHighest;
 
-          return Center(
-            child: Icon(
-              Icons.album_rounded,
-              size: iconSize,
-              color: isLight
-                  ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.34)
-                  : Colors.white.withValues(alpha: 0.78),
+          return ClipRect(
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -recordSize * 0.24,
+                  bottom: -recordSize * 0.24,
+                  child: SizedBox.square(
+                    dimension: recordSize,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: recordColor,
+                        border: Border.all(color: ringColor, width: ringWidth),
+                      ),
+                      child: Center(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: holeColor,
+                            border: Border.all(
+                              color: ringColor,
+                              width: math.max(1.0, ringWidth * 0.45),
+                            ),
+                          ),
+                          child: SizedBox.square(dimension: holeSize),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         },

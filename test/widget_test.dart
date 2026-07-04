@@ -212,15 +212,15 @@ void main() {
     await tester.tap(find.text('Language'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Simplified Chinese'), findsOneWidget);
+    expect(find.text('简体中文 (Simplified Chinese)'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Korean'),
+      find.text('한국어 (Korean)'),
       160,
       scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    expect(find.text('Korean'), findsOneWidget);
+    expect(find.text('한국어 (Korean)'), findsOneWidget);
   });
 
   testWidgets('shows library exclusion controls in settings', (tester) async {
