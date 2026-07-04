@@ -2375,12 +2375,13 @@ Future<void> _showPreferenceSheet<T>({
     backgroundColor: theme.colorScheme.surface,
     builder: (context) {
       final height = MediaQuery.sizeOf(context).height;
+      final maxSheetHeight = height * 0.86;
       return Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 560, maxHeight: height * 0.72),
+          constraints: BoxConstraints(maxWidth: 560, maxHeight: maxSheetHeight),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
