@@ -82,10 +82,14 @@ function run(command, args) {
 async function saveAssets(req, res) {
   const body = await readJsonBody(req);
   const iconPng = decodePngDataUrl(body.iconPng);
+  const iosPng = body.iosPng == null ? undefined : decodePngDataUrl(body.iosPng);
   const foregroundPng = decodePngDataUrl(body.foregroundPng);
 
   await mkdir(path.join(repoRoot, 'assets/branding'), { recursive: true });
   await writeFile(path.join(repoRoot, 'assets/branding/songbrief_icon.png'), iconPng);
+  if (iosPng) {
+    await writeFile(path.join(repoRoot, 'assets/branding/songbrief_icon_ios.png'), iosPng);
+  }
   await writeFile(
     path.join(repoRoot, 'assets/branding/songbrief_icon_foreground.png'),
     foregroundPng,
@@ -102,6 +106,7 @@ async function saveAssets(req, res) {
       ok: true,
       files: [
         'assets/branding/songbrief_icon.png',
+        ...(iosPng ? ['assets/branding/songbrief_icon_ios.png'] : []),
         'assets/branding/songbrief_icon_foreground.png',
         'tool/icon_tuner/icon_params.json',
       ],

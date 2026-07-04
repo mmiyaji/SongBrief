@@ -98,7 +98,14 @@
       aspect-ratio: 1;
       border: 1px solid rgba(149, 213, 213, 0.16);
       border-radius: 18px;
-      background: #020606;
+      background-color: #020606;
+      background-image:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.055) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.055) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.055) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.055) 75%);
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+      background-size: 24px 24px;
       overflow: hidden;
     }
 
@@ -146,7 +153,14 @@
 
     .size-swatch canvas {
       border-radius: 14px;
-      background: #020606;
+      background-color: #020606;
+      background-image:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%);
+      background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+      background-size: 10px 10px;
     }
 
     .actions {
@@ -353,6 +367,8 @@
       canvasSize: 1024,
       panelInset: 74,
       panelRadius: 128,
+      outerBackground: 'transparent',
+      outerBackgroundColor: '#22211f',
       panelFill: '#071517',
       panelBorder: '#24383b',
       panelBorderWidth: 6,
@@ -412,6 +428,11 @@
       {
         root: 'backgroundControls',
         controls: [
+          select('outerBackground', '外側背景', [
+            ['transparent', '透明'],
+            ['solid', '単色'],
+          ]),
+          color('outerBackgroundColor', '外側背景色'),
           slider('panelInset', '外側余白', 40, 120, 1),
           slider('panelRadius', '角丸', 72, 180, 1),
           color('panelFill', '背景色'),
@@ -525,8 +546,11 @@
       ctx.imageSmoothingQuality = 'high';
 
       if (!options.foregroundOnly) {
-        ctx.fillStyle = '#22211f';
-        ctx.fillRect(0, 0, size, size);
+        const outerBackground = options.outerBackground ?? p.outerBackground;
+        if (outerBackground === 'solid') {
+          ctx.fillStyle = options.outerBackgroundColor ?? p.outerBackgroundColor;
+          ctx.fillRect(0, 0, size, size);
+        }
 
         const inset = p.panelInset;
         const panelSize = size - inset * 2;
@@ -875,6 +899,10 @@
           body: JSON.stringify({
             params,
             iconPng: canvasDataUrl(),
+            iosPng: canvasDataUrl({
+              outerBackground: 'solid',
+              outerBackgroundColor: params.panelFill,
+            }),
             foregroundPng: canvasDataUrl({ foregroundOnly: true }),
           }),
         });

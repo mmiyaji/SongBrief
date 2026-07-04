@@ -2,6 +2,8 @@
   "canvasSize": 1024,
   "panelInset": 74,
   "panelRadius": 128,
+  "outerBackground": "transparent",
+  "outerBackgroundColor": "#22211f",
   "panelFill": "#071517",
   "panelBorder": "#24383b",
   "panelBorderWidth": 6,

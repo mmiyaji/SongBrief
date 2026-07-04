@@ -11,6 +11,7 @@ Open `http://127.0.0.1:5174/`.
 The Save button updates:
 
 - `assets/branding/songbrief_icon.png`
+- `assets/branding/songbrief_icon_ios.png`
 - `assets/branding/songbrief_icon_foreground.png`
 - `tool/icon_tuner/icon_params.json`
 
