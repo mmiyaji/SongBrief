@@ -80,6 +80,8 @@ class _NowPlayingLyricsPanel extends StatelessWidget {
                 context,
                 'No local lyrics were found for this song.',
                 'この曲のローカル歌詞は見つかりませんでした。',
+                zh: '未找到此歌曲的本地歌词。',
+                ko: '이 곡의 로컬 가사를 찾을 수 없습니다.',
               ),
             )
           else
@@ -144,7 +146,13 @@ class _HeroTrackPanel extends ConsumerWidget {
                         left: 18,
                         top: 18,
                         child: _HeroBadge(
-                          label: _t(context, '#1 Song', '#1 曲'),
+                          label: _t(
+                            context,
+                            '#1 Song',
+                            '#1 曲',
+                            zh: '#1 歌曲',
+                            ko: '#1 곡',
+                          ),
                         ),
                       ),
                       Positioned(
@@ -310,7 +318,13 @@ class _HeroTrackWideHeader extends StatelessWidget {
                         left: 12,
                         top: 12,
                         child: _HeroBadge(
-                          label: _t(context, '#1 Song', '#1 曲'),
+                          label: _t(
+                            context,
+                            '#1 Song',
+                            '#1 曲',
+                            zh: '#1 歌曲',
+                            ko: '#1 곡',
+                          ),
                         ),
                       ),
                     ],
@@ -754,11 +768,15 @@ class _TrendPanel extends ConsumerWidget {
                     context,
                     'Play-count changes for this song from daily listening records.',
                     '日々の聴取記録から、この曲の再生回数の増分を表示します。',
+                    zh: '根据每日收听记录显示这首歌播放次数的变化。',
+                    ko: '일별 청취 기록을 바탕으로 이 곡의 재생 횟수 변화를 표시합니다.',
                   )
                 : _t(
                     context,
                     'This chart appears after records from at least two different days are available.',
                     '別の日の記録がもう1回分たまると、このグラフを表示できます。',
+                    zh: '至少有两个不同日期的记录后会显示此图表。',
+                    ko: '서로 다른 날짜의 기록이 2일 이상 있으면 이 차트를 표시합니다.',
                   ),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -835,6 +853,8 @@ class _TrendBars extends StatelessWidget {
               context,
               'Open SongBrief on another day to build a listening trend.',
               '別の日にもSongBriefを開くと、日々の変化を表示できます。',
+              zh: '在其他日期打开 SongBrief 后即可生成收听趋势。',
+              ko: '다른 날에도 SongBrief를 열면 청취 추세를 만들 수 있습니다.',
             ),
           ),
         ),
@@ -947,6 +967,8 @@ void _showTrackTrendInfoSheet(BuildContext context) {
                   context,
                   'SongBrief compares daily listening records and charts the increase in play count for the selected song. Missing days are not guessed; they stay at 0 until another pair of records is available.',
                   'SongBriefは日々の聴取記録を比較し、選択中の曲の再生回数の増分を表示します。記録がない日は推定せず、比較できる別の日の記録がそろうまで0として扱います。',
+                  zh: 'SongBrief 会比较每日收听记录，并显示所选歌曲播放次数的增加量。没有记录的日期不会推测，在可比较的另一条记录出现前按 0 处理。',
+                  ko: 'SongBrief는 일별 청취 기록을 비교해 선택한 곡의 재생 횟수 증가분을 표시합니다. 기록이 없는 날은 추정하지 않고, 비교할 수 있는 다른 날짜의 기록이 생길 때까지 0으로 처리합니다.',
                 ),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -960,6 +982,8 @@ void _showTrackTrendInfoSheet(BuildContext context) {
                   context,
                   '7 days uses daily buckets, 4 weeks uses weekly buckets, and 1 year uses monthly buckets.',
                   '7日間は日別、4週間は週別、1年間は月別のバケットで集計します。',
+                  zh: '7天按天汇总，4周按周汇总，1年按月汇总。',
+                  ko: '7일은 일별, 4주는 주별, 1년은 월별 단위로 집계합니다.',
                 ),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -1370,7 +1394,7 @@ class _LibraryGroupListSheet extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$subtitle ・ ${_countLabel(context, groups.length, singular: 'group', plural: 'groups', jaUnit: '件')} ・ ${_trackCountLabel(context, totalTracks)} ・ ${_playCountLabel(context, totalPlayCount)}',
+                          '$subtitle ・ ${_countLabel(context, groups.length, singular: 'group', plural: 'groups', jaUnit: '件', zhUnit: '组', koUnit: '개 그룹')} ・ ${_trackCountLabel(context, totalTracks)} ・ ${_playCountLabel(context, totalPlayCount)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -2375,6 +2399,8 @@ class _TrackLibraryContextPanel extends ConsumerWidget {
                 context,
                 'No local lyrics were found for this song.',
                 'この曲のローカル歌詞は見つかりませんでした。',
+                zh: '未找到此歌曲的本地歌词。',
+                ko: '이 곡의 로컬 가사를 찾을 수 없습니다.',
               ),
             )
           else

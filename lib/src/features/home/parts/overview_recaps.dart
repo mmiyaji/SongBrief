@@ -755,6 +755,8 @@ class _RediscoveryTrackRow extends StatelessWidget {
                         context,
                         '${track.artist} - ${_playCountLabel(context, track.playCount)}',
                         '${track.artist} ・ ${_playCountLabel(context, track.playCount)}',
+                        zh: '${track.artist} · ${_playCountLabel(context, track.playCount)}',
+                        ko: '${track.artist} · ${_playCountLabel(context, track.playCount)}',
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -837,6 +839,8 @@ class _DiversityScoreCard extends StatelessWidget {
               context,
               'Top 3 artists hold ${score.topThreeShare.toStringAsFixed(0)}% of plays.',
               '上位3アーティストが再生の${score.topThreeShare.toStringAsFixed(0)}%を占めています。',
+              zh: '前 3 位艺人占播放次数的 ${score.topThreeShare.toStringAsFixed(0)}%。',
+              ko: '상위 3명의 아티스트가 재생의 ${score.topThreeShare.toStringAsFixed(0)}%를 차지합니다.',
             ),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -1283,6 +1287,8 @@ List<_MilestoneForecast> _milestoneForecasts(
         context,
         '${_numberFormat(context).format(playTarget)} plays',
         '${_numberFormat(context).format(playTarget)}回再生',
+        zh: '${_numberFormat(context).format(playTarget)} 次播放',
+        ko: '${_numberFormat(context).format(playTarget)}회 재생',
       ),
       daysLabel: _daysUntilLabel(context, playDays),
     ),
@@ -1293,6 +1299,8 @@ List<_MilestoneForecast> _milestoneForecasts(
           context,
           '${_hoursLabel(listeningTargetSeconds)} hours',
           '${_hoursLabel(listeningTargetSeconds)}時間',
+          zh: '${_hoursLabel(listeningTargetSeconds)} 小时',
+          ko: '${_hoursLabel(listeningTargetSeconds)}시간',
         ),
         daysLabel: _daysUntilLabel(context, listeningDays),
       ),
@@ -1373,6 +1381,8 @@ _BurnoutSummary _burnoutSummary(
             context,
             '${burnout.title} cooled after an early spike.',
             '${burnout.title} は急上昇後に落ち着きました。',
+            zh: '${burnout.title} 在快速上升后趋于平静。',
+            ko: '${burnout.title}은 급상승 후 안정되었습니다.',
           ),
   );
 }
@@ -1485,6 +1495,8 @@ String _daysUntilLabel(BuildContext context, int days) {
     context,
     'about ${_dayCountLabel(context, days)}',
     '約${_dayCountLabel(context, days)}',
+    zh: '约${_dayCountLabel(context, days)}',
+    ko: '약 ${_dayCountLabel(context, days)}',
   );
 }
 

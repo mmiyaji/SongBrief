@@ -42,8 +42,14 @@ part 'parts/shared_helpers.dart';
 const _privacyPolicyUrl = 'https://mmiyaji.github.io/SongBrief/privacy/';
 const _termsOfUseUrl = 'https://mmiyaji.github.io/SongBrief/terms/';
 
-String _t(BuildContext context, String en, String ja) {
-  return appText(context, en, ja);
+String _t(
+  BuildContext context,
+  String en,
+  String ja, {
+  String? zh,
+  String? ko,
+}) {
+  return appText(context, en, ja, zh: zh, ko: ko);
 }
 
 String _localeName(BuildContext context) {
@@ -64,13 +70,17 @@ String _countLabel(
   required String singular,
   required String plural,
   required String jaUnit,
+  required String zhUnit,
+  required String koUnit,
 }) {
   final formatted = _numberFormat(context).format(count);
-  return _t(
-    context,
-    '$formatted ${count == 1 ? singular : plural}',
-    '$formatted$jaUnit',
-  );
+  final languageCode = Localizations.localeOf(context).languageCode;
+  return switch (languageCode) {
+    'ja' => '$formatted$jaUnit',
+    'zh' => '$formatted$zhUnit',
+    'ko' => '$formatted$koUnit',
+    _ => '$formatted ${count == 1 ? singular : plural}',
+  };
 }
 
 String _playCountLabel(BuildContext context, int count) {
@@ -80,6 +90,8 @@ String _playCountLabel(BuildContext context, int count) {
     singular: 'play',
     plural: 'plays',
     jaUnit: '回',
+    zhUnit: '次',
+    koUnit: '회',
   );
 }
 
@@ -90,6 +102,8 @@ String _skipCountLabel(BuildContext context, int count) {
     singular: 'skip',
     plural: 'skips',
     jaUnit: '回',
+    zhUnit: '次',
+    koUnit: '회',
   );
 }
 
@@ -100,6 +114,8 @@ String _trackCountLabel(BuildContext context, int count) {
     singular: 'track',
     plural: 'tracks',
     jaUnit: '曲',
+    zhUnit: '首',
+    koUnit: '곡',
   );
 }
 
@@ -110,6 +126,8 @@ String _artistCountLabel(BuildContext context, int count) {
     singular: 'artist',
     plural: 'artists',
     jaUnit: 'アーティスト',
+    zhUnit: '位艺人',
+    koUnit: '아티스트',
   );
 }
 
@@ -120,6 +138,8 @@ String _albumCountLabel(BuildContext context, int count) {
     singular: 'album',
     plural: 'albums',
     jaUnit: 'アルバム',
+    zhUnit: '张专辑',
+    koUnit: '앨범',
   );
 }
 
@@ -130,6 +150,8 @@ String _dayCountLabel(BuildContext context, int count) {
     singular: 'day',
     plural: 'days',
     jaUnit: '日',
+    zhUnit: '天',
+    koUnit: '일',
   );
 }
 
@@ -250,13 +272,21 @@ String _themeBrightnessDescription(
       context,
       'Follows the device appearance setting.',
       '端末の外観設定に合わせます。',
+      zh: '跟随设备外观设置。',
+      ko: '기기의 화면 설정을 따릅니다.',
     ),
   };
 }
 
 String _languageLabel(BuildContext context, AppLanguage language) {
   return switch (language) {
-    AppLanguage.system => _t(context, 'System', 'システム (System)'),
+    AppLanguage.system => _t(
+      context,
+      'System',
+      'システム (System)',
+      zh: '系统 (System)',
+      ko: '시스템 (System)',
+    ),
     AppLanguage.japanese => '日本語 (Japanese)',
     AppLanguage.english => 'English',
     AppLanguage.chineseSimplified => '简体中文 (Simplified Chinese)',
@@ -270,26 +300,36 @@ String _languageDescription(BuildContext context, AppLanguage language) {
       context,
       'Follows the device language when available.',
       '利用可能な場合は端末の言語設定に合わせます。',
+      zh: '可用时跟随设备的语言设置。',
+      ko: '가능한 경우 기기의 언어 설정을 따릅니다.',
     ),
     AppLanguage.japanese => _t(
       context,
       'Uses Japanese app text.',
       'アプリ内の表示を日本語にします。',
+      zh: '应用内文字将显示为日语。',
+      ko: '앱 내 문구를 일본어로 표시합니다.',
     ),
     AppLanguage.english => _t(
       context,
       'Uses English app text.',
       'アプリ内の表示を英語にします。',
+      zh: '应用内文字将显示为英语。',
+      ko: '앱 내 문구를 영어로 표시합니다.',
     ),
     AppLanguage.chineseSimplified => _t(
       context,
-      'Uses Simplified Chinese where supported; untranslated text falls back to English.',
-      '対応済みの箇所は簡体字中国語で表示し、未翻訳の文言は英語で表示します。',
+      'Uses Simplified Chinese app text.',
+      'アプリ内の表示を簡体字中国語にします。',
+      zh: '应用内文字将显示为简体中文。',
+      ko: '앱 내 문구를 중국어 간체로 표시합니다.',
     ),
     AppLanguage.korean => _t(
       context,
-      'Uses Korean where supported; untranslated text falls back to English.',
-      '対応済みの箇所は韓国語で表示し、未翻訳の文言は英語で表示します。',
+      'Uses Korean app text.',
+      'アプリ内の表示を韓国語にします。',
+      zh: '应用内文字将显示为韩语。',
+      ko: '앱 내 문구를 한국어로 표시합니다.',
     ),
   };
 }
@@ -879,6 +919,8 @@ class _AuthorizationPanel extends ConsumerWidget {
             context,
             'Music access is ${_authorizationLabel(context, status).toLowerCase()}.',
             'ミュージックアクセスは「${_authorizationLabel(context, status)}」です。',
+            zh: '音乐访问权限：${_authorizationLabel(context, status)}。',
+            ko: '음악 접근 상태: ${_authorizationLabel(context, status)}.',
           );
 
     return GlassSurface(

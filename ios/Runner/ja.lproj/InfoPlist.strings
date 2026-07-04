@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "SongBrief";
+"NSAppleMusicUsageDescription" = "SongBriefは、ローカルの聴取統計を作成するために、ミュージックライブラリの再生回数、スキップ回数、最後に再生した日を読み取ります。";
+"NSFaceIDUsageDescription" = "アプリロックが有効な場合、SongBriefはアプリのロック解除にFace IDを使用します。";

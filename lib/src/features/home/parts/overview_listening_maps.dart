@@ -229,6 +229,8 @@ class _ReleaseYearPlayMapCard extends StatelessWidget {
               context,
               '${topBucket.year} has the highest concentration',
               '${topBucket.year}年の集中度が最も高いです',
+              zh: '${topBucket.year} 年的集中度最高',
+              ko: '${topBucket.year}년의 집중도가 가장 높습니다',
             ),
       child: buckets.isEmpty
           ? _AnalyticsEmptyState(
@@ -495,6 +497,14 @@ class _InteractiveReleaseYearChartState
                     '${_trackCountLabel(context, selectedBucket.trackCount)} / '
                         '${_playCountLabel(context, selectedBucket.playCount)} / '
                         '平均${selectedBucket.averagePlays.toStringAsFixed(1)}',
+                    zh:
+                        '${_trackCountLabel(context, selectedBucket.trackCount)} / '
+                        '${_playCountLabel(context, selectedBucket.playCount)} / '
+                        '平均 ${selectedBucket.averagePlays.toStringAsFixed(1)}',
+                    ko:
+                        '${_trackCountLabel(context, selectedBucket.trackCount)} / '
+                        '${_playCountLabel(context, selectedBucket.playCount)} / '
+                        '평균 ${selectedBucket.averagePlays.toStringAsFixed(1)}',
                   ),
                   onTap: widget.onOpenBucket == null
                       ? null
@@ -1691,6 +1701,12 @@ class _ActivityHeatmapCell extends StatelessWidget {
       '${DateFormat.MMMd(_localeName(context)).format(day.date)}: '
           '${_playCountLabel(context, day.playCount)}',
       '${DateFormat.MMMd(_localeName(context)).format(day.date)}: '
+          '${_playCountLabel(context, day.playCount)}',
+      zh:
+          '${DateFormat.MMMd(_localeName(context)).format(day.date)}：'
+          '${_playCountLabel(context, day.playCount)}',
+      ko:
+          '${DateFormat.MMMd(_localeName(context)).format(day.date)}: '
           '${_playCountLabel(context, day.playCount)}',
     );
 

@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "SongBrief";
+"NSAppleMusicUsageDescription" = "SongBrief 会读取音乐资料库中的播放次数、跳过次数和上次播放日期，用于在本机生成收听统计。";
+"NSFaceIDUsageDescription" = "启用应用锁时，SongBrief 会使用 Face ID 解锁应用。";

@@ -1,11 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/home/home_screen.dart';
-import 'localization/app_text.dart';
+import 'localization/generated/app_localizations.dart';
 import 'settings/app_lock.dart';
 import 'settings/app_preferences.dart';
 import 'theme/app_theme.dart';
@@ -21,18 +20,10 @@ class SongBriefApp extends ConsumerWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'SongBrief',
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       locale: appLanguage.locale,
-      supportedLocales: const [
-        Locale('en'),
-        Locale('ja'),
-        Locale('zh'),
-        Locale('ko'),
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildSongBriefTheme(
         style: themeStyle,
         brightness: Brightness.light,
@@ -150,6 +141,7 @@ class _AppLockScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final text = Localizations.of<AppLocalizations>(context, AppLocalizations);
     return Positioned.fill(
       child: Material(
         color: theme.colorScheme.surface,
@@ -182,21 +174,14 @@ class _AppLockScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 18),
                         Text(
-                          appText(
-                            context,
-                            'SongBrief is locked',
-                            'SongBriefはロック中です',
-                          ),
+                          text?.appLockedTitle ?? 'SongBrief is locked',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.titleLarge,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          appText(
-                            context,
-                            'Unlock with your device authentication.',
-                            '端末認証でロックを解除してください。',
-                          ),
+                          text?.appLockedSubtitle ??
+                              'Unlock with your device authentication.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -206,11 +191,8 @@ class _AppLockScreen extends ConsumerWidget {
                         if (state.errorMessage != null) ...[
                           const SizedBox(height: 12),
                           Text(
-                            appText(
-                              context,
-                              'Authentication failed.',
-                              '認証に失敗しました。',
-                            ),
+                            text?.authenticationFailed ??
+                                'Authentication failed.',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.error,
@@ -230,11 +212,9 @@ class _AppLockScreen extends ConsumerWidget {
                                           appLockControllerProvider.notifier,
                                         )
                                         .unlock(
-                                          localizedReason: appText(
-                                            context,
-                                            'Unlock SongBrief.',
-                                            'SongBriefのロックを解除します。',
-                                          ),
+                                          localizedReason:
+                                              text?.unlockSongBriefReason ??
+                                              'Unlock SongBrief.',
                                         );
                                   },
                             icon: state.authenticating
@@ -245,7 +225,7 @@ class _AppLockScreen extends ConsumerWidget {
                                     ),
                                   )
                                 : const Icon(Icons.lock_open_rounded),
-                            label: Text(appText(context, 'Unlock', 'ロック解除')),
+                            label: Text(text?.unlock ?? 'Unlock'),
                           ),
                         ),
                       ],

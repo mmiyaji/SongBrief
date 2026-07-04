@@ -379,6 +379,8 @@ class _RediscoveryRankingSection extends StatelessWidget {
           context,
           '${_numberFormat(context).format(item.value)}d',
           '${_numberFormat(context).format(item.value)}日',
+          zh: '${_numberFormat(context).format(item.value)}天',
+          ko: '${_numberFormat(context).format(item.value)}일',
         ),
         detailBuilder: (context, item) => _t(context, 'not played', '未再生'),
       ),
@@ -428,6 +430,8 @@ class _RankMovementSection extends StatelessWidget {
             context,
             '#$previousRank to #$currentRank',
             '#$previousRank → #$currentRank',
+            zh: '#$previousRank → #$currentRank',
+            ko: '#$previousRank → #$currentRank',
           );
         },
       ),
@@ -1125,6 +1129,8 @@ class _LibrarySearchPanel extends StatelessWidget {
               context,
               '${number.format(resultCount)} ${_libraryBrowseModeLabel(context, mode).toLowerCase()} matched',
               '${number.format(resultCount)}件の${_libraryBrowseModeLabel(context, mode)}',
+              zh: '${number.format(resultCount)} 个${_libraryBrowseModeLabel(context, mode)}匹配',
+              ko: '${number.format(resultCount)}개 ${_libraryBrowseModeLabel(context, mode)} 일치',
             ),
           ),
           const SizedBox(height: 14),
@@ -1475,6 +1481,8 @@ class _LibraryGroupPanel extends StatelessWidget {
                 context,
                 'No ${_libraryBrowseModeLabel(context, mode).toLowerCase()} matched the current search.',
                 '現在の検索に一致する${_libraryBrowseModeLabel(context, mode)}はありません。',
+                zh: '当前搜索没有匹配的${_libraryBrowseModeLabel(context, mode)}。',
+                ko: '현재 검색과 일치하는 ${_libraryBrowseModeLabel(context, mode)} 항목이 없습니다.',
               ),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -1946,6 +1954,8 @@ class _LoadMoreButton extends StatelessWidget {
             context,
             'Show ${number.format(actualNextCount)} more',
             'さらに${number.format(actualNextCount)}件表示',
+            zh: '再显示 ${number.format(actualNextCount)} 项',
+            ko: '${number.format(actualNextCount)}개 더 보기',
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -3134,7 +3144,13 @@ String _filterRuleCountLabel(BuildContext context, int count) {
   if (count == 0) {
     return _t(context, 'None', 'なし');
   }
-  return _t(context, '$count rules', '$count件');
+  return _t(
+    context,
+    '$count rules',
+    '$count件',
+    zh: '$count 条规则',
+    ko: '$count개 규칙',
+  );
 }
 
 Future<void> _addPlaylistExclusion(BuildContext context, WidgetRef ref) async {
@@ -3497,6 +3513,8 @@ String _cacheUsageLabel(BuildContext context, _CacheUsage usage) {
     context,
     '${_byteSizeLabel(usage.bytes)} / $imageCount $suffix',
     '${_byteSizeLabel(usage.bytes)} / $imageCount件',
+    zh: '${_byteSizeLabel(usage.bytes)} / $imageCount 张图片',
+    ko: '${_byteSizeLabel(usage.bytes)} / 이미지 $imageCount개',
   );
 }
 
@@ -3506,6 +3524,8 @@ String _cacheUsageDetailLabel(BuildContext context, _CacheUsage usage) {
     context,
     'Memory image cache: ${_byteSizeLabel(usage.bytes)}. Cached ${number.format(usage.imageCount)}, live ${number.format(usage.liveImageCount)}, pending ${number.format(usage.pendingImageCount)}.',
     'メモリ画像キャッシュ: ${_byteSizeLabel(usage.bytes)}。保持 ${number.format(usage.imageCount)}件、表示中 ${number.format(usage.liveImageCount)}件、読込中 ${number.format(usage.pendingImageCount)}件。',
+    zh: '内存图片缓存：${_byteSizeLabel(usage.bytes)}。已缓存 ${number.format(usage.imageCount)} 张，显示中 ${number.format(usage.liveImageCount)} 张，等待中 ${number.format(usage.pendingImageCount)} 张。',
+    ko: '메모리 이미지 캐시: ${_byteSizeLabel(usage.bytes)}. 보관 ${number.format(usage.imageCount)}개, 표시 중 ${number.format(usage.liveImageCount)}개, 대기 중 ${number.format(usage.pendingImageCount)}개.',
   );
 }
 
@@ -3535,6 +3555,8 @@ Future<void> _confirmAndClearTemporaryCaches(
       context,
       '${_cacheUsageDetailLabel(context, cacheUsage)} This does not delete listening records or settings.',
       '${_cacheUsageDetailLabel(context, cacheUsage)} 聴取記録や設定は削除しません。',
+      zh: '${_cacheUsageDetailLabel(context, cacheUsage)} 不会删除收听记录或设置。',
+      ko: '${_cacheUsageDetailLabel(context, cacheUsage)} 청취 기록이나 설정은 삭제하지 않습니다.',
     ),
     consentLabel: _t(
       context,
@@ -3585,6 +3607,8 @@ Future<void> _deleteOldSnapshots(
       context,
       'Listening records before $cutoffLabel will be deleted. This cannot be undone.',
       '$cutoffLabel より前の聴取記録を削除します。この操作は元に戻せません。',
+      zh: '$cutoffLabel 之前的收听记录将被删除。此操作无法撤销。',
+      ko: '$cutoffLabel 이전의 청취 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
     ),
     confirmLabel: _t(context, 'Delete old records', '古い記録を削除'),
   );
@@ -3613,6 +3637,8 @@ Future<void> _deleteOldSnapshots(
               context,
               'Deleted $removed listening records.',
               '$removed件の聴取記録を削除しました。',
+              zh: '已删除 $removed 条收听记录。',
+              ko: '청취 기록 $removed개를 삭제했습니다.',
             ),
     );
   } on Object {
@@ -3637,6 +3663,8 @@ Future<void> _clearSnapshotHistory(
       context,
       'All saved listening records will be deleted. This cannot be undone.',
       '保存済みの聴取記録をすべて削除します。この操作は元に戻せません。',
+      zh: '所有已保存的收听记录都会被删除。此操作无法撤销。',
+      ko: '저장된 모든 청취 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
     ),
     confirmLabel: _t(context, 'Delete all records', 'すべての記録を削除'),
   );
@@ -3658,6 +3686,8 @@ Future<void> _clearSnapshotHistory(
         context,
         'Deleted $before listening records.',
         '$before件の聴取記録を削除しました。',
+        zh: '已删除 $before 条收听记录。',
+        ko: '청취 기록 $before개를 삭제했습니다.',
       ),
     );
   } on Object {
@@ -3704,6 +3734,8 @@ Future<void> _cleanGeneratedData(
         context,
         'Caches cleared and $before listening records deleted.',
         'キャッシュを削除し、$before件の聴取記録を削除しました。',
+        zh: '已清除缓存，并删除 $before 条收听记录。',
+        ko: '캐시를 삭제하고 청취 기록 $before개를 삭제했습니다.',
       ),
     );
   } on Object {
@@ -4014,6 +4046,8 @@ class _PremiumSetting extends ConsumerWidget {
                               context,
                               'Buy premium ${state.price}',
                               'プレミアムを購入 ${state.price}',
+                              zh: '购买高级版 ${state.price}',
+                              ko: '프리미엄 구매 ${state.price}',
                             ),
                     ),
                   ),
@@ -4083,45 +4117,16 @@ String _premiumStatusLabel(BuildContext context, PremiumState state) {
 }
 
 String _premiumMessageLabel(BuildContext context, String message) {
-  return switch (message) {
-    'Premium is unlocked by launch mode.' => _t(
-      context,
-      'Premium is unlocked by launch mode.',
-      '起動モードでプレミアムが有効です。',
-    ),
-    'Configure the premium product in App Store Connect.' => _t(
+  if (message == 'Configure the premium product in App Store Connect.') {
+    return _t(
       context,
       'Premium purchase is not available yet.',
       'プレミアム購入は現在準備中です。',
-    ),
-    'Store is not available.' => _t(
-      context,
-      'Store is not available.',
-      'ストアを利用できません。',
-    ),
-    'Purchase is waiting for store confirmation.' => _t(
-      context,
-      'Purchase is waiting for store confirmation.',
-      'ストアの購入確認を待っています。',
-    ),
-    'Restore request sent to the store.' => _t(
-      context,
-      'Restore request sent to the store.',
-      '購入の復元リクエストを送信しました。',
-    ),
-    'Premium is active. Ads are removed.' => _t(
-      context,
-      'Premium is active. Ads are removed.',
-      'プレミアムが有効です。広告は表示されません。',
-    ),
-    'Purchase is pending.' => _t(
-      context,
-      'Purchase is pending.',
-      '購入処理が保留中です。',
-    ),
-    'Purchase failed.' => _t(context, 'Purchase failed.', '購入に失敗しました。'),
-    _ => message,
-  };
+      zh: '高级版购买功能尚未开放。',
+      ko: '프리미엄 구매는 아직 사용할 수 없습니다.',
+    );
+  }
+  return localizeRuntimeMessage(context, message);
 }
 
 Future<void> _saveLibraryExport(
@@ -4187,6 +4192,8 @@ Future<void> _saveLibraryExport(
           context,
           'Saved ${payload.fileName}.',
           '${payload.fileName} を保存しました。',
+          zh: '已保存 ${payload.fileName}。',
+          ko: '${payload.fileName} 저장됨.',
         ),
       ),
     ),
@@ -4229,7 +4236,15 @@ Future<void> _openExternalUrl(BuildContext context, String url) async {
 
   messenger?.showSnackBar(
     SnackBar(
-      content: Text(_t(context, 'Could not open $url', '$url を開けませんでした')),
+      content: Text(
+        _t(
+          context,
+          'Could not open $url',
+          '$url を開けませんでした',
+          zh: '无法打开 $url',
+          ko: '$url을 열 수 없습니다',
+        ),
+      ),
     ),
   );
 }

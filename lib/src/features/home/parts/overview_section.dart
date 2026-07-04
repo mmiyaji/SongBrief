@@ -429,6 +429,8 @@ class _SnapshotStatusPanel extends StatelessWidget {
                         context,
                         'Last recorded $latestDate - ${_snapshotSourceLabel(context, latest.source)}',
                         '最終記録 $latestDate ・ ${_snapshotSourceLabel(context, latest.source)}',
+                        zh: '最后记录 $latestDate · ${_snapshotSourceLabel(context, latest.source)}',
+                        ko: '마지막 기록 $latestDate · ${_snapshotSourceLabel(context, latest.source)}',
                       ),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,

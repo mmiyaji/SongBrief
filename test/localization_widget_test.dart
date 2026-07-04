@@ -72,6 +72,35 @@ void main() {
       greaterThan(tester.getTopLeft(playlistMode).dy + 28),
     );
   });
+
+  testWidgets('localizes settings in Simplified Chinese', (tester) async {
+    await _pumpSection(
+      tester,
+      language: AppLanguage.chineseSimplified,
+      section: HomeSection.settings,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('设置'), findsWidgets);
+    expect(find.text('音乐访问权限'), findsOneWidget);
+    expect(find.text('主题'), findsOneWidget);
+    expect(find.text('语言'), findsOneWidget);
+    expect(find.text('高级版'), findsWidgets);
+  });
+
+  testWidgets('localizes playing in Korean', (tester) async {
+    await _pumpSection(
+      tester,
+      language: AppLanguage.korean,
+      section: HomeSection.playing,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('재생 중'), findsWidgets);
+    expect(find.text('이번 주 추세'), findsOneWidget);
+    expect(find.text('가사'), findsOneWidget);
+    expect(find.text('재생 횟수'), findsWidgets);
+  });
 }
 
 const _expectedEnglish = <HomeSection, List<String>>{

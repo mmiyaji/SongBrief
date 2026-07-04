@@ -751,10 +751,16 @@ String _albumRankingTitle(LibraryTrack track) {
 
 String _percentageDetail(BuildContext context, int value, int total) {
   if (total <= 0) {
-    return _t(context, '0% of tracks', '曲の0%');
+    return _t(context, '0% of tracks', '曲の0%', zh: '0% 的歌曲', ko: '곡의 0%');
   }
   final percentage = (value / total * 100).toStringAsFixed(1);
-  return _t(context, '$percentage% of tracks', '曲の$percentage%');
+  return _t(
+    context,
+    '$percentage% of tracks',
+    '曲の$percentage%',
+    zh: '$percentage% 的歌曲',
+    ko: '곡의 $percentage%',
+  );
 }
 
 List<_BreakdownValue> _rankingBreakdownRows(
@@ -1564,6 +1570,8 @@ String _shortPlayedAtLabel(BuildContext context, DateTime? dateTime) {
       context,
       'Today ${DateFormat('HH:mm').format(dateTime)}',
       '今日 ${DateFormat('HH:mm').format(dateTime)}',
+      zh: '今天 ${DateFormat('HH:mm').format(dateTime)}',
+      ko: '오늘 ${DateFormat('HH:mm').format(dateTime)}',
     );
   }
   return DateFormat('M/d').format(dateTime);
@@ -2050,7 +2058,13 @@ List<_TrackTrendBucket> _trackTrendBuckets(
           end: today.subtract(Duration(days: offset * 7)),
           label: offset == 0
               ? _t(context, 'This week', '今週')
-              : _t(context, '${offset + 1}w', '${offset + 1}週'),
+              : _t(
+                  context,
+                  '${offset + 1}w',
+                  '${offset + 1}週',
+                  zh: '${offset + 1}周',
+                  ko: '${offset + 1}주',
+                ),
         ),
     ],
     TrendRange.year => [
@@ -2143,9 +2157,9 @@ String _normalizeLyricsText(String lyrics) {
 
 String _trendRangeLabel(BuildContext context, TrendRange range) {
   return switch (range) {
-    TrendRange.week => _t(context, '7 days', '7日間'),
-    TrendRange.month => _t(context, '4 weeks', '4週間'),
-    TrendRange.year => _t(context, '1 year', '1年間'),
+    TrendRange.week => _t(context, '7 days', '7日間', zh: '7天', ko: '7일'),
+    TrendRange.month => _t(context, '4 weeks', '4週間', zh: '4周', ko: '4주'),
+    TrendRange.year => _t(context, '1 year', '1年間', zh: '1年', ko: '1년'),
   };
 }
 
@@ -2255,25 +2269,43 @@ String _sectionSubtitle(
   bool isDemo,
 ) {
   final source = isDemo
-      ? _t(context, 'demo library', 'デモライブラリ')
-      : _t(context, 'Music library', 'ミュージックライブラリ');
+      ? _t(context, 'demo library', 'デモライブラリ', zh: '演示资料库', ko: '데모 라이브러리')
+      : _t(
+          context,
+          'Music library',
+          'ミュージックライブラリ',
+          zh: '音乐资料库',
+          ko: '음악 라이브러리',
+        );
   return switch (section) {
     HomeSection.playing => _t(
       context,
       'Recent playback from the $source',
       '$source の直近再生トラック',
+      zh: '$source 的最近播放曲目',
+      ko: '$source의 최근 재생 트랙',
     ),
     HomeSection.overview => _t(
       context,
       'Overview of the $source',
       '$source の概要',
+      zh: '$source 概览',
+      ko: '$source 개요',
     ),
     HomeSection.rankings => _t(
       context,
       'Rankings from the $source',
       '$source のランキング',
+      zh: '$source 排行榜',
+      ko: '$source 순위',
     ),
-    HomeSection.library => _t(context, 'Browse the $source', '$source のブラウズ'),
+    HomeSection.library => _t(
+      context,
+      'Browse the $source',
+      '$source のブラウズ',
+      zh: '浏览$source',
+      ko: '$source 탐색',
+    ),
     HomeSection.settings => _t(
       context,
       'Access and recording settings',
