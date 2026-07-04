@@ -84,7 +84,7 @@ const _expectedEnglish = <HomeSection, List<String>>{
   HomeSection.overview: [
     'Overview',
     'Total Plays',
-    'Daily snapshots',
+    'Daily listening records',
     'Listening insights',
     'Library distribution',
   ],
@@ -119,7 +119,7 @@ const _expectedEnglish = <HomeSection, List<String>>{
 
 const _expectedJapanese = <HomeSection, List<String>>{
   HomeSection.playing: ['再生中', '今週の傾向', '最近再生した曲', '再生回数'],
-  HomeSection.overview: ['概要', '総再生回数', '日次スナップショット', 'リスニング洞察', 'ライブラリ分布'],
+  HomeSection.overview: ['概要', '総再生回数', '日々の聴取記録', 'リスニング洞察', 'ライブラリ分布'],
   HomeSection.rankings: ['ランキング', 'トップ曲', '再生回数順', '曲', 'アーティスト', 'アルバム', '最近'],
   HomeSection.library: ['ライブラリ', '曲', 'プレイリスト', '検索可能な曲詳細と再生コントロール', '並び替え'],
   HomeSection.settings: [

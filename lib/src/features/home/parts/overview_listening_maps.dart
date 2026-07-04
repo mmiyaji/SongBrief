@@ -609,7 +609,7 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
     );
     final summary = _activityHeatmapSummary(days);
     final sourceLabel = widget.history.snapshotCount >= 2
-        ? _t(context, 'Snapshot deltas', 'スナップショット差分')
+        ? _t(context, 'Listening record changes', '聴取記録の変化')
         : _t(context, 'Recent-track estimate', '最近再生からの推定');
     final selectedDay =
         _validSelectedActivityDay(days, _selectedDay) ??
@@ -624,8 +624,8 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
           ? _AnalyticsEmptyState(
               label: _t(
                 context,
-                'Activity appears after daily snapshots are recorded.',
-                '日次スナップショットが記録されると活動量を表示します。',
+                'Activity appears after daily listening records are available.',
+                '日々の聴取記録がたまると活動量を表示します。',
               ),
             )
           : Column(

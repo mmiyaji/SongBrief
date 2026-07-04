@@ -181,8 +181,8 @@ class _OverviewInsightPanel extends StatelessWidget {
             title: _t(context, 'Listening insights', 'リスニング洞察'),
             subtitle: _t(
               context,
-              'Different cuts of the current library scan',
-              '現在のライブラリスキャンを複数の視点で表示',
+              'Different views of the current library',
+              '現在のライブラリを複数の視点で表示',
             ),
           ),
           const SizedBox(height: 14),

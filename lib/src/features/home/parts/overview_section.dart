@@ -363,7 +363,7 @@ class _SnapshotStatusPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _t(context, 'Daily snapshots', '日次スナップショット'),
+                    _t(context, 'Daily listening records', '日々の聴取記録'),
                     style: theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 3),
@@ -376,8 +376,8 @@ class _SnapshotStatusPanel extends StatelessWidget {
                           )
                         : _t(
                             context,
-                            'The first snapshot will be saved after the next scan.',
-                            '次回のスキャン後に最初のスナップショットを保存します。',
+                            'The first listening record will be saved after the next library update.',
+                            '次回のライブラリ更新後に最初の聴取記録を保存します。',
                           ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -420,15 +420,15 @@ class _SnapshotStatusPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _t(context, 'Daily snapshots', '日次スナップショット'),
+                      _t(context, 'Daily listening records', '日々の聴取記録'),
                       style: theme.textTheme.titleMedium,
                     ),
                     const SizedBox(height: 3),
                     Text(
                       _t(
                         context,
-                        'Last scan $latestDate - ${_snapshotSourceLabel(context, latest.source)}',
-                        '最終スキャン $latestDate ・ ${_snapshotSourceLabel(context, latest.source)}',
+                        'Last recorded $latestDate - ${_snapshotSourceLabel(context, latest.source)}',
+                        '最終記録 $latestDate ・ ${_snapshotSourceLabel(context, latest.source)}',
                       ),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
@@ -495,7 +495,7 @@ class _SnapshotStatusPanel extends StatelessWidget {
           if (topDeltas.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
-              _t(context, 'Top gains since previous scan', '前回スキャンからの増加上位'),
+              _t(context, 'Top gains since previous record', '前回の記録からの増加上位'),
               style: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w800,
@@ -516,8 +516,8 @@ class _SnapshotStatusPanel extends StatelessWidget {
             Text(
               _t(
                 context,
-                'No play count changes were observed between the last two scans.',
-                '直近2回のスキャン間で再生回数の変化はありませんでした。',
+                'No play-count changes were found between the last two records.',
+                '直近2回の記録では再生回数の変化はありませんでした。',
               ),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -618,7 +618,7 @@ class _SnapshotTrendChart extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _t(context, 'Snapshot trend', '日次スナップショット推移'),
+                    _t(context, 'Listening record trend', '聴取記録の推移'),
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -631,8 +631,8 @@ class _SnapshotTrendChart extends StatelessWidget {
               Text(
                 _t(
                   context,
-                  'Trend bars appear after two or more snapshots.',
-                  '2件以上のスナップショットが保存されると推移を表示します。',
+                  'Trend bars appear after records from two or more days are available.',
+                  '2日分以上の記録がたまると推移を表示します。',
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -817,8 +817,8 @@ class _SummaryGrid extends StatelessWidget {
                 title: _t(context, 'Artists', 'アーティスト'),
                 subtitle: _t(
                   context,
-                  'All artist groups in this scan',
-                  'このスキャン内のアーティスト一覧',
+                  'All artist groups in the current library',
+                  '現在のライブラリ内のアーティスト一覧',
                 ),
                 icon: Icons.person_rounded,
                 groups: _libraryGroupsForMode(
@@ -840,8 +840,8 @@ class _SummaryGrid extends StatelessWidget {
                 title: _t(context, 'Albums', 'アルバム'),
                 subtitle: _t(
                   context,
-                  'All album groups in this scan',
-                  'このスキャン内のアルバム一覧',
+                  'All album groups in the current library',
+                  '現在のライブラリ内のアルバム一覧',
                 ),
                 icon: Icons.album_rounded,
                 groups: _libraryGroupsForMode(

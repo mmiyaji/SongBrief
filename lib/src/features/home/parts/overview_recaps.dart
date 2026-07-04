@@ -35,8 +35,8 @@ class _RecapHighlightsPanel extends StatelessWidget {
             title: _t(context, 'Recap highlights', 'リキャップ'),
             subtitle: _t(
               context,
-              'Monthly and yearly movement from saved snapshots',
-              '保存済みスナップショットから月間・年間の動きを表示',
+              'Monthly and yearly movement from daily listening records',
+              '日々の聴取記録から月間・年間の動きを表示',
             ),
           ),
           const SizedBox(height: 14),
@@ -407,7 +407,7 @@ class _RecapSummaryCardContent extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _t(context, 'Snapshot summary', 'スナップショットサマリー'),
+                        _t(context, 'Listening record summary', '聴取記録サマリー'),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w700,
@@ -504,8 +504,8 @@ class _RecapSummaryCardContent extends StatelessWidget {
               _AnalyticsEmptyState(
                 label: _t(
                   context,
-                  'Recaps appear after daily snapshots accumulate.',
-                  '日次スナップショットが貯まるとリキャップを表示します。',
+                  'Recaps appear after daily listening records accumulate.',
+                  '日々の聴取記録がたまるとリキャップを表示します。',
                 ),
               ),
             ],
@@ -864,8 +864,8 @@ class _AlbumCompletionCard extends StatelessWidget {
           ? _AnalyticsEmptyState(
               label: _t(
                 context,
-                'Album groups appear after library scan.',
-                'ライブラリスキャン後に表示します。',
+                'Album groups appear after the library is loaded.',
+                'ライブラリの読み込み後に表示します。',
               ),
             )
           : Column(
@@ -1266,8 +1266,8 @@ _BurnoutSummary _burnoutSummary(
     return _BurnoutSummary(
       description: _t(
         context,
-        'Burnout detection appears after several snapshots.',
-        'スナップショットが増えると聴き飽き傾向を表示します。',
+        'Burnout detection appears after several listening records.',
+        '聴取記録が増えると聴き飽き傾向を表示します。',
       ),
     );
   }

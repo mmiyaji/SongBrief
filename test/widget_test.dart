@@ -107,7 +107,7 @@ void main() {
 
     expect(find.text('How this trend is calculated'), findsOneWidget);
     expect(
-      find.textContaining('compares saved daily snapshots'),
+      find.textContaining('compares daily listening records'),
       findsOneWidget,
     );
   });
@@ -177,7 +177,7 @@ void main() {
     expect(find.text('Active exclusions'), findsOneWidget);
   });
 
-  testWidgets('hides snapshot-based panels when snapshot saving is off', (
+  testWidgets('hides record-based panels when daily records are off', (
     tester,
   ) async {
     final container = ProviderContainer(
@@ -207,7 +207,7 @@ void main() {
           .setSection(HomeSection.overview);
       await tester.pumpAndSettle();
 
-      expect(find.text('Daily snapshots'), findsNothing);
+      expect(find.text('Daily listening records'), findsNothing);
       expect(find.text('Recap highlights'), findsNothing);
       expect(find.text('Activity heatmap'), findsNothing);
       expect(find.text('Listening maps'), findsOneWidget);

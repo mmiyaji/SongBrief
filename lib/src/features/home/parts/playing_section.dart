@@ -752,13 +752,13 @@ class _TrendPanel extends ConsumerWidget {
             hasSnapshotData
                 ? _t(
                     context,
-                    'Play-count changes for this song from saved daily snapshots.',
-                    '保存済みの日次スナップショットから、この曲の再生回数の増分を表示します。',
+                    'Play-count changes for this song from daily listening records.',
+                    '日々の聴取記録から、この曲の再生回数の増分を表示します。',
                   )
                 : _t(
                     context,
-                    'At least two daily snapshots are required before this chart can show values.',
-                    '数値を表示するには日次スナップショットが2件以上必要です。',
+                    'This chart appears after records from at least two different days are available.',
+                    '別の日の記録がもう1回分たまると、このグラフを表示できます。',
                   ),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -833,8 +833,8 @@ class _TrendBars extends StatelessWidget {
           child: _TrackContextEmptyText(
             text: _t(
               context,
-              'Scan the library on two different days to build a snapshot trend.',
-              'スナップショット傾向は、別日のライブラリスキャンが2件そろうと表示されます。',
+              'Open SongBrief on another day to build a listening trend.',
+              '別の日にもSongBriefを開くと、日々の変化を表示できます。',
             ),
           ),
         ),
@@ -945,8 +945,8 @@ void _showTrackTrendInfoSheet(BuildContext context) {
               Text(
                 _t(
                   context,
-                  'SongBrief compares saved daily snapshots and charts the increase in play count for the selected song. Missing days are not estimated; they remain 0 until another snapshot pair is available.',
-                  'SongBriefは保存済みの日次スナップショット同士を比較し、選択中の曲の再生回数の増分を表示します。欠けている日は推定せず、差分を取れるスナップショットがそろうまで0として扱います。',
+                  'SongBrief compares daily listening records and charts the increase in play count for the selected song. Missing days are not guessed; they stay at 0 until another pair of records is available.',
+                  'SongBriefは日々の聴取記録を比較し、選択中の曲の再生回数の増分を表示します。記録がない日は推定せず、比較できる別の日の記録がそろうまで0として扱います。',
                 ),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,

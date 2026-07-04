@@ -237,8 +237,8 @@ class _RankingExtensions extends StatelessWidget {
           _RankingInsightEmpty(
             text: _t(
               context,
-              'Period, rising, and rank-change rankings appear after two saved daily snapshots.',
-              '期間別・急上昇・順位変動ランキングは、日次スナップショットが2件以上保存されると表示されます。',
+              'Period, rising, and rank-change rankings appear after records from two different days are available.',
+              '期間別・急上昇・順位変動ランキングは、別の日の記録がもう1回分たまると表示できます。',
             ),
           ),
         ],
@@ -279,8 +279,8 @@ class _PeriodRankingSectionState extends State<_PeriodRankingSection> {
       title: _t(context, 'Period movers', '期間別ランキング'),
       subtitle: _t(
         context,
-        'Tracks ranked by play-count increases within the selected snapshot range.',
-        '選択した期間のスナップショット差分で増えた再生数順です。',
+        'Tracks ranked by play-count increases within the selected record range.',
+        '選択した期間の聴取記録で増えた再生数順です。',
       ),
       trailing: SegmentedButton<TrendRange>(
         showSelectedIcon: false,
@@ -328,8 +328,8 @@ class _RisingRankingSection extends StatelessWidget {
       title: _t(context, 'Rising now', '急上昇'),
       subtitle: _t(
         context,
-        'Biggest increases since the previous saved snapshot.',
-        '前回の保存スナップショットから伸びた曲です。',
+        'Biggest increases since the previous daily record.',
+        '前回の聴取記録から伸びた曲です。',
       ),
       child: _RankingInsightList(
         overview: overview,
@@ -342,7 +342,7 @@ class _RisingRankingSection extends StatelessWidget {
         metricBuilder: (context, item) =>
             '+${_numberFormat(context).format(item.value)}',
         detailBuilder: (context, item) =>
-            _t(context, 'since previous snapshot', '前回比'),
+            _t(context, 'since previous record', '前回比'),
       ),
     );
   }
@@ -400,8 +400,8 @@ class _RankMovementSection extends StatelessWidget {
       title: _t(context, 'Rank changes', '順位変動'),
       subtitle: _t(
         context,
-        'Largest ranking movements compared with the previous snapshot.',
-        '前回スナップショットの順位から大きく動いた曲です。',
+        'Largest ranking movements compared with the previous record.',
+        '前回の記録時点の順位から大きく動いた曲です。',
       ),
       child: _RankingInsightList(
         overview: overview,
@@ -2018,7 +2018,7 @@ class _SettingsSection extends ConsumerWidget {
               ),
               _SettingsRow(
                 icon: Icons.update,
-                label: _t(context, 'Snapshot', 'スナップショット'),
+                label: _t(context, 'Last record', '最終記録'),
                 value: stats.snapshotRecordingEnabled
                     ? _dateTimeFormat(context).format(overview.generatedAt)
                     : _t(context, 'Off', 'オフ'),
@@ -2241,15 +2241,15 @@ class _ExportSetting extends StatelessWidget {
         ),
         _SettingsRow(
           icon: Icons.calendar_month_outlined,
-          label: _t(context, 'Snapshots', 'スナップショット'),
+          label: _t(context, 'Listening records', '聴取記録'),
           value: _dayCountLabel(context, stats.snapshotHistory.snapshotCount),
         ),
         const SizedBox(height: 8),
         Text(
           _t(
             context,
-            'CSV is suited for spreadsheets. JSON includes snapshot summaries for backup or analysis.',
-            'CSVは表計算向け、JSONはスナップショット概要も含む分析・バックアップ向けです。',
+            'CSV is suited for spreadsheets. JSON includes listening record summaries for backup or analysis.',
+            'CSVは表計算向け、JSONは聴取記録の概要も含む分析・バックアップ向けです。',
           ),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -2305,8 +2305,8 @@ class _LibraryFilterSetting extends ConsumerWidget {
         Text(
           _t(
             context,
-            'Matching songs are hidden from SongBrief rankings, library, exports, and future snapshots. Your Apple Music library is not changed.',
-            '一致する曲をSongBriefのランキング、ライブラリ、エクスポート、今後のスナップショットから除外します。Apple Musicの内容は変更しません。',
+            'Matching songs are hidden from SongBrief rankings, library, exports, and future records. Your Apple Music library is not changed.',
+            '一致する曲をSongBriefのランキング、ライブラリ、エクスポート、今後の聴取記録から除外します。Apple Musicの内容は変更しません。',
           ),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -2674,7 +2674,7 @@ class _DataManagementSetting extends ConsumerWidget {
         : history.snapshots.first;
     final latestSnapshot = history.latest;
     final rangeLabel = oldestSnapshot == null || latestSnapshot == null
-        ? _t(context, 'No history', '履歴なし')
+        ? _t(context, 'No records', '記録なし')
         : '${DateFormat.Md(_localeName(context)).format(oldestSnapshot.capturedAt)} - '
               '${DateFormat.Md(_localeName(context)).format(latestSnapshot.capturedAt)}';
 
@@ -2703,7 +2703,7 @@ class _DataManagementSetting extends ConsumerWidget {
         const SizedBox(height: 10),
         _SettingsRow(
           icon: Icons.calendar_month_outlined,
-          label: _t(context, 'Snapshot history', 'スナップショット履歴'),
+          label: _t(context, 'Listening record history', '聴取記録の履歴'),
           value:
               '${_dayCountLabel(context, history.snapshotCount)} / $rangeLabel',
         ),
@@ -2711,8 +2711,8 @@ class _DataManagementSetting extends ConsumerWidget {
         Text(
           _t(
             context,
-            'Snapshot deletion requires confirmation. App settings and purchase status are kept.',
-            '履歴の削除には確認が必要です。設定と購入状態は保持します。',
+            'Deleting listening records requires confirmation. App settings and purchase status are kept.',
+            '聴取記録の削除には確認が必要です。設定と購入状態は保持します。',
           ),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -2738,7 +2738,7 @@ class _DataManagementSetting extends ConsumerWidget {
                   ? null
                   : () => _clearSnapshotHistory(context, ref, stats),
               icon: const Icon(Icons.history_toggle_off_outlined),
-              label: Text(_t(context, 'Delete history', '履歴を削除')),
+              label: Text(_t(context, 'Delete records', '記録を削除')),
             ),
             FilledButton.tonalIcon(
               onPressed: () => _cleanGeneratedData(context, ref, stats),
@@ -2781,7 +2781,7 @@ class _SnapshotRecordingSetting extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _t(context, 'Save daily snapshots', '日次スナップショットを保存'),
+                    _t(context, 'Save daily listening records', '日々の聴取記録を保存'),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -2791,13 +2791,13 @@ class _SnapshotRecordingSetting extends ConsumerWidget {
                     enabled
                         ? _t(
                             context,
-                            'Snapshot-based trends and recaps are visible.',
-                            '履歴ベースの傾向・リキャップを表示します。',
+                            'Record-based trends and recaps are visible.',
+                            '聴取記録を使った傾向・リキャップを表示します。',
                           )
                         : _t(
                             context,
-                            'Snapshot-based trends and recaps are hidden.',
-                            '履歴ベースの傾向・リキャップは非表示です。',
+                            'Record-based trends and recaps are hidden.',
+                            '聴取記録を使った傾向・リキャップは非表示です。',
                           ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -2912,8 +2912,8 @@ Future<void> _confirmAndClearTemporaryCaches(
     title: _t(context, 'Clear temporary caches?', '一時キャッシュを削除しますか？'),
     message: _t(
       context,
-      '${_cacheUsageDetailLabel(context, cacheUsage)} This does not delete snapshot history or settings.',
-      '${_cacheUsageDetailLabel(context, cacheUsage)} スナップショット履歴や設定は削除しません。',
+      '${_cacheUsageDetailLabel(context, cacheUsage)} This does not delete listening records or settings.',
+      '${_cacheUsageDetailLabel(context, cacheUsage)} 聴取記録や設定は削除しません。',
     ),
     consentLabel: _t(
       context,
@@ -2959,13 +2959,13 @@ Future<void> _deleteOldSnapshots(
   final cutoffLabel = DateFormat.yMMMd(_localeName(context)).format(cutoff);
   final confirmed = await _confirmSnapshotDeletion(
     context,
-    title: _t(context, 'Delete old snapshots?', '古いスナップショットを削除しますか？'),
+    title: _t(context, 'Delete old listening records?', '古い聴取記録を削除しますか？'),
     message: _t(
       context,
-      'Snapshots before $cutoffLabel will be deleted. This cannot be undone.',
-      '$cutoffLabel より前のスナップショットを削除します。この操作は元に戻せません。',
+      'Listening records before $cutoffLabel will be deleted. This cannot be undone.',
+      '$cutoffLabel より前の聴取記録を削除します。この操作は元に戻せません。',
     ),
-    confirmLabel: _t(context, 'Delete old snapshots', '古い履歴を削除'),
+    confirmLabel: _t(context, 'Delete old records', '古い記録を削除'),
   );
   if (!confirmed || !context.mounted) {
     return;
@@ -2983,18 +2983,22 @@ Future<void> _deleteOldSnapshots(
     _showDataManagementResult(
       context,
       removed <= 0
-          ? _t(context, 'No matching snapshots were deleted.', '削除対象の履歴はありません。')
+          ? _t(
+              context,
+              'No matching listening records were deleted.',
+              '削除対象の聴取記録はありません。',
+            )
           : _t(
               context,
-              'Deleted $removed snapshots.',
-              '$removed件のスナップショットを削除しました。',
+              'Deleted $removed listening records.',
+              '$removed件の聴取記録を削除しました。',
             ),
     );
   } on Object {
     if (context.mounted) {
       _showDataManagementResult(
         context,
-        _t(context, 'Could not delete snapshots.', 'スナップショットを削除できませんでした。'),
+        _t(context, 'Could not delete listening records.', '聴取記録を削除できませんでした。'),
       );
     }
   }
@@ -3007,13 +3011,13 @@ Future<void> _clearSnapshotHistory(
 ) async {
   final confirmed = await _confirmSnapshotDeletion(
     context,
-    title: _t(context, 'Delete all snapshot history?', '履歴をすべて削除しますか？'),
+    title: _t(context, 'Delete all listening records?', '聴取記録をすべて削除しますか？'),
     message: _t(
       context,
-      'All saved snapshots will be deleted. This cannot be undone.',
-      '保存済みスナップショットをすべて削除します。この操作は元に戻せません。',
+      'All saved listening records will be deleted. This cannot be undone.',
+      '保存済みの聴取記録をすべて削除します。この操作は元に戻せません。',
     ),
-    confirmLabel: _t(context, 'Delete all history', 'すべての履歴を削除'),
+    confirmLabel: _t(context, 'Delete all records', 'すべての記録を削除'),
   );
   if (!confirmed || !context.mounted) {
     return;
@@ -3029,13 +3033,17 @@ Future<void> _clearSnapshotHistory(
     }
     _showDataManagementResult(
       context,
-      _t(context, 'Deleted $before snapshots.', '$before件のスナップショットを削除しました。'),
+      _t(
+        context,
+        'Deleted $before listening records.',
+        '$before件の聴取記録を削除しました。',
+      ),
     );
   } on Object {
     if (context.mounted) {
       _showDataManagementResult(
         context,
-        _t(context, 'Could not delete snapshots.', 'スナップショットを削除できませんでした。'),
+        _t(context, 'Could not delete listening records.', '聴取記録を削除できませんでした。'),
       );
     }
   }
@@ -3051,8 +3059,8 @@ Future<void> _cleanGeneratedData(
     title: _t(context, 'Clean generated data?', '生成データを全削除しますか？'),
     message: _t(
       context,
-      'Artwork caches and all snapshot history will be cleared. App settings and purchase status are kept.',
-      'アートワークキャッシュとすべてのスナップショット履歴を削除します。設定と購入状態は保持します。',
+      'Artwork caches and all listening records will be cleared. App settings and purchase status are kept.',
+      'アートワークキャッシュとすべての聴取記録を削除します。設定と購入状態は保持します。',
     ),
     confirmLabel: _t(context, 'Clean data', '削除する'),
   );
@@ -3073,8 +3081,8 @@ Future<void> _cleanGeneratedData(
       context,
       _t(
         context,
-        'Caches cleared and $before snapshots deleted.',
-        'キャッシュを削除し、$before件のスナップショットを削除しました。',
+        'Caches cleared and $before listening records deleted.',
+        'キャッシュを削除し、$before件の聴取記録を削除しました。',
       ),
     );
   } on Object {
@@ -3099,8 +3107,8 @@ Future<bool> _confirmSnapshotDeletion(
     message: message,
     consentLabel: _t(
       context,
-      'I understand this deletes snapshot history.',
-      'スナップショット履歴が削除されることに同意します。',
+      'I understand this deletes listening records.',
+      '聴取記録が削除されることに同意します。',
     ),
     confirmLabel: confirmLabel,
   );

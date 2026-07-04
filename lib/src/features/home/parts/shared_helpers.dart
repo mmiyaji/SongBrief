@@ -1531,8 +1531,8 @@ String _hoursLabel(int listeningSeconds) {
 
 String _snapshotSourceLabel(BuildContext context, String source) {
   return switch (source) {
-    'background' => _t(context, 'background refresh', 'バックグラウンド更新'),
-    _ => _t(context, 'app scan', 'アプリスキャン'),
+    'background' => _t(context, 'background record', 'バックグラウンド記録'),
+    _ => _t(context, 'app record', 'アプリ記録'),
   };
 }
 
@@ -2276,8 +2276,8 @@ String _sectionSubtitle(
     HomeSection.library => _t(context, 'Browse the $source', '$source のブラウズ'),
     HomeSection.settings => _t(
       context,
-      'Access and scan settings',
-      'アクセスとスキャン設定',
+      'Access and recording settings',
+      'アクセスと記録設定',
     ),
   };
 }
