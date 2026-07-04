@@ -576,7 +576,9 @@ FlTitlesData _releaseYearTitlesData({
   );
 }
 
-class _ActivityHeatmapCard extends StatelessWidget {
+enum _ActivityHeatmapView { calendar, weekdays, highlights }
+
+class _ActivityHeatmapCard extends StatefulWidget {
   const _ActivityHeatmapCard({
     required this.overview,
     required this.history,
@@ -588,18 +590,31 @@ class _ActivityHeatmapCard extends StatelessWidget {
   final bool expanded;
 
   @override
+  State<_ActivityHeatmapCard> createState() => _ActivityHeatmapCardState();
+}
+
+class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
+  _ActivityHeatmapDay? _selectedDay;
+  _ActivityHeatmapView _view = _ActivityHeatmapView.calendar;
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final days = _activityHeatmapDays(overview: overview, history: history);
+    final days = _activityHeatmapDays(
+      overview: widget.overview,
+      history: widget.history,
+    );
     final maxValue = days.fold<int>(
       0,
       (current, day) => math.max(current, day.playCount),
     );
-    final activeDays = days.where((day) => day.playCount > 0).length;
-    final weeks = _activityHeatmapWeeks(days);
-    final sourceLabel = history.snapshotCount >= 2
+    final summary = _activityHeatmapSummary(days);
+    final sourceLabel = widget.history.snapshotCount >= 2
         ? _t(context, 'Snapshot deltas', 'スナップショット差分')
         : _t(context, 'Recent-track estimate', '最近再生からの推定');
+    final selectedDay =
+        _validSelectedActivityDay(days, _selectedDay) ??
+        summary.peakDay ??
+        (days.isEmpty ? null : days.last);
 
     return _OverviewAnalysisCard(
       icon: Icons.grid_on_rounded,
@@ -616,79 +631,482 @@ class _ActivityHeatmapCard extends StatelessWidget {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final cellSize = expanded
-                        ? constraints.maxWidth >= 520
-                              ? 16.0
-                              : 13.0
-                        : constraints.maxWidth >= 360
-                        ? 13.0
-                        : 11.0;
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: weeks
-                            .map(
-                              (week) => Padding(
-                                padding: const EdgeInsets.only(right: 4),
-                                child: Column(
-                                  children: week
-                                      .map(
-                                        (day) => _ActivityHeatmapCell(
-                                          day: day,
-                                          maxValue: maxValue,
-                                          size: cellSize,
-                                        ),
-                                      )
-                                      .toList(),
-                                ),
+                if (widget.expanded) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<_ActivityHeatmapView>(
+                      showSelectedIcon: false,
+                      segments: _ActivityHeatmapView.values
+                          .map(
+                            (view) => ButtonSegment<_ActivityHeatmapView>(
+                              value: view,
+                              label: Text(
+                                _activityHeatmapViewLabel(context, view),
                               ),
-                            )
-                            .toList(),
-                      ),
-                    );
+                            ),
+                          )
+                          .toList(),
+                      selected: {_view},
+                      onSelectionChanged: (selection) {
+                        setState(() {
+                          _view = selection.first;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: switch (widget.expanded
+                      ? _view
+                      : _ActivityHeatmapView.calendar) {
+                    _ActivityHeatmapView.calendar => _ActivityHeatmapCalendar(
+                      key: const ValueKey('activity-calendar'),
+                      days: days,
+                      maxValue: maxValue,
+                      selectedDay: selectedDay,
+                      expanded: widget.expanded,
+                      onSelectDay: (day) {
+                        setState(() {
+                          _selectedDay = day;
+                        });
+                      },
+                    ),
+                    _ActivityHeatmapView.weekdays => _ActivityWeekdayRhythm(
+                      key: const ValueKey('activity-weekdays'),
+                      days: days,
+                    ),
+                    _ActivityHeatmapView.highlights => _ActivityHighlights(
+                      key: const ValueKey('activity-highlights'),
+                      summary: summary,
+                      days: days,
+                    ),
                   },
                 ),
                 const SizedBox(height: 12),
-                Row(
+                if (selectedDay != null)
+                  _ActivityDayDetail(
+                    day: selectedDay,
+                    sourceLabel: sourceLabel,
+                  ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _AnalysisPill(
                       label: _t(context, 'Active days', '再生日'),
-                      value: _numberFormat(context).format(activeDays),
+                      value: _numberFormat(context).format(summary.activeDays),
                     ),
-                    const Spacer(),
-                    Text(
-                      _t(context, 'Less', '少'),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    _AnalysisPill(
+                      label: _t(context, 'Longest streak', '最長連続'),
+                      value: _dayCountLabel(context, summary.longestStreak),
                     ),
-                    const SizedBox(width: 6),
-                    for (var index = 0; index < 4; index++)
-                      Container(
-                        width: 11,
-                        height: 11,
-                        margin: const EdgeInsets.only(right: 3),
-                        decoration: BoxDecoration(
-                          color: _activityHeatmapColor(theme, index + 1, 4),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
+                    if (summary.bestWeekday != null)
+                      _AnalysisPill(
+                        label: _t(context, 'Best weekday', 'よく聴く曜日'),
+                        value: _weekdayLabel(context, summary.bestWeekday!),
                       ),
-                    const SizedBox(width: 3),
-                    Text(
-                      _t(context, 'More', '多'),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    const _ActivityHeatmapLegend(),
                   ],
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _ActivityHeatmapCalendar extends StatelessWidget {
+  const _ActivityHeatmapCalendar({
+    super.key,
+    required this.days,
+    required this.maxValue,
+    required this.selectedDay,
+    required this.expanded,
+    required this.onSelectDay,
+  });
+
+  final List<_ActivityHeatmapDay> days;
+  final int maxValue;
+  final _ActivityHeatmapDay? selectedDay;
+  final bool expanded;
+  final ValueChanged<_ActivityHeatmapDay> onSelectDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final weeks = _activityHeatmapWeeks(days);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cellSize = expanded
+            ? constraints.maxWidth >= 520
+                  ? 18.0
+                  : 14.0
+            : constraints.maxWidth >= 360
+            ? 14.0
+            : 12.0;
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: weeks
+                .map(
+                  (week) => Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Column(
+                      children: week
+                          .map(
+                            (day) => _ActivityHeatmapCell(
+                              day: day,
+                              maxValue: maxValue,
+                              size: cellSize,
+                              selected: _sameActivityDate(day, selectedDay),
+                              onTap: () => onSelectDay(day),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ActivityDayDetail extends StatelessWidget {
+  const _ActivityDayDetail({required this.day, required this.sourceLabel});
+
+  final _ActivityHeatmapDay day;
+  final String sourceLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final topTracks = day.trackDeltas.take(3).toList(growable: false);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.event_available_rounded,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _t(context, 'Selected day', '選択中の日'),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  _playCountLabel(context, day.playCount),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${DateFormat.yMMMd(_localeName(context)).format(day.date)} / $sourceLabel',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (topTracks.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              for (final track in topTracks)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${track.title} - ${track.artist}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '+${_numberFormat(context).format(track.playDelta)}',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ] else ...[
+              const SizedBox(height: 8),
+              Text(
+                _t(
+                  context,
+                  'Song detail is unavailable for this day.',
+                  'この日の曲別詳細はありません。',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityWeekdayRhythm extends StatelessWidget {
+  const _ActivityWeekdayRhythm({super.key, required this.days});
+
+  final List<_ActivityHeatmapDay> days;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final values = _weekdayActivityValues(days);
+    final maxValue = values.fold<int>(
+      1,
+      (current, value) => math.max(current, value.playCount),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final value in values)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 42,
+                  child: Text(
+                    _weekdayLabel(context, value.weekday),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      minHeight: 12,
+                      value: value.playCount / maxValue,
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.52),
+                      color: Color.lerp(
+                        theme.colorScheme.secondary,
+                        theme.colorScheme.primary,
+                        value.playCount / maxValue,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 72,
+                  child: Text(
+                    _playCountLabel(context, value.playCount),
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ActivityHighlights extends StatelessWidget {
+  const _ActivityHighlights({
+    super.key,
+    required this.summary,
+    required this.days,
+  });
+
+  final _ActivityHeatmapSummary summary;
+  final List<_ActivityHeatmapDay> days;
+
+  @override
+  Widget build(BuildContext context) {
+    final peakDay = summary.peakDay;
+    final calmDays = days.where((day) => day.playCount == 0).length;
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        _ActivityMetricTile(
+          icon: Icons.local_fire_department_rounded,
+          label: _t(context, 'Peak day', 'ピーク日'),
+          value: peakDay == null
+              ? '-'
+              : DateFormat.MMMd(_localeName(context)).format(peakDay.date),
+          detail: peakDay == null
+              ? _t(context, 'No activity yet', 'まだ記録がありません')
+              : _playCountLabel(context, peakDay.playCount),
+        ),
+        _ActivityMetricTile(
+          icon: Icons.show_chart_rounded,
+          label: _t(context, 'Current streak', '現在の連続'),
+          value: _dayCountLabel(context, summary.currentStreak),
+          detail: _t(
+            context,
+            'Consecutive active days ending today',
+            '今日まで続いている再生日数',
+          ),
+        ),
+        _ActivityMetricTile(
+          icon: Icons.timeline_rounded,
+          label: _t(context, 'Longest streak', '最長連続'),
+          value: _dayCountLabel(context, summary.longestStreak),
+          detail: _t(context, 'Best run in this range', 'この期間で最長の流れ'),
+        ),
+        _ActivityMetricTile(
+          icon: Icons.nights_stay_rounded,
+          label: _t(context, 'Quiet days', '静かな日'),
+          value: _dayCountLabel(context, calmDays),
+          detail: _t(context, 'Days without detected plays', '再生増加がない日'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActivityMetricTile extends StatelessWidget {
+  const _ActivityMetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.detail,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 180,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.34,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.36),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: theme.colorScheme.primary, size: 20),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                detail,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityHeatmapLegend extends StatelessWidget {
+  const _ActivityHeatmapLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _t(context, 'Less', '少'),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: 6),
+        for (var index = 0; index < 4; index++)
+          Container(
+            width: 11,
+            height: 11,
+            margin: const EdgeInsets.only(right: 3),
+            decoration: BoxDecoration(
+              color: _activityHeatmapColor(theme, index + 1, 4),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+        const SizedBox(width: 3),
+        Text(
+          _t(context, 'More', '多'),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1187,15 +1605,21 @@ class _ActivityHeatmapCell extends StatelessWidget {
     required this.day,
     required this.maxValue,
     required this.size,
+    required this.selected,
+    required this.onTap,
   });
 
   final _ActivityHeatmapDay day;
   final int maxValue;
   final double size;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final color = _activityHeatmapColor(theme, day.playCount, maxValue);
+    final ratio = maxValue <= 0 ? 0.0 : (day.playCount / maxValue).clamp(0, 1);
     final label = _t(
       context,
       '${DateFormat.MMMd(_localeName(context)).format(day.date)}: '
@@ -1208,15 +1632,38 @@ class _ActivityHeatmapCell extends StatelessWidget {
       message: label,
       triggerMode: TooltipTriggerMode.tap,
       showDuration: const Duration(seconds: 3),
-      child: Container(
-        width: size,
-        height: size,
-        margin: const EdgeInsets.only(bottom: 4),
-        decoration: BoxDecoration(
-          color: _activityHeatmapColor(theme, day.playCount, maxValue),
-          borderRadius: BorderRadius.circular(3.5),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.28),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: size,
+          height: size,
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: EdgeInsets.all(selected ? 2 : 1.5),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.42,
+            ),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.28),
+              width: selected ? 1.8 : 1,
+            ),
+          ),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: double.infinity,
+              height: day.playCount <= 0 ? 0 : math.max(3, (size - 4) * ratio),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(2.5),
+              ),
+            ),
           ),
         ),
       ),

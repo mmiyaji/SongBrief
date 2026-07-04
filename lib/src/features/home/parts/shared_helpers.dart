@@ -1435,10 +1435,43 @@ class _ReleaseYearAccumulator {
 }
 
 class _ActivityHeatmapDay {
-  const _ActivityHeatmapDay({required this.date, required this.playCount});
+  const _ActivityHeatmapDay({
+    required this.date,
+    required this.playCount,
+    this.trackDeltas = const [],
+  });
 
   final DateTime date;
   final int playCount;
+  final List<TrackCounterDelta> trackDeltas;
+}
+
+class _ActivityHeatmapSummary {
+  const _ActivityHeatmapSummary({
+    required this.activeDays,
+    required this.currentStreak,
+    required this.longestStreak,
+    required this.peakDay,
+    required this.bestWeekday,
+  });
+
+  final int activeDays;
+  final int currentStreak;
+  final int longestStreak;
+  final _ActivityHeatmapDay? peakDay;
+  final int? bestWeekday;
+}
+
+class _WeekdayActivityValue {
+  const _WeekdayActivityValue({
+    required this.weekday,
+    required this.playCount,
+    required this.activeDays,
+  });
+
+  final int weekday;
+  final int playCount;
+  final int activeDays;
 }
 
 class _GenreYearStack {
@@ -1709,6 +1742,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
   final rawStart = today.subtract(const Duration(days: 83));
   final start = rawStart.subtract(Duration(days: rawStart.weekday % 7));
   final valuesByDay = <String, int>{};
+  final trackDeltasByDay = <String, List<TrackCounterDelta>>{};
 
   if (history.snapshots.length >= 2) {
     for (var index = 1; index < history.snapshots.length; index++) {
@@ -1718,6 +1752,11 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
       );
       final key = snapshotDateKey(delta.current.capturedAt);
       valuesByDay[key] = (valuesByDay[key] ?? 0) + delta.totalPlayDelta;
+      if (delta.trackDeltas.isNotEmpty) {
+        trackDeltasByDay
+            .putIfAbsent(key, () => <TrackCounterDelta>[])
+            .addAll(delta.trackDeltas);
+      }
     }
   } else {
     for (final track in overview.tracks) {
@@ -1732,6 +1771,19 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
       final estimatedPlays = math.max(1, (track.playCount / 16).round());
       final key = snapshotDateKey(day);
       valuesByDay[key] = (valuesByDay[key] ?? 0) + estimatedPlays;
+      trackDeltasByDay
+          .putIfAbsent(key, () => <TrackCounterDelta>[])
+          .add(
+            TrackCounterDelta(
+              id: track.id,
+              title: track.title,
+              artist: track.artist,
+              albumTitle: track.albumTitle,
+              playDelta: estimatedPlays,
+              skipDelta: 0,
+              listeningSecondsDelta: track.duration.inSeconds * estimatedPlays,
+            ),
+          );
     }
   }
 
@@ -1741,14 +1793,37 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
     !day.isAfter(today);
     day = day.add(const Duration(days: 1))
   ) {
+    final key = snapshotDateKey(day);
+    final trackDeltas = trackDeltasByDay[key] ?? const <TrackCounterDelta>[];
     days.add(
       _ActivityHeatmapDay(
         date: day,
-        playCount: valuesByDay[snapshotDateKey(day)] ?? 0,
+        playCount: valuesByDay[key] ?? 0,
+        trackDeltas: _topActivityTrackDeltas(trackDeltas),
       ),
     );
   }
   return List.unmodifiable(days);
+}
+
+List<TrackCounterDelta> _topActivityTrackDeltas(
+  Iterable<TrackCounterDelta> deltas,
+) {
+  final sorted = deltas.toList(growable: false)
+    ..sort((a, b) {
+      final byPlays = b.playDelta.compareTo(a.playDelta);
+      if (byPlays != 0) {
+        return byPlays;
+      }
+      final bySeconds = b.listeningSecondsDelta.compareTo(
+        a.listeningSecondsDelta,
+      );
+      if (bySeconds != 0) {
+        return bySeconds;
+      }
+      return a.title.compareTo(b.title);
+    });
+  return List.unmodifiable(sorted.take(5));
 }
 
 List<List<_ActivityHeatmapDay>> _activityHeatmapWeeks(
@@ -1770,6 +1845,121 @@ Color _activityHeatmapColor(ThemeData theme, int value, int maxValue) {
   final normalized = (value / maxValue).clamp(0.0, 1.0);
   final base = theme.colorScheme.primary.withValues(alpha: 0.28);
   return Color.lerp(base, theme.colorScheme.primary, 0.32 + normalized * 0.68)!;
+}
+
+_ActivityHeatmapSummary _activityHeatmapSummary(
+  List<_ActivityHeatmapDay> days,
+) {
+  var activeDays = 0;
+  var currentRun = 0;
+  var longestStreak = 0;
+  _ActivityHeatmapDay? peakDay;
+
+  for (final day in days) {
+    if (day.playCount > 0) {
+      activeDays += 1;
+      currentRun += 1;
+      longestStreak = math.max(longestStreak, currentRun);
+      if (peakDay == null || day.playCount > peakDay.playCount) {
+        peakDay = day;
+      }
+    } else {
+      currentRun = 0;
+    }
+  }
+
+  var currentStreak = 0;
+  for (final day in days.reversed) {
+    if (day.playCount <= 0) {
+      break;
+    }
+    currentStreak += 1;
+  }
+
+  final weekdays = _weekdayActivityValues(days);
+  _WeekdayActivityValue? bestWeekday;
+  for (final weekday in weekdays) {
+    if (weekday.playCount <= 0) {
+      continue;
+    }
+    if (bestWeekday == null || weekday.playCount > bestWeekday.playCount) {
+      bestWeekday = weekday;
+    }
+  }
+
+  return _ActivityHeatmapSummary(
+    activeDays: activeDays,
+    currentStreak: currentStreak,
+    longestStreak: longestStreak,
+    peakDay: peakDay,
+    bestWeekday: bestWeekday?.weekday,
+  );
+}
+
+List<_WeekdayActivityValue> _weekdayActivityValues(
+  List<_ActivityHeatmapDay> days,
+) {
+  final plays = List<int>.filled(8, 0);
+  final activeDays = List<int>.filled(8, 0);
+  for (final day in days) {
+    final weekday = day.date.weekday;
+    plays[weekday] += day.playCount;
+    if (day.playCount > 0) {
+      activeDays[weekday] += 1;
+    }
+  }
+  return List.unmodifiable(
+    List.generate(
+      7,
+      (index) => _WeekdayActivityValue(
+        weekday: index + 1,
+        playCount: plays[index + 1],
+        activeDays: activeDays[index + 1],
+      ),
+    ),
+  );
+}
+
+_ActivityHeatmapDay? _validSelectedActivityDay(
+  List<_ActivityHeatmapDay> days,
+  _ActivityHeatmapDay? selectedDay,
+) {
+  if (selectedDay == null) {
+    return null;
+  }
+  for (final day in days) {
+    if (_sameActivityDate(day, selectedDay)) {
+      return day;
+    }
+  }
+  return null;
+}
+
+bool _sameActivityDate(
+  _ActivityHeatmapDay? first,
+  _ActivityHeatmapDay? second,
+) {
+  if (first == null || second == null) {
+    return false;
+  }
+  return snapshotDateKey(first.date) == snapshotDateKey(second.date);
+}
+
+String _activityHeatmapViewLabel(
+  BuildContext context,
+  _ActivityHeatmapView view,
+) {
+  return switch (view) {
+    _ActivityHeatmapView.calendar => _t(context, 'Calendar', 'カレンダー'),
+    _ActivityHeatmapView.weekdays => _t(context, 'Weekdays', '曜日'),
+    _ActivityHeatmapView.highlights => _t(context, 'Highlights', 'ハイライト'),
+  };
+}
+
+String _weekdayLabel(BuildContext context, int weekday) {
+  final monday = DateTime(2026, 1, 5);
+  final date = monday.add(Duration(days: weekday - 1));
+  return DateFormat.E(_localeName(context)).format(date);
 }
 
 DateTime _localDateOnly(DateTime date) {

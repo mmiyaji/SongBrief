@@ -54,6 +54,22 @@ void main() {
     expect(find.text('Genre stack by release year'), findsOneWidget);
     expect(find.text('Era mix'), findsOneWidget);
     expect(find.text('Activity heatmap'), findsWidgets);
+    expect(find.text('Selected day'), findsWidgets);
+    expect(find.text('Calendar'), findsOneWidget);
+    expect(find.text('Weekdays'), findsOneWidget);
+    expect(find.text('Highlights'), findsWidgets);
+
+    await tester.tap(find.text('Weekdays'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mon'), findsOneWidget);
+
+    await tester.tap(find.text('Highlights').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Peak day'), findsOneWidget);
+    expect(find.text('Current streak'), findsOneWidget);
+    expect(find.text('Quiet days'), findsOneWidget);
   });
 
   testWidgets('shows recap and collection insight panels', (tester) async {
