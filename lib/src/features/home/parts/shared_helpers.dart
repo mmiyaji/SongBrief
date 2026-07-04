@@ -1956,10 +1956,33 @@ String _activityHeatmapViewLabel(
   };
 }
 
+const _calendarWeekdayOrder = <int>[
+  DateTime.sunday,
+  DateTime.monday,
+  DateTime.tuesday,
+  DateTime.wednesday,
+  DateTime.thursday,
+  DateTime.friday,
+  DateTime.saturday,
+];
+
 String _weekdayLabel(BuildContext context, int weekday) {
   final monday = DateTime(2026, 1, 5);
   final date = monday.add(Duration(days: weekday - 1));
   return DateFormat.E(_localeName(context)).format(date);
+}
+
+String _weekdayShortLabel(BuildContext context, int weekday) {
+  final label = _weekdayLabel(context, weekday);
+  final locale = _localeName(context);
+  if (locale.startsWith('ja')) {
+    return label.replaceAll('曜', '');
+  }
+  return label.length <= 2 ? label : label.substring(0, 2);
+}
+
+bool _isWeekend(int weekday) {
+  return weekday == DateTime.saturday || weekday == DateTime.sunday;
 }
 
 DateTime _localDateOnly(DateTime date) {
@@ -2008,16 +2031,16 @@ List<_TrackTrendBucket> _trackTrendBuckets(
   TrendRange range,
 ) {
   final today = _localDateOnly(DateTime.now());
-  final dateFormat = DateFormat.Md(_localeName(context));
   return switch (range) {
     TrendRange.week => [
       for (var offset = 6; offset >= 0; offset--)
         _TrackTrendBucket(
           start: today.subtract(Duration(days: offset)),
           end: today.subtract(Duration(days: offset)),
-          label: offset == 0
-              ? _t(context, 'Today', '今日')
-              : dateFormat.format(today.subtract(Duration(days: offset))),
+          label: _weekdayShortLabel(
+            context,
+            today.subtract(Duration(days: offset)).weekday,
+          ),
         ),
     ],
     TrendRange.month => [

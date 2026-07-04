@@ -736,6 +736,7 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final weeks = _activityHeatmapWeeks(days);
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -746,33 +747,164 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
             : constraints.maxWidth >= 360
             ? 14.0
             : 12.0;
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: weeks
-                .map(
-                  (week) => Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Column(
-                      children: week
-                          .map(
-                            (day) => _ActivityHeatmapCell(
-                              day: day,
-                              maxValue: maxValue,
-                              size: cellSize,
-                              selected: _sameActivityDate(day, selectedDay),
-                              onTap: () => onSelectDay(day),
-                            ),
-                          )
-                          .toList(),
+        final rowHeight = cellSize + 4;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Column(
+                children: [
+                  for (final weekday in _calendarWeekdayOrder)
+                    SizedBox(
+                      height: rowHeight,
+                      width: expanded ? 28 : 22,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          _weekdayShortLabel(context, weekday),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: _isWeekend(weekday)
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                )
-                .toList(),
-          ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: weeks
+                      .map(
+                        (week) => Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Column(
+                            children: week
+                                .map(
+                                  (day) => _ActivityHeatmapCell(
+                                    day: day,
+                                    maxValue: maxValue,
+                                    size: cellSize,
+                                    selected: _sameActivityDate(
+                                      day,
+                                      selectedDay,
+                                    ),
+                                    onTap: () => onSelectDay(day),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ),
+          ],
         );
       },
+    );
+  }
+}
+
+class _ActivityWeekdayHeader extends StatelessWidget {
+  const _ActivityWeekdayHeader({required this.weekday});
+
+  final int weekday;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          _isWeekend(weekday)
+              ? Icons.weekend_rounded
+              : Icons.calendar_today_rounded,
+          color: _isWeekend(weekday)
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurfaceVariant,
+          size: 14,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          _weekdayLabel(context, weekday),
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: _isWeekend(weekday)
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActivityWeekdayRhythm extends StatelessWidget {
+  const _ActivityWeekdayRhythm({super.key, required this.days});
+
+  final List<_ActivityHeatmapDay> days;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final values = _weekdayActivityValues(days);
+    final maxValue = values.fold<int>(
+      1,
+      (current, value) => math.max(current, value.playCount),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final value in values)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 72,
+                  child: _ActivityWeekdayHeader(weekday: value.weekday),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      minHeight: 12,
+                      value: value.playCount / maxValue,
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.52),
+                      color: Color.lerp(
+                        theme.colorScheme.secondary,
+                        theme.colorScheme.primary,
+                        value.playCount / maxValue,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 72,
+                  child: Text(
+                    _playCountLabel(context, value.playCount),
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -827,7 +959,8 @@ class _ActivityDayDetail extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '${DateFormat.yMMMd(_localeName(context)).format(day.date)} / $sourceLabel',
+              '${DateFormat.yMMMd(_localeName(context)).format(day.date)}'
+              ' (${_weekdayLabel(context, day.date.weekday)}) / $sourceLabel',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
@@ -878,73 +1011,6 @@ class _ActivityDayDetail extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ActivityWeekdayRhythm extends StatelessWidget {
-  const _ActivityWeekdayRhythm({super.key, required this.days});
-
-  final List<_ActivityHeatmapDay> days;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final values = _weekdayActivityValues(days);
-    final maxValue = values.fold<int>(
-      1,
-      (current, value) => math.max(current, value.playCount),
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final value in values)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 42,
-                  child: Text(
-                    _weekdayLabel(context, value.weekday),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      minHeight: 12,
-                      value: value.playCount / maxValue,
-                      backgroundColor: theme.colorScheme.surfaceContainerHighest
-                          .withValues(alpha: 0.52),
-                      color: Color.lerp(
-                        theme.colorScheme.secondary,
-                        theme.colorScheme.primary,
-                        value.playCount / maxValue,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 72,
-                  child: Text(
-                    _playCountLabel(context, value.playCount),
-                    textAlign: TextAlign.right,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
     );
   }
 }

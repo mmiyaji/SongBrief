@@ -55,6 +55,8 @@ void main() {
     expect(find.text('Era mix'), findsOneWidget);
     expect(find.text('Activity heatmap'), findsWidgets);
     expect(find.text('Selected day'), findsWidgets);
+    expect(find.text('Su'), findsWidgets);
+    expect(find.text('Sa'), findsWidgets);
     expect(find.text('Calendar'), findsOneWidget);
     expect(find.text('Weekdays'), findsOneWidget);
     expect(find.text('Highlights'), findsWidgets);
