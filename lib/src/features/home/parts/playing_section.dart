@@ -1759,7 +1759,6 @@ class _TrackArtworkImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bytes = artwork.asData?.value;
-    final theme = Theme.of(context);
     if (bytes != null) {
       return Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true);
     }
@@ -1769,16 +1768,51 @@ class _TrackArtworkImage extends StatelessWidget {
       return Image.asset(asset, fit: BoxFit.cover);
     }
 
+    return const _MissingArtworkPlaceholder();
+  }
+}
+
+class _MissingArtworkPlaceholder extends StatelessWidget {
+  const _MissingArtworkPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-      ),
-      child: Center(
-        child: Icon(
-          Icons.album_rounded,
-          size: 72,
-          color: Colors.white.withValues(alpha: 0.86),
+        color: Color.alphaBlend(
+          theme.colorScheme.primary.withValues(alpha: 0.10),
+          theme.colorScheme.surfaceContainerHighest,
         ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final shortestSide = math.min(
+            constraints.maxWidth,
+            constraints.maxHeight,
+          );
+          final outerSize = (shortestSide * 0.62).clamp(22.0, 92.0);
+          final iconSize = (outerSize * 0.54).clamp(14.0, 48.0);
+
+          return Center(
+            child: Container(
+              width: outerSize,
+              height: outerSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.surface.withValues(alpha: 0.58),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                ),
+              ),
+              child: Icon(
+                Icons.album_rounded,
+                size: iconSize,
+                color: theme.colorScheme.primary.withValues(alpha: 0.70),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1951,18 +1985,7 @@ class _AlbumArtwork extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: bytes == null
-            ? DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.album_rounded,
-                    size: 76,
-                    color: Colors.white.withValues(alpha: 0.86),
-                  ),
-                ),
-              )
+            ? const _MissingArtworkPlaceholder()
             : Image.memory(
                 bytes,
                 fit: BoxFit.cover,
