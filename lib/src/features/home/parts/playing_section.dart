@@ -1778,12 +1778,10 @@ class _MissingArtworkPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Color.alphaBlend(
-          theme.colorScheme.primary.withValues(alpha: 0.10),
-          theme.colorScheme.surfaceContainerHighest,
-        ),
+        color: theme.colorScheme.surfaceContainerHighest,
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -1791,25 +1789,15 @@ class _MissingArtworkPlaceholder extends StatelessWidget {
             constraints.maxWidth,
             constraints.maxHeight,
           );
-          final outerSize = (shortestSide * 0.62).clamp(22.0, 92.0);
-          final iconSize = (outerSize * 0.54).clamp(14.0, 48.0);
+          final iconSize = (shortestSide * 0.56).clamp(20.0, 76.0);
 
           return Center(
-            child: Container(
-              width: outerSize,
-              height: outerSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: theme.colorScheme.surface.withValues(alpha: 0.58),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                ),
-              ),
-              child: Icon(
-                Icons.album_rounded,
-                size: iconSize,
-                color: theme.colorScheme.primary.withValues(alpha: 0.70),
-              ),
+            child: Icon(
+              Icons.album_rounded,
+              size: iconSize,
+              color: isLight
+                  ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.34)
+                  : Colors.white.withValues(alpha: 0.78),
             ),
           );
         },
