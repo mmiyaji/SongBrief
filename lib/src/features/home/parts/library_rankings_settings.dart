@@ -1990,18 +1990,11 @@ class _SettingsSection extends ConsumerWidget {
           _AuthorizationPanel(status: stats.authorizationStatus),
           const SizedBox(height: 14),
         ],
-        GlassSurface(
-          padding: const EdgeInsets.all(18),
-          radius: 24,
-          tint: const Color(0x62FFFFFF),
+        _SettingsGroup(
+          title: _t(context, 'Music Access', 'ミュージックアクセス'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _t(context, 'Music Access', 'ミュージックアクセス'),
-                style: theme.textTheme.titleLarge,
-              ),
-              const SizedBox(height: 14),
               _SettingsRow(
                 icon: Icons.privacy_tip,
                 label: _t(context, 'Authorization', '認証状態'),
@@ -2023,7 +2016,28 @@ class _SettingsSection extends ConsumerWidget {
                     ? _dateTimeFormat(context).format(overview.generatedAt)
                     : _t(context, 'Off', 'オフ'),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    ref
+                        .read(musicStatsControllerProvider.notifier)
+                        .refreshStats();
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: Text(_t(context, 'Refresh', '更新')),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SettingsGroup(
+          title: _t(context, 'Display & Operation', '表示と操作'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
                 _t(context, 'Theme', 'テーマ'),
                 style: theme.textTheme.titleMedium,
@@ -2121,40 +2135,47 @@ class _SettingsSection extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
               _AppLockSetting(lockState: appLock),
-              const SizedBox(height: 18),
-              Text(
-                _t(context, 'Export', 'エクスポート'),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SettingsGroup(
+          title: _t(context, 'Export & Exclusions', 'エクスポートと除外'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               _ExportSetting(stats: stats),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
+              Divider(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+                height: 1,
+              ),
+              const SizedBox(height: 16),
               Text(
                 _t(context, 'Display & Exclusions', '表示と除外'),
                 style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 10),
               _LibraryFilterSetting(stats: stats, filters: libraryFilters),
-              const SizedBox(height: 18),
-              Text(
-                _t(context, 'Data Management', 'データ管理'),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
-              _DataManagementSetting(stats: stats),
-              const SizedBox(height: 18),
-              Text(
-                _t(context, 'Premium', 'プレミアム'),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
-              _PremiumSetting(premiumState: premium),
-              const SizedBox(height: 18),
-              Text(
-                _t(context, 'App Info', 'アプリ情報'),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SettingsGroup(
+          title: _t(context, 'Data Management', 'データ管理'),
+          child: _DataManagementSetting(stats: stats),
+        ),
+        const SizedBox(height: 14),
+        _SettingsGroup(
+          title: _t(context, 'Premium', 'プレミアム'),
+          child: _PremiumSetting(premiumState: premium),
+        ),
+        const SizedBox(height: 14),
+        _SettingsGroup(
+          title: _t(context, 'App Info', 'アプリ情報'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               _SettingsRow(
                 icon: Icons.info_outline,
                 label: _t(context, 'Application', 'アプリケーション'),
@@ -2200,25 +2221,37 @@ class _SettingsSection extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              AdBannerSlot(placement: _t(context, 'Settings', '設定')),
-              const SizedBox(height: 14),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    ref
-                        .read(musicStatsControllerProvider.notifier)
-                        .refreshStats();
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: Text(_t(context, 'Refresh', '更新')),
-                ),
-              ),
             ],
           ),
         ),
+        const SizedBox(height: 14),
+        AdBannerSlot(placement: _t(context, 'Settings', '設定')),
       ],
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GlassSurface(
+      padding: const EdgeInsets.all(18),
+      radius: 24,
+      tint: const Color(0x62FFFFFF),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: theme.textTheme.titleLarge),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
     );
   }
 }

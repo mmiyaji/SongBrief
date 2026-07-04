@@ -129,6 +129,8 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Light'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Light'));
     await tester.pumpAndSettle();
 
