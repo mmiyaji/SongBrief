@@ -732,7 +732,11 @@ class _SectionBody extends StatelessWidget {
       HomeSection.overview => _OverviewSection(stats: stats),
       HomeSection.rankings =>
         overview.hasTracks
-            ? _RankingPanel(overview: overview)
+            ? _RankingPanel(
+                overview: overview,
+                history: stats.snapshotHistory,
+                snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
+              )
             : const _EmptyLibraryPanel(),
       HomeSection.library => _LibrarySection(overview: overview),
       HomeSection.settings => _SettingsSection(stats: stats),

@@ -6,6 +6,25 @@ import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
 
 void main() {
+  testWidgets('shows ranking extension sections below the main ranking', (
+    tester,
+  ) async {
+    await _pumpRankings(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Top Songs'), findsOneWidget);
+    expect(find.text('More rankings'), findsOneWidget);
+    expect(find.text('Period movers'), findsOneWidget);
+    expect(find.text('Rising now'), findsOneWidget);
+    expect(find.text('Rediscovery'), findsOneWidget);
+    expect(find.text('Rank changes'), findsOneWidget);
+
+    await tester.tap(find.text('4 weeks'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('4 weeks'), findsOneWidget);
+  });
+
   testWidgets('opens artist ranking entries as artist song groups', (
     tester,
   ) async {
@@ -33,7 +52,7 @@ void main() {
     await tester.tap(find.text('Albums').last);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Nami Arata - Night Transit').last);
+    await tester.tap(find.text('Nami Arata - Night Transit').first);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Album songs'), findsOneWidget);
