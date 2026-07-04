@@ -6,6 +6,7 @@ import '../domain/library_snapshot.dart';
 import '../domain/library_track.dart';
 import '../domain/music_library_authorization.dart';
 import '../domain/music_stats_state.dart';
+import '../settings/library_filter_preferences.dart';
 import '../settings/snapshot_preferences.dart';
 import 'library_snapshot_repository.dart';
 import 'music_library_channel.dart';
@@ -21,6 +22,7 @@ final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
     ref.watch(musicLibraryClientProvider),
     ref.watch(librarySnapshotRepositoryProvider),
     snapshotRecordingEnabled: ref.watch(snapshotRecordingProvider),
+    libraryFilters: ref.watch(libraryFilterPreferencesProvider),
   );
 });
 
@@ -29,18 +31,21 @@ class MusicStatsRepository {
     this._client,
     this._snapshotRepository, {
     this.snapshotRecordingEnabled = true,
+    this.libraryFilters,
   });
 
   final MusicLibraryClient _client;
   final LibrarySnapshotRepository _snapshotRepository;
   final bool snapshotRecordingEnabled;
+  final LibraryFilterPreferences? libraryFilters;
 
   Future<MusicStatsState> load({bool requestAccess = false}) async {
     if (!_isIosMusicRuntime) {
       final tracks = _largeDemoTrackCount > 0
           ? _largeSampleTracks(_largeDemoTrackCount)
           : _sampleTracks();
-      final overview = LibraryOverview.fromTracks(tracks, isDemo: true);
+      final filteredTracks = _filteredTracks(tracks);
+      final overview = LibraryOverview.fromTracks(filteredTracks, isDemo: true);
       return MusicStatsState(
         authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
         overview: overview,
@@ -69,7 +74,7 @@ class MusicStatsRepository {
     if (snapshotRecordingEnabled) {
       await _client.scheduleSnapshotRefresh();
     }
-    final tracks = await _client.fetchTracks();
+    final tracks = _filteredTracks(await _client.fetchTracks());
     final overview = LibraryOverview.fromTracks(tracks, isDemo: false);
     final snapshotHistory = snapshotRecordingEnabled
         ? await _snapshotRepository.recordSnapshot(overview)
@@ -154,6 +159,10 @@ class MusicStatsRepository {
 
   Future<SnapshotHistory> clearSnapshotHistory() {
     return _snapshotRepository.clearHistory();
+  }
+
+  List<LibraryTrack> _filteredTracks(List<LibraryTrack> tracks) {
+    return libraryFilters?.apply(tracks) ?? tracks;
   }
 
   List<LibraryTrack> _sampleTracks() {

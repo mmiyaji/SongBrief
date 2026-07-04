@@ -158,6 +158,25 @@ void main() {
     expect(find.textContaining('Blue and mint'), findsOneWidget);
   });
 
+  testWidgets('shows library exclusion controls in settings', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Display & Exclusions'), findsOneWidget);
+    expect(find.text('Hidden playlists'), findsOneWidget);
+    expect(find.text('Hidden genres'), findsOneWidget);
+    expect(find.text('Hidden keywords'), findsOneWidget);
+    expect(find.text('Active exclusions'), findsOneWidget);
+  });
+
   testWidgets('hides snapshot-based panels when snapshot saving is off', (
     tester,
   ) async {
