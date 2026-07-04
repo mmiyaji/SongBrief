@@ -66,6 +66,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('app-lock-initializing')), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-lock-privacy-mark')), findsOneWidget);
 
     await tester.tap(find.text('Private action'), warnIfMissed: false);
     await tester.pump();
@@ -135,6 +136,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('SongBrief is locked'), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-lock-privacy-mark')), findsOneWidget);
     expect(protector.lockStates, contains(true));
 
     await tester.tap(

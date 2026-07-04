@@ -129,9 +129,8 @@ class _AppLockInitializingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Positioned.fill(
       child: AbsorbPointer(
-        child: ColoredBox(
+        child: _PrivacyScreenShell(
           key: const ValueKey('app-lock-initializing'),
-          color: Theme.of(context).colorScheme.surface,
         ),
       ),
     );
@@ -172,12 +171,11 @@ class _AppLockScreen extends ConsumerWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.lock_rounded,
-                          color: theme.colorScheme.primary,
-                          size: 42,
+                        const _PrivacyScreenBrandMark(
+                          size: 92,
+                          showLockBadge: true,
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 18),
                         Text(
                           appText(
                             context,
@@ -253,6 +251,106 @@ class _AppLockScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PrivacyScreenShell extends StatelessWidget {
+  const _PrivacyScreenShell({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ColoredBox(
+      color: theme.colorScheme.surface,
+      child: const Center(child: _PrivacyScreenBrandMark(size: 112)),
+    );
+  }
+}
+
+class _PrivacyScreenBrandMark extends StatelessWidget {
+  const _PrivacyScreenBrandMark({
+    required this.size,
+    this.showLockBadge = false,
+  });
+
+  final double size;
+  final bool showLockBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(size * 0.24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: size * 0.18,
+            offset: Offset(0, size * 0.08),
+          ),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(size * 0.24),
+            child: Image.asset(
+              'assets/branding/songbrief_icon_ios.png',
+              key: const ValueKey('app-lock-privacy-mark'),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (context, error, stackTrace) {
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(size * 0.24),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.42,
+                      ),
+                    ),
+                  ),
+                  child: SizedBox.square(
+                    dimension: size,
+                    child: Icon(
+                      Icons.multiline_chart_rounded,
+                      color: theme.colorScheme.primary,
+                      size: size * 0.42,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (showLockBadge)
+            Positioned(
+              right: -size * 0.04,
+              bottom: -size * 0.04,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: theme.colorScheme.surface,
+                    width: 3,
+                  ),
+                ),
+                child: SizedBox.square(
+                  dimension: size * 0.3,
+                  child: Icon(
+                    Icons.lock_rounded,
+                    color: theme.colorScheme.onPrimary,
+                    size: size * 0.16,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

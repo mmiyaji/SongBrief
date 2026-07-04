@@ -8,6 +8,7 @@ import 'package:screen_protector/screen_protector.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const appLockEnabledPreferenceKey = 'songbrief_app_lock_enabled_v1';
+const appLockPrivacyScreenImageName = 'PrivacyScreen';
 
 final initialAppLockEnabledProvider = Provider<bool>((ref) => false);
 
@@ -66,11 +67,11 @@ class AppLockPrivacyProtector {
 
     try {
       if (locked) {
-        await ScreenProtector.protectDataLeakageWithColor(
-          const Color(0xFF040708),
+        await ScreenProtector.protectDataLeakageWithImage(
+          appLockPrivacyScreenImageName,
         );
       } else {
-        await ScreenProtector.protectDataLeakageWithColorOff();
+        await ScreenProtector.protectDataLeakageOff();
       }
     } on MissingPluginException {
       // Preview protection is best-effort and should not block app locking.
