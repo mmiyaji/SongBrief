@@ -9,13 +9,17 @@ const _appLanguagePreferenceKey = 'songbrief_app_language_v1';
 enum AppLanguage {
   system,
   japanese,
-  english;
+  english,
+  chineseSimplified,
+  korean;
 
   Locale? get locale {
     return switch (this) {
       AppLanguage.system => null,
       AppLanguage.japanese => const Locale('ja'),
       AppLanguage.english => const Locale('en'),
+      AppLanguage.chineseSimplified => const Locale('zh'),
+      AppLanguage.korean => const Locale('ko'),
     };
   }
 }

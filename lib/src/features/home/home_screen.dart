@@ -168,6 +168,10 @@ String _themeStyleLabel(BuildContext context, SongBriefThemeStyle style) {
     SongBriefThemeStyle.flux => _t(context, 'Flux', 'フラックス'),
     SongBriefThemeStyle.ember => _t(context, 'Ember', 'エンバー'),
     SongBriefThemeStyle.mono => _t(context, 'Mono', 'モノ'),
+    SongBriefThemeStyle.aurora => _t(context, 'Aurora', 'オーロラ'),
+    SongBriefThemeStyle.grove => _t(context, 'Grove', 'グローブ'),
+    SongBriefThemeStyle.pulse => _t(context, 'Pulse', 'パルス'),
+    SongBriefThemeStyle.muse => _t(context, 'Muse', 'ミューズ'),
   };
 }
 
@@ -192,6 +196,26 @@ String _themeStyleDescription(BuildContext context, SongBriefThemeStyle style) {
       context,
       'High-contrast monochrome theme.',
       '白黒を基調にした高コントラストテーマです。',
+    ),
+    SongBriefThemeStyle.aurora => _t(
+      context,
+      'Green spectrum accents with a quiet glow.',
+      'グリーンの光を軸にした落ち着いた発光感のテーマです。',
+    ),
+    SongBriefThemeStyle.grove => _t(
+      context,
+      'Natural green with cyan and coral accents.',
+      '自然なグリーンにシアンとコーラルを添えたテーマです。',
+    ),
+    SongBriefThemeStyle.pulse => _t(
+      context,
+      'Blue, teal, and rose accents for crisp contrast.',
+      'ブルー、ティール、ローズで明快に見せるテーマです。',
+    ),
+    SongBriefThemeStyle.muse => _t(
+      context,
+      'Violet, teal, and amber accents with a softer tone.',
+      'バイオレット、ティール、アンバーを柔らかく組み合わせたテーマです。',
     ),
   };
 }
@@ -235,6 +259,42 @@ String _languageLabel(BuildContext context, AppLanguage language) {
     AppLanguage.system => _t(context, 'System', 'システム'),
     AppLanguage.japanese => _t(context, 'Japanese', '日本語'),
     AppLanguage.english => _t(context, 'English', '英語'),
+    AppLanguage.chineseSimplified => _t(
+      context,
+      'Simplified Chinese',
+      '簡体字中国語',
+    ),
+    AppLanguage.korean => _t(context, 'Korean', '韓国語'),
+  };
+}
+
+String _languageDescription(BuildContext context, AppLanguage language) {
+  return switch (language) {
+    AppLanguage.system => _t(
+      context,
+      'Follows the device language when available.',
+      '利用可能な場合は端末の言語設定に合わせます。',
+    ),
+    AppLanguage.japanese => _t(
+      context,
+      'Uses Japanese app text.',
+      'アプリ内の表示を日本語にします。',
+    ),
+    AppLanguage.english => _t(
+      context,
+      'Uses English app text.',
+      'アプリ内の表示を英語にします。',
+    ),
+    AppLanguage.chineseSimplified => _t(
+      context,
+      'Uses Simplified Chinese where supported; untranslated text falls back to English.',
+      '対応済みの箇所は簡体字中国語で表示し、未翻訳の文言は英語で表示します。',
+    ),
+    AppLanguage.korean => _t(
+      context,
+      'Uses Korean where supported; untranslated text falls back to English.',
+      '対応済みの箇所は韓国語で表示し、未翻訳の文言は英語で表示します。',
+    ),
   };
 }
 

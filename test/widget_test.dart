@@ -123,15 +123,17 @@ void main() {
 
     expect(
       tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
-      ThemeMode.dark,
+      ThemeMode.system,
     );
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Light'));
+    await tester.ensureVisible(find.text('Appearance'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Light'));
+    await tester.tap(find.text('Appearance'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Light').last);
     await tester.pumpAndSettle();
 
     expect(
@@ -152,12 +154,73 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Theme'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Theme'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Flux'));
     await tester.pumpAndSettle();
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.theme?.colorScheme.primary, const Color(0xFF007486));
     expect(find.textContaining('Blue and mint'), findsOneWidget);
+  });
+
+  testWidgets('shows expanded theme and language choices in settings', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Theme'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Theme'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aurora'), findsOneWidget);
+    expect(find.text('Grove'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Pulse'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Pulse'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Muse'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Muse'), findsOneWidget);
+
+    await tester.tap(find.text('Muse'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Language'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Language'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Simplified Chinese'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Korean'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Korean'), findsOneWidget);
   });
 
   testWidgets('shows library exclusion controls in settings', (tester) async {

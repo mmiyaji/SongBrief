@@ -15,7 +15,16 @@ const _appFontFallback = <String>[
   'sans-serif',
 ];
 
-enum SongBriefThemeStyle { prism, flux, ember, mono }
+enum SongBriefThemeStyle {
+  prism,
+  flux,
+  ember,
+  mono,
+  aurora,
+  grove,
+  pulse,
+  muse,
+}
 
 enum SongBriefThemeBrightness {
   dark,
@@ -84,7 +93,7 @@ class ThemeBrightnessController extends Notifier<SongBriefThemeBrightness> {
   @override
   SongBriefThemeBrightness build() {
     _restore();
-    return SongBriefThemeBrightness.dark;
+    return SongBriefThemeBrightness.system;
   }
 
   void setBrightness(SongBriefThemeBrightness brightness) {
@@ -279,6 +288,50 @@ class _ThemeTokens {
           onSurfaceVariant: Color(0xFF606060),
           outline: Color(0xFFD4D4D4),
         ),
+        SongBriefThemeStyle.aurora => const _ThemeTokens(
+          surface: Color(0xFFF5FAF6),
+          surfaceHigh: Color(0xFFE8F3EB),
+          primary: Color(0xFF007A62),
+          onPrimary: Color(0xFFFFFFFF),
+          secondary: Color(0xFF776900),
+          tertiary: Color(0xFF695ED6),
+          onSurface: Color(0xFF102018),
+          onSurfaceVariant: Color(0xFF5A7165),
+          outline: Color(0xFFC7D9CE),
+        ),
+        SongBriefThemeStyle.grove => const _ThemeTokens(
+          surface: Color(0xFFF8FAF4),
+          surfaceHigh: Color(0xFFEDF3E5),
+          primary: Color(0xFF426B00),
+          onPrimary: Color(0xFFFFFFFF),
+          secondary: Color(0xFF00736A),
+          tertiary: Color(0xFFC24B4F),
+          onSurface: Color(0xFF1A1F13),
+          onSurfaceVariant: Color(0xFF687159),
+          outline: Color(0xFFD2DAC4),
+        ),
+        SongBriefThemeStyle.pulse => const _ThemeTokens(
+          surface: Color(0xFFF7F9FF),
+          surfaceHigh: Color(0xFFEAF0FA),
+          primary: Color(0xFF225FD3),
+          onPrimary: Color(0xFFFFFFFF),
+          secondary: Color(0xFF008477),
+          tertiary: Color(0xFFB14375),
+          onSurface: Color(0xFF101827),
+          onSurfaceVariant: Color(0xFF59677E),
+          outline: Color(0xFFC8D2E6),
+        ),
+        SongBriefThemeStyle.muse => const _ThemeTokens(
+          surface: Color(0xFFFBF8FF),
+          surfaceHigh: Color(0xFFF1ECF8),
+          primary: Color(0xFF8753A1),
+          onPrimary: Color(0xFFFFFFFF),
+          secondary: Color(0xFF007A74),
+          tertiary: Color(0xFFB05800),
+          onSurface: Color(0xFF1F1724),
+          onSurfaceVariant: Color(0xFF6C6172),
+          outline: Color(0xFFDCCFE4),
+        ),
       };
     }
 
@@ -326,6 +379,50 @@ class _ThemeTokens {
         onSurface: Color(0xFFF7F7F7),
         onSurfaceVariant: Color(0xFFA6A6A6),
         outline: Color(0xFF303030),
+      ),
+      SongBriefThemeStyle.aurora => const _ThemeTokens(
+        surface: Color(0xFF040806),
+        surfaceHigh: Color(0xFF142219),
+        primary: Color(0xFF66F0C5),
+        onPrimary: Color(0xFF002018),
+        secondary: Color(0xFFE6F873),
+        tertiary: Color(0xFFA9A4FF),
+        onSurface: Color(0xFFF4FCF6),
+        onSurfaceVariant: Color(0xFFA4BBAF),
+        outline: Color(0xFF273A2D),
+      ),
+      SongBriefThemeStyle.grove => const _ThemeTokens(
+        surface: Color(0xFF060805),
+        surfaceHigh: Color(0xFF172112),
+        primary: Color(0xFFB6EC67),
+        onPrimary: Color(0xFF122000),
+        secondary: Color(0xFF65E6D2),
+        tertiary: Color(0xFFFF9A9C),
+        onSurface: Color(0xFFF8FCF2),
+        onSurfaceVariant: Color(0xFFB1BEA8),
+        outline: Color(0xFF2E3927),
+      ),
+      SongBriefThemeStyle.pulse => const _ThemeTokens(
+        surface: Color(0xFF05070C),
+        surfaceHigh: Color(0xFF151C2A),
+        primary: Color(0xFF8CB7FF),
+        onPrimary: Color(0xFF001B4A),
+        secondary: Color(0xFF60E7D6),
+        tertiary: Color(0xFFFF9AC2),
+        onSurface: Color(0xFFF5F8FF),
+        onSurfaceVariant: Color(0xFFAAB5CA),
+        outline: Color(0xFF2B3548),
+      ),
+      SongBriefThemeStyle.muse => const _ThemeTokens(
+        surface: Color(0xFF08050B),
+        surfaceHigh: Color(0xFF1B1520),
+        primary: Color(0xFFDDA8FF),
+        onPrimary: Color(0xFF2C003F),
+        secondary: Color(0xFF71E4D8),
+        tertiary: Color(0xFFFFB568),
+        onSurface: Color(0xFFFCF7FF),
+        onSurfaceVariant: Color(0xFFC0B2C7),
+        outline: Color(0xFF382C3F),
       ),
     };
   }

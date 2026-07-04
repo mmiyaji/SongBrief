@@ -22,7 +22,12 @@ class SongBriefApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       title: 'SongBrief',
       locale: appLanguage.locale,
-      supportedLocales: const [Locale('en'), Locale('ja')],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('ja'),
+        Locale('zh'),
+        Locale('ko'),
+      ],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

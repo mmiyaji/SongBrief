@@ -5,6 +5,18 @@ import 'package:songbrief/src/settings/app_preferences.dart';
 import 'package:songbrief/src/theme/app_theme.dart';
 
 void main() {
+  test('uses system appearance by default', () async {
+    SharedPreferences.setMockInitialValues({});
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    expect(
+      container.read(themeBrightnessProvider),
+      SongBriefThemeBrightness.system,
+    );
+    expect(container.read(appLanguageProvider), AppLanguage.system);
+  });
+
   test('restores saved theme and language preferences', () async {
     SharedPreferences.setMockInitialValues({
       'songbrief_theme_style_v1': 'ember',

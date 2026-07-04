@@ -2038,95 +2038,69 @@ class _SettingsSection extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _t(context, 'Theme', 'テーマ'),
-                style: theme.textTheme.titleMedium,
+              _PreferenceSelectorTile<SongBriefThemeStyle>(
+                icon: Icons.palette_outlined,
+                label: _t(context, 'Theme', 'テーマ'),
+                valueLabel: _themeStyleLabel(context, selectedTheme),
+                description: _themeStyleDescription(context, selectedTheme),
+                selected: selectedTheme,
+                options: [
+                  for (final style in SongBriefThemeStyle.values)
+                    _PreferenceOption(
+                      value: style,
+                      label: _themeStyleLabel(context, style),
+                      description: _themeStyleDescription(context, style),
+                    ),
+                ],
+                onChanged: (style) {
+                  ref.read(themeStyleProvider.notifier).setStyle(style);
+                },
               ),
               const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<SongBriefThemeStyle>(
-                  showSelectedIcon: false,
-                  segments: SongBriefThemeStyle.values
-                      .map(
-                        (style) => ButtonSegment<SongBriefThemeStyle>(
-                          value: style,
-                          label: Text(_themeStyleLabel(context, style)),
-                        ),
-                      )
-                      .toList(),
-                  selected: {selectedTheme},
-                  onSelectionChanged: (selection) {
-                    ref
-                        .read(themeStyleProvider.notifier)
-                        .setStyle(selection.first);
-                  },
+              _PreferenceSelectorTile<SongBriefThemeBrightness>(
+                icon: Icons.contrast_rounded,
+                label: _t(context, 'Appearance', '外観'),
+                valueLabel: _themeBrightnessLabel(context, selectedBrightness),
+                description: _themeBrightnessDescription(
+                  context,
+                  selectedBrightness,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _themeStyleDescription(context, selectedTheme),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<SongBriefThemeBrightness>(
-                  showSelectedIcon: false,
-                  segments: SongBriefThemeBrightness.values
-                      .map(
-                        (brightness) => ButtonSegment<SongBriefThemeBrightness>(
-                          value: brightness,
-                          label: Text(
-                            _themeBrightnessLabel(context, brightness),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  selected: {selectedBrightness},
-                  onSelectionChanged: (selection) {
-                    ref
-                        .read(themeBrightnessProvider.notifier)
-                        .setBrightness(selection.first);
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _themeBrightnessDescription(context, selectedBrightness),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                _t(context, 'Language', '言語'),
-                style: theme.textTheme.titleMedium,
+                selected: selectedBrightness,
+                options: [
+                  for (final brightness in SongBriefThemeBrightness.values)
+                    _PreferenceOption(
+                      value: brightness,
+                      label: _themeBrightnessLabel(context, brightness),
+                      description: _themeBrightnessDescription(
+                        context,
+                        brightness,
+                      ),
+                    ),
+                ],
+                onChanged: (brightness) {
+                  ref
+                      .read(themeBrightnessProvider.notifier)
+                      .setBrightness(brightness);
+                },
               ),
               const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<AppLanguage>(
-                  showSelectedIcon: false,
-                  segments: AppLanguage.values
-                      .map(
-                        (language) => ButtonSegment<AppLanguage>(
-                          value: language,
-                          label: Text(_languageLabel(context, language)),
-                        ),
-                      )
-                      .toList(),
-                  selected: {selectedLanguage},
-                  onSelectionChanged: (selection) {
-                    ref
-                        .read(appLanguageProvider.notifier)
-                        .setLanguage(selection.first);
-                  },
-                ),
+              _PreferenceSelectorTile<AppLanguage>(
+                icon: Icons.language_rounded,
+                label: _t(context, 'Language', '言語'),
+                valueLabel: _languageLabel(context, selectedLanguage),
+                description: _languageDescription(context, selectedLanguage),
+                selected: selectedLanguage,
+                options: [
+                  for (final language in AppLanguage.values)
+                    _PreferenceOption(
+                      value: language,
+                      label: _languageLabel(context, language),
+                      description: _languageDescription(context, language),
+                    ),
+                ],
+                onChanged: (language) {
+                  ref.read(appLanguageProvider.notifier).setLanguage(language);
+                },
               ),
               const SizedBox(height: 18),
               Text(
@@ -2251,6 +2225,256 @@ class _SettingsGroup extends StatelessWidget {
           const SizedBox(height: 14),
           child,
         ],
+      ),
+    );
+  }
+}
+
+class _PreferenceOption<T> {
+  const _PreferenceOption({
+    required this.value,
+    required this.label,
+    required this.description,
+  });
+
+  final T value;
+  final String label;
+  final String description;
+}
+
+class _PreferenceSelectorTile<T> extends StatelessWidget {
+  const _PreferenceSelectorTile({
+    required this.icon,
+    required this.label,
+    required this.valueLabel,
+    required this.description,
+    required this.selected,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String label;
+  final String valueLabel;
+  final String description;
+  final T selected;
+  final List<_PreferenceOption<T>> options;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _showPreferenceSheet<T>(
+          context: context,
+          title: label,
+          selected: selected,
+          options: options,
+          onChanged: onChanged,
+        ),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.22,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(icon, color: theme.colorScheme.primary, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(
+                              valueLabel,
+                              textAlign: TextAlign.right,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showPreferenceSheet<T>({
+  required BuildContext context,
+  required String title,
+  required T selected,
+  required List<_PreferenceOption<T>> options,
+  required ValueChanged<T> onChanged,
+}) {
+  final theme = Theme.of(context);
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: theme.colorScheme.surface,
+    builder: (context) {
+      final height = MediaQuery.sizeOf(context).height;
+      return Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 560, maxHeight: height * 0.72),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title, style: theme.textTheme.titleLarge),
+                const SizedBox(height: 10),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final option = options[index];
+                      final isSelected = option.value == selected;
+                      return _PreferenceOptionRow<T>(
+                        option: option,
+                        selected: isSelected,
+                        onTap: () {
+                          onChanged(option.value);
+                          Navigator.of(context).pop();
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _PreferenceOptionRow<T> extends StatelessWidget {
+  const _PreferenceOptionRow({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _PreferenceOption<T> option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: selected
+                ? theme.colorScheme.primary.withValues(alpha: 0.14)
+                : theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.22,
+                  ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected
+                  ? theme.colorScheme.primary.withValues(alpha: 0.38)
+                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        option.label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        option.description,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(
+                  selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                  color: selected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
