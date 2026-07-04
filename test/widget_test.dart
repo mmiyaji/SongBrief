@@ -171,10 +171,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Display & Exclusions'), findsOneWidget);
-    expect(find.text('Hidden playlists'), findsOneWidget);
-    expect(find.text('Hidden genres'), findsOneWidget);
-    expect(find.text('Hidden keywords'), findsOneWidget);
     expect(find.text('Active exclusions'), findsOneWidget);
+    expect(find.text('Manage'), findsOneWidget);
+    expect(find.text('Hidden playlists'), findsNothing);
+
+    await tester.ensureVisible(find.text('Manage'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Manage hidden items'), findsOneWidget);
+    expect(find.text('Hidden playlists'), findsOneWidget);
+    expect(find.text('Playlists (0)'), findsOneWidget);
+    expect(find.text('Genres (0)'), findsOneWidget);
+    expect(find.text('Keywords (0)'), findsOneWidget);
   });
 
   testWidgets('hides record-based panels when daily records are off', (

@@ -2290,8 +2290,6 @@ class _LibraryFilterSetting extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final controller = ref.read(libraryFilterPreferencesProvider.notifier);
-    final overview = stats.overview;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2314,68 +2312,305 @@ class _LibraryFilterSetting extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _RuleGroup(
-          icon: Icons.playlist_remove_rounded,
-          title: _t(context, 'Hidden playlists', '非表示プレイリスト'),
-          description: _t(
-            context,
-            'Hide songs that belong to selected playlists.',
-            '選択したプレイリストに含まれる曲を非表示にします。',
-          ),
-          rules: filters.excludedPlaylists,
-          suggestions: _playlistSuggestions(overview, filters),
-          emptyLabel: _t(context, 'No hidden playlists', '非表示プレイリストはありません'),
-          addLabel: _t(context, 'Add playlist', 'プレイリストを追加'),
-          onAdd: () => _addPlaylistExclusion(context, ref),
-          onAddSuggestion: controller.addExcludedPlaylist,
-          onRemove: controller.removeExcludedPlaylist,
-        ),
-        const SizedBox(height: 10),
-        _RuleGroup(
-          icon: Icons.category_outlined,
-          title: _t(context, 'Hidden genres', '非表示ジャンル'),
-          description: _t(
-            context,
-            'Hide songs with selected genre names.',
-            '選択したジャンル名の曲を非表示にします。',
-          ),
-          rules: filters.excludedGenres,
-          suggestions: _genreSuggestions(overview, filters),
-          emptyLabel: _t(context, 'No hidden genres', '非表示ジャンルはありません'),
-          addLabel: _t(context, 'Add genre', 'ジャンルを追加'),
-          onAdd: () => _addGenreExclusion(context, ref),
-          onAddSuggestion: controller.addExcludedGenre,
-          onRemove: controller.removeExcludedGenre,
-        ),
-        const SizedBox(height: 10),
-        _RuleGroup(
-          icon: Icons.manage_search_rounded,
-          title: _t(context, 'Hidden keywords', '非表示キーワード'),
-          description: _t(
-            context,
-            'Hide songs whose title, artist, album, genre, or playlist contains a keyword.',
-            '曲名、アーティスト、アルバム、ジャンル、プレイリストにキーワードを含む曲を非表示にします。',
-          ),
-          rules: filters.excludedKeywords,
-          suggestions: const <String>[],
-          emptyLabel: _t(context, 'No hidden keywords', '非表示キーワードはありません'),
-          addLabel: _t(context, 'Add keyword', 'キーワードを追加'),
-          onAdd: () => _addKeywordExclusion(context, ref),
-          onAddSuggestion: controller.addExcludedKeyword,
-          onRemove: controller.removeExcludedKeyword,
-        ),
-        if (!filters.isEmpty) ...[
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: OutlinedButton.icon(
-              onPressed: controller.clearAll,
-              icon: const Icon(Icons.clear_all_rounded),
-              label: Text(_t(context, 'Clear exclusions', '除外をすべて解除')),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.24,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
             ),
           ),
-        ],
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final summaryItems = [
+                  _FilterSummaryItem(
+                    icon: Icons.playlist_remove_rounded,
+                    label: _t(context, 'Playlists', 'プレイリスト'),
+                    count: filters.excludedPlaylists.length,
+                  ),
+                  _FilterSummaryItem(
+                    icon: Icons.category_outlined,
+                    label: _t(context, 'Genres', 'ジャンル'),
+                    count: filters.excludedGenres.length,
+                  ),
+                  _FilterSummaryItem(
+                    icon: Icons.manage_search_rounded,
+                    label: _t(context, 'Keywords', 'キーワード'),
+                    count: filters.excludedKeywords.length,
+                  ),
+                ];
+
+                final action = OutlinedButton.icon(
+                  onPressed: () =>
+                      _showLibraryFilterManagerSheet(context, stats: stats),
+                  icon: const Icon(Icons.tune_rounded),
+                  label: Text(_t(context, 'Manage', '管理')),
+                );
+
+                if (constraints.maxWidth >= 620) {
+                  return Row(
+                    children: [
+                      for (final item in summaryItems)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            child: item,
+                          ),
+                        ),
+                      action,
+                    ],
+                  );
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final item in summaryItems)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: item,
+                      ),
+                    Align(alignment: Alignment.centerRight, child: action),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _FilterSummaryItem extends StatelessWidget {
+  const _FilterSummaryItem({
+    required this.icon,
+    required this.label,
+    required this.count,
+  });
+
+  final IconData icon;
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Icon(icon, color: theme.colorScheme.primary, size: 18),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Text(
+          _numberFormat(context).format(count),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> _showLibraryFilterManagerSheet(
+  BuildContext context, {
+  required MusicStatsState stats,
+}) {
+  final size = MediaQuery.sizeOf(context);
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    constraints: BoxConstraints(maxWidth: math.min(size.width - 32, 760)),
+    builder: (context) => _LibraryFilterManagerSheet(stats: stats),
+  );
+}
+
+class _LibraryFilterManagerSheet extends ConsumerWidget {
+  const _LibraryFilterManagerSheet({required this.stats});
+
+  final MusicStatsState stats;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final filters = ref.watch(libraryFilterPreferencesProvider);
+    final controller = ref.read(libraryFilterPreferencesProvider.notifier);
+    final height = MediaQuery.sizeOf(context).height;
+    final overview = stats.overview;
+
+    return SafeArea(
+      top: false,
+      child: DefaultTabController(
+        length: 3,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: height * 0.86),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.visibility_off_outlined,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _t(context, 'Manage hidden items', '非表示項目を管理'),
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _t(
+                              context,
+                              'Edit exclusion rules without changing your Apple Music library.',
+                              'Apple Musicの内容は変更せず、SongBrief上の除外ルールだけを編集します。',
+                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!filters.isEmpty)
+                      TextButton.icon(
+                        onPressed: controller.clearAll,
+                        icon: const Icon(Icons.clear_all_rounded),
+                        label: Text(_t(context, 'Clear all', 'すべて解除')),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TabBar(
+                  tabs: [
+                    Tab(
+                      icon: const Icon(Icons.playlist_remove_rounded),
+                      text:
+                          '${_t(context, 'Playlists', 'プレイリスト')} (${filters.excludedPlaylists.length})',
+                    ),
+                    Tab(
+                      icon: const Icon(Icons.category_outlined),
+                      text:
+                          '${_t(context, 'Genres', 'ジャンル')} (${filters.excludedGenres.length})',
+                    ),
+                    Tab(
+                      icon: const Icon(Icons.manage_search_rounded),
+                      text:
+                          '${_t(context, 'Keywords', 'キーワード')} (${filters.excludedKeywords.length})',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      SingleChildScrollView(
+                        child: _RuleGroup(
+                          icon: Icons.playlist_remove_rounded,
+                          title: _t(context, 'Hidden playlists', '非表示プレイリスト'),
+                          description: _t(
+                            context,
+                            'Hide songs that belong to selected playlists.',
+                            '選択したプレイリストに含まれる曲を非表示にします。',
+                          ),
+                          rules: filters.excludedPlaylists,
+                          suggestions: _playlistSuggestions(overview, filters),
+                          emptyLabel: _t(
+                            context,
+                            'No hidden playlists',
+                            '非表示プレイリストはありません',
+                          ),
+                          addLabel: _t(context, 'Add playlist', 'プレイリストを追加'),
+                          onAdd: () => _addPlaylistExclusion(context, ref),
+                          onAddSuggestion: controller.addExcludedPlaylist,
+                          onRemove: controller.removeExcludedPlaylist,
+                        ),
+                      ),
+                      SingleChildScrollView(
+                        child: _RuleGroup(
+                          icon: Icons.category_outlined,
+                          title: _t(context, 'Hidden genres', '非表示ジャンル'),
+                          description: _t(
+                            context,
+                            'Hide songs with selected genre names.',
+                            '選択したジャンル名の曲を非表示にします。',
+                          ),
+                          rules: filters.excludedGenres,
+                          suggestions: _genreSuggestions(overview, filters),
+                          emptyLabel: _t(
+                            context,
+                            'No hidden genres',
+                            '非表示ジャンルはありません',
+                          ),
+                          addLabel: _t(context, 'Add genre', 'ジャンルを追加'),
+                          onAdd: () => _addGenreExclusion(context, ref),
+                          onAddSuggestion: controller.addExcludedGenre,
+                          onRemove: controller.removeExcludedGenre,
+                        ),
+                      ),
+                      SingleChildScrollView(
+                        child: _RuleGroup(
+                          icon: Icons.manage_search_rounded,
+                          title: _t(context, 'Hidden keywords', '非表示キーワード'),
+                          description: _t(
+                            context,
+                            'Hide songs whose title, artist, album, genre, or playlist contains a keyword.',
+                            '曲名、アーティスト、アルバム、ジャンル、プレイリストにキーワードを含む曲を非表示にします。',
+                          ),
+                          rules: filters.excludedKeywords,
+                          suggestions: const <String>[],
+                          emptyLabel: _t(
+                            context,
+                            'No hidden keywords',
+                            '非表示キーワードはありません',
+                          ),
+                          addLabel: _t(context, 'Add keyword', 'キーワードを追加'),
+                          onAdd: () => _addKeywordExclusion(context, ref),
+                          onAddSuggestion: controller.addExcludedKeyword,
+                          onRemove: controller.removeExcludedKeyword,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
