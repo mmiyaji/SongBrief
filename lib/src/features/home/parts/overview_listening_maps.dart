@@ -196,7 +196,19 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
   }
 }
 
-class _ReleaseYearPlayMapCard extends StatelessWidget {
+enum _ReleaseYearMetric {
+  plays,
+  tracks;
+
+  double valueFor(_ReleaseYearBucket bucket) {
+    return switch (this) {
+      _ReleaseYearMetric.plays => bucket.playCount.toDouble(),
+      _ReleaseYearMetric.tracks => bucket.trackCount.toDouble(),
+    };
+  }
+}
+
+class _ReleaseYearPlayMapCard extends StatefulWidget {
   const _ReleaseYearPlayMapCard({
     required this.overview,
     this.expanded = false,
@@ -206,19 +218,29 @@ class _ReleaseYearPlayMapCard extends StatelessWidget {
   final bool expanded;
 
   @override
+  State<_ReleaseYearPlayMapCard> createState() =>
+      _ReleaseYearPlayMapCardState();
+}
+
+class _ReleaseYearPlayMapCardState extends State<_ReleaseYearPlayMapCard> {
+  var _metric = _ReleaseYearMetric.plays;
+
+  @override
   Widget build(BuildContext context) {
     final number = _numberFormat(context);
-    final buckets = _releaseYearBuckets(overview.tracks);
+    final metric = widget.expanded ? _metric : _ReleaseYearMetric.plays;
+    final buckets = _releaseYearBuckets(widget.overview.tracks);
     final topBucket = buckets.isEmpty
         ? null
         : buckets.reduce(
-            (current, next) =>
-                next.playCount > current.playCount ? next : current,
+            (current, next) => metric.valueFor(next) > metric.valueFor(current)
+                ? next
+                : current,
           );
 
     return _OverviewAnalysisCard(
       icon: Icons.timeline_rounded,
-      title: _t(context, 'Release year x plays', '発売年 x 再生数'),
+      title: _releaseYearMetricTitle(context, metric),
       subtitle: topBucket == null
           ? _t(
               context,
@@ -245,11 +267,12 @@ class _ReleaseYearPlayMapCard extends StatelessWidget {
               children: [
                 _InteractiveReleaseYearChart(
                   buckets: buckets,
-                  height: expanded ? 250 : 190,
-                  onOpenBucket: expanded
+                  metric: metric,
+                  height: widget.expanded ? 250 : 190,
+                  onOpenBucket: widget.expanded
                       ? (bucket) {
                           final tracks = _tracksByReleaseYear(
-                            overview,
+                            widget.overview,
                             bucket.year,
                           );
                           if (tracks.isEmpty) {
@@ -269,6 +292,15 @@ class _ReleaseYearPlayMapCard extends StatelessWidget {
                         }
                       : null,
                 ),
+                if (widget.expanded) ...[
+                  const SizedBox(height: 10),
+                  _ReleaseYearMetricSelector(
+                    metric: metric,
+                    onChanged: (value) => setState(() {
+                      _metric = value;
+                    }),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -282,13 +314,18 @@ class _ReleaseYearPlayMapCard extends StatelessWidget {
                       _AnalysisPill(
                         label: _t(context, 'Top year', '最多年'),
                         value:
-                            '${topBucket.year} / ${number.format(topBucket.playCount)}',
+                            '${topBucket.year} / '
+                            '${_releaseYearMetricValueLabel(context, metric, topBucket)}',
                       ),
                     _AnalysisPill(
-                      label: _t(context, 'Avg / song', '曲平均'),
+                      label: metric == _ReleaseYearMetric.plays
+                          ? _t(context, 'Avg / song', '曲平均')
+                          : _t(context, 'Plays', '再生回数'),
                       value: topBucket == null
                           ? '0'
-                          : topBucket.averagePlays.toStringAsFixed(1),
+                          : metric == _ReleaseYearMetric.plays
+                          ? topBucket.averagePlays.toStringAsFixed(1)
+                          : number.format(topBucket.playCount),
                     ),
                   ],
                 ),
@@ -298,14 +335,107 @@ class _ReleaseYearPlayMapCard extends StatelessWidget {
   }
 }
 
+class _ReleaseYearMetricSelector extends StatelessWidget {
+  const _ReleaseYearMetricSelector({
+    required this.metric,
+    required this.onChanged,
+  });
+
+  final _ReleaseYearMetric metric;
+  final ValueChanged<_ReleaseYearMetric> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SegmentedButton<_ReleaseYearMetric>(
+        showSelectedIcon: false,
+        selected: {metric},
+        onSelectionChanged: (values) => onChanged(values.first),
+        segments: [
+          ButtonSegment(
+            value: _ReleaseYearMetric.plays,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: Text(_t(context, 'Plays', '再生回数')),
+          ),
+          ButtonSegment(
+            value: _ReleaseYearMetric.tracks,
+            icon: const Icon(Icons.music_note_rounded),
+            label: Text(_t(context, 'Tracks', '曲')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _releaseYearMetricTitle(
+  BuildContext context,
+  _ReleaseYearMetric metric,
+) {
+  return switch (metric) {
+    _ReleaseYearMetric.plays => _t(
+      context,
+      'Release year x plays',
+      '発売年 × 再生数',
+    ),
+    _ReleaseYearMetric.tracks => _t(
+      context,
+      'Release year x songs',
+      '発売年 × 曲数',
+    ),
+  };
+}
+
+String _releaseYearMetricValueLabel(
+  BuildContext context,
+  _ReleaseYearMetric metric,
+  _ReleaseYearBucket bucket,
+) {
+  return switch (metric) {
+    _ReleaseYearMetric.plays => _playCountLabel(context, bucket.playCount),
+    _ReleaseYearMetric.tracks => _trackCountLabel(context, bucket.trackCount),
+  };
+}
+
+String _releaseYearMetricTooltip(
+  BuildContext context,
+  _ReleaseYearMetric metric,
+  _ReleaseYearBucket bucket,
+) {
+  return switch (metric) {
+    _ReleaseYearMetric.plays =>
+      '${_playCountLabel(context, bucket.playCount)} / '
+          '${_trackCountLabel(context, bucket.trackCount)}',
+    _ReleaseYearMetric.tracks =>
+      '${_trackCountLabel(context, bucket.trackCount)} / '
+          '${_playCountLabel(context, bucket.playCount)}',
+  };
+}
+
+String _releaseYearMetricDetail(
+  BuildContext context,
+  _ReleaseYearMetric metric,
+  _ReleaseYearBucket bucket,
+) {
+  final base = _releaseYearMetricTooltip(context, metric, bucket);
+  if (metric == _ReleaseYearMetric.tracks) {
+    return base;
+  }
+  final averageLabel = _t(context, 'avg', '平均', zh: '平均', ko: '평균');
+  return '$base / $averageLabel ${bucket.averagePlays.toStringAsFixed(1)}';
+}
+
 class _InteractiveReleaseYearChart extends StatefulWidget {
   const _InteractiveReleaseYearChart({
     required this.buckets,
+    required this.metric,
     required this.height,
     this.onOpenBucket,
   });
 
   final List<_ReleaseYearBucket> buckets;
+  final _ReleaseYearMetric metric;
   final double height;
   final ValueChanged<_ReleaseYearBucket>? onOpenBucket;
 
@@ -326,18 +456,21 @@ class _InteractiveReleaseYearChartState
     final selectedIndex = selectedBucket == null
         ? -1
         : buckets.indexWhere((bucket) => bucket.year == selectedBucket.year);
-    final maxAverage = buckets.fold<double>(
+    final maxMetricValue = buckets.fold<double>(
       1,
-      (current, bucket) => math.max(current, bucket.averagePlays),
+      (current, bucket) => math.max(current, widget.metric.valueFor(bucket)),
     );
-    final maxY = maxAverage <= 1 ? 1.0 : maxAverage * 1.18;
+    final maxY = maxMetricValue <= 1 ? 1.0 : maxMetricValue * 1.18;
     final minYear = buckets.first.year;
     final maxYear = buckets.last.year;
     final yearSpan = maxYear - minYear;
     final minX = (yearSpan == 0 ? minYear - 1 : minYear).toDouble();
     final maxX = (yearSpan == 0 ? maxYear + 1 : maxYear).toDouble();
     final spots = buckets
-        .map((bucket) => FlSpot(bucket.year.toDouble(), bucket.averagePlays))
+        .map(
+          (bucket) =>
+              FlSpot(bucket.year.toDouble(), widget.metric.valueFor(bucket)),
+        )
         .toList(growable: false);
 
     return Column(
@@ -410,8 +543,7 @@ class _InteractiveReleaseYearChartState
                         final bucket = buckets[spot.spotIndex];
                         return LineTooltipItem(
                           '${bucket.year}\n'
-                          '${_playCountLabel(context, bucket.playCount)} / '
-                          '${_trackCountLabel(context, bucket.trackCount)}',
+                          '${_releaseYearMetricTooltip(context, widget.metric, bucket)}',
                           theme.textTheme.labelSmall!.copyWith(
                             color: theme.colorScheme.onInverseSurface,
                             fontWeight: FontWeight.w900,
@@ -489,22 +621,10 @@ class _InteractiveReleaseYearChartState
                   key: ValueKey(selectedBucket.year),
                   icon: Icons.info_outline_rounded,
                   label: selectedBucket.year.toString(),
-                  value: _t(
+                  value: _releaseYearMetricDetail(
                     context,
-                    '${_trackCountLabel(context, selectedBucket.trackCount)} / '
-                        '${_playCountLabel(context, selectedBucket.playCount)} / '
-                        '${selectedBucket.averagePlays.toStringAsFixed(1)} avg',
-                    '${_trackCountLabel(context, selectedBucket.trackCount)} / '
-                        '${_playCountLabel(context, selectedBucket.playCount)} / '
-                        '平均${selectedBucket.averagePlays.toStringAsFixed(1)}',
-                    zh:
-                        '${_trackCountLabel(context, selectedBucket.trackCount)} / '
-                        '${_playCountLabel(context, selectedBucket.playCount)} / '
-                        '平均 ${selectedBucket.averagePlays.toStringAsFixed(1)}',
-                    ko:
-                        '${_trackCountLabel(context, selectedBucket.trackCount)} / '
-                        '${_playCountLabel(context, selectedBucket.playCount)} / '
-                        '평균 ${selectedBucket.averagePlays.toStringAsFixed(1)}',
+                    widget.metric,
+                    selectedBucket,
                   ),
                   onTap: widget.onOpenBucket == null
                       ? null

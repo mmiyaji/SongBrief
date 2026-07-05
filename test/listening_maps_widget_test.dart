@@ -79,6 +79,25 @@ void main() {
     expect(find.text('Quiet days'), findsOneWidget);
   });
 
+  testWidgets('switches release year map to song count in expanded view', (
+    tester,
+  ) async {
+    await _pumpOverview(tester);
+    await tester.pumpAndSettle();
+
+    final expandButton = find.byTooltip('Expand listening maps');
+    await tester.ensureVisible(expandButton);
+    await tester.tap(expandButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Release year x songs'), findsNothing);
+
+    await tester.tap(find.text('Tracks').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Release year x songs'), findsOneWidget);
+  });
+
   testWidgets('shows recap and collection insight panels', (tester) async {
     await _pumpOverview(tester);
     await tester.pumpAndSettle();

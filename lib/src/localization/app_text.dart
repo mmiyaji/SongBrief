@@ -1039,6 +1039,11 @@ const _copyTranslations = <String, _LocalizedCopy>{
     zh: '发行年份 × 播放次数',
     ko: '발매 연도 × 재생 횟수',
   ),
+  'Release year x songs': _LocalizedCopy(
+    ja: '発売年 × 曲数',
+    zh: '发行年份 × 歌曲数',
+    ko: '발매 연도 × 곡 수',
+  ),
   'Release dates are not available yet.': _LocalizedCopy(
     ja: '発売日情報はまだ利用できません。',
     zh: '发行日期尚不可用。',
