@@ -319,51 +319,26 @@ class _PrivacyScreenBrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(size * 0.24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.22),
-            blurRadius: size * 0.18,
-            offset: Offset(0, size * 0.08),
-          ),
-        ],
-      ),
+    return SizedBox.square(
+      dimension: size,
       child: Stack(
         clipBehavior: Clip.none,
+        alignment: Alignment.center,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(size * 0.24),
-            child: Image.asset(
-              'assets/branding/songbrief_icon_ios.png',
-              key: const ValueKey('app-lock-privacy-mark'),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (context, error, stackTrace) {
-                return DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(size * 0.24),
-                    border: Border.all(
-                      color: theme.colorScheme.outlineVariant.withValues(
-                        alpha: 0.42,
-                      ),
-                    ),
-                  ),
-                  child: SizedBox.square(
-                    dimension: size,
-                    child: Icon(
-                      Icons.multiline_chart_rounded,
-                      color: theme.colorScheme.primary,
-                      size: size * 0.42,
-                    ),
-                  ),
-                );
-              },
-            ),
+          Image.asset(
+            'assets/branding/songbrief_icon_foreground.png',
+            key: const ValueKey('app-lock-privacy-mark'),
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (context, error, stackTrace) {
+              return Icon(
+                Icons.multiline_chart_rounded,
+                color: theme.colorScheme.primary,
+                size: size * 0.56,
+              );
+            },
           ),
           if (showLockBadge)
             Positioned(
