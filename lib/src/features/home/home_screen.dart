@@ -37,8 +37,8 @@ part 'parts/overview_recaps.dart';
 part 'parts/library_rankings_settings.dart';
 part 'parts/shared_helpers.dart';
 
-const _privacyPolicyUrl = 'https://mmiyaji.github.io/SongBrief/privacy/';
-const _termsOfUseUrl = 'https://mmiyaji.github.io/SongBrief/terms/';
+const _privacyPolicyUrl = 'https://songbrief.ruhenheim.org/privacy/';
+const _termsOfUseUrl = 'https://songbrief.ruhenheim.org/terms/';
 
 String _t(
   BuildContext context,

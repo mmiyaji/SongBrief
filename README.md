@@ -75,8 +75,9 @@ flutter run --dart-define=SONGBRIEF_AD_MODE=admobLive \
 ```
 
 `admobTest` uses Google's sample banner ad units. Web and desktop builds show
-a quiet ad preview instead of loading the mobile AdMob SDK. Premium removal can
-be previewed with:
+a quiet ad preview instead of loading the mobile AdMob SDK. Premium purchases
+are hidden by default while store monetization is deferred. Ad removal behavior
+can still be previewed locally with:
 
 ```sh
 flutter run --dart-define=SONGBRIEF_AD_MODE=admobTest \
@@ -89,15 +90,23 @@ Android still uses Google's sample App ID until an Android AdMob app is created:
 - Android: pass `-PSONGBRIEF_ADMOB_ANDROID_APP_ID=ca-app-pub-...~...` to Gradle
   or update the default manifest placeholder in `android/app/build.gradle.kts`
 
-The premium product ID defaults to `songbrief_premium_lifetime` and can be
-changed with `--dart-define=SONGBRIEF_PREMIUM_PRODUCT_ID=...`.
-Create the matching non-consumable product in App Store Connect before
-TestFlight purchase testing. The app settings screen shows the loaded store
-product title, price, and a reload action for checking configuration changes.
+The premium purchase UI remains disabled unless
+`SONGBRIEF_PREMIUM_PURCHASES_ENABLED=true` is passed at launch. The future
+premium product ID defaults to `songbrief_premium_lifetime` and can be changed
+with `--dart-define=SONGBRIEF_PREMIUM_PRODUCT_ID=...`.
 
 ## Legal Pages
 
-GitHub Pages publishes the App Store legal pages from `docs/`:
+Cloudflare Pages should publish the App Store legal pages from `docs/`:
 
-- Privacy Policy: https://mmiyaji.github.io/SongBrief/privacy/
-- Terms of Use: https://mmiyaji.github.io/SongBrief/terms/
+- Privacy Policy: https://songbrief.ruhenheim.org/privacy/
+- Terms of Use: https://songbrief.ruhenheim.org/terms/
+- AdMob app-ads.txt: https://songbrief.ruhenheim.org/app-ads.txt
+
+Recommended Cloudflare Pages settings:
+
+- Build command: leave empty
+- Build output directory: `docs`
+- Custom domain: `songbrief.ruhenheim.org`
+
+Keep the old GitHub Pages URL available only as a temporary migration fallback.
