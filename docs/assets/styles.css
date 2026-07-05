@@ -209,6 +209,30 @@ li + li {
   width: 100%;
 }
 
+.lightbox-link {
+  color: inherit;
+  cursor: zoom-in;
+  display: block;
+  height: 100%;
+  text-decoration: none;
+  width: 100%;
+}
+
+.lightbox-link:focus-visible {
+  outline: 3px solid rgba(15, 122, 104, 0.6);
+  outline-offset: -6px;
+}
+
+.lightbox-link img {
+  transition: transform 180ms ease;
+}
+
+@media (hover: hover) {
+  .lightbox-link:hover img {
+    transform: scale(1.015);
+  }
+}
+
 .phone-frame {
   border-radius: 34px;
   height: 460px;
