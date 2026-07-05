@@ -95,18 +95,24 @@ The premium purchase UI remains disabled unless
 premium product ID defaults to `songbrief_premium_lifetime` and can be changed
 with `--dart-define=SONGBRIEF_PREMIUM_PRODUCT_ID=...`.
 
-## Legal Pages
+## Public Site and Legal Pages
 
-Cloudflare Pages should publish the App Store legal pages from `docs/`:
+Cloudflare Pages publishes the public SongBrief landing page and App Store legal
+pages from `docs/`:
 
+- Landing page: https://songbrief.ruhenheim.org/
 - Privacy Policy: https://songbrief.ruhenheim.org/privacy/
 - Terms of Use: https://songbrief.ruhenheim.org/terms/
 - AdMob app-ads.txt: https://songbrief.ruhenheim.org/app-ads.txt
 
-Recommended Cloudflare Pages settings:
+The GitHub Actions workflow in `.github/workflows/cloudflare-pages.yml`
+deploys `docs/` to the Cloudflare Pages project named `songbrief`.
 
-- Build command: leave empty
-- Build output directory: `docs`
-- Custom domain: `songbrief.ruhenheim.org`
+Required GitHub repository secrets:
 
-Keep the old GitHub Pages URL available only as a temporary migration fallback.
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+
+The Cloudflare API token should be scoped to the account and allow Cloudflare
+Pages edits. After the first successful deployment, add the custom domain
+`songbrief.ruhenheim.org` to the `songbrief` Pages project.
