@@ -3,16 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'src/app.dart';
+import 'src/analytics/app_analytics.dart';
 import 'src/settings/app_lock.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final preferences = await SharedPreferences.getInstance();
+  final analytics = await AppAnalytics.initialize();
   final appLockEnabled =
       preferences.getBool(appLockEnabledPreferenceKey) ?? false;
   runApp(
     ProviderScope(
       overrides: [
+        appAnalyticsProvider.overrideWithValue(analytics),
         initialAppLockEnabledProvider.overrideWithValue(appLockEnabled),
       ],
       child: const SongBriefApp(),

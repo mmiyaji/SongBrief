@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../analytics/app_analytics.dart';
 import '../../data/music_stats_repository.dart';
 import '../../data/music_library_channel.dart';
 import '../../domain/library_overview.dart';
@@ -38,7 +39,13 @@ class HomeSectionController extends Notifier<HomeSection> {
   }
 
   void setSection(HomeSection section) {
+    if (state == section) {
+      return;
+    }
     state = section;
+    unawaited(
+      ref.read(appAnalyticsProvider).logScreenView('home_${section.name}'),
+    );
   }
 }
 
@@ -208,15 +215,26 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       () => ref.read(musicStatsRepositoryProvider).load(requestAccess: true),
     );
     if (state.hasValue) {
+      unawaited(ref.read(appAnalyticsProvider).logEvent('music_access_loaded'));
       await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
     }
   }
 
   Future<void> refreshStats() async {
+    unawaited(
+      ref
+          .read(appAnalyticsProvider)
+          .logEvent('library_refresh', parameters: const {'mode': 'manual'}),
+    );
     await _load(showLoading: true);
   }
 
   Future<void> refreshStatsSilently() async {
+    unawaited(
+      ref
+          .read(appAnalyticsProvider)
+          .logEvent('library_refresh', parameters: const {'mode': 'silent'}),
+    );
     await _load(showLoading: false);
   }
 
@@ -258,7 +276,31 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       _ => next,
     };
     if (state.hasValue) {
+      final overview = state.requireValue.overview;
+      unawaited(
+        ref
+            .read(appAnalyticsProvider)
+            .logEvent(
+              'library_refresh_completed',
+              parameters: {
+                'mode': showLoading ? 'manual' : 'silent',
+                'source': overview.isDemo ? 'demo' : 'music_library',
+                'track_count': overview.totalTracks,
+                'artist_count': overview.totalArtists,
+                'album_count': overview.totalAlbums,
+              },
+            ),
+      );
       await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
+    } else if (next.hasError) {
+      unawaited(
+        ref
+            .read(appAnalyticsProvider)
+            .logEvent(
+              'library_refresh_failed',
+              parameters: {'mode': showLoading ? 'manual' : 'silent'},
+            ),
+      );
     }
   }
 }
@@ -291,6 +333,14 @@ class PlaybackController extends Notifier<PlaybackState> {
     try {
       await ref.read(musicStatsRepositoryProvider).playTrack(trackId);
       state = PlaybackState(activeTrackId: trackId, isPlaying: true);
+      unawaited(
+        ref
+            .read(appAnalyticsProvider)
+            .logEvent(
+              'playback_control',
+              parameters: const {'action': 'play_track'},
+            ),
+      );
     } on Object catch (error) {
       state = previous.copyWith(isBusy: false, errorMessage: error.toString());
     }
@@ -312,6 +362,11 @@ class PlaybackController extends Notifier<PlaybackState> {
         isPlaying: previous.hasActiveTrack,
         isBusy: false,
       );
+      unawaited(
+        ref
+            .read(appAnalyticsProvider)
+            .logEvent('playback_control', parameters: const {'action': 'play'}),
+      );
     } on Object catch (error) {
       state = previous.copyWith(isBusy: false, errorMessage: error.toString());
     }
@@ -323,22 +378,37 @@ class PlaybackController extends Notifier<PlaybackState> {
     try {
       await ref.read(musicStatsRepositoryProvider).pause();
       state = previous.copyWith(isPlaying: false, isBusy: false);
+      unawaited(
+        ref
+            .read(appAnalyticsProvider)
+            .logEvent(
+              'playback_control',
+              parameters: const {'action': 'pause'},
+            ),
+      );
     } on Object catch (error) {
       state = previous.copyWith(isBusy: false, errorMessage: error.toString());
     }
   }
 
   Future<void> skipToNext() {
-    return _runTransport((repository) => repository.skipToNext());
+    return _runTransport(
+      (repository) => repository.skipToNext(),
+      analyticsAction: 'skip_next',
+    );
   }
 
   Future<void> skipToPrevious() {
-    return _runTransport((repository) => repository.skipToPrevious());
+    return _runTransport(
+      (repository) => repository.skipToPrevious(),
+      analyticsAction: 'skip_previous',
+    );
   }
 
   Future<void> _runTransport(
     Future<void> Function(MusicStatsRepository repository) action, {
     bool keepPlaying = true,
+    required String analyticsAction,
   }) async {
     final previous = state;
     state = previous.copyWith(isBusy: true);
@@ -347,6 +417,14 @@ class PlaybackController extends Notifier<PlaybackState> {
       state = previous.copyWith(
         isPlaying: previous.isPlaying && keepPlaying,
         isBusy: false,
+      );
+      unawaited(
+        ref
+            .read(appAnalyticsProvider)
+            .logEvent(
+              'playback_control',
+              parameters: {'action': analyticsAction},
+            ),
       );
       await Future<void>.delayed(const Duration(milliseconds: 900));
       await syncWithPlayer();

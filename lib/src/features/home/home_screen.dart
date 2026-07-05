@@ -21,8 +21,6 @@ import '../../domain/music_stats_state.dart';
 import '../../export/library_exporter.dart';
 import '../../localization/app_text.dart';
 import '../../monetization/ad_banner_slot.dart';
-import '../../monetization/monetization_config.dart';
-import '../../monetization/premium_controller.dart';
 import '../../settings/app_lock.dart';
 import '../../settings/app_preferences.dart';
 import '../../settings/library_filter_preferences.dart';

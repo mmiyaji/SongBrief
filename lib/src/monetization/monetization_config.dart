@@ -20,6 +20,11 @@ class MonetizationConfig {
     'SONGBRIEF_PREMIUM_UNLOCKED',
   );
 
+  static const premiumPurchasesEnabled = bool.fromEnvironment(
+    'SONGBRIEF_PREMIUM_PURCHASES_ENABLED',
+    defaultValue: false,
+  );
+
   static const premiumProductId = String.fromEnvironment(
     'SONGBRIEF_PREMIUM_PRODUCT_ID',
     defaultValue: 'songbrief_premium_lifetime',

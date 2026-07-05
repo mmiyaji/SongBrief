@@ -87,6 +87,19 @@ class PremiumController extends AsyncNotifier<PremiumState> {
     final entitled =
         MonetizationConfig.premiumUnlockedAtLaunch || storedEntitlement;
 
+    final base = PremiumState(
+      entitled: entitled,
+      productId: MonetizationConfig.premiumProductId,
+      storeSupported: false,
+      message: MonetizationConfig.premiumUnlockedAtLaunch
+          ? 'Premium is unlocked by launch mode.'
+          : null,
+    );
+
+    if (!MonetizationConfig.premiumPurchasesEnabled) {
+      return base;
+    }
+
     final client = createPurchaseClient();
     _client = client;
     _subscription = client.updates.listen(_handleUpdates);
@@ -95,20 +108,13 @@ class PremiumController extends AsyncNotifier<PremiumState> {
       client.dispose();
     });
 
-    final base = PremiumState(
-      entitled: entitled,
-      productId: MonetizationConfig.premiumProductId,
-      storeSupported: client.isSupported,
-      message: MonetizationConfig.premiumUnlockedAtLaunch
-          ? 'Premium is unlocked by launch mode.'
-          : null,
-    );
+    final purchaseBase = base.copyWith(storeSupported: client.isSupported);
 
     if (entitled || !client.isSupported) {
-      return base;
+      return purchaseBase;
     }
 
-    return _queryProduct(base);
+    return _queryProduct(purchaseBase);
   }
 
   Future<void> reloadProduct() async {

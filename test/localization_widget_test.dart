@@ -85,7 +85,7 @@ void main() {
     expect(find.text('音乐访问权限'), findsOneWidget);
     expect(find.text('主题'), findsOneWidget);
     expect(find.text('语言'), findsOneWidget);
-    expect(find.text('高级版'), findsWidgets);
+    expect(find.text('应用信息'), findsOneWidget);
   });
 
   testWidgets('localizes playing in Korean', (tester) async {
