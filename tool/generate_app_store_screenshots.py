@@ -20,10 +20,10 @@ SPECS = {
         "raw_device": "iphone",
         "apple_display": "6.9-inch iPhone portrait",
     },
-    "ipad_13": {
-        "pixels": (2064, 2752),
-        "raw_device": "ipad",
-        "apple_display": "13-inch iPad portrait",
+    "ipad_13_landscape": {
+        "pixels": (2752, 2064),
+        "raw_device": "ipad_landscape",
+        "apple_display": "13-inch iPad landscape",
     },
 }
 
@@ -173,27 +173,66 @@ def paste_device(
     inner_width: int,
     border: int,
     radius: int,
+    speaker: bool = False,
+    camera_dot: bool = False,
 ) -> None:
     raw = raw.convert("RGBA")
     inner_height = round(inner_width * raw.height / raw.width)
     screenshot = raw.resize((inner_width, inner_height), Image.Resampling.LANCZOS)
-    screen_x = center_x - inner_width // 2
-    screen_y = top + border
+    body_x = center_x - inner_width // 2 - border
+    body_y = top
+    body_w = inner_width + border * 2
+    body_h = inner_height + border * 2
+    screen_x = body_x + border
+    screen_y = body_y + border
+    body_radius = radius
+    clip_radius = max(28, radius - border)
 
     shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     shadow_draw = ImageDraw.Draw(shadow)
-    clip_radius = max(28, radius - border)
     shadow_draw.rounded_rectangle(
         (
-            screen_x - border,
-            screen_y - border,
-            screen_x + inner_width + border,
-            screen_y + inner_height + border,
+            body_x,
+            body_y + max(8, border // 2),
+            body_x + body_w,
+            body_y + body_h + max(8, border // 2),
         ),
-        radius=clip_radius + border,
-        fill=(0, 0, 0, 120),
+        radius=body_radius,
+        fill=(0, 0, 0, 155),
     )
     canvas.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(border * 2)))
+
+    frame_draw = ImageDraw.Draw(canvas)
+    frame_draw.rounded_rectangle(
+        (body_x, body_y, body_x + body_w, body_y + body_h),
+        radius=body_radius,
+        fill="#061011",
+        outline="#244247",
+        width=max(2, border // 10),
+    )
+    if speaker:
+        speaker_w = max(42, border * 4)
+        speaker_h = max(5, border // 4)
+        speaker_x = center_x - speaker_w // 2
+        speaker_y = body_y + max(6, border // 2 - speaker_h // 2)
+        frame_draw.rounded_rectangle(
+            (
+                speaker_x,
+                speaker_y,
+                speaker_x + speaker_w,
+                speaker_y + speaker_h,
+            ),
+            radius=speaker_h // 2,
+            fill="#20363a",
+        )
+    if camera_dot:
+        dot_r = max(4, border // 6)
+        dot_x = body_x + body_w - max(border // 2, dot_r * 2)
+        dot_y = body_y + body_h // 2
+        frame_draw.ellipse(
+            (dot_x - dot_r, dot_y - dot_r, dot_x + dot_r, dot_y + dot_r),
+            fill="#17292c",
+        )
 
     mask = rounded_mask((inner_width, inner_height), clip_radius)
     clipped = Image.new("RGBA", (inner_width, inner_height), (0, 0, 0, 0))
@@ -214,27 +253,28 @@ def make_image(lang: str, spec_name: str, shot_name: str) -> Path:
     raw_path = RAW_ROOT / lang / spec["raw_device"] / f"{shot_name}.png"
     raw = Image.open(raw_path)
     title, subtitle = CAPTIONS[lang]["items"][shot_name]
+    is_phone = spec_name == "iphone_6_9"
 
     canvas = Image.new("RGBA", (width, height), "#020a0a")
     draw = ImageDraw.Draw(canvas)
-    scale = width / 1320
+    scale = width / 1320 if is_phone else height / 2064
 
-    margin = int(96 * scale)
-    top = int(110 * scale)
-    icon_size = int(96 * scale)
+    margin = int((96 if is_phone else 120) * scale)
+    top = int((110 if is_phone else 108) * scale)
+    icon_size = int((96 if is_phone else 104) * scale)
     paste_icon(canvas, margin, top, icon_size)
 
-    brand_font = load_font(int(44 * scale), bold=True)
-    tag_font = load_font(int(26 * scale))
-    title_font = load_font(int((76 if spec_name == "iphone_6_9" else 82) * scale), bold=True)
-    subtitle_font = load_font(int((36 if spec_name == "iphone_6_9" else 38) * scale))
+    brand_font = load_font(int((44 if is_phone else 48) * scale), bold=True)
+    tag_font = load_font(int((26 if is_phone else 28) * scale))
+    title_font = load_font(int((76 if is_phone else 82) * scale), bold=True)
+    subtitle_font = load_font(int((36 if is_phone else 38) * scale))
 
     text_x = margin + icon_size + int(28 * scale)
     draw.text((text_x, top + int(10 * scale)), "SongBrief", font=brand_font, fill="#f6fbf8")
     draw.text((text_x, top + int(64 * scale)), CAPTIONS[lang]["tagline"], font=tag_font, fill="#98aaa7")
 
-    headline_y = int(320 * scale if spec_name == "iphone_6_9" else 285 * scale)
-    headline_width = width - margin * 2
+    headline_y = int((320 if is_phone else 270) * scale)
+    headline_width = width - margin * 2 if is_phone else int(1560 * scale)
     after_title = draw_wrapped(draw, (margin, headline_y), title, title_font, "#f6fbf8", headline_width, int(14 * scale))
     after_subtitle = draw_wrapped(
         draw,
@@ -247,25 +287,27 @@ def make_image(lang: str, spec_name: str, shot_name: str) -> Path:
     )
     draw_accent(draw, margin, after_subtitle + int(40 * scale), scale)
 
-    if spec_name == "iphone_6_9":
+    if is_phone:
         paste_device(
             canvas,
             raw,
             center_x=width // 2,
-            top=int(835 * scale),
+            top=int(810 * scale),
             inner_width=int(850 * scale),
-            border=int(16 * scale),
+            border=int(24 * scale),
             radius=int(78 * scale),
+            speaker=True,
         )
     else:
         paste_device(
             canvas,
             raw,
             center_x=width // 2,
-            top=int(610 * scale),
-            inner_width=int(1450 * scale),
-            border=int(18 * scale),
-            radius=int(58 * scale),
+            top=int(575 * scale),
+            inner_width=int(1860 * scale),
+            border=int(34 * scale),
+            radius=int(72 * scale),
+            camera_dot=True,
         )
 
     out_dir = OUT_ROOT / lang / spec_name

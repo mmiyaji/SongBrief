@@ -6,10 +6,10 @@ Generated on 2026-07-05 from actual SongBrief web-demo UI screenshots.
 
 - `en/iphone_6_9`: 1320 x 2868 PNG, 6 screenshots
 - `ja/iphone_6_9`: 1320 x 2868 PNG, 6 screenshots
-- `en/ipad_13`: 2064 x 2752 PNG, 6 screenshots
-- `ja/ipad_13`: 2064 x 2752 PNG, 6 screenshots
+- `en/ipad_13_landscape`: 2752 x 2064 PNG, 6 screenshots
+- `ja/ipad_13_landscape`: 2752 x 2064 PNG, 6 screenshots
 
-These sizes target Apple's current 6.9-inch iPhone portrait and 13-inch iPad portrait screenshot slots. Raw UI captures are kept under `store_assets/raw_screenshots/`.
+These sizes target Apple's current 6.9-inch iPhone portrait and 13-inch iPad landscape screenshot slots. Raw UI captures are kept under `store_assets/raw_screenshots/`.
 
 ## Notes
 
