@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-lang="ja">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,34 +11,43 @@
     <link rel="icon" type="image/png" href="/assets/songbrief-icon.png">
     <link rel="apple-touch-icon" href="/assets/songbrief-icon.png">
     <link rel="stylesheet" href="../assets/styles.css">
+    <script src="../assets/site.js" defer></script>
   </head>
   <body>
     <header class="site-header">
       <div class="header-inner">
         <a class="brand" href="../">SongBrief</a>
-        <nav class="nav" aria-label="Legal pages">
-          <a href="./" aria-current="page">Privacy Policy</a>
-          <a href="../terms/">Terms of Use</a>
-        </nav>
+        <div class="header-actions">
+          <nav class="nav" aria-label="Site navigation">
+            <a href="../" data-i18n-ja="ホーム" data-i18n-en="Home">ホーム</a>
+            <a href="../design-samples/" data-i18n-ja="デザイン案" data-i18n-en="Design Samples">デザイン案</a>
+            <a href="./" aria-current="page" data-i18n-ja="プライバシー" data-i18n-en="Privacy Policy">プライバシー</a>
+            <a href="../terms/" data-i18n-ja="利用規約" data-i18n-en="Terms of Use">利用規約</a>
+          </nav>
+          <div class="language-switch" role="group" aria-label="Language">
+            <button type="button" data-lang-choice="ja" aria-pressed="true">日本語</button>
+            <button type="button" data-lang-choice="en" aria-pressed="false">English</button>
+          </div>
+        </div>
       </div>
     </header>
 
     <main class="main">
       <section class="hero">
-        <div class="eyebrow">Privacy Policy / プライバシーポリシー</div>
-        <h1>SongBrief Privacy Policy</h1>
-        <p class="lead">
+        <div class="eyebrow" data-i18n-ja="プライバシーポリシー" data-i18n-en="Privacy Policy">プライバシーポリシー</div>
+        <h1 data-i18n-ja="SongBrief プライバシーポリシー" data-i18n-en="SongBrief Privacy Policy">SongBrief プライバシーポリシー</h1>
+        <p class="lead" data-lang-panel="en">
           This policy explains how SongBrief handles information when you use
           the app and related legal pages.
         </p>
-        <p class="lead">このポリシーは、SongBriefアプリおよび関連する法務ページの利用時に、情報をどのように取り扱うかを説明するものです。</p>
+        <p class="lead" data-lang-panel="ja">このポリシーは、SongBriefアプリおよび関連する法務ページの利用時に、情報をどのように取り扱うかを説明するものです。</p>
         <div class="meta">
-          <span class="pill">Effective: 2026-07-05</span>
-          <span class="pill">Last updated: 2026-07-05</span>
+          <span class="pill" data-i18n-ja="適用開始: 2026-07-05" data-i18n-en="Effective: 2026-07-05">適用開始: 2026-07-05</span>
+          <span class="pill" data-i18n-ja="最終更新: 2026-07-05" data-i18n-en="Last updated: 2026-07-05">最終更新: 2026-07-05</span>
         </div>
       </section>
 
-      <section class="section" lang="ja">
+      <section class="section" lang="ja" data-lang-panel="ja">
         <div class="lang-label">Japanese</div>
         <h2>プライバシーポリシー</h2>
 
@@ -81,7 +90,7 @@
         <p>このポリシーに関するお問い合わせは、SongBriefプロジェクトのGitHub Issues、またはプロジェクトが公開している連絡手段からお願いします。</p>
       </section>
 
-      <section class="section" lang="en">
+      <section class="section" lang="en" data-lang-panel="en">
         <div class="lang-label">English</div>
         <h2>Privacy Policy</h2>
 
