@@ -17,7 +17,7 @@
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     >
-    <link rel="stylesheet" href="./assets/styles.css?v=history-insights-20260705">
+    <link rel="stylesheet" href="./assets/styles.css?v=history-story-20260705">
     <script src="./assets/site.js" defer></script>
   </head>
   <body>
@@ -142,29 +142,18 @@
           <p data-i18n-ja="SongBriefは、アプリが記録できた日のライブラリ状態を比べて、前回から増えた再生、曜日ごとの偏り、発売年ごとの集中度などを表示します。単なる累計ではなく、最近どう変わったかを確認できます。" data-i18n-en="SongBrief compares the library states it can record and shows what changed since the previous record, including recent play increases, weekday patterns, and release-year concentration. It is not just a lifetime total; it helps you see what changed recently.">SongBriefは、アプリが記録できた日のライブラリ状態を比べて、前回から増えた再生、曜日ごとの偏り、発売年ごとの集中度などを表示します。単なる累計ではなく、最近どう変わったかを確認できます。</p>
         </div>
 
-        <div class="history-layout">
-          <div class="history-copy">
-            <div class="insight-list">
+        <div class="history-stack" aria-label="Listening history screenshots">
+          <div class="history-feature history-feature-phone">
+            <div class="history-feature-copy">
               <article class="insight-card">
                 <strong data-i18n-ja="前回からの増加" data-i18n-en="Changes since the last record">前回からの増加</strong>
                 <span data-i18n-ja="直近の記録との差分から、最近よく聴いた曲を抽出します。" data-i18n-en="Find the songs that gained plays since the latest recorded state.">直近の記録との差分から、最近よく聴いた曲を抽出します。</span>
               </article>
               <article class="insight-card">
-                <strong data-i18n-ja="再生ヒートマップ" data-i18n-en="Playback heatmap">再生ヒートマップ</strong>
-                <span data-i18n-ja="日付や曜日ごとの再生活動を、濃淡で俯瞰できます。" data-i18n-en="Scan listening activity by date and weekday with density-based views.">日付や曜日ごとの再生活動を、濃淡で俯瞰できます。</span>
-              </article>
-              <article class="insight-card">
                 <strong data-i18n-ja="リキャップ" data-i18n-en="Recaps">リキャップ</strong>
                 <span data-i18n-ja="月間・年間の総再生、トップ曲、聴取時間を一枚にまとめます。" data-i18n-en="Summarize monthly and yearly plays, top tracks, and listening time in one view.">月間・年間の総再生、トップ曲、聴取時間を一枚にまとめます。</span>
               </article>
-              <article class="insight-card">
-                <strong data-i18n-ja="指標の切り替え" data-i18n-en="Switchable metrics">指標の切り替え</strong>
-                <span data-i18n-ja="発売年別の再生数と曲数など、見たい指標を切り替えられます。" data-i18n-en="Switch between metrics such as plays and track counts by release year.">発売年別の再生数と曲数など、見たい指標を切り替えられます。</span>
-              </article>
             </div>
-          </div>
-
-          <div class="history-preview" aria-label="Listening history screenshots">
             <figure class="device-frame phone-frame history-phone">
               <a
                 class="glightbox lightbox-link"
@@ -177,6 +166,19 @@
               </a>
               <figcaption>日々の聴取記録 / Daily records</figcaption>
             </figure>
+          </div>
+
+          <div class="history-feature history-feature-wide">
+            <div class="history-feature-copy">
+              <article class="insight-card">
+                <strong data-i18n-ja="再生ヒートマップ" data-i18n-en="Playback heatmap">再生ヒートマップ</strong>
+                <span data-i18n-ja="日付や曜日ごとの再生活動を、濃淡で俯瞰できます。" data-i18n-en="Scan listening activity by date and weekday with density-based views.">日付や曜日ごとの再生活動を、濃淡で俯瞰できます。</span>
+              </article>
+              <article class="insight-card">
+                <strong data-i18n-ja="指標の切り替え" data-i18n-en="Switchable metrics">指標の切り替え</strong>
+                <span data-i18n-ja="発売年別の再生数と曲数など、見たい指標を切り替えられます。" data-i18n-en="Switch between metrics such as plays and track counts by release year.">発売年別の再生数と曲数など、見たい指標を切り替えられます。</span>
+              </article>
+            </div>
             <figure class="device-frame tablet-frame history-tablet">
               <a
                 class="glightbox lightbox-link"
