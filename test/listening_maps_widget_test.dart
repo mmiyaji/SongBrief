@@ -51,10 +51,7 @@ void main() {
     expect(find.text('Listening maps'), findsOneWidget);
     expect(find.text('Tap a year point'), findsOneWidget);
 
-    final expandButton = find.byTooltip('Expand listening maps');
-    await tester.ensureVisible(expandButton);
-    await tester.tap(expandButton);
-    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
 
     expect(find.text('Genre stack by release year'), findsOneWidget);
     expect(find.text('Era mix'), findsOneWidget);
@@ -85,14 +82,13 @@ void main() {
     await _pumpOverview(tester);
     await tester.pumpAndSettle();
 
-    final expandButton = find.byTooltip('Expand listening maps');
-    await tester.ensureVisible(expandButton);
-    await tester.tap(expandButton);
-    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
 
     expect(find.text('Release year x songs'), findsNothing);
 
-    await tester.tap(find.text('Tracks').last);
+    final tracksToggle = find.text('Tracks').last;
+    await tester.ensureVisible(tracksToggle);
+    await tester.tap(tracksToggle);
     await tester.pumpAndSettle();
 
     expect(find.text('Release year x songs'), findsOneWidget);
@@ -170,10 +166,7 @@ void main() {
     await _pumpOverview(tester);
     await tester.pumpAndSettle();
 
-    final expandButton = find.byTooltip('Expand listening maps');
-    await tester.ensureVisible(expandButton);
-    await tester.tap(expandButton);
-    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
 
     final decadeRow = find.text('2010s');
     await tester.ensureVisible(decadeRow);
@@ -182,6 +175,18 @@ void main() {
 
     expect(find.textContaining('Release decade songs'), findsOneWidget);
   });
+}
+
+Future<void> _openExpandedListeningMaps(WidgetTester tester) async {
+  final expandButton = find.byTooltip('Expand listening maps');
+  await tester.scrollUntilVisible(
+    expandButton,
+    420,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(expandButton);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpOverview(WidgetTester tester, {List<LibraryTrack>? tracks}) {

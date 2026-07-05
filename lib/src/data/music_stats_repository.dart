@@ -12,6 +12,16 @@ import 'library_snapshot_repository.dart';
 import 'music_library_channel.dart';
 
 const _largeDemoTrackCount = int.fromEnvironment('SONGBRIEF_DEMO_TRACK_COUNT');
+const _demoArtworkAssets = [
+  'assets/demo_art/skyline_echo.png',
+  'assets/demo_art/glass_harbor.png',
+  'assets/demo_art/tableau.png',
+  'assets/demo_art/subway_light.png',
+  'assets/demo_art/late_bloom.png',
+  'assets/demo_art/north_line.png',
+  'assets/demo_art/signal_blue.png',
+  'assets/demo_art/midnight_arcade.png',
+];
 
 final musicLibraryClientProvider = Provider<MusicLibraryClient>(
   (ref) => const PlatformMusicLibraryClient(),
@@ -49,9 +59,7 @@ class MusicStatsRepository {
       return MusicStatsState(
         authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
         overview: overview,
-        snapshotHistory: _largeDemoTrackCount > 0
-            ? SnapshotHistory.empty
-            : snapshotRecordingEnabled
+        snapshotHistory: snapshotRecordingEnabled
             ? _sampleSnapshotHistory(overview)
             : SnapshotHistory.empty,
         snapshotRecordingEnabled: snapshotRecordingEnabled,
@@ -228,6 +236,7 @@ class MusicStatsRepository {
         artist: 'The Pale Keys',
         albumTitle: 'Still Frames',
         genre: 'Indie Rock',
+        artworkAsset: 'assets/demo_art/subway_light.png',
         releaseDate: DateTime(2018, 10, 2),
         duration: const Duration(minutes: 3, seconds: 28),
         playCount: 121,
@@ -242,6 +251,7 @@ class MusicStatsRepository {
         artist: 'Mika Seno',
         albumTitle: 'Small Signals',
         genre: 'Pop',
+        artworkAsset: 'assets/demo_art/late_bloom.png',
         releaseDate: DateTime(2024, 2, 9),
         duration: const Duration(minutes: 4, seconds: 2),
         playCount: 116,
@@ -259,6 +269,7 @@ class MusicStatsRepository {
         artist: 'Mika Seno',
         albumTitle: 'Small Signals',
         genre: 'Pop',
+        artworkAsset: 'assets/demo_art/north_line.png',
         releaseDate: DateTime(2024, 2, 9),
         duration: const Duration(minutes: 2, seconds: 58),
         playCount: 96,
@@ -273,6 +284,7 @@ class MusicStatsRepository {
         artist: 'Kite Room',
         albumTitle: 'Afterimage',
         genre: 'Ambient',
+        artworkAsset: 'assets/demo_art/signal_blue.png',
         releaseDate: DateTime(2015, 7, 24),
         duration: const Duration(minutes: 6, seconds: 18),
         playCount: 78,
@@ -316,6 +328,7 @@ class MusicStatsRepository {
         albumTitle: 'Demo Album ${albumIndex.toString().padLeft(4, '0')}',
         albumArtist: 'Demo Artist ${artistIndex.toString().padLeft(4, '0')}',
         genre: genre,
+        artworkAsset: _demoArtworkAssets[index % _demoArtworkAssets.length],
         releaseDate: DateTime(1975 + index % 50, index % 12 + 1, 1),
         duration: Duration(minutes: 2 + index % 5, seconds: index % 60),
         playCount: playCount,
@@ -335,42 +348,41 @@ class MusicStatsRepository {
   }
 
   SnapshotHistory _sampleSnapshotHistory(LibraryOverview overview) {
-    const playDeltasByTrack = <String, List<int>>{
-      'demo-1': [1, 0, 2, 1, 1, 2, 1],
-      'demo-2': [0, 1, 1, 0, 1, 1, 0],
-      'demo-3': [1, 0, 0, 1, 0, 0, 1],
-      'demo-4': [0, 0, 1, 0, 0, 1, 0],
-      'demo-5': [0, 1, 0, 0, 1, 0, 0],
-      'demo-6': [0, 0, 0, 1, 0, 0, 0],
-      'demo-7': [0, 0, 0, 0, 0, 1, 0],
-    };
-    const skipDeltasByTrack = <String, List<int>>{
-      'demo-1': [0, 0, 0, 1, 0, 0, 0],
-      'demo-2': [0, 1, 0, 0, 0, 1, 0],
-      'demo-4': [1, 0, 1, 0, 1, 0, 0],
-    };
+    const snapshotDays = 90;
     final today = DateTime.now();
     final todayStart = DateTime(today.year, today.month, today.day, 6);
     var history = SnapshotHistory.empty;
 
-    for (var snapshotIndex = 0; snapshotIndex <= 7; snapshotIndex++) {
-      final day = todayStart.subtract(Duration(days: 7 - snapshotIndex));
-      final tracks = [
-        for (final track in overview.tracks)
-          track.copyWith(
-            playCount: _demoCounterAtSnapshot(
+    for (var snapshotIndex = 0; snapshotIndex < snapshotDays; snapshotIndex++) {
+      final day = todayStart.subtract(
+        Duration(days: snapshotDays - 1 - snapshotIndex),
+      );
+      final tracks = List<LibraryTrack>.generate(overview.tracks.length, (
+        trackIndex,
+      ) {
+        final track = overview.tracks[trackIndex];
+        return track.copyWith(
+          playCount: _demoCounterAtSnapshot(
+            current: track.playCount,
+            deltas: _demoPlayDeltas(
+              trackIndex: trackIndex,
               current: track.playCount,
-              deltas: playDeltasByTrack[track.id] ?? const <int>[],
-              snapshotIndex: snapshotIndex,
+              days: snapshotDays,
             ),
-            skipCount: _demoCounterAtSnapshot(
-              current: track.skipCount,
-              deltas: skipDeltasByTrack[track.id] ?? const <int>[],
-              snapshotIndex: snapshotIndex,
-            ),
-            lastPlayedAt: track.lastPlayedAt,
+            snapshotIndex: snapshotIndex,
           ),
-      ];
+          skipCount: _demoCounterAtSnapshot(
+            current: track.skipCount,
+            deltas: _demoSkipDeltas(
+              trackIndex: trackIndex,
+              current: track.skipCount,
+              days: snapshotDays,
+            ),
+            snapshotIndex: snapshotIndex,
+          ),
+          lastPlayedAt: track.lastPlayedAt,
+        );
+      }, growable: false);
       history = history.withSnapshot(
         DailyLibrarySnapshot.fromOverview(
           LibraryOverview.fromTracks(tracks, isDemo: true),
@@ -394,6 +406,75 @@ class MusicStatsRepository {
     }
     final value = current - remaining;
     return value < 0 ? 0 : value;
+  }
+
+  List<int> _demoPlayDeltas({
+    required int trackIndex,
+    required int current,
+    required int days,
+  }) {
+    if (days <= 1 || current <= 0) {
+      return const <int>[];
+    }
+    final raw = List<int>.generate(days - 1, (dayIndex) {
+      final weekdayPulse = dayIndex % 7 == 5 || dayIndex % 7 == 6 ? 1 : 0;
+      final releasePush = trackIndex % 9 == 0 && dayIndex > days - 28 ? 2 : 0;
+      final rediscoveryWave =
+          trackIndex % 11 == 4 && dayIndex > 16 && dayIndex < 36 ? 2 : 0;
+      final steadyFavorite = trackIndex < 8 && (dayIndex + trackIndex) % 3 == 0
+          ? 1
+          : 0;
+      final longTail = trackIndex >= 8 && (dayIndex + trackIndex) % 17 == 0
+          ? 1
+          : 0;
+      return weekdayPulse +
+          releasePush +
+          rediscoveryWave +
+          steadyFavorite +
+          longTail;
+    });
+    return _fitDeltasToCurrent(raw, current);
+  }
+
+  List<int> _demoSkipDeltas({
+    required int trackIndex,
+    required int current,
+    required int days,
+  }) {
+    if (days <= 1 || current <= 0) {
+      return const <int>[];
+    }
+    final raw = List<int>.generate(days - 1, (dayIndex) {
+      if (trackIndex % 13 == 3 && dayIndex % 9 == 0) {
+        return 2;
+      }
+      if (trackIndex % 5 == 1 && dayIndex % 14 == 0) {
+        return 1;
+      }
+      return 0;
+    });
+    return _fitDeltasToCurrent(raw, current);
+  }
+
+  List<int> _fitDeltasToCurrent(List<int> raw, int current) {
+    final total = raw.fold<int>(0, (sum, value) => sum + value);
+    if (total <= current) {
+      return raw;
+    }
+    var remaining = current;
+    final fitted = <int>[];
+    for (final value in raw) {
+      if (remaining <= 0) {
+        fitted.add(0);
+      } else if (value <= remaining) {
+        fitted.add(value);
+        remaining -= value;
+      } else {
+        fitted.add(remaining);
+        remaining = 0;
+      }
+    }
+    return List<int>.unmodifiable(fitted);
   }
 }
 

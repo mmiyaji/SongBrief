@@ -344,7 +344,7 @@ class _SnapshotStatusPanel extends StatelessWidget {
     final latest = history.latest;
     final delta = history.latestDelta;
 
-    if (isDemo || latest == null) {
+    if (latest == null) {
       return GlassSurface(
         padding: const EdgeInsets.all(18),
         radius: 24,

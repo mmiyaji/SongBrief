@@ -1,0 +1,45 @@
+{
+  "source": "Actual screenshots captured from the local SongBrief web demo.",
+  "specs": {
+    "iphone_6_9": {
+      "pixels": [
+        1320,
+        2868
+      ],
+      "apple_display": "6.9-inch iPhone portrait"
+    },
+    "ipad_13": {
+      "pixels": [
+        2064,
+        2752
+      ],
+      "apple_display": "13-inch iPad portrait"
+    }
+  },
+  "files": [
+    "store_assets/app_store_screenshots/en/iphone_6_9/01_playing.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/02_overview.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/03_rankings.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/04_library.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/05_settings.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/06_history.png",
+    "store_assets/app_store_screenshots/en/ipad_13/01_playing.png",
+    "store_assets/app_store_screenshots/en/ipad_13/02_overview.png",
+    "store_assets/app_store_screenshots/en/ipad_13/03_rankings.png",
+    "store_assets/app_store_screenshots/en/ipad_13/04_library.png",
+    "store_assets/app_store_screenshots/en/ipad_13/05_settings.png",
+    "store_assets/app_store_screenshots/en/ipad_13/06_history.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/01_playing.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/02_overview.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/03_rankings.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/04_library.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/05_settings.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/06_history.png",
+    "store_assets/app_store_screenshots/ja/ipad_13/01_playing.png",
+    "store_assets/app_store_screenshots/ja/ipad_13/02_overview.png",
+    "store_assets/app_store_screenshots/ja/ipad_13/03_rankings.png",
+    "store_assets/app_store_screenshots/ja/ipad_13/04_library.png",
+    "store_assets/app_store_screenshots/ja/ipad_13/05_settings.png",
+    "store_assets/app_store_screenshots/ja/ipad_13/06_history.png"
+  ]
+}
