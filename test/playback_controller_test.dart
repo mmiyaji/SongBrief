@@ -73,6 +73,29 @@ void main() {
     expect(state.activeTrackId, 'track-9');
     expect(state.isPlaying, isTrue);
   });
+
+  test(
+    'toggle resumes the active paused track without restarting it',
+    () async {
+      final repository = _FakeMusicStatsRepository();
+      final container = ProviderContainer(
+        overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(playbackControllerProvider.notifier);
+      await controller.playTrack('track-1');
+      await controller.pause();
+      await controller.toggleTrack('track-1');
+
+      final state = container.read(playbackControllerProvider);
+      expect(repository.playTrackCalls, 1);
+      expect(repository.pauseCalls, 1);
+      expect(repository.playCalls, 1);
+      expect(state.activeTrackId, 'track-1');
+      expect(state.isPlaying, isTrue);
+    },
+  );
 }
 
 class _FakeMusicStatsRepository extends MusicStatsRepository {
@@ -87,6 +110,9 @@ class _FakeMusicStatsRepository extends MusicStatsRepository {
   final Stream<MusicPlaybackSnapshot> playbackEventsOverride;
   var loadCalls = 0;
   var skipToNextCalls = 0;
+  var playTrackCalls = 0;
+  var playCalls = 0;
+  var pauseCalls = 0;
 
   @override
   Future<MusicStatsState> load({bool requestAccess = false}) async {
@@ -109,6 +135,21 @@ class _FakeMusicStatsRepository extends MusicStatsRepository {
   @override
   Future<void> skipToNext() async {
     skipToNextCalls += 1;
+  }
+
+  @override
+  Future<void> playTrack(String trackId) async {
+    playTrackCalls += 1;
+  }
+
+  @override
+  Future<void> play() async {
+    playCalls += 1;
+  }
+
+  @override
+  Future<void> pause() async {
+    pauseCalls += 1;
   }
 }
 

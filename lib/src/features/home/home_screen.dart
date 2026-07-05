@@ -153,6 +153,33 @@ String _dayCountLabel(BuildContext context, int count) {
   );
 }
 
+String _trackWebSearchQuery(LibraryTrack track) {
+  return _joinSearchTerms([track.title, track.artist]);
+}
+
+String _albumWebSearchQuery(LibraryTrack track) {
+  return _joinSearchTerms([
+    track.albumTitle,
+    track.albumArtist ?? track.artist,
+  ]);
+}
+
+String _artistWebSearchQuery(String artist) {
+  return _joinSearchTerms([artist]);
+}
+
+String _joinSearchTerms(Iterable<String?> values) {
+  return values
+      .map((value) => value?.trim() ?? '')
+      .where((value) => value.isNotEmpty)
+      .toSet()
+      .join(' ');
+}
+
+Uri _webSearchUri(String query) {
+  return Uri.https('www.google.com', '/search', {'q': query});
+}
+
 String _authorizationLabel(
   BuildContext context,
   MusicLibraryAuthorizationStatus status,

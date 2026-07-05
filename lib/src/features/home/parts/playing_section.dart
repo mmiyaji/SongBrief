@@ -232,6 +232,11 @@ class _HeroTrackPanel extends ConsumerWidget {
                                     track: track,
                                     onDark: true,
                                   ),
+                                  _SearchWebButton(
+                                    query: _trackWebSearchQuery(track),
+                                    subject: track.title,
+                                    onDark: true,
+                                  ),
                                 ],
                               ),
                             ),
@@ -426,6 +431,10 @@ class _HeroTrackWideHeader extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     _OpenInAppleMusicButton(track: track),
+                    _SearchWebButton(
+                      query: _trackWebSearchQuery(track),
+                      subject: track.title,
+                    ),
                   ],
                 ),
               ),
@@ -1284,6 +1293,10 @@ class _TrackDetailSheet extends ConsumerWidget {
               _PlaybackControls(track: track),
               const SizedBox(height: 10),
               _OpenInAppleMusicButton(track: track),
+              _SearchWebButton(
+                query: _trackWebSearchQuery(track),
+                subject: track.title,
+              ),
               const SizedBox(height: 18),
               _TrackDetailsPanel(track: track),
               const SizedBox(height: 18),
@@ -1304,6 +1317,8 @@ void _showTrackGroupSheet(
   required List<LibraryTrack> tracks,
   RankingScope? rankingScope,
   String? rankingTitle,
+  String? webSearchQuery,
+  String? webSearchSubject,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -1316,6 +1331,8 @@ void _showTrackGroupSheet(
       tracks: tracks,
       rankingScope: rankingScope,
       rankingTitle: rankingTitle,
+      webSearchQuery: webSearchQuery,
+      webSearchSubject: webSearchSubject,
     ),
   );
 }
@@ -1443,6 +1460,8 @@ class _TrackGroupSheet extends ConsumerWidget {
     required this.tracks,
     this.rankingScope,
     this.rankingTitle,
+    this.webSearchQuery,
+    this.webSearchSubject,
   });
 
   final String title;
@@ -1451,6 +1470,8 @@ class _TrackGroupSheet extends ConsumerWidget {
   final List<LibraryTrack> tracks;
   final RankingScope? rankingScope;
   final String? rankingTitle;
+  final String? webSearchQuery;
+  final String? webSearchSubject;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1470,6 +1491,9 @@ class _TrackGroupSheet extends ConsumerWidget {
     final latestTrack = _latestPlayedTrack(tracks);
     final topTrack = tracks.isEmpty ? null : tracks.first;
     final height = MediaQuery.sizeOf(context).height;
+    final effectiveWebSearchQuery =
+        webSearchQuery ?? _webSearchQueryForTrackGroupSheet();
+    final effectiveWebSearchSubject = webSearchSubject ?? title;
 
     return SafeArea(
       top: false,
@@ -1527,6 +1551,13 @@ class _TrackGroupSheet extends ConsumerWidget {
                 ),
               ),
             ],
+            if (effectiveWebSearchQuery.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _SearchWebButton(
+                query: effectiveWebSearchQuery,
+                subject: effectiveWebSearchSubject,
+              ),
+            ],
             const SizedBox(height: 14),
             _TrackGroupSummary(
               trackCount: tracks.length,
@@ -1545,6 +1576,14 @@ class _TrackGroupSheet extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _webSearchQueryForTrackGroupSheet() {
+    return switch (rankingScope) {
+      RankingScope.artists => _artistWebSearchQuery(rankingTitle ?? title),
+      RankingScope.albums => _joinSearchTerms([title, subtitle]),
+      _ => '',
+    };
   }
 }
 
@@ -1959,6 +1998,10 @@ class _NowTrackCopy extends StatelessWidget {
         _PlaybackControls(track: track),
         const SizedBox(height: 10),
         _OpenInAppleMusicButton(track: track),
+        _SearchWebButton(
+          query: _trackWebSearchQuery(track),
+          subject: track.title,
+        ),
       ],
     );
   }
@@ -2147,6 +2190,43 @@ class _OpenInAppleMusicButton extends StatelessWidget {
   }
 }
 
+class _SearchWebButton extends StatelessWidget {
+  const _SearchWebButton({
+    required this.query,
+    required this.subject,
+    this.onDark = false,
+  });
+
+  final String query;
+  final String subject;
+  final bool onDark;
+
+  @override
+  Widget build(BuildContext context) {
+    if (query.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        style: TextButton.styleFrom(
+          foregroundColor: onDark
+              ? Colors.white.withValues(alpha: 0.82)
+              : theme.colorScheme.onSurfaceVariant,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+        ),
+        onPressed: () => _openWebSearch(context, query, subject),
+        icon: const Icon(Icons.travel_explore_rounded, size: 18),
+        label: Text(_t(context, 'Search the web', 'Webで検索')),
+      ),
+    );
+  }
+}
+
 class _TrackDetailsPanel extends ConsumerWidget {
   const _TrackDetailsPanel({required this.track});
 
@@ -2190,6 +2270,8 @@ class _TrackDetailsPanel extends ConsumerWidget {
                   tracks: artistTracks,
                   rankingScope: RankingScope.artists,
                   rankingTitle: track.artist,
+                  webSearchQuery: _artistWebSearchQuery(track.artist),
+                  webSearchSubject: track.artist,
                 ),
         ),
         const SizedBox(height: 10),
@@ -2207,6 +2289,8 @@ class _TrackDetailsPanel extends ConsumerWidget {
                   tracks: albumTracks,
                   rankingScope: RankingScope.albums,
                   rankingTitle: _albumRankingTitle(track),
+                  webSearchQuery: _albumWebSearchQuery(track),
+                  webSearchSubject: track.albumTitle,
                 ),
         ),
         const SizedBox(height: 10),
@@ -2224,6 +2308,8 @@ class _TrackDetailsPanel extends ConsumerWidget {
                   tracks: albumArtistTracks,
                   rankingScope: RankingScope.artists,
                   rankingTitle: albumArtist,
+                  webSearchQuery: _artistWebSearchQuery(albumArtist),
+                  webSearchSubject: albumArtist,
                 ),
         ),
         const SizedBox(height: 10),

@@ -359,6 +359,8 @@ VoidCallback? _rankingEntryTapHandler(
         tracks: tracks,
         rankingScope: RankingScope.artists,
         rankingTitle: entry.title,
+        webSearchQuery: _artistWebSearchQuery(entry.title),
+        webSearchSubject: entry.title,
       );
     },
     RankingEntryKind.album =>
@@ -377,6 +379,8 @@ VoidCallback? _rankingEntryTapHandler(
                 tracks: tracks,
                 rankingScope: RankingScope.albums,
                 rankingTitle: _albumRankingTitle(representativeTrack),
+                webSearchQuery: _albumWebSearchQuery(representativeTrack),
+                webSearchSubject: representativeTrack.albumTitle,
               );
             },
   };
@@ -1328,6 +1332,19 @@ class _LibraryGroupEntry {
   final String? rankingTitle;
 
   int get trackCount => tracks.length;
+}
+
+String? _webSearchQueryForLibraryGroup(_LibraryGroupEntry group) {
+  return switch (group.rankingScope) {
+    RankingScope.artists => _artistWebSearchQuery(
+      group.rankingTitle ?? group.title,
+    ),
+    RankingScope.albums =>
+      group.representativeTrack == null
+          ? _joinSearchTerms([group.title, group.subtitle])
+          : _albumWebSearchQuery(group.representativeTrack!),
+    _ => null,
+  };
 }
 
 class _LibraryGroupAccumulator {

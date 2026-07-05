@@ -350,6 +350,9 @@ class PlaybackController extends Notifier<PlaybackState> {
     if (state.isTrackPlaying(trackId)) {
       return pause();
     }
+    if (state.isTrackActive(trackId)) {
+      return play();
+    }
     return playTrack(trackId);
   }
 

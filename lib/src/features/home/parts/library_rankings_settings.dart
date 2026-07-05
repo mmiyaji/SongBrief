@@ -1520,6 +1520,7 @@ class _LibraryGroupRow extends ConsumerWidget {
     final artwork = representative == null
         ? const AsyncData<Uint8List?>(null)
         : ref.watch(trackArtworkProvider(representative.id));
+    final webSearchQuery = _webSearchQueryForLibraryGroup(group);
 
     return Material(
       color: Colors.transparent,
@@ -1533,6 +1534,8 @@ class _LibraryGroupRow extends ConsumerWidget {
           tracks: group.tracks,
           rankingScope: group.rankingScope,
           rankingTitle: group.rankingTitle,
+          webSearchQuery: webSearchQuery,
+          webSearchSubject: group.title,
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -4025,6 +4028,49 @@ Future<void> _openAppleMusicTrack(
   LibraryTrack track,
 ) async {
   await _openExternalUrl(context, appleMusicUrlForTrack(track).toString());
+}
+
+Future<void> _openWebSearch(
+  BuildContext context,
+  String query,
+  String subject,
+) async {
+  final trimmedQuery = query.trim();
+  if (trimmedQuery.isEmpty) {
+    return;
+  }
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(_t(context, 'Open web search?', 'Web検索を開きますか？')),
+      content: Text(
+        _t(
+          context,
+          'SongBrief will open an external browser and search for "$trimmedQuery" about "$subject". The search terms may include song, artist, or album names and will be sent to the search service.',
+          '外部ブラウザで「$subject」について「$trimmedQuery」を検索します。検索語句には曲名、アーティスト名、アルバム名などが含まれ、検索サービスへ送信されます。',
+          zh: 'SongBrief 将在外部浏览器中搜索与“$subject”相关的“$trimmedQuery”。搜索词可能包含歌曲、艺人或专辑名称，并会发送到搜索服务。',
+          ko: 'SongBrief가 외부 브라우저에서 "$subject"에 대해 "$trimmedQuery"를 검색합니다. 검색어에는 곡명, 아티스트명, 앨범명이 포함될 수 있으며 검색 서비스로 전송됩니다.',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(_t(context, 'Cancel', 'キャンセル')),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(_t(context, 'Open', '開く')),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true || !context.mounted) {
+    return;
+  }
+
+  await _openExternalUrl(context, _webSearchUri(trimmedQuery).toString());
 }
 
 Future<void> _openExternalUrl(BuildContext context, String url) async {

@@ -18,6 +18,8 @@ void main() {
     final skylineEcho = find.text('Skyline Echo');
     expect(skylineEcho, findsWidgets);
 
+    await tester.ensureVisible(skylineEcho.last);
+    await tester.pumpAndSettle();
     await tester.tap(skylineEcho.last);
     await tester.pumpAndSettle();
 

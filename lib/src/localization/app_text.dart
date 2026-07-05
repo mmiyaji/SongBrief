@@ -605,6 +605,12 @@ const _copyTranslations = <String, _LocalizedCopy>{
     zh: '在 Apple Music 中搜索',
     ko: 'Apple Music에서 검색',
   ),
+  'Search the web': _LocalizedCopy(ja: 'Webで検索', zh: '网页搜索', ko: '웹에서 검색'),
+  'Open web search?': _LocalizedCopy(
+    ja: 'Web検索を開きますか？',
+    zh: '打开网页搜索？',
+    ko: '웹 검색을 열까요?',
+  ),
   'Show details': _LocalizedCopy(ja: '詳細を見る', zh: '查看详情', ko: '상세 보기'),
   'See all': _LocalizedCopy(ja: 'すべて見る', zh: '查看全部', ko: '모두 보기'),
   'Show position in ranking': _LocalizedCopy(
