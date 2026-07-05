@@ -10,6 +10,13 @@
     >
     <link rel="icon" type="image/png" href="/assets/songbrief-icon.png">
     <link rel="apple-touch-icon" href="/assets/songbrief-icon.png">
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/glightbox@3.3.1/dist/css/glightbox.min.css"
+      integrity="sha384-GPAzSuZc0kFvdIev6wm9zg8gnafE8tLso7rsAYQfc9hAdWCpOcpcNI5W9lWkYcsd"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    >
     <link rel="stylesheet" href="./assets/styles.css">
   </head>
   <body>
@@ -46,10 +53,26 @@
 
         <div class="preview-stack" aria-label="SongBrief screenshots">
           <div class="device-frame phone-frame">
-            <img src="./assets/screenshot-iphone-overview.png" alt="SongBrief overview screen">
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-iphone-overview.png"
+              data-gallery="songbrief-screens"
+              data-title="概要 / Overview"
+              aria-label="概要画面を拡大"
+            >
+              <img src="./assets/screenshot-iphone-overview.png" alt="SongBrief overview screen">
+            </a>
           </div>
           <div class="device-frame phone-frame secondary-phone">
-            <img src="./assets/screenshot-iphone-rankings.png" alt="SongBrief rankings screen">
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-iphone-rankings.png"
+              data-gallery="songbrief-screens"
+              data-title="ランキング / Rankings"
+              aria-label="ランキング画面を拡大"
+            >
+              <img src="./assets/screenshot-iphone-rankings.png" alt="SongBrief rankings screen">
+            </a>
           </div>
         </div>
       </section>
@@ -113,15 +136,39 @@
 
         <div class="screenshot-row">
           <figure class="device-frame phone-frame">
-            <img src="./assets/screenshot-iphone-overview.png" alt="Overview screen on iPhone">
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-iphone-overview.png"
+              data-gallery="songbrief-screens"
+              data-title="概要 / Overview"
+              aria-label="概要画面を拡大"
+            >
+              <img src="./assets/screenshot-iphone-overview.png" alt="Overview screen on iPhone">
+            </a>
             <figcaption>概要 / Overview</figcaption>
           </figure>
           <figure class="device-frame phone-frame">
-            <img src="./assets/screenshot-iphone-rankings.png" alt="Rankings screen on iPhone">
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-iphone-rankings.png"
+              data-gallery="songbrief-screens"
+              data-title="ランキング / Rankings"
+              aria-label="ランキング画面を拡大"
+            >
+              <img src="./assets/screenshot-iphone-rankings.png" alt="Rankings screen on iPhone">
+            </a>
             <figcaption>ランキング / Rankings</figcaption>
           </figure>
           <figure class="device-frame tablet-frame">
-            <img src="./assets/screenshot-ipad-library.png" alt="Library screen on iPad">
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-ipad-library.png"
+              data-gallery="songbrief-screens"
+              data-title="ライブラリ / Library"
+              aria-label="ライブラリ画面を拡大"
+            >
+              <img src="./assets/screenshot-ipad-library.png" alt="Library screen on iPad">
+            </a>
             <figcaption>ライブラリ / Library</figcaption>
           </figure>
         </div>
@@ -143,5 +190,21 @@
     <footer class="site-footer">
       <p>&copy; 2026 SongBrief. All rights reserved.</p>
     </footer>
+    <script
+      src="https://cdn.jsdelivr.net/npm/glightbox@3.3.1/dist/js/glightbox.min.js"
+      integrity="sha384-MZZbZ6RXJudK43v1qY1zOWKOU2yfeBPatuFoKyHAaAgHTUZhwblRTc9CphTt4IGQ"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script>
+      if (window.GLightbox) {
+        GLightbox({
+          selector: '.glightbox',
+          loop: true,
+          touchNavigation: true,
+          zoomable: true
+        });
+      }
+    </script>
   </body>
 </html>
