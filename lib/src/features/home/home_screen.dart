@@ -221,8 +221,8 @@ String _themeStyleDescription(BuildContext context, SongBriefThemeStyle style) {
     ),
     SongBriefThemeStyle.aurora => _t(
       context,
-      'Green spectrum accents with a quiet glow.',
-      'グリーンの光を軸にした落ち着いた発光感のテーマです。',
+      'Magenta, ice blue, and amber accents with a polar-night feel.',
+      'マゼンタ、アイスブルー、アンバーで極夜の光をイメージしたテーマです。',
     ),
     SongBriefThemeStyle.grove => _t(
       context,

@@ -681,11 +681,12 @@ const _copyTranslations = <String, _LocalizedCopy>{
     zh: '以黑白为主的高对比度主题。',
     ko: '흑백을 바탕으로 한 고대비 테마입니다.',
   ),
-  'Green spectrum accents with a quiet glow.': _LocalizedCopy(
-    ja: 'グリーンの光を軸にした落ち着いた発光感のテーマです。',
-    zh: '以绿色光谱为轴、带有柔和光感的主题。',
-    ko: '그린 빛을 중심으로 한 은은한 발광감의 테마입니다.',
-  ),
+  'Magenta, ice blue, and amber accents with a polar-night feel.':
+      _LocalizedCopy(
+        ja: 'マゼンタ、アイスブルー、アンバーで極夜の光をイメージしたテーマです。',
+        zh: '以洋红、冰蓝和琥珀色营造极夜光感的主题。',
+        ko: '마젠타, 아이스 블루, 앰버로 극야의 빛을 표현한 테마입니다.',
+      ),
   'Natural green with cyan and coral accents.': _LocalizedCopy(
     ja: '自然なグリーンにシアンとコーラルを添えたテーマです。',
     zh: '自然绿色搭配青色和珊瑚色的主题。',

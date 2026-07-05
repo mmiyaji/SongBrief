@@ -2564,9 +2564,9 @@ List<Color> _themeStyleSwatchColors(SongBriefThemeStyle style) {
       Color(0xFF303030),
     ],
     SongBriefThemeStyle.aurora => const [
-      Color(0xFF66F0C5),
-      Color(0xFFE6F873),
-      Color(0xFFA9A4FF),
+      Color(0xFFFF8BD8),
+      Color(0xFF75D8FF),
+      Color(0xFFFFC15A),
     ],
     SongBriefThemeStyle.grove => const [
       Color(0xFFB6EC67),
