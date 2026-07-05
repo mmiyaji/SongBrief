@@ -19,7 +19,23 @@
     }
   };
 
+  const getUrlLanguage = () => {
+    const requested = new URLSearchParams(window.location.search).get('lang');
+    return languages.includes(requested) ? requested : null;
+  };
+
+  const updateUrlLanguage = (language) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('lang', language);
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  };
+
   const getInitialLanguage = () => {
+    const requested = getUrlLanguage();
+    if (requested) {
+      return requested;
+    }
+
     const saved = getSavedLanguage();
     if (languages.includes(saved)) {
       return saved;
@@ -75,11 +91,15 @@
     });
   };
 
-  const setLanguage = (language) => {
+  const setLanguage = (language, options = {}) => {
     const nextLanguage = languages.includes(language) ? language : 'ja';
     document.documentElement.lang = nextLanguage;
     document.documentElement.dataset.lang = nextLanguage;
     saveLanguage(nextLanguage);
+
+    if (options.updateUrl) {
+      updateUrlLanguage(nextLanguage);
+    }
 
     document.querySelectorAll('[data-i18n-ja][data-i18n-en]').forEach((element) => {
       setText(element, nextLanguage);
@@ -110,7 +130,7 @@
 
     document.querySelectorAll('[data-lang-choice]').forEach((button) => {
       button.addEventListener('click', () => {
-        setLanguage(button.dataset.langChoice);
+        setLanguage(button.dataset.langChoice, { updateUrl: true });
       });
     });
   });
