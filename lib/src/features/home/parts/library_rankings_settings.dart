@@ -1994,6 +1994,7 @@ class _SettingsSection extends ConsumerWidget {
     final selectedBrightness = ref.watch(themeBrightnessProvider);
     final selectedLanguage = ref.watch(appLanguageProvider);
     final appLock = ref.watch(appLockControllerProvider);
+    final crashReporting = ref.watch(crashReportingControllerProvider);
     final libraryFilters = ref.watch(libraryFilterPreferencesProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2123,6 +2124,8 @@ class _SettingsSection extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
               _AppLockSetting(lockState: appLock),
+              const SizedBox(height: 10),
+              _CrashReportingSetting(state: crashReporting),
             ],
           ),
         ),
@@ -3940,6 +3943,104 @@ class _AppLockSetting extends ConsumerWidget {
       },
     );
   }
+}
+
+class _CrashReportingSetting extends ConsumerWidget {
+  const _CrashReportingSetting({required this.state});
+
+  final CrashReportingState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final enabled = state.enabled;
+    return SwitchListTile.adaptive(
+      contentPadding: EdgeInsets.zero,
+      secondary: Icon(
+        Icons.bug_report_outlined,
+        color: state.available
+            ? theme.colorScheme.primary
+            : theme.colorScheme.onSurfaceVariant,
+      ),
+      title: Text(
+        _t(context, 'Crash reports', 'クラッシュレポート', zh: '崩溃报告', ko: '크래시 리포트'),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        _crashReportingDescription(context, state),
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      value: enabled,
+      onChanged: state.canToggle
+          ? (value) {
+              ref
+                  .read(crashReportingControllerProvider.notifier)
+                  .setEnabled(value);
+            }
+          : null,
+    );
+  }
+}
+
+String _crashReportingDescription(
+  BuildContext context,
+  CrashReportingState state,
+) {
+  if (!state.available) {
+    return switch (state.unavailableReason) {
+      CrashReportingUnavailableReason.unsupportedPlatform => _t(
+        context,
+        'Crash reports are available in the iOS app, not in this preview.',
+        'クラッシュレポートはiOSアプリで利用できます。このプレビューでは利用できません。',
+        zh: '崩溃报告可在 iOS 应用中使用，当前预览不可用。',
+        ko: '크래시 리포트는 iOS 앱에서 사용할 수 있으며 이 미리보기에서는 사용할 수 없습니다.',
+      ),
+      CrashReportingUnavailableReason.initializationFailed => _t(
+        context,
+        'Crash reports could not be started. Check Firebase configuration.',
+        'クラッシュレポートを開始できませんでした。Firebase設定を確認してください。',
+        zh: '无法启动崩溃报告。请检查 Firebase 设置。',
+        ko: '크래시 리포트를 시작할 수 없습니다. Firebase 설정을 확인하세요.',
+      ),
+      _ => _t(
+        context,
+        'Crash reports are disabled in this build.',
+        'このビルドではクラッシュレポートを無効化しています。',
+        zh: '此构建已禁用崩溃报告。',
+        ko: '이 빌드에서는 크래시 리포트가 비활성화되어 있습니다.',
+      ),
+    };
+  }
+  if (state.updating) {
+    return _t(
+      context,
+      'Updating crash report settings...',
+      'クラッシュレポート設定を更新しています...',
+      zh: '正在更新崩溃报告设置...',
+      ko: '크래시 리포트 설정을 업데이트하는 중...',
+    );
+  }
+  if (state.enabled) {
+    return _t(
+      context,
+      'Sends stack traces, device/OS information, and app version to Firebase after crashes. Music library details are not sent.',
+      'クラッシュ後にスタックトレース、端末/OS情報、アプリバージョンをFirebaseへ送信します。曲名などは送信しません。',
+      zh: '崩溃后会向 Firebase 发送堆栈跟踪、设备/系统信息和应用版本。不会发送音乐库详情。',
+      ko: '크래시 후 스택 트레이스, 기기/OS 정보, 앱 버전을 Firebase로 보냅니다. 음악 라이브러리 상세 정보는 보내지 않습니다.',
+    );
+  }
+  return _t(
+    context,
+    'When enabled, SongBrief can receive crash diagnostics. Track names, lyrics, playlists, and listening history are not included.',
+    '有効にすると、SongBriefがクラッシュ診断を受け取れます。曲名、歌詞、プレイリスト、聴取履歴は含めません。',
+    zh: '启用后，SongBrief 可以接收崩溃诊断。不会包含曲名、歌词、播放列表或收听历史。',
+    ko: '활성화하면 SongBrief가 크래시 진단을 받을 수 있습니다. 곡명, 가사, 플레이리스트, 청취 기록은 포함하지 않습니다.',
+  );
 }
 
 Future<void> _saveLibraryExport(

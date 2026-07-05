@@ -18,6 +18,7 @@ import '../../domain/library_snapshot.dart';
 import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
+import '../../analytics/crash_reporting.dart';
 import '../../export/library_exporter.dart';
 import '../../localization/app_text.dart';
 import '../../monetization/ad_banner_slot.dart';

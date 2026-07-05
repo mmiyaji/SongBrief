@@ -27,6 +27,7 @@ env:
   KEYCHAIN_NAME: "songbrief-build.keychain-db"
   SONGBRIEF_AD_MODE: "admobLive"
   SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID: "ca-app-pub-5321136982470738/2315074663"
+  SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED: "true"
   SONGBRIEF_PREMIUM_PRODUCT_ID: "songbrief_premium_lifetime"
 
 jobs:
@@ -246,6 +247,7 @@ jobs:
             --build-number="$BUILD_NUMBER" \
             --dart-define=SONGBRIEF_AD_MODE="$SONGBRIEF_AD_MODE" \
             --dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID="$SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID" \
+            --dart-define=SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED="$SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED" \
             --dart-define=SONGBRIEF_PREMIUM_PRODUCT_ID="$SONGBRIEF_PREMIUM_PRODUCT_ID" \
             --export-options-plist="$RUNNER_TEMP/ExportOptions.plist"
 

@@ -1,9 +1,8 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../firebase_options.dart';
+import 'app_firebase.dart';
 
 const _firebaseAnalyticsEnabled = bool.fromEnvironment(
   'SONGBRIEF_FIREBASE_ANALYTICS_ENABLED',
@@ -28,15 +27,7 @@ class AppAnalytics {
     }
 
     try {
-      if (Firebase.apps.isEmpty) {
-        try {
-          await Firebase.initializeApp(
-            options: DefaultFirebaseOptions.currentPlatform,
-          );
-        } on UnsupportedError {
-          await Firebase.initializeApp();
-        }
-      }
+      await ensureSongBriefFirebaseInitialized();
       final analytics = FirebaseAnalytics.instance;
       await analytics.setAnalyticsCollectionEnabled(true);
       await analytics.logAppOpen();

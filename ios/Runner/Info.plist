@@ -29,6 +29,8 @@
 		<string>songbrief</string>
 		<key>GADApplicationIdentifier</key>
 		<string>$(GAD_APPLICATION_IDENTIFIER)</string>
+		<key>FirebaseCrashlyticsCollectionEnabled</key>
+		<false/>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>NSAppleMusicUsageDescription</key>

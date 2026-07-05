@@ -82,6 +82,14 @@
           再生操作の種類など、アプリの動作改善に必要な範囲に限定します。
         </p>
         <p>
+          クラッシュレポートをユーザーが有効にした場合、SongBriefはFirebase
+          Crashlyticsを使用して、クラッシュ時のスタックトレース、アプリ状態、
+          端末とOSの情報、アプリバージョンなどを処理する場合があります。
+          SongBriefは、曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、
+          聴取履歴、音楽ライブラリ内の識別子をクラッシュレポートに意図的に
+          含めません。
+        </p>
+        <p>
           Googleは、広告配信、制限付き広告、広告品質確認、不正利用防止、
           解析のために、端末情報、広告識別子、IPアドレス、アプリ利用状況、
           広告表示ごとの収益情報などを処理する場合があります。地域や設定により、
@@ -97,9 +105,10 @@
           履歴に基づく傾向表示やリキャップなどの機能は利用できない場合があります。
         </p>
         <p>
-          広告や解析が有効な場合、FirebaseおよびAdMobの動作に必要なデータは
-          Googleへ送信されます。ただし、SongBriefは音楽ライブラリの詳細情報を
-          広告や解析のイベントとして送信しません。
+          広告、解析、クラッシュレポートが有効な場合、Firebase、AdMob、
+          Crashlyticsの動作に必要なデータはGoogleへ送信されます。ただし、
+          SongBriefは音楽ライブラリの詳細情報を広告、解析、クラッシュレポートの
+          データとして送信しません。
         </p>
         <p>
           この法務ページはCloudflare Pagesで配信します。移行期間中は
@@ -190,6 +199,14 @@
           screen views, refresh actions, and playback control types.
         </p>
         <p>
+          If you enable crash reports, SongBrief may use Firebase Crashlytics
+          to process crash stack traces, app state, device and OS information,
+          and the SongBrief app version. SongBrief does not intentionally
+          include track titles, artist names, album names, lyrics, playlist
+          names, listening history, or music library identifiers in crash
+          reports.
+        </p>
+        <p>
           Google may process device information, advertising identifiers, IP
           address, app usage, and impression-level ad revenue information for
           ad delivery, limited ads, ad quality, fraud prevention, and analytics.
@@ -205,9 +222,10 @@
           based features such as trends and recaps may not be available.
         </p>
         <p>
-          When ads or analytics are enabled, data required by Firebase and
-          AdMob is sent to Google. SongBrief does not send detailed music
-          library information as ad or analytics events.
+          When ads, analytics, or crash reports are enabled, data required by
+          Firebase, AdMob, and Crashlytics is sent to Google. SongBrief does
+          not send detailed music library information as ad, analytics, or
+          crash report data.
         </p>
         <p>
           This legal website is served by Cloudflare Pages. During migration,

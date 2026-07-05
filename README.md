@@ -62,6 +62,26 @@ flutter analyze
 flutter test
 ```
 
+## Crash Reporting Notes
+
+Crash reporting uses Firebase Crashlytics and is controlled by both a build
+flag and an in-app setting. Local debug builds disable the Crashlytics path by
+default. TestFlight and release builds can make the setting available with:
+
+```sh
+flutter run --release \
+  --dart-define=SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED=true
+```
+
+The in-app setting defaults to off. When enabled, Crashlytics may receive crash
+stack traces, app state, device/OS information, and the SongBrief app version.
+Do not add track titles, artist names, album names, playlist names, lyrics, or
+music library identifiers to Crashlytics logs, custom keys, or recorded errors.
+
+The iOS `Info.plist` keeps native Crashlytics collection disabled at launch so
+collection follows the user's SongBrief setting. Release symbolication may still
+require Firebase dSYM upload configuration in CI before App Store release.
+
 ## Monetization Notes
 
 Ads are opt-in by launch mode. The default mode is ad-free:
