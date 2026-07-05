@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -185,11 +186,13 @@ class _AdPlaceholder extends StatelessWidget {
         '小さなバナー広告を読み込み中',
       ),
       PlatformAdLoadState.loaded => appText(context, 'Ad loaded', '広告を読み込みました'),
-      PlatformAdLoadState.failed when config.missingLiveAdUnit => appText(
-        context,
-        'Set a live AdMob ad unit ID before release',
-        '公開前に本番のAdMob広告ユニットIDを設定してください',
-      ),
+      PlatformAdLoadState.failed
+          when config.missingLiveAdUnit && !kReleaseMode =>
+        appText(
+          context,
+          'Set a live AdMob ad unit ID before release',
+          '公開前に本番のAdMob広告ユニットIDを設定してください',
+        ),
       PlatformAdLoadState.failed when !config.platformCanLoadAds => appText(
         context,
         'Ad preview for this launch mode',

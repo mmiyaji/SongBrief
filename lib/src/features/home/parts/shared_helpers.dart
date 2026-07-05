@@ -471,9 +471,7 @@ class _LoadingState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.error});
-
-  final Object error;
+  const _ErrorState();
 
   @override
   Widget build(BuildContext context) {
@@ -498,7 +496,13 @@ class _ErrorState extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '$error',
+                _t(
+                  context,
+                  'Try refreshing, or check Music access in Settings.',
+                  '画面を更新するか、設定でミュージックアクセスを確認してください。',
+                  zh: '请刷新屏幕，或在设置中确认音乐访问权限。',
+                  ko: '화면을 새로 고치거나 설정에서 음악 접근 권한을 확인하세요.',
+                ),
                 style: theme.textTheme.bodySmall,
                 textAlign: TextAlign.center,
               ),
@@ -1542,7 +1546,7 @@ class _GroupSummaryValue {
   final String value;
 }
 
-const _appVersionLabel = '1.0.0+1';
+const _fallbackAppVersionLabel = '1.0.0+1';
 
 String _hoursLabel(int listeningSeconds) {
   final hours = listeningSeconds / 3600;

@@ -9,6 +9,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -40,6 +41,20 @@ part 'parts/shared_helpers.dart';
 
 const _privacyPolicyUrl = 'https://songbrief.ruhenheim.org/privacy/';
 const _termsOfUseUrl = 'https://songbrief.ruhenheim.org/terms/';
+
+final _appVersionLabelProvider = FutureProvider<String>((ref) async {
+  final packageInfo = await PackageInfo.fromPlatform();
+  return _formatAppVersion(packageInfo);
+});
+
+String _formatAppVersion(PackageInfo packageInfo) {
+  final version = packageInfo.version.trim();
+  final buildNumber = packageInfo.buildNumber.trim();
+  if (buildNumber.isEmpty) {
+    return version;
+  }
+  return '$version+$buildNumber';
+}
 
 String _t(
   BuildContext context,
@@ -449,7 +464,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     selectedSection: selectedSection,
                     useRail: useRail,
                   ),
-                  error: (error, stackTrace) => _ErrorState(error: error),
+                  error: (error, stackTrace) => const _ErrorState(),
                   loading: () => const _LoadingState(),
                 ),
               ),

@@ -1996,6 +1996,12 @@ class _SettingsSection extends ConsumerWidget {
     final appLock = ref.watch(appLockControllerProvider);
     final crashReporting = ref.watch(crashReportingControllerProvider);
     final libraryFilters = ref.watch(libraryFilterPreferencesProvider);
+    final appVersion = ref
+        .watch(_appVersionLabelProvider)
+        .maybeWhen(
+          data: (value) => value,
+          orElse: () => _fallbackAppVersionLabel,
+        );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2170,7 +2176,7 @@ class _SettingsSection extends ConsumerWidget {
               _SettingsRow(
                 icon: Icons.sell_outlined,
                 label: _t(context, 'Version', 'バージョン'),
-                value: _appVersionLabel,
+                value: appVersion,
               ),
               _SettingsRow(
                 icon: Icons.privacy_tip_outlined,
@@ -2195,7 +2201,7 @@ class _SettingsSection extends ConsumerWidget {
                       showLicensePage(
                         context: context,
                         applicationName: 'SongBrief',
-                        applicationVersion: _appVersionLabel,
+                        applicationVersion: appVersion,
                         applicationIcon: Icon(
                           Icons.graphic_eq_rounded,
                           color: theme.colorScheme.primary,
