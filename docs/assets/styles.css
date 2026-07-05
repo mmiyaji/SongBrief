@@ -377,6 +377,29 @@ figcaption {
   margin-top: 0;
 }
 
+.feature-detail-list {
+  border-top: 1px solid var(--line);
+  display: grid;
+  margin-top: 26px;
+}
+
+.feature-detail-row {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(120px, 0.26fr) minmax(0, 1fr);
+  padding: 14px 0;
+}
+
+.feature-detail-row strong {
+  font-size: 0.94rem;
+}
+
+.feature-detail-row span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .history-stack {
   display: grid;
   gap: 34px;
@@ -835,6 +858,7 @@ figcaption {
 
   .stat-grid,
   .feature-grid,
+  .feature-detail-row,
   .design-grid,
   .screenshot-row {
     grid-template-columns: 1fr;
