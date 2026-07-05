@@ -1475,85 +1475,73 @@ class _TrackGroupSheet extends ConsumerWidget {
       top: false,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: height * 0.86),
-        child: Padding(
+        child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, color: theme.colorScheme.primary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: theme.colorScheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$subtitle ・ ${_trackCountLabel(context, tracks.length)} ・ ${_playCountLabel(context, totalPlayCount)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$subtitle ・ ${_trackCountLabel(context, tracks.length)} ・ ${_playCountLabel(context, totalPlayCount)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (rankingScope != null && rankingTitle != null) ...[
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: () {
-                    _focusRankingEntry(
-                      context,
-                      ref,
-                      scope: rankingScope!,
-                      title: rankingTitle!,
-                      closeAllRoutes: true,
-                    );
-                  },
-                  icon: const Icon(Icons.leaderboard_rounded),
-                  label: Text(
-                    _t(context, 'Show position in ranking', 'ランキング内の位置を見る'),
+                      ),
+                    ],
                   ),
                 ),
               ],
+            ),
+            if (rankingScope != null && rankingTitle != null) ...[
               const SizedBox(height: 14),
-              _TrackGroupSummary(
-                trackCount: tracks.length,
-                totalPlayCount: totalPlayCount,
-                totalSkipCount: totalSkipCount,
-                totalListeningSeconds: totalListeningSeconds,
-                topTrack: topTrack,
-                latestTrack: latestTrack,
-              ),
-              const SizedBox(height: 14),
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: tracks.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final track = tracks[index];
-                    return _GroupTrackRow(track: track, rank: index + 1);
-                  },
+              FilledButton.icon(
+                onPressed: () {
+                  _focusRankingEntry(
+                    context,
+                    ref,
+                    scope: rankingScope!,
+                    title: rankingTitle!,
+                    closeAllRoutes: true,
+                  );
+                },
+                icon: const Icon(Icons.leaderboard_rounded),
+                label: Text(
+                  _t(context, 'Show position in ranking', 'ランキング内の位置を見る'),
                 ),
               ),
             ],
-          ),
+            const SizedBox(height: 14),
+            _TrackGroupSummary(
+              trackCount: tracks.length,
+              totalPlayCount: totalPlayCount,
+              totalSkipCount: totalSkipCount,
+              totalListeningSeconds: totalListeningSeconds,
+              topTrack: topTrack,
+              latestTrack: latestTrack,
+            ),
+            const SizedBox(height: 14),
+            for (final indexed in tracks.indexed) ...[
+              if (indexed.$1 > 0) const SizedBox(height: 8),
+              _GroupTrackRow(track: indexed.$2, rank: indexed.$1 + 1),
+            ],
+          ],
         ),
       ),
     );
