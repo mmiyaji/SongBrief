@@ -9,135 +9,24 @@ String appText(
   String? zh,
   String? ko,
 }) {
-  final languageCode =
-      Localizations.of<AppLocalizations>(
-        context,
-        AppLocalizations,
-      )?.localeName.split('_').first ??
-      Localizations.localeOf(context).languageCode;
-  return switch (languageCode) {
+  final languageTag = _localizationLanguageTag(context);
+  return switch (languageTag) {
     'ja' => ja,
-    'zh' => zh ?? _copyTranslations[en]?.zh ?? _dynamicText('zh', en),
-    'ko' => ko ?? _copyTranslations[en]?.ko ?? _dynamicText('ko', en),
+    'zh-Hans' => zh ?? _copyTranslations[en]?.zh ?? en,
+    'ko' => ko ?? _copyTranslations[en]?.ko ?? en,
     _ => en,
   };
 }
 
-String _dynamicText(String languageCode, String en) {
-  String? result;
-  final recentPlaybackMatch = RegExp(
-    r'^Recent playback from the (.+)$',
-  ).firstMatch(en);
-  if (recentPlaybackMatch != null) {
-    final source = recentPlaybackMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '$source 的最近播放曲目',
-      'ko' => '$source의 최근 재생 트랙',
-      _ => null,
-    };
+String _localizationLanguageTag(BuildContext context) {
+  final localizations = Localizations.of<AppLocalizations>(
+    context,
+    AppLocalizations,
+  );
+  if (localizations != null) {
+    return localizations.localeName.replaceAll('_', '-');
   }
-  final overviewMatch = RegExp(r'^Overview of the (.+)$').firstMatch(en);
-  if (result == null && overviewMatch != null) {
-    final source = overviewMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '$source 概览',
-      'ko' => '$source 개요',
-      _ => null,
-    };
-  }
-  final rankingsMatch = RegExp(r'^Rankings from the (.+)$').firstMatch(en);
-  if (result == null && rankingsMatch != null) {
-    final source = rankingsMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '$source 排行榜',
-      'ko' => '$source 순위',
-      _ => null,
-    };
-  }
-  final browseMatch = RegExp(r'^Browse the (.+)$').firstMatch(en);
-  if (result == null && browseMatch != null) {
-    final source = browseMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '浏览$source',
-      'ko' => '$source 탐색',
-      _ => null,
-    };
-  }
-  final todayMatch = RegExp(r'^Today (.+)$').firstMatch(en);
-  if (result == null && todayMatch != null) {
-    final time = todayMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '今天 $time',
-      'ko' => '오늘 $time',
-      _ => null,
-    };
-  }
-  final musicAccessMatch = RegExp(r'^Music access is (.+)\.$').firstMatch(en);
-  if (result == null && musicAccessMatch != null) {
-    final status = musicAccessMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '音乐访问权限：$status。',
-      'ko' => '음악 접근 상태: $status.',
-      _ => null,
-    };
-  }
-  final matchedSearch = RegExp(r'^(.+) matched$').firstMatch(en);
-  if (result == null && matchedSearch != null) {
-    final countAndScope = matchedSearch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '$countAndScope 个结果匹配',
-      'ko' => '$countAndScope개 항목이 일치합니다',
-      _ => null,
-    };
-  }
-  final noMatchedSearch = RegExp(
-    r'^No (.+) matched the current search\.$',
-  ).firstMatch(en);
-  if (result == null && noMatchedSearch != null) {
-    final scope = noMatchedSearch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '当前搜索没有匹配的$scope。',
-      'ko' => '현재 검색과 일치하는 $scope 항목이 없습니다.',
-      _ => null,
-    };
-  }
-  final showMoreMatch = RegExp(r'^Show (.+) more$').firstMatch(en);
-  if (result == null && showMoreMatch != null) {
-    final count = showMoreMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '再显示 $count 项',
-      'ko' => '$count개 더 보기',
-      _ => null,
-    };
-  }
-  final rulesMatch = RegExp(r'^(.+) rules$').firstMatch(en);
-  if (result == null && rulesMatch != null) {
-    final count = rulesMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '$count 条规则',
-      'ko' => '$count개 규칙',
-      _ => null,
-    };
-  }
-  final savedMatch = RegExp(r'^Saved (.+)\.$').firstMatch(en);
-  if (result == null && savedMatch != null) {
-    final fileName = savedMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '已保存 $fileName。',
-      'ko' => '$fileName 저장됨.',
-      _ => null,
-    };
-  }
-  final couldNotOpenMatch = RegExp(r'^Could not open (.+)$').firstMatch(en);
-  if (result == null && couldNotOpenMatch != null) {
-    final url = couldNotOpenMatch.group(1)!;
-    result = switch (languageCode) {
-      'zh' => '无法打开 $url',
-      'ko' => '$url을 열 수 없습니다',
-      _ => null,
-    };
-  }
-  return result ?? en;
+  return Localizations.localeOf(context).toLanguageTag();
 }
 
 String localizeRuntimeMessage(BuildContext context, String message) {

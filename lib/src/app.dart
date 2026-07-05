@@ -9,6 +9,13 @@ import 'settings/app_lock.dart';
 import 'settings/app_preferences.dart';
 import 'theme/app_theme.dart';
 
+const songBriefSupportedLocales = <Locale>[
+  Locale('en'),
+  Locale('ja'),
+  songBriefSimplifiedChineseLocale,
+  Locale('ko'),
+];
+
 class SongBriefApp extends ConsumerWidget {
   const SongBriefApp({super.key});
 
@@ -22,8 +29,9 @@ class SongBriefApp extends ConsumerWidget {
       title: 'SongBrief',
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       locale: appLanguage.locale,
-      supportedLocales: AppLocalizations.supportedLocales,
+      supportedLocales: songBriefSupportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localeListResolutionCallback: resolveSongBriefLocale,
       theme: buildSongBriefTheme(
         style: themeStyle,
         brightness: Brightness.light,
@@ -38,6 +46,51 @@ class SongBriefApp extends ConsumerWidget {
       home: const HomeScreen(),
     );
   }
+}
+
+Locale resolveSongBriefLocale(
+  List<Locale>? preferredLocales,
+  Iterable<Locale> supportedLocales,
+) {
+  const fallback = Locale('en');
+  final supported = supportedLocales.toList(growable: false);
+  if (preferredLocales == null || preferredLocales.isEmpty) {
+    return fallback;
+  }
+
+  for (final preferred in preferredLocales) {
+    final resolved = _resolveSingleSongBriefLocale(preferred, supported);
+    if (resolved != null) {
+      return resolved;
+    }
+  }
+  return fallback;
+}
+
+Locale? _resolveSingleSongBriefLocale(
+  Locale preferred,
+  List<Locale> supportedLocales,
+) {
+  if (preferred.languageCode == 'zh') {
+    final scriptCode = preferred.scriptCode?.toLowerCase();
+    final countryCode = preferred.countryCode?.toUpperCase();
+    if (scriptCode == 'hans' ||
+        (scriptCode == null &&
+            (countryCode == 'CN' ||
+                countryCode == 'SG' ||
+                countryCode == 'MY'))) {
+      return songBriefSimplifiedChineseLocale;
+    }
+    return null;
+  }
+
+  for (final supported in supportedLocales) {
+    if (preferred.languageCode == supported.languageCode &&
+        supported.scriptCode == null) {
+      return supported;
+    }
+  }
+  return null;
 }
 
 class AppLockGate extends ConsumerStatefulWidget {

@@ -5,6 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _appLanguagePreferenceKey = 'songbrief_app_language_v1';
+const songBriefSimplifiedChineseLocale = Locale.fromSubtags(
+  languageCode: 'zh',
+  scriptCode: 'Hans',
+);
 
 enum AppLanguage {
   system,
@@ -18,7 +22,7 @@ enum AppLanguage {
       AppLanguage.system => null,
       AppLanguage.japanese => const Locale('ja'),
       AppLanguage.english => const Locale('en'),
-      AppLanguage.chineseSimplified => const Locale('zh'),
+      AppLanguage.chineseSimplified => songBriefSimplifiedChineseLocale,
       AppLanguage.korean => const Locale('ko'),
     };
   }
