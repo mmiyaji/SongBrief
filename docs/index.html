@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SongBrief Legal</title>
+    <title>SongBrief - 音楽ライブラリ統計アプリ</title>
     <meta
       name="description"
-      content="SongBrief terms of use and privacy policy."
+      content="SongBrief is an iOS music library statistics app for rankings, daily records, recaps, and playback insights."
     >
     <link rel="stylesheet" href="./assets/styles.css">
   </head>
@@ -14,58 +14,153 @@
     <header class="site-header">
       <div class="header-inner">
         <a class="brand" href="./">SongBrief</a>
-        <nav class="nav" aria-label="Legal pages">
+        <nav class="nav" aria-label="Site navigation">
+          <a href="#features">Features</a>
+          <a href="#screens">Screens</a>
           <a href="./privacy/">Privacy Policy</a>
           <a href="./terms/">Terms of Use</a>
         </nav>
       </div>
     </header>
 
-    <main class="main">
-      <section class="hero">
-        <div class="eyebrow">Legal / 法務情報</div>
-        <h1>SongBrief Legal</h1>
-        <p class="lead">
-          SongBrief is a music library statistics app. This page links to the
-          terms and privacy information used for App Store review and in-app
-          access.
-        </p>
-        <p class="lead">
-          SongBriefは、音楽ライブラリの再生傾向を確認するためのアプリです。
-          このページでは、App Store審査とアプリ内表示に使用する
-          プライバシーポリシーと利用規約を掲載しています。
-        </p>
-        <div class="meta">
-          <span class="pill">Japanese / English</span>
-          <span class="pill">Effective: 2026-07-05</span>
-          <span class="pill">Last updated: 2026-07-05</span>
+    <main class="main landing">
+      <section class="hero hero-app">
+        <div class="hero-copy">
+          <img class="app-icon" src="./assets/songbrief-icon.png" alt="SongBrief app icon">
+          <div class="eyebrow">Music Library Statistics</div>
+          <h1>音楽ライブラリの再生傾向を、静かに整理する。</h1>
+          <p class="lead">
+            SongBriefは、iOSのミュージックライブラリから再生回数、
+            スキップ回数、最後に再生した日などを読み取り、ランキング、
+            日次記録、リキャップとして見やすくまとめるアプリです。
+          </p>
+          <p class="lead">
+            SongBrief turns your local iOS music library metadata into rankings,
+            daily records, recaps, and playback insights without sending your
+            detailed music library to a developer-operated server.
+          </p>
+          <div class="cta-row">
+            <span class="pill">iOS / iPadOS</span>
+            <span class="pill">App Store準備中</span>
+            <a class="button-link" href="./privacy/">プライバシー方針を見る</a>
+          </div>
+        </div>
+
+        <div class="preview-stack" aria-label="SongBrief screenshots">
+          <div class="device-frame phone-frame">
+            <img src="./assets/screenshot-iphone-overview.png" alt="SongBrief overview screen">
+          </div>
+          <div class="device-frame phone-frame secondary-phone">
+            <img src="./assets/screenshot-iphone-rankings.png" alt="SongBrief rankings screen">
+          </div>
         </div>
       </section>
 
-      <section class="card-grid" aria-label="Legal documents">
-        <a class="card" href="./privacy/">
-          <h2>Privacy Policy</h2>
-          <p>
-            How SongBrief handles music library metadata, permissions,
-            advertising, analytics, and locally stored records.
-          </p>
-          <p>
-            SongBriefが音楽ライブラリのメタデータ、権限、広告、解析、
-            端末内に保存する履歴をどのように扱うかを説明します。
-          </p>
-        </a>
+      <section class="stat-grid" aria-label="SongBrief highlights">
+        <div class="metric-card">
+          <strong>ランキング</strong>
+          <span>曲・アーティスト・アルバムを再生回数や期間で比較</span>
+        </div>
+        <div class="metric-card">
+          <strong>日次記録</strong>
+          <span>アプリが取得できた日の差分から傾向を可視化</span>
+        </div>
+        <div class="metric-card">
+          <strong>リキャップ</strong>
+          <span>月間・年間の聴き方を一枚のサマリーに集約</span>
+        </div>
+        <div class="metric-card">
+          <strong>ローカル重視</strong>
+          <span>音楽ライブラリの詳細は主に端末内で処理</span>
+        </div>
+      </section>
 
-        <a class="card" href="./terms/">
-          <h2>Terms of Use</h2>
+      <section id="features" class="section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">Features</div>
+            <h2>再生回数だけで終わらない統計</h2>
+          </div>
           <p>
-            The basic terms for using SongBrief, including acceptable use,
-            data accuracy, advertising, and disclaimers.
+            SongBriefは、iOSが提供する音楽ライブラリのカウンターと
+            アプリ内の記録を組み合わせ、普段の聴き方を複数の角度で確認できます。
           </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3>再生中の詳細</h3>
+            <p>
+              ジャケット、曲情報、再生回数、スキップ回数、登録プレイリスト、
+              歌詞などをひとつの画面で確認できます。
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>ランキングの深掘り</h3>
+            <p>
+              トップ曲を主線に、期間切り替え、急上昇、再発見、順位変動などを
+              追加して、聴き方の変化を追えます。
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>リスニングマップ</h3>
+            <p>
+              発売年、曜日、ジャンルなどの切り口で再生傾向を可視化し、
+              詳細ビューでは曲数表示にも切り替えられます。
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>ライブラリ管理</h3>
+            <p>
+              曲、アーティスト、アルバム、ジャンル、プレイリストを検索し、
+              非表示条件やエクスポートで自分の見方に整えられます。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="screens" class="section screenshot-section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">Screens</div>
+            <h2>iPhoneとiPadで同じデータを扱いやすく</h2>
+          </div>
           <p>
-            SongBriefの利用条件、統計情報の正確性、広告表示、免責事項などの
-            基本的な条件を説明します。
+            スマートフォンではタブ中心、タブレットではサイドバー中心に切り替え、
+            ランキングやライブラリを広い画面で見渡せるようにしています。
           </p>
-        </a>
+        </div>
+
+        <div class="screenshot-row">
+          <figure class="device-frame phone-frame">
+            <img src="./assets/screenshot-iphone-overview.png" alt="Overview screen on iPhone">
+            <figcaption>概要 / Overview</figcaption>
+          </figure>
+          <figure class="device-frame phone-frame">
+            <img src="./assets/screenshot-iphone-rankings.png" alt="Rankings screen on iPhone">
+            <figcaption>ランキング / Rankings</figcaption>
+          </figure>
+          <figure class="device-frame tablet-frame">
+            <img src="./assets/screenshot-ipad-library.png" alt="Library screen on iPad">
+            <figcaption>ライブラリ / Library</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section legal-note">
+        <div>
+          <div class="eyebrow">Privacy</div>
+          <h2>音楽ライブラリの詳細は広告・解析イベントに含めません</h2>
+          <p>
+            SongBriefは、曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、
+            再生履歴などを広告リクエストや解析イベントに含めない方針です。
+            詳細はプライバシーポリシーをご確認ください。
+          </p>
+        </div>
+        <div class="legal-actions">
+          <a class="button-link" href="./privacy/">Privacy Policy</a>
+          <a class="button-link secondary" href="./terms/">Terms of Use</a>
+        </div>
       </section>
     </main>
 
