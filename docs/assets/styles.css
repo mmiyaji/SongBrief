@@ -156,6 +156,13 @@ a {
   width: 92px;
 }
 
+.app-icon-small {
+  border-radius: 18px;
+  height: 72px;
+  margin-bottom: 18px;
+  width: 72px;
+}
+
 .eyebrow {
   color: var(--accent);
   font-weight: 800;
@@ -485,6 +492,90 @@ figcaption {
   display: grid;
   gap: 20px;
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.legal-page {
+  width: min(1120px, calc(100% - 36px));
+}
+
+.legal-hero {
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 42px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.42fr);
+  margin-bottom: 30px;
+  padding-bottom: 48px;
+}
+
+.legal-sidecar {
+  align-self: end;
+  border-top: 1px solid var(--line);
+  display: grid;
+}
+
+.legal-sidecar-row {
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+}
+
+.legal-sidecar-row span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.legal-sidecar-row strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.legal-quick-grid {
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 30px 0 10px;
+}
+
+.legal-quick-grid .metric-card {
+  border-right: 1px solid var(--line);
+}
+
+.legal-quick-grid .metric-card:last-child {
+  border-right: 0;
+}
+
+.legal-document {
+  max-width: 860px;
+}
+
+.legal-document h2 {
+  font-size: clamp(1.55rem, 3vw, 2.05rem);
+}
+
+.legal-document h3 {
+  border-top: 1px solid var(--line);
+  margin-top: 28px;
+  padding-top: 22px;
+}
+
+.legal-document h3:first-of-type {
+  margin-top: 22px;
+}
+
+.legal-document p,
+.legal-document ul {
+  max-width: 780px;
+}
+
+.legal-url-note {
+  max-width: 860px;
 }
 
 .card-grid {
@@ -830,6 +921,7 @@ figcaption {
   }
 
   .hero-app,
+  .legal-hero,
   .section-heading,
   .legal-note {
     grid-template-columns: 1fr;
@@ -857,6 +949,7 @@ figcaption {
   }
 
   .stat-grid,
+  .legal-quick-grid,
   .feature-grid,
   .feature-detail-row,
   .design-grid,
@@ -870,6 +963,15 @@ figcaption {
   }
 
   .metric-card:last-child {
+    border-bottom: 0;
+  }
+
+  .legal-quick-grid .metric-card {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+  }
+
+  .legal-quick-grid .metric-card:last-child {
     border-bottom: 0;
   }
 

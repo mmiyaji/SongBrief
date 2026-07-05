@@ -19,7 +19,9 @@
         <a class="brand" href="../">SongBrief</a>
         <div class="header-actions">
           <nav class="nav" aria-label="Site navigation">
-            <a href="../" data-i18n-ja="ホーム" data-i18n-en="Home">ホーム</a>
+            <a href="../#features" data-i18n-ja="機能" data-i18n-en="Features">機能</a>
+            <a href="../#history" data-i18n-ja="聴取記録" data-i18n-en="History">聴取記録</a>
+            <a href="../#screens" data-i18n-ja="画面" data-i18n-en="Screens">画面</a>
             <a href="./" aria-current="page" data-i18n-ja="プライバシー" data-i18n-en="Privacy Policy">プライバシー</a>
             <a href="../terms/" data-i18n-ja="利用規約" data-i18n-en="Terms of Use">利用規約</a>
           </nav>
@@ -31,22 +33,54 @@
       </div>
     </header>
 
-    <main class="main">
-      <section class="hero">
-        <div class="eyebrow" data-i18n-ja="プライバシーポリシー" data-i18n-en="Privacy Policy">プライバシーポリシー</div>
-        <h1 data-i18n-ja="SongBrief プライバシーポリシー" data-i18n-en="SongBrief Privacy Policy">SongBrief プライバシーポリシー</h1>
-        <p class="lead" data-lang-panel="en">
-          This policy explains how SongBrief handles information when you use
-          the app and related legal pages.
-        </p>
-        <p class="lead" data-lang-panel="ja">このポリシーは、SongBriefアプリおよび関連する法務ページの利用時に、情報をどのように取り扱うかを説明するものです。</p>
-        <div class="meta">
-          <span class="pill" data-i18n-ja="適用開始: 2026-07-05" data-i18n-en="Effective: 2026-07-05">適用開始: 2026-07-05</span>
-          <span class="pill" data-i18n-ja="最終更新: 2026-07-05" data-i18n-en="Last updated: 2026-07-05">最終更新: 2026-07-05</span>
+    <main class="main landing legal-page">
+      <section class="hero legal-hero">
+        <div class="hero-copy">
+          <img class="app-icon app-icon-small" src="../assets/songbrief-icon.png" alt="SongBrief app icon">
+          <div class="eyebrow" data-i18n-ja="プライバシーポリシー" data-i18n-en="Privacy Policy">プライバシーポリシー</div>
+          <h1 data-i18n-ja="SongBriefが扱うデータについて" data-i18n-en="How SongBrief handles data">SongBriefが扱うデータについて</h1>
+          <p class="lead" data-lang-panel="ja">このポリシーは、SongBriefアプリおよび関連する法務ページの利用時に、情報をどのように取り扱うかを説明するものです。</p>
+          <p class="lead" data-lang-panel="en">
+            This policy explains how SongBrief handles information when you use
+            the app and related legal pages.
+          </p>
+          <div class="cta-row">
+            <a class="button-link" href="../" data-i18n-ja="トップへ戻る" data-i18n-en="Back to Home">トップへ戻る</a>
+            <a class="button-link secondary" href="../terms/" data-i18n-ja="利用規約を見る" data-i18n-en="Read Terms">利用規約を見る</a>
+          </div>
+        </div>
+        <div class="legal-sidecar" aria-label="Policy metadata">
+          <div class="legal-sidecar-row">
+            <span data-i18n-ja="適用開始" data-i18n-en="Effective">適用開始</span>
+            <strong>2026-07-05</strong>
+          </div>
+          <div class="legal-sidecar-row">
+            <span data-i18n-ja="最終更新" data-i18n-en="Last updated">最終更新</span>
+            <strong>2026-07-05</strong>
+          </div>
+          <div class="legal-sidecar-row">
+            <span data-i18n-ja="対象" data-i18n-en="Scope">対象</span>
+            <strong data-i18n-ja="アプリと法務ページ" data-i18n-en="App and legal pages">アプリと法務ページ</strong>
+          </div>
         </div>
       </section>
 
-      <section class="section" lang="ja" data-lang-panel="ja">
+      <section class="legal-quick-grid" aria-label="Privacy summary">
+        <div class="metric-card">
+          <strong data-i18n-ja="端末内中心" data-i18n-en="On-device first">端末内中心</strong>
+          <span data-i18n-ja="音楽ライブラリの詳細は主に端末内で処理します。" data-i18n-en="Detailed music library data is primarily handled on device.">音楽ライブラリの詳細は主に端末内で処理します。</span>
+        </div>
+        <div class="metric-card">
+          <strong data-i18n-ja="広告・解析" data-i18n-en="Ads and analytics">広告・解析</strong>
+          <span data-i18n-ja="曲名や再生履歴を広告リクエストや解析イベントに含めません。" data-i18n-en="Track names and listening history are not included in ad requests or analytics events.">曲名や再生履歴を広告リクエストや解析イベントに含めません。</span>
+        </div>
+        <div class="metric-card">
+          <strong data-i18n-ja="クラッシュ診断" data-i18n-en="Crash diagnostics">クラッシュ診断</strong>
+          <span data-i18n-ja="有効時も曲名、歌詞、プレイリスト名などは含めません。" data-i18n-en="When enabled, reports do not include track names, lyrics, or playlist names.">有効時も曲名、歌詞、プレイリスト名などは含めません。</span>
+        </div>
+      </section>
+
+      <section class="section legal-document" lang="ja" data-lang-panel="ja">
         <div class="lang-label">Japanese</div>
         <h2>プライバシーポリシー</h2>
 
@@ -66,11 +100,12 @@
         <h3>3. 広告と解析</h3>
         <p>広告が有効なビルドでは、SongBriefはGoogle AdMobを使用して控えめな広告枠を表示する場合があります。また、Firebase Analyticsを使用して、アプリの基本的な利用状況、広告表示、広告収益の集計に必要な情報を処理する場合があります。AdMobとFirebaseを連携している場合、広告表示や広告収益に関するデータがGoogleのサービス間で処理されます。</p>
         <p>SongBriefは、曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、再生履歴、音楽ライブラリ内の識別子などを、広告リクエストや解析イベントに含めません。解析イベントは、アプリ起動、画面表示、更新操作、再生操作の種類など、アプリの動作改善に必要な範囲に限定します。</p>
+        <p>クラッシュレポートをユーザーが有効にした場合、SongBriefはFirebase Crashlyticsを使用して、クラッシュ時のスタックトレース、アプリ状態、端末とOSの情報、アプリバージョンなどを処理する場合があります。SongBriefは、曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、聴取履歴、音楽ライブラリ内の識別子をクラッシュレポートに意図的に含めません。</p>
         <p>Googleは、広告配信、制限付き広告、広告品質確認、不正利用防止、解析のために、端末情報、広告識別子、IPアドレス、アプリ利用状況、広告表示ごとの収益情報などを処理する場合があります。地域や設定により、Googleの同意メッセージやiOSのトラッキング許可ダイアログが表示される場合があります。</p>
 
         <h3>4. 保存と送信</h3>
         <p>音楽ライブラリの統計、日次の記録、非表示条件、キャッシュなどは、主に端末内のストレージに保存されます。ユーザーはアプリ内の設定から、キャッシュや履歴を削除できます。日次の記録を保存しない設定にした場合、履歴に基づく傾向表示やリキャップなどの機能は利用できない場合があります。</p>
-        <p>広告や解析が有効な場合、FirebaseおよびAdMobの動作に必要なデータはGoogleへ送信されます。ただし、SongBriefは音楽ライブラリの詳細情報を広告や解析のイベントとして送信しません。</p>
+        <p>広告、解析、クラッシュレポートが有効な場合、Firebase、AdMob、Crashlyticsの動作に必要なデータはGoogleへ送信されます。ただし、SongBriefは音楽ライブラリの詳細情報を広告、解析、クラッシュレポートのデータとして送信しません。</p>
         <p>この法務ページはCloudflare Pagesで配信します。移行期間中はGitHub Pagesでも参照できる場合があります。Webページにアクセスした場合、CloudflareまたはGitHubが、セキュリティ、配信、ログ管理のために標準的なアクセス情報を処理する場合があります。</p>
 
         <h3>5. 権限と同意の管理</h3>
@@ -89,7 +124,7 @@
         <p>このポリシーに関するお問い合わせは、SongBriefプロジェクトのGitHub Issues、またはプロジェクトが公開している連絡手段からお願いします。</p>
       </section>
 
-      <section class="section" lang="en" data-lang-panel="en">
+      <section class="section legal-document" lang="en" data-lang-panel="en">
         <div class="lang-label">English</div>
         <h2>Privacy Policy</h2>
 
@@ -134,6 +169,14 @@
           screen views, refresh actions, and playback control types.
         </p>
         <p>
+          If you enable crash reports, SongBrief may use Firebase Crashlytics
+          to process crash stack traces, app state, device and OS information,
+          and the SongBrief app version. SongBrief does not intentionally
+          include track titles, artist names, album names, lyrics, playlist
+          names, listening history, or music library identifiers in crash
+          reports.
+        </p>
+        <p>
           Google may process device information, advertising identifiers, IP
           address, app usage, and impression-level ad revenue information for
           ad delivery, limited ads, ad quality, fraud prevention, and analytics.
@@ -149,9 +192,10 @@
           based features such as trends and recaps may not be available.
         </p>
         <p>
-          When ads or analytics are enabled, data required by Firebase and
-          AdMob is sent to Google. SongBrief does not send detailed music
-          library information as ad or analytics events.
+          When ads, analytics, or crash reports are enabled, data required by
+          Firebase, AdMob, and Crashlytics is sent to Google. SongBrief does
+          not send detailed music library information as ad, analytics, or
+          crash report data.
         </p>
         <p>
           This legal website is served by Cloudflare Pages. During migration,
@@ -198,7 +242,7 @@
         </p>
       </section>
 
-      <section class="section">
+      <section class="section legal-url-note">
         <p class="notice">
           App Store Connect Privacy Policy URL:
           <strong>https://songbrief.ruhenheim.org/privacy/</strong>
