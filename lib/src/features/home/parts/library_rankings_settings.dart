@@ -3399,7 +3399,9 @@ class _DataManagementSetting extends ConsumerWidget {
             onPressed: () =>
                 _showCacheManagementSheet(context, ref, cacheUsage: cacheUsage),
             icon: const Icon(Icons.tune_rounded),
-            label: Text(_t(context, 'Manage caches', 'キャッシュを管理')),
+            label: Text(
+              _t(context, 'Manage caches', 'キャッシュを管理', zh: '管理缓存', ko: '캐시 관리'),
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -3417,7 +3419,9 @@ class _DataManagementSetting extends ConsumerWidget {
                 : () =>
                       _showListeningRecordManagementSheet(context, ref, stats),
             icon: const Icon(Icons.tune_rounded),
-            label: Text(_t(context, 'Manage records', '記録を管理')),
+            label: Text(
+              _t(context, 'Manage records', '記録を管理', zh: '管理记录', ko: '기록 관리'),
+            ),
           ),
         ),
       ],
@@ -3948,7 +3952,13 @@ Future<void> _showCacheManagementSheet(
                 value: clearImageCache,
                 enabled: cacheUsage.hasImages,
                 icon: Icons.image_outlined,
-                title: _t(context, 'Artwork image cache', 'アートワーク画像キャッシュ'),
+                title: _t(
+                  context,
+                  'Artwork image cache',
+                  'アートワーク画像キャッシュ',
+                  zh: '封面图片缓存',
+                  ko: '아트워크 이미지 캐시',
+                ),
                 subtitle: _cacheUsageDetailLabel(context, cacheUsage),
                 onChanged: (value) {
                   setState(() {
@@ -4677,7 +4687,15 @@ Future<bool> _confirmExternalNavigation(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(_t(context, 'Open external site?', '外部サイトを開きますか？')),
+      title: Text(
+        _t(
+          context,
+          'Open external site?',
+          '外部サイトを開きますか？',
+          zh: '打开外部网站？',
+          ko: '외부 사이트를 열까요?',
+        ),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
