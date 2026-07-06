@@ -595,6 +595,7 @@ class _LoadingBeatBars extends StatelessWidget {
       theme.colorScheme.tertiary,
     ];
     return Row(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: List.generate(colors.length, (index) {
         final phase = (progress + index * 0.13) % 1;
