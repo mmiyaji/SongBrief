@@ -2316,50 +2316,59 @@ class _PreferenceSelectorTile<T> extends StatelessWidget {
                 Icon(icon, color: theme.colorScheme.primary, size: 22),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final valueWidth = math.min(
+                        260.0,
+                        math.max(156.0, constraints.maxWidth * 0.38),
+                      );
+                      final labelColumn = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              label,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w800,
-                              ),
+                          Text(
+                            label,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          if (valueLeading != null) ...[
-                            valueLeading!,
-                            const SizedBox(width: 8),
-                          ],
-                          Flexible(
-                            child: Text(
-                              valueLabel,
-                              textAlign: TextAlign.right,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.w900,
-                              ),
+                          const SizedBox(height: 4),
+                          Text(
+                            description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                      );
+                      final value = _PreferenceSelectorValue(
+                        leading: valueLeading,
+                        label: valueLabel,
+                      );
+
+                      if (constraints.maxWidth < 430) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            labelColumn,
+                            const SizedBox(height: 8),
+                            value,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(child: labelColumn),
+                          const SizedBox(width: 16),
+                          SizedBox(width: valueWidth, child: value),
+                        ],
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -2372,6 +2381,36 @@ class _PreferenceSelectorTile<T> extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PreferenceSelectorValue extends StatelessWidget {
+  const _PreferenceSelectorValue({required this.label, this.leading});
+
+  final String label;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        if (leading != null) ...[leading!, const SizedBox(width: 8)],
+        Expanded(
+          child: Text(
+            label,
+            textAlign: TextAlign.left,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
