@@ -497,6 +497,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final hasData = state.hasValue;
 
         return Scaffold(
+          extendBody: hasData && !useRail,
           backgroundColor: Theme.of(context).colorScheme.surface,
           bottomNavigationBar: hasData && !useRail
               ? _MobilePlaybackChrome(
