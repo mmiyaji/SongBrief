@@ -3778,13 +3778,13 @@ enum _SnapshotDeletionAction {
 class _SnapshotDeletionActionTile extends StatelessWidget {
   const _SnapshotDeletionActionTile({
     required this.action,
-    required this.history,
+    required this.estimate,
     required this.selected,
     required this.onSelected,
   });
 
   final _SnapshotDeletionAction action;
-  final SnapshotHistory history;
+  final _SnapshotDeletionEstimate estimate;
   final bool selected;
   final VoidCallback onSelected;
 
@@ -3832,8 +3832,8 @@ class _SnapshotDeletionActionTile extends StatelessWidget {
                       Text(
                         _snapshotDeletionActionSubtitle(
                           context,
-                          history,
                           action,
+                          estimate,
                         ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
@@ -3871,45 +3871,150 @@ String _snapshotDeletionActionTitle(
   return _snapshotRetentionLabel(context, action.retention!);
 }
 
+class _SnapshotDeletionEstimate {
+  const _SnapshotDeletionEstimate({
+    required this.deleteCount,
+    required this.keepCount,
+    required this.deletedBytes,
+    required this.remainingBytes,
+  });
+
+  final int deleteCount;
+  final int keepCount;
+  final int deletedBytes;
+  final int remainingBytes;
+}
+
+class _SnapshotStorageEstimate {
+  const _SnapshotStorageEstimate({
+    required this.totalBytes,
+    required this.byAction,
+  });
+
+  final int totalBytes;
+  final Map<_SnapshotDeletionAction, _SnapshotDeletionEstimate> byAction;
+}
+
+_SnapshotStorageEstimate _snapshotStorageEstimate(SnapshotHistory history) {
+  final totalBytes = _snapshotHistoryStorageBytes(history);
+  final byAction = <_SnapshotDeletionAction, _SnapshotDeletionEstimate>{};
+
+  for (final action in _SnapshotDeletionAction.values) {
+    if (action == _SnapshotDeletionAction.deleteAll) {
+      byAction[action] = _SnapshotDeletionEstimate(
+        deleteCount: history.snapshotCount,
+        keepCount: 0,
+        deletedBytes: totalBytes,
+        remainingBytes: 0,
+      );
+      continue;
+    }
+
+    final cutoff = _snapshotRetentionCutoff(action.retention!);
+    final keptSnapshots = history.snapshots
+        .where((snapshot) => !snapshot.capturedAt.isBefore(cutoff))
+        .toList(growable: false);
+    final remainingBytes = _snapshotHistoryStorageBytes(
+      SnapshotHistory(snapshots: List.unmodifiable(keptSnapshots)),
+    );
+    byAction[action] = _SnapshotDeletionEstimate(
+      deleteCount: history.snapshotCount - keptSnapshots.length,
+      keepCount: keptSnapshots.length,
+      deletedBytes: math.max(0, totalBytes - remainingBytes),
+      remainingBytes: remainingBytes,
+    );
+  }
+
+  return _SnapshotStorageEstimate(totalBytes: totalBytes, byAction: byAction);
+}
+
+int _snapshotHistoryStorageBytes(SnapshotHistory history) {
+  if (history.snapshotCount == 0) {
+    return 0;
+  }
+  return utf8.encode(jsonEncode(history.toJson())).length;
+}
+
+class _SnapshotStorageSummary extends StatelessWidget {
+  const _SnapshotStorageSummary({
+    required this.history,
+    required this.estimate,
+  });
+
+  final SnapshotHistory history;
+  final _SnapshotStorageEstimate estimate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.22,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.36),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.storage_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _t(
+                  context,
+                  'Stored records: ${_dayCountLabel(context, history.snapshotCount)}, about ${_byteSizeLabel(estimate.totalBytes)}.',
+                  '保存済みの聴取記録: ${_dayCountLabel(context, history.snapshotCount)}、約${_byteSizeLabel(estimate.totalBytes)}。',
+                  zh: '已保存记录：${_dayCountLabel(context, history.snapshotCount)}，约 ${_byteSizeLabel(estimate.totalBytes)}。',
+                  ko: '저장된 청취 기록: ${_dayCountLabel(context, history.snapshotCount)}, 약 ${_byteSizeLabel(estimate.totalBytes)}.',
+                ),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 String _snapshotDeletionActionSubtitle(
   BuildContext context,
-  SnapshotHistory history,
   _SnapshotDeletionAction action,
+  _SnapshotDeletionEstimate estimate,
 ) {
   final number = _numberFormat(context);
   if (action == _SnapshotDeletionAction.deleteAll) {
-    final count = history.snapshotCount;
     return _t(
       context,
-      'Delete ${number.format(count)} saved records.',
-      '${number.format(count)}件の保存済み記録を削除します。',
-      zh: '删除 ${number.format(count)} 条已保存记录。',
-      ko: '저장된 기록 ${number.format(count)}개를 삭제합니다.',
+      'Delete ${number.format(estimate.deleteCount)} saved records, about ${_byteSizeLabel(estimate.deletedBytes)}.',
+      '${number.format(estimate.deleteCount)}件の保存済み記録（約${_byteSizeLabel(estimate.deletedBytes)}）を削除します。',
+      zh: '删除 ${number.format(estimate.deleteCount)} 条已保存记录，约 ${_byteSizeLabel(estimate.deletedBytes)}。',
+      ko: '저장된 기록 ${number.format(estimate.deleteCount)}개, 약 ${_byteSizeLabel(estimate.deletedBytes)}를 삭제합니다.',
     );
   }
 
   final cutoff = _snapshotRetentionCutoff(action.retention!);
-  final deleteCount = _snapshotDeleteCount(history, cutoff);
-  final keepCount = history.snapshotCount - deleteCount;
   final cutoffLabel = DateFormat.yMMMd(_localeName(context)).format(cutoff);
   return _t(
     context,
-    'Delete ${number.format(deleteCount)} records before $cutoffLabel. Keep ${number.format(keepCount)}.',
-    '$cutoffLabel より前の ${number.format(deleteCount)}件を削除し、${number.format(keepCount)}件を保持します。',
-    zh: '删除 $cutoffLabel 之前的 ${number.format(deleteCount)} 条，保留 ${number.format(keepCount)} 条。',
-    ko: '$cutoffLabel 이전 기록 ${number.format(deleteCount)}개를 삭제하고 ${number.format(keepCount)}개를 유지합니다.',
+    'Delete ${number.format(estimate.deleteCount)} records before $cutoffLabel, about ${_byteSizeLabel(estimate.deletedBytes)}. Keep ${number.format(estimate.keepCount)}, about ${_byteSizeLabel(estimate.remainingBytes)}.',
+    '$cutoffLabel より前の ${number.format(estimate.deleteCount)}件（約${_byteSizeLabel(estimate.deletedBytes)}）を削除し、${number.format(estimate.keepCount)}件（約${_byteSizeLabel(estimate.remainingBytes)}）を保持します。',
+    zh: '删除 $cutoffLabel 之前的 ${number.format(estimate.deleteCount)} 条，约 ${_byteSizeLabel(estimate.deletedBytes)}。保留 ${number.format(estimate.keepCount)} 条，约 ${_byteSizeLabel(estimate.remainingBytes)}。',
+    ko: '$cutoffLabel 이전 기록 ${number.format(estimate.deleteCount)}개, 약 ${_byteSizeLabel(estimate.deletedBytes)}를 삭제하고 ${number.format(estimate.keepCount)}개, 약 ${_byteSizeLabel(estimate.remainingBytes)}를 유지합니다.',
   );
 }
 
 DateTime _snapshotRetentionCutoff(_SnapshotRetentionOption retention) {
   final now = _localDateOnly(DateTime.now());
   return now.subtract(Duration(days: retention.days));
-}
-
-int _snapshotDeleteCount(SnapshotHistory history, DateTime cutoff) {
-  return history.snapshots
-      .where((snapshot) => snapshot.capturedAt.isBefore(cutoff))
-      .length;
 }
 
 Future<void> _showCacheManagementSheet(
@@ -4019,6 +4124,7 @@ Future<void> _showListeningRecordManagementSheet(
 ) async {
   var selectedAction = _SnapshotDeletionAction.keep90;
   var agreed = false;
+  final storageEstimate = _snapshotStorageEstimate(stats.snapshotHistory);
   final request = await showModalBottomSheet<_SnapshotDeletionAction>(
     context: context,
     showDragHandle: true,
@@ -4047,10 +4153,15 @@ Future<void> _showListeningRecordManagementSheet(
                 ),
               ),
               const SizedBox(height: 14),
+              _SnapshotStorageSummary(
+                history: stats.snapshotHistory,
+                estimate: storageEstimate,
+              ),
+              const SizedBox(height: 14),
               for (final action in _SnapshotDeletionAction.values) ...[
                 _SnapshotDeletionActionTile(
                   action: action,
-                  history: stats.snapshotHistory,
+                  estimate: storageEstimate.byAction[action]!,
                   selected: selectedAction == action,
                   onSelected: () {
                     setState(() {
