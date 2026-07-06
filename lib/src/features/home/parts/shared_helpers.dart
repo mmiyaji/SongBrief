@@ -509,7 +509,7 @@ class _LoadingStateState extends State<_LoadingState>
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _LoadingBrandMark(progress: value),
+                  _LoadingPulseLoader(progress: value),
                   const SizedBox(height: 26),
                   Text(
                     _t(
@@ -539,8 +539,6 @@ class _LoadingStateState extends State<_LoadingState>
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  _LoadingProgressTrack(progress: value),
                 ],
               );
             },
@@ -551,34 +549,19 @@ class _LoadingStateState extends State<_LoadingState>
   }
 }
 
-class _LoadingBrandMark extends StatelessWidget {
-  const _LoadingBrandMark({required this.progress});
+class _LoadingPulseLoader extends StatelessWidget {
+  const _LoadingPulseLoader({required this.progress});
 
   final double progress;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final t = Curves.easeInOutCubic.transform(progress);
-    final pulse = 0.96 + (math.sin(progress * math.pi * 2) + 1) * 0.025;
     return SizedBox.square(
-      dimension: 142,
+      dimension: 112,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Transform.scale(
-            scale: pulse,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.16),
-                ),
-              ),
-              child: const SizedBox.expand(),
-            ),
-          ),
           Positioned.fill(
             child: CustomPaint(
               painter: _LoadingOrbitPainter(
@@ -589,28 +572,7 @@ class _LoadingBrandMark extends StatelessWidget {
               ),
             ),
           ),
-          Transform.scale(
-            scale: 0.9 + t * 0.04,
-            child: Image.asset(
-              'assets/branding/songbrief_icon_foreground.png',
-              width: 98,
-              height: 98,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(
-                  Icons.multiline_chart_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 72,
-                );
-              },
-            ),
-          ),
-          Positioned(
-            left: 36,
-            bottom: 28,
-            child: _LoadingBeatBars(progress: progress),
-          ),
+          _LoadingBeatBars(progress: progress),
         ],
       ),
     );
@@ -629,19 +591,24 @@ class _LoadingBeatBars extends StatelessWidget {
       theme.colorScheme.tertiary,
       theme.colorScheme.primary,
       theme.colorScheme.secondary,
+      theme.colorScheme.primary,
+      theme.colorScheme.tertiary,
     ];
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
-      children: List.generate(3, (index) {
-        final phase = (progress + index * 0.18) % 1;
-        final height = 18 + Curves.easeInOut.transform(
-          (math.sin(phase * math.pi * 2) + 1) / 2,
-        ) * 26;
+      children: List.generate(colors.length, (index) {
+        final phase = (progress + index * 0.13) % 1;
+        final height =
+            20 +
+            Curves.easeInOut.transform(
+                  (math.sin(phase * math.pi * 2) + 1) / 2,
+                ) *
+                34;
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
-            width: 10,
+            width: 8,
             height: height,
             decoration: BoxDecoration(
               color: colors[index].withValues(alpha: 0.92),
@@ -650,41 +617,6 @@ class _LoadingBeatBars extends StatelessWidget {
           ),
         );
       }),
-    );
-  }
-}
-
-class _LoadingProgressTrack extends StatelessWidget {
-  const _LoadingProgressTrack({required this.progress});
-
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final left = math.sin(progress * math.pi * 2) * 0.5 + 0.5;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: ColoredBox(
-        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.24),
-        child: SizedBox(
-          height: 6,
-          child: Align(
-            alignment: Alignment(-1 + left * 2, 0),
-            child: FractionallySizedBox(
-              widthFactor: 0.38,
-              alignment: Alignment.center,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color: theme.colorScheme.primary,
-                ),
-                child: const SizedBox.expand(),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
