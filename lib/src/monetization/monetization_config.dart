@@ -11,6 +11,9 @@ enum AdLaunchMode {
 class MonetizationConfig {
   const MonetizationConfig._();
 
+  static const productionIosBannerAdUnitId =
+      'ca-app-pub-5321136982470738/2315074663';
+
   static const rawAdMode = String.fromEnvironment(
     'SONGBRIEF_AD_MODE',
     defaultValue: 'off',
@@ -36,6 +39,7 @@ class MonetizationConfig {
 
   static const iosBannerAdUnitId = String.fromEnvironment(
     'SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID',
+    defaultValue: productionIosBannerAdUnitId,
   );
 
   static const umpDebugGeographyEea = bool.fromEnvironment(

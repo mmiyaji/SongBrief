@@ -89,10 +89,12 @@ Ads are opt-in by launch mode. The default mode is ad-free:
 ```sh
 flutter run --dart-define=SONGBRIEF_AD_MODE=off
 flutter run --dart-define=SONGBRIEF_AD_MODE=admobTest
-flutter run --dart-define=SONGBRIEF_AD_MODE=admobLive \
-  --dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID=ca-app-pub-5321136982470738/2315074663 \
-  --dart-define=SONGBRIEF_ADMOB_ANDROID_BANNER_AD_UNIT_ID=ca-app-pub-.../...
+flutter run --dart-define=SONGBRIEF_AD_MODE=admobLive
 ```
+
+Android `admobLive` builds additionally need
+`SONGBRIEF_ADMOB_ANDROID_BANNER_AD_UNIT_ID` after an Android AdMob app and
+banner ad unit are created.
 
 `admobTest` uses Google's sample banner ad units. Web and desktop builds show
 a quiet ad preview instead of loading the mobile AdMob SDK. Premium purchases
@@ -105,10 +107,12 @@ flutter run --dart-define=SONGBRIEF_AD_MODE=admobTest \
 ```
 
 The iOS native AdMob App ID is configured in `ios/Flutter/AdMob.xcconfig`.
+The production iOS banner ad unit ID is embedded as the app fallback and can be
+overridden with `SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID` when needed.
 The TestFlight workflow builds in `admobLive` mode and fails before signing if
 the iOS banner ad unit ID is empty, malformed, or still uses Google's sample
-publisher ID. Keep production uploads on that workflow or pass the same
-`SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID` define when building manually.
+publisher ID. Keep production uploads on that workflow so the CI validation
+still runs before App Store uploads.
 Android still uses Google's sample App ID until an Android AdMob app is created:
 
 - Android: pass `-PSONGBRIEF_ADMOB_ANDROID_APP_ID=ca-app-pub-...~...` to Gradle
