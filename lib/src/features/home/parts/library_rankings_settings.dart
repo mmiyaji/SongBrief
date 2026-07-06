@@ -3347,7 +3347,6 @@ class _DataManagementSetting extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     ref.watch(_cacheUsageRevisionProvider);
     final cacheUsage = _currentCacheUsage();
     final snapshotRecordingEnabled = ref.watch(snapshotRecordingProvider);
@@ -3374,13 +3373,10 @@ class _DataManagementSetting extends ConsumerWidget {
         Align(
           alignment: Alignment.centerRight,
           child: OutlinedButton.icon(
-            onPressed: () => _confirmAndClearTemporaryCaches(
-              context,
-              ref,
-              cacheUsage: cacheUsage,
-            ),
-            icon: const Icon(Icons.delete_sweep_outlined),
-            label: Text(_t(context, 'Clear caches', 'キャッシュを削除')),
+            onPressed: () =>
+                _showCacheManagementSheet(context, ref, cacheUsage: cacheUsage),
+            icon: const Icon(Icons.tune_rounded),
+            label: Text(_t(context, 'Manage caches', 'キャッシュを管理')),
           ),
         ),
         const SizedBox(height: 10),
@@ -3390,45 +3386,16 @@ class _DataManagementSetting extends ConsumerWidget {
           value:
               '${_dayCountLabel(context, history.snapshotCount)} / $rangeLabel',
         ),
-        const SizedBox(height: 8),
-        Text(
-          _t(
-            context,
-            'Deleting listening records requires confirmation. App settings and purchase status are kept.',
-            '聴取記録の削除には確認が必要です。設定と購入状態は保持します。',
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            onPressed: history.snapshotCount == 0
+                ? null
+                : () =>
+                      _showListeningRecordManagementSheet(context, ref, stats),
+            icon: const Icon(Icons.tune_rounded),
+            label: Text(_t(context, 'Manage records', '記録を管理')),
           ),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          alignment: WrapAlignment.end,
-          children: [
-            for (final retention in _SnapshotRetentionOption.values)
-              OutlinedButton.icon(
-                onPressed: history.snapshotCount == 0
-                    ? null
-                    : () => _deleteOldSnapshots(context, ref, stats, retention),
-                icon: const Icon(Icons.auto_delete_outlined),
-                label: Text(_snapshotRetentionLabel(context, retention)),
-              ),
-            OutlinedButton.icon(
-              onPressed: history.snapshotCount == 0
-                  ? null
-                  : () => _clearSnapshotHistory(context, ref, stats),
-              icon: const Icon(Icons.history_toggle_off_outlined),
-              label: Text(_t(context, 'Delete records', '記録を削除')),
-            ),
-            FilledButton.tonalIcon(
-              onPressed: () => _cleanGeneratedData(context, ref, stats),
-              icon: const Icon(Icons.cleaning_services_rounded),
-              label: Text(_t(context, 'Clean generated data', '生成データを全削除')),
-            ),
-          ],
         ),
       ],
     );
@@ -3540,6 +3507,12 @@ class _CacheUsage {
   final int imageCount;
   final int liveImageCount;
   final int pendingImageCount;
+
+  bool get hasImages =>
+      bytes > 0 ||
+      imageCount > 0 ||
+      liveImageCount > 0 ||
+      pendingImageCount > 0;
 }
 
 _CacheUsage _currentCacheUsage() {
@@ -3589,32 +3562,518 @@ String _byteSizeLabel(int bytes) {
   return '${value.toStringAsFixed(value >= 10 ? 1 : 2)} ${units[unitIndex]}';
 }
 
-Future<void> _confirmAndClearTemporaryCaches(
+class _DataManagementSheetScaffold extends StatelessWidget {
+  const _DataManagementSheetScaffold({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Align(
+      alignment: Alignment.topCenter,
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 560,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: theme.colorScheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(title, style: theme.textTheme.titleLarge),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...children,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DataManagementChoiceTile extends StatelessWidget {
+  const _DataManagementChoiceTile({
+    required this.value,
+    required this.enabled,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final bool enabled;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final effectiveValue = enabled && value;
+    final borderColor = effectiveValue
+        ? theme.colorScheme.primary.withValues(alpha: 0.62)
+        : theme.colorScheme.outlineVariant.withValues(alpha: 0.38);
+    final foregroundColor = enabled
+        ? theme.colorScheme.onSurface
+        : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.68);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: enabled ? () => onChanged(!value) : null,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: effectiveValue ? 0.34 : 0.18,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: effectiveValue,
+                  onChanged: enabled
+                      ? (value) => onChanged(value ?? false)
+                      : null,
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  icon,
+                  color: enabled
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.56,
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: foregroundColor,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        enabled
+                            ? subtitle
+                            : _t(
+                                context,
+                                'Nothing is currently stored for this item.',
+                                '現在、この項目に削除できるデータはありません。',
+                                zh: '当前此项目没有可删除的数据。',
+                                ko: '현재 이 항목에 삭제할 데이터가 없습니다.',
+                              ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DataManagementConsentTile extends StatelessWidget {
+  const _DataManagementConsentTile({
+    required this.value,
+    required this.title,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final String title;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return CheckboxListTile(
+      value: value,
+      onChanged: (value) => onChanged(value ?? false),
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        title,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+enum _SnapshotDeletionAction {
+  keep30(_SnapshotRetentionOption.days30),
+  keep90(_SnapshotRetentionOption.days90),
+  keep180(_SnapshotRetentionOption.days180),
+  deleteAll(null);
+
+  const _SnapshotDeletionAction(this.retention);
+
+  final _SnapshotRetentionOption? retention;
+}
+
+class _SnapshotDeletionActionTile extends StatelessWidget {
+  const _SnapshotDeletionActionTile({
+    required this.action,
+    required this.history,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final _SnapshotDeletionAction action;
+  final SnapshotHistory history;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final borderColor = selected
+        ? theme.colorScheme.primary.withValues(alpha: 0.62)
+        : theme.colorScheme.outlineVariant.withValues(alpha: 0.38);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onSelected,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: selected ? 0.34 : 0.18,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(
+                  action == _SnapshotDeletionAction.deleteAll
+                      ? Icons.history_toggle_off_outlined
+                      : Icons.auto_delete_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _snapshotDeletionActionTitle(context, action),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _snapshotDeletionActionSubtitle(
+                          context,
+                          history,
+                          action,
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: selected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _snapshotDeletionActionTitle(
+  BuildContext context,
+  _SnapshotDeletionAction action,
+) {
+  if (action == _SnapshotDeletionAction.deleteAll) {
+    return _t(context, 'Delete all records', 'すべての記録を削除');
+  }
+  return _snapshotRetentionLabel(context, action.retention!);
+}
+
+String _snapshotDeletionActionSubtitle(
+  BuildContext context,
+  SnapshotHistory history,
+  _SnapshotDeletionAction action,
+) {
+  final number = _numberFormat(context);
+  if (action == _SnapshotDeletionAction.deleteAll) {
+    final count = history.snapshotCount;
+    return _t(
+      context,
+      'Delete ${number.format(count)} saved records.',
+      '${number.format(count)}件の保存済み記録を削除します。',
+      zh: '删除 ${number.format(count)} 条已保存记录。',
+      ko: '저장된 기록 ${number.format(count)}개를 삭제합니다.',
+    );
+  }
+
+  final cutoff = _snapshotRetentionCutoff(action.retention!);
+  final deleteCount = _snapshotDeleteCount(history, cutoff);
+  final keepCount = history.snapshotCount - deleteCount;
+  final cutoffLabel = DateFormat.yMMMd(_localeName(context)).format(cutoff);
+  return _t(
+    context,
+    'Delete ${number.format(deleteCount)} records before $cutoffLabel. Keep ${number.format(keepCount)}.',
+    '$cutoffLabel より前の ${number.format(deleteCount)}件を削除し、${number.format(keepCount)}件を保持します。',
+    zh: '删除 $cutoffLabel 之前的 ${number.format(deleteCount)} 条，保留 ${number.format(keepCount)} 条。',
+    ko: '$cutoffLabel 이전 기록 ${number.format(deleteCount)}개를 삭제하고 ${number.format(keepCount)}개를 유지합니다.',
+  );
+}
+
+DateTime _snapshotRetentionCutoff(_SnapshotRetentionOption retention) {
+  final now = _localDateOnly(DateTime.now());
+  return now.subtract(Duration(days: retention.days));
+}
+
+int _snapshotDeleteCount(SnapshotHistory history, DateTime cutoff) {
+  return history.snapshots
+      .where((snapshot) => snapshot.capturedAt.isBefore(cutoff))
+      .length;
+}
+
+Future<void> _showCacheManagementSheet(
   BuildContext context,
   WidgetRef ref, {
   required _CacheUsage cacheUsage,
 }) async {
-  final confirmed = await _confirmDataDeletion(
-    context,
-    title: _t(context, 'Clear temporary caches?', '一時キャッシュを削除しますか？'),
-    message: _t(
-      context,
-      '${_cacheUsageDetailLabel(context, cacheUsage)} This does not delete listening records or settings.',
-      '${_cacheUsageDetailLabel(context, cacheUsage)} 聴取記録や設定は削除しません。',
-      zh: '${_cacheUsageDetailLabel(context, cacheUsage)} 不会删除收听记录或设置。',
-      ko: '${_cacheUsageDetailLabel(context, cacheUsage)} 청취 기록이나 설정은 삭제하지 않습니다.',
-    ),
-    consentLabel: _t(
-      context,
-      'I understand this clears temporary caches.',
-      '一時キャッシュが削除されることに同意します。',
-    ),
-    confirmLabel: _t(context, 'Clear caches', 'キャッシュを削除'),
+  var clearImageCache = cacheUsage.hasImages;
+  var agreed = false;
+  final confirmed = await showModalBottomSheet<bool>(
+    context: context,
+    showDragHandle: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    builder: (sheetContext) {
+      final theme = Theme.of(sheetContext);
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final canDelete = clearImageCache && agreed;
+          return _DataManagementSheetScaffold(
+            title: _t(context, 'Temporary caches', '一時キャッシュ'),
+            icon: Icons.cleaning_services_outlined,
+            children: [
+              Text(
+                _t(
+                  context,
+                  'Choose the temporary data to clear. Listening records and settings are kept.',
+                  '削除する一時データを選びます。聴取記録と設定は保持します。',
+                  zh: '选择要清除的临时数据。收听记录和设置会保留。',
+                  ko: '삭제할 임시 데이터를 선택합니다. 청취 기록과 설정은 유지됩니다.',
+                ),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _DataManagementChoiceTile(
+                value: clearImageCache,
+                enabled: cacheUsage.hasImages,
+                icon: Icons.image_outlined,
+                title: _t(context, 'Artwork image cache', 'アートワーク画像キャッシュ'),
+                subtitle: _cacheUsageDetailLabel(context, cacheUsage),
+                onChanged: (value) {
+                  setState(() {
+                    clearImageCache = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 10),
+              _DataManagementConsentTile(
+                value: agreed,
+                title: _t(
+                  context,
+                  'I understand the selected temporary caches will be cleared.',
+                  '選択した一時キャッシュが削除されることに同意します。',
+                  zh: '我了解所选临时缓存将被清除。',
+                  ko: '선택한 임시 캐시가 삭제되는 것에 동의합니다.',
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    agreed = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: Text(_t(context, 'Cancel', 'キャンセル')),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton.icon(
+                    onPressed: canDelete
+                        ? () => Navigator.of(context).pop(true)
+                        : null,
+                    icon: const Icon(Icons.delete_sweep_outlined),
+                    label: Text(_t(context, 'Clear caches', 'キャッシュを削除')),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      );
+    },
   );
-  if (!confirmed || !context.mounted) {
+  if (confirmed != true || !context.mounted) {
     return;
   }
   _clearTemporaryCaches(context, ref);
+}
+
+Future<void> _showListeningRecordManagementSheet(
+  BuildContext context,
+  WidgetRef ref,
+  MusicStatsState stats,
+) async {
+  var selectedAction = _SnapshotDeletionAction.keep90;
+  var agreed = false;
+  final request = await showModalBottomSheet<_SnapshotDeletionAction>(
+    context: context,
+    showDragHandle: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    builder: (sheetContext) {
+      final theme = Theme.of(sheetContext);
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return _DataManagementSheetScaffold(
+            title: _t(context, 'Listening records', '聴取記録'),
+            icon: Icons.calendar_month_outlined,
+            children: [
+              Text(
+                _t(
+                  context,
+                  'Choose how much listening history to keep. App settings and purchase status are kept.',
+                  '残す聴取記録の期間を選びます。設定と購入状態は保持します。',
+                  zh: '选择要保留的收听记录范围。应用设置和购买状态会保留。',
+                  ko: '보관할 청취 기록 기간을 선택합니다. 앱 설정과 구매 상태는 유지됩니다.',
+                ),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              for (final action in _SnapshotDeletionAction.values) ...[
+                _SnapshotDeletionActionTile(
+                  action: action,
+                  history: stats.snapshotHistory,
+                  selected: selectedAction == action,
+                  onSelected: () {
+                    setState(() {
+                      selectedAction = action;
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+              _DataManagementConsentTile(
+                value: agreed,
+                title: _t(
+                  context,
+                  'I understand the selected listening records will be deleted.',
+                  '選択した聴取記録が削除されることに同意します。',
+                  zh: '我了解所选收听记录将被删除。',
+                  ko: '선택한 청취 기록이 삭제되는 것에 동의합니다.',
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    agreed = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(_t(context, 'Cancel', 'キャンセル')),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton.icon(
+                    onPressed: agreed
+                        ? () => Navigator.of(context).pop(selectedAction)
+                        : null,
+                    icon: const Icon(Icons.history_toggle_off_outlined),
+                    label: Text(_t(context, 'Delete records', '記録を削除')),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+  if (request == null || !context.mounted) {
+    return;
+  }
+  if (request == _SnapshotDeletionAction.deleteAll) {
+    await _clearSnapshotHistory(context, ref, stats);
+    return;
+  }
+  await _deleteOldSnapshots(context, ref, stats, request.retention!);
 }
 
 void _clearTemporaryCaches(
@@ -3643,24 +4102,7 @@ Future<void> _deleteOldSnapshots(
   MusicStatsState stats,
   _SnapshotRetentionOption retention,
 ) async {
-  final now = _localDateOnly(DateTime.now());
-  final cutoff = now.subtract(Duration(days: retention.days));
-  final cutoffLabel = DateFormat.yMMMd(_localeName(context)).format(cutoff);
-  final confirmed = await _confirmSnapshotDeletion(
-    context,
-    title: _t(context, 'Delete old listening records?', '古い聴取記録を削除しますか？'),
-    message: _t(
-      context,
-      'Listening records before $cutoffLabel will be deleted. This cannot be undone.',
-      '$cutoffLabel より前の聴取記録を削除します。この操作は元に戻せません。',
-      zh: '$cutoffLabel 之前的收听记录将被删除。此操作无法撤销。',
-      ko: '$cutoffLabel 이전의 청취 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
-    ),
-    confirmLabel: _t(context, 'Delete old records', '古い記録を削除'),
-  );
-  if (!confirmed || !context.mounted) {
-    return;
-  }
+  final cutoff = _snapshotRetentionCutoff(retention);
 
   try {
     final before = stats.snapshotHistory.snapshotCount;
@@ -3702,22 +4144,6 @@ Future<void> _clearSnapshotHistory(
   WidgetRef ref,
   MusicStatsState stats,
 ) async {
-  final confirmed = await _confirmSnapshotDeletion(
-    context,
-    title: _t(context, 'Delete all listening records?', '聴取記録をすべて削除しますか？'),
-    message: _t(
-      context,
-      'All saved listening records will be deleted. This cannot be undone.',
-      '保存済みの聴取記録をすべて削除します。この操作は元に戻せません。',
-      zh: '所有已保存的收听记录都会被删除。此操作无法撤销。',
-      ko: '저장된 모든 청취 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
-    ),
-    confirmLabel: _t(context, 'Delete all records', 'すべての記録を削除'),
-  );
-  if (!confirmed || !context.mounted) {
-    return;
-  }
-
   try {
     final before = stats.snapshotHistory.snapshotCount;
     await ref
@@ -3744,133 +4170,6 @@ Future<void> _clearSnapshotHistory(
       );
     }
   }
-}
-
-Future<void> _cleanGeneratedData(
-  BuildContext context,
-  WidgetRef ref,
-  MusicStatsState stats,
-) async {
-  final confirmed = await _confirmSnapshotDeletion(
-    context,
-    title: _t(context, 'Clean generated data?', '生成データを全削除しますか？'),
-    message: _t(
-      context,
-      'Artwork caches and all listening records will be cleared. App settings and purchase status are kept.',
-      'アートワークキャッシュとすべての聴取記録を削除します。設定と購入状態は保持します。',
-    ),
-    confirmLabel: _t(context, 'Clean data', '削除する'),
-  );
-  if (!confirmed || !context.mounted) {
-    return;
-  }
-
-  try {
-    final before = stats.snapshotHistory.snapshotCount;
-    _clearTemporaryCaches(context, ref, showMessage: false);
-    await ref
-        .read(musicStatsControllerProvider.notifier)
-        .clearSnapshotHistory();
-    if (!context.mounted) {
-      return;
-    }
-    _showDataManagementResult(
-      context,
-      _t(
-        context,
-        'Caches cleared and $before listening records deleted.',
-        'キャッシュを削除し、$before件の聴取記録を削除しました。',
-        zh: '已清除缓存，并删除 $before 条收听记录。',
-        ko: '캐시를 삭제하고 청취 기록 $before개를 삭제했습니다.',
-      ),
-    );
-  } on Object {
-    if (context.mounted) {
-      _showDataManagementResult(
-        context,
-        _t(context, 'Could not clean generated data.', '生成データを削除できませんでした。'),
-      );
-    }
-  }
-}
-
-Future<bool> _confirmSnapshotDeletion(
-  BuildContext context, {
-  required String title,
-  required String message,
-  required String confirmLabel,
-}) {
-  return _confirmDataDeletion(
-    context,
-    title: title,
-    message: message,
-    consentLabel: _t(
-      context,
-      'I understand this deletes listening records.',
-      '聴取記録が削除されることに同意します。',
-    ),
-    confirmLabel: confirmLabel,
-  );
-}
-
-Future<bool> _confirmDataDeletion(
-  BuildContext context, {
-  required String title,
-  required String message,
-  required String consentLabel,
-  required String confirmLabel,
-}) async {
-  var agreed = false;
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) {
-      final theme = Theme.of(dialogContext);
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Text(title),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(message),
-                const SizedBox(height: 12),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  value: agreed,
-                  onChanged: (value) {
-                    setState(() {
-                      agreed = value ?? false;
-                    });
-                  },
-                  title: Text(
-                    consentLabel,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: Text(_t(context, 'Cancel', 'キャンセル')),
-              ),
-              FilledButton(
-                onPressed: agreed
-                    ? () => Navigator.of(dialogContext).pop(true)
-                    : null,
-                child: Text(confirmLabel),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
-  return result ?? false;
 }
 
 void _showDataManagementResult(BuildContext context, String message) {
