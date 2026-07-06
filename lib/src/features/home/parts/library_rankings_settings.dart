@@ -2173,6 +2173,11 @@ class _SettingsSection extends ConsumerWidget {
                 icon: Icons.info_outline,
                 label: _t(context, 'Application', 'アプリケーション'),
                 value: 'SongBrief',
+                onTap: () => _openExternalUrl(
+                  context,
+                  _officialWebsiteUrl,
+                  requireConfirmation: true,
+                ),
               ),
               _SettingsRow(
                 icon: Icons.sell_outlined,
