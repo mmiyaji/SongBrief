@@ -42,6 +42,7 @@ part 'parts/shared_helpers.dart';
 
 const _privacyPolicyUrl = 'https://songbrief.ruhenheim.org/privacy/';
 const _termsOfUseUrl = 'https://songbrief.ruhenheim.org/terms/';
+const _authorUrl = 'https://ruhenheim.org';
 
 final _appVersionLabelProvider = FutureProvider<String>((ref) async {
   final packageInfo = await PackageInfo.fromPlatform();

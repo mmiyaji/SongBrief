@@ -2180,16 +2180,34 @@ class _SettingsSection extends ConsumerWidget {
                 value: appVersion,
               ),
               _SettingsRow(
+                icon: Icons.person_outline_rounded,
+                label: _t(context, 'Author', '作者', zh: '作者', ko: '작성자'),
+                value: 'mmiyaji',
+                onTap: () => _openExternalUrl(
+                  context,
+                  _authorUrl,
+                  requireConfirmation: true,
+                ),
+              ),
+              _SettingsRow(
                 icon: Icons.privacy_tip_outlined,
                 label: _t(context, 'Privacy Policy', 'プライバシーポリシー'),
                 value: _t(context, 'Open', '開く'),
-                onTap: () => _openExternalUrl(context, _privacyPolicyUrl),
+                onTap: () => _openExternalUrl(
+                  context,
+                  _privacyPolicyUrl,
+                  requireConfirmation: true,
+                ),
               ),
               _SettingsRow(
                 icon: Icons.gavel_outlined,
                 label: _t(context, 'Terms of Use', '利用規約'),
                 value: _t(context, 'Open', '開く'),
-                onTap: () => _openExternalUrl(context, _termsOfUseUrl),
+                onTap: () => _openExternalUrl(
+                  context,
+                  _termsOfUseUrl,
+                  requireConfirmation: true,
+                ),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -4604,7 +4622,18 @@ Future<void> _openWebSearch(
   await _openExternalUrl(context, _webSearchUri(trimmedQuery).toString());
 }
 
-Future<void> _openExternalUrl(BuildContext context, String url) async {
+Future<void> _openExternalUrl(
+  BuildContext context,
+  String url, {
+  bool requireConfirmation = false,
+}) async {
+  if (requireConfirmation) {
+    final confirmed = await _confirmExternalNavigation(context, url);
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+  }
+
   final uri = Uri.parse(url);
   final messenger = ScaffoldMessenger.maybeOf(context);
 
@@ -4634,4 +4663,49 @@ Future<void> _openExternalUrl(BuildContext context, String url) async {
       ),
     ),
   );
+}
+
+Future<bool> _confirmExternalNavigation(
+  BuildContext context,
+  String url,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(_t(context, 'Open external site?', '外部サイトを開きますか？')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _t(
+              context,
+              'SongBrief will open the following link in an external browser.',
+              'SongBriefから外部ブラウザで次のリンクを開きます。',
+              zh: 'SongBrief 将在外部浏览器中打开以下链接。',
+              ko: 'SongBrief에서 외부 브라우저로 다음 링크를 엽니다.',
+            ),
+          ),
+          const SizedBox(height: 12),
+          SelectableText(
+            url,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(_t(context, 'Cancel', 'キャンセル')),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(_t(context, 'Open', '開く')),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
 }
