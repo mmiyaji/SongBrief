@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/data/library_snapshot_repository.dart';
+import 'package:songbrief/src/domain/library_overview.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
+import 'package:songbrief/src/domain/library_track.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +61,52 @@ void main() {
       preferences.getString(legacyLibrarySnapshotPreferencesKeys.single),
       'newly-written-legacy-value',
     );
+  });
+
+  test('returns empty history for malformed stored payloads', () async {
+    SharedPreferences.setMockInitialValues({
+      librarySnapshotPreferencesKey: '{not-json',
+    });
+
+    final history = await const LibrarySnapshotRepository().loadHistory();
+
+    expect(history.snapshotCount, 0);
+  });
+
+  test('records an overview snapshot and replaces the same day', () async {
+    final repository = const LibrarySnapshotRepository();
+    final first = await repository.recordSnapshot(
+      _overview(playCount: 4),
+      capturedAt: DateTime(2026, 7, 7, 8),
+    );
+    final second = await repository.recordSnapshot(
+      _overview(playCount: 9),
+      capturedAt: DateTime(2026, 7, 7, 20),
+      source: 'manual',
+    );
+    final reloaded = await repository.loadHistory();
+
+    expect(first.snapshotCount, 1);
+    expect(second.snapshotCount, 1);
+    expect(second.latest?.source, 'manual');
+    expect(second.latest?.totalPlayCount, 9);
+    expect(reloaded.latest?.totalPlayCount, 9);
+  });
+
+  test('does not record empty overviews', () async {
+    final existing = SnapshotHistory(
+      snapshots: List.unmodifiable([_snapshotOn(DateTime(2026, 1, 1))]),
+    );
+    SharedPreferences.setMockInitialValues({
+      librarySnapshotPreferencesKey: jsonEncode(existing.toJson()),
+    });
+
+    final result = await const LibrarySnapshotRepository().recordSnapshot(
+      LibraryOverview.empty(isDemo: false),
+    );
+
+    expect(result.snapshotCount, 1);
+    expect(result.latest?.dateKey, '2026-01-01');
   });
 
   test(
@@ -119,6 +167,21 @@ DailyLibrarySnapshot _snapshotOn(DateTime capturedAt) {
     totalListeningSeconds: capturedAt.day * 180,
     tracks: const [],
   );
+}
+
+LibraryOverview _overview({required int playCount}) {
+  return LibraryOverview.fromTracks([
+    LibraryTrack(
+      id: 'track-1',
+      title: 'Snapshot Song',
+      artist: 'Snapshot Artist',
+      albumTitle: 'Snapshot Album',
+      duration: const Duration(minutes: 4),
+      playCount: playCount,
+      skipCount: 1,
+      isCloudItem: false,
+    ),
+  ], isDemo: false);
 }
 
 DailyLibrarySnapshot _largeSnapshot(int index) {

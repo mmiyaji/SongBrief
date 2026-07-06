@@ -1,8 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/settings/library_filter_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   test('excludes tracks by playlist, genre, and keyword', () {
     final filters = LibraryFilterPreferences(
       excludedPlaylists: ['Focus'],
@@ -60,6 +68,100 @@ void main() {
     expect(filters.excludedKeywords, ['demo']);
     expect(filters.ruleCount, 3);
   });
+
+  test('copyWith preserves existing rule groups unless replaced', () {
+    final filters = LibraryFilterPreferences(
+      excludedPlaylists: ['Focus'],
+      excludedGenres: ['Rock'],
+      excludedKeywords: ['demo'],
+    );
+
+    final changed = filters.copyWith(excludedGenres: ['Ambient']);
+
+    expect(changed.excludedPlaylists, ['Focus']);
+    expect(changed.excludedGenres, ['Ambient']);
+    expect(changed.excludedKeywords, ['demo']);
+    expect(changed.isEmpty, isFalse);
+  });
+
+  test('returns the original track list when there are no filter rules', () {
+    final filters = LibraryFilterPreferences();
+    final tracks = [
+      _track(
+        id: '1',
+        title: 'Visible Song',
+        artist: 'Nami',
+        albumTitle: 'Night Transit',
+        genre: 'Pop',
+        playlistNames: ['Daily'],
+      ),
+    ];
+
+    expect(identical(filters.apply(tracks), tracks), isTrue);
+    expect(filters.apply(const []), isEmpty);
+  });
+
+  test('controller restores, updates, persists, and clears rules', () async {
+    SharedPreferences.setMockInitialValues({
+      'songbrief_excluded_playlists_v1': ['Focus'],
+      'songbrief_excluded_genres_v1': ['Ambient'],
+      'songbrief_excluded_keywords_v1': ['secret'],
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container.read(libraryFilterPreferencesProvider);
+    await _drainPreferenceRestore();
+
+    expect(container.read(libraryFilterPreferencesProvider).excludedPlaylists, [
+      'Focus',
+    ]);
+    expect(container.read(libraryFilterPreferencesProvider).excludedGenres, [
+      'Ambient',
+    ]);
+    expect(container.read(libraryFilterPreferencesProvider).excludedKeywords, [
+      'secret',
+    ]);
+
+    final controller = container.read(
+      libraryFilterPreferencesProvider.notifier,
+    );
+    controller.addExcludedPlaylist('Favorites');
+    controller.removeExcludedPlaylist('Focus');
+    controller.addExcludedGenre('Rock');
+    controller.removeExcludedGenre('Ambient');
+    controller.addExcludedKeyword('demo');
+    controller.removeExcludedKeyword('secret');
+    await _drainPreferenceRestore();
+
+    final updated = container.read(libraryFilterPreferencesProvider);
+    expect(updated.excludedPlaylists, ['Favorites']);
+    expect(updated.excludedGenres, ['Rock']);
+    expect(updated.excludedKeywords, ['demo']);
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getStringList('songbrief_excluded_playlists_v1'), [
+      'Favorites',
+    ]);
+    expect(preferences.getStringList('songbrief_excluded_genres_v1'), ['Rock']);
+    expect(preferences.getStringList('songbrief_excluded_keywords_v1'), [
+      'demo',
+    ]);
+
+    controller.clearAll();
+    await _drainPreferenceRestore();
+
+    expect(container.read(libraryFilterPreferencesProvider).isEmpty, isTrue);
+    expect(
+      preferences.getStringList('songbrief_excluded_playlists_v1'),
+      isEmpty,
+    );
+    expect(preferences.getStringList('songbrief_excluded_genres_v1'), isEmpty);
+    expect(
+      preferences.getStringList('songbrief_excluded_keywords_v1'),
+      isEmpty,
+    );
+  });
 }
 
 LibraryTrack _track({
@@ -82,4 +184,9 @@ LibraryTrack _track({
     isCloudItem: false,
     playlistNames: playlistNames,
   );
+}
+
+Future<void> _drainPreferenceRestore() async {
+  await Future<void>.delayed(Duration.zero);
+  await Future<void>.delayed(Duration.zero);
 }

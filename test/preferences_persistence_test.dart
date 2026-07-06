@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:songbrief/src/settings/snapshot_preferences.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
 import 'package:songbrief/src/theme/app_theme.dart';
 
@@ -60,6 +61,25 @@ void main() {
     expect(preferences.getString('songbrief_theme_style_v1'), 'mono');
     expect(preferences.getString('songbrief_theme_brightness_v1'), 'system');
     expect(preferences.getString('songbrief_app_language_v1'), 'english');
+  });
+
+  test('restores and saves daily listening record preference', () async {
+    SharedPreferences.setMockInitialValues({
+      snapshotRecordingEnabledPreferenceKey: false,
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    expect(container.read(snapshotRecordingProvider), isTrue);
+    await _drainPreferenceRestore();
+    expect(container.read(snapshotRecordingProvider), isFalse);
+
+    container.read(snapshotRecordingProvider.notifier).setEnabled(true);
+    await _drainPreferenceRestore();
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getBool(snapshotRecordingEnabledPreferenceKey), isTrue);
+    expect(container.read(snapshotRecordingProvider), isTrue);
   });
 }
 

@@ -9,6 +9,28 @@ import 'package:songbrief/src/domain/music_stats_state.dart';
 import 'package:songbrief/src/export/library_exporter.dart';
 
 void main() {
+  test('builds CSV and JSON file payloads with compact timestamps', () {
+    final exportedAt = DateTime(2026, 7, 7, 9, 5);
+
+    final csv = buildLibraryExportPayload(
+      _stats(),
+      LibraryExportFormat.csv,
+      exportedAt: exportedAt,
+    );
+    final json = buildLibraryExportPayload(
+      _stats(),
+      LibraryExportFormat.json,
+      exportedAt: exportedAt,
+    );
+
+    expect(csv.fileName, 'songbrief-library-20260707-0905.csv');
+    expect(csv.mimeType, 'text/csv');
+    expect(csv.content, startsWith('"id","title"'));
+    expect(json.fileName, 'songbrief-library-20260707-0905.json');
+    expect(json.mimeType, 'application/json');
+    expect(json.content, contains('"version": 1'));
+  });
+
   test('builds escaped CSV rows for library tracks', () {
     final csv = buildLibraryCsv(_stats());
 
@@ -21,8 +43,14 @@ void main() {
 
   test('escapes spreadsheet formulas in CSV cells', () {
     final csv = buildLibraryCsv(_stats(title: '=HYPERLINK("https://x")'));
+    final plusCsv = buildLibraryCsv(_stats(title: '+SUM(1,2)'));
+    final minusCsv = buildLibraryCsv(_stats(title: '-10'));
+    final atCsv = buildLibraryCsv(_stats(title: '@hidden'));
 
     expect(csv, contains('"\'=HYPERLINK(""https://x"")"'));
+    expect(plusCsv, contains('"\'+SUM(1,2)"'));
+    expect(minusCsv, contains('"\'-10"'));
+    expect(atCsv, contains('"\'@hidden"'));
   });
 
   test('builds JSON with totals and snapshot summaries', () {
