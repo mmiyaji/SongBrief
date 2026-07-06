@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-lang="ja">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,19 +8,36 @@
       name="description"
       content="SongBrief is an iOS music library statistics app for rankings, daily records, recaps, and playback insights."
     >
-    <link rel="stylesheet" href="./assets/styles.css">
+    <link rel="icon" type="image/png" href="/assets/songbrief-icon.png">
+    <link rel="apple-touch-icon" href="/assets/songbrief-icon.png">
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/glightbox@3.3.1/dist/css/glightbox.min.css"
+      integrity="sha384-GPAzSuZc0kFvdIev6wm9zg8gnafE8tLso7rsAYQfc9hAdWCpOcpcNI5W9lWkYcsd"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    >
+    <link rel="stylesheet" href="./assets/styles.css?v=faq-20260707">
+    <script src="./assets/site.js?v=language-links-20260706" defer></script>
   </head>
   <body>
     <header class="site-header">
       <div class="header-inner">
         <a class="brand" href="./">SongBrief</a>
-        <nav class="nav" aria-label="Site navigation">
-          <a href="#features">Features</a>
-          <a href="#screens">Screens</a>
-          <a href="#faq">FAQ</a>
-          <a href="./privacy/">Privacy Policy</a>
-          <a href="./terms/">Terms of Use</a>
-        </nav>
+        <div class="header-actions">
+          <nav class="nav" aria-label="Site navigation">
+            <a href="#features" data-i18n-ja="機能" data-i18n-en="Features">機能</a>
+            <a href="#history" data-i18n-ja="聴取記録" data-i18n-en="History">聴取記録</a>
+            <a href="#screens" data-i18n-ja="画面" data-i18n-en="Screens">画面</a>
+            <a href="#faq" data-i18n-ja="FAQ" data-i18n-en="FAQ">FAQ</a>
+            <a href="./privacy/" data-i18n-ja="プライバシー" data-i18n-en="Privacy Policy">プライバシー</a>
+            <a href="./terms/" data-i18n-ja="利用規約" data-i18n-en="Terms of Use">利用規約</a>
+          </nav>
+          <div class="language-switch" role="group" aria-label="Language">
+            <button type="button" data-lang-choice="ja" aria-pressed="true">日本語</button>
+            <button type="button" data-lang-choice="en" aria-pressed="false">English</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -28,122 +45,270 @@
       <section class="hero hero-app">
         <div class="hero-copy">
           <img class="app-icon" src="./assets/songbrief-icon.png" alt="SongBrief app icon">
-          <div class="eyebrow">Music Library Statistics</div>
-          <h1>音楽ライブラリの再生傾向を、静かに整理する。</h1>
-          <p class="lead">
-            SongBriefは、iOSのミュージックライブラリから再生回数、
-            スキップ回数、最後に再生した日などを読み取り、ランキング、
-            日次記録、リキャップとして見やすくまとめるアプリです。
-          </p>
-          <p class="lead">
+          <div class="eyebrow" data-i18n-ja="音楽ライブラリ統計" data-i18n-en="Music Library Statistics">音楽ライブラリ統計</div>
+          <h1 data-i18n-ja="音楽ライブラリの再生傾向を、静かに整理する。" data-i18n-en="A quiet way to read your music library.">音楽ライブラリの再生傾向を、静かに整理する。</h1>
+          <p class="lead" data-lang-panel="ja">SongBriefは、iOSのミュージックライブラリから再生回数、スキップ回数、最後に再生した日などを読み取り、ランキング、日次記録、リキャップとして見やすくまとめるアプリです。</p>
+          <p class="lead" data-lang-panel="en">
             SongBrief turns your local iOS music library metadata into rankings,
             daily records, recaps, and playback insights without sending your
             detailed music library to a developer-operated server.
           </p>
           <div class="cta-row">
             <span class="pill">iOS / iPadOS</span>
-            <span class="pill">App Store準備中</span>
-            <a class="button-link" href="./privacy/">プライバシー方針を見る</a>
+            <span class="pill" data-i18n-ja="App Store準備中" data-i18n-en="App Store preparation">App Store準備中</span>
+            <a class="button-link" href="./privacy/" data-i18n-ja="プライバシー方針を見る" data-i18n-en="Read Privacy Policy">プライバシー方針を見る</a>
           </div>
         </div>
 
         <div class="preview-stack" aria-label="SongBrief screenshots">
           <div class="device-frame phone-frame">
-            <img src="./assets/screenshot-iphone-overview.png" alt="SongBrief overview screen">
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-iphone-overview.png"
+              data-media-ja="./assets/screenshot-iphone-overview.png"
+              data-media-en="./assets/screenshot-iphone-overview-en.png"
+              data-gallery="songbrief-screens"
+              data-title="概要 / Overview"
+              aria-label="概要画面を拡大"
+            >
+              <img
+                src="./assets/screenshot-iphone-overview.png"
+                data-media-ja="./assets/screenshot-iphone-overview.png"
+                data-media-en="./assets/screenshot-iphone-overview-en.png"
+                alt="SongBrief overview screen"
+              >
+            </a>
           </div>
           <div class="device-frame phone-frame secondary-phone">
-            <img src="./assets/screenshot-iphone-rankings.png" alt="SongBrief rankings screen">
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-iphone-rankings.png"
+              data-media-ja="./assets/screenshot-iphone-rankings.png"
+              data-media-en="./assets/screenshot-iphone-rankings-en.png"
+              data-gallery="songbrief-screens"
+              data-title="ランキング / Rankings"
+              aria-label="ランキング画面を拡大"
+            >
+              <img
+                src="./assets/screenshot-iphone-rankings.png"
+                data-media-ja="./assets/screenshot-iphone-rankings.png"
+                data-media-en="./assets/screenshot-iphone-rankings-en.png"
+                alt="SongBrief rankings screen"
+              >
+            </a>
           </div>
         </div>
       </section>
 
       <section class="stat-grid" aria-label="SongBrief highlights">
         <div class="metric-card">
-          <strong>ランキング</strong>
-          <span>曲・アーティスト・アルバムを再生回数や期間で比較</span>
+          <strong data-i18n-ja="ランキング" data-i18n-en="Rankings">ランキング</strong>
+          <span data-i18n-ja="曲・アーティスト・アルバムを再生回数や期間で比較" data-i18n-en="Compare tracks, artists, and albums by play count or period">曲・アーティスト・アルバムを再生回数や期間で比較</span>
         </div>
         <div class="metric-card">
-          <strong>日次記録</strong>
-          <span>アプリが取得できた日の差分から傾向を可視化</span>
+          <strong data-i18n-ja="日次記録" data-i18n-en="Daily Records">日次記録</strong>
+          <span data-i18n-ja="アプリが取得できた日の差分から傾向を可視化" data-i18n-en="Visualize changes from the days SongBrief can record">アプリが取得できた日の差分から傾向を可視化</span>
         </div>
         <div class="metric-card">
-          <strong>リキャップ</strong>
-          <span>月間・年間の聴き方を一枚のサマリーに集約</span>
+          <strong data-i18n-ja="リキャップ" data-i18n-en="Recaps">リキャップ</strong>
+          <span data-i18n-ja="月間・年間の聴き方を一枚のサマリーに集約" data-i18n-en="Summarize monthly and yearly listening in one view">月間・年間の聴き方を一枚のサマリーに集約</span>
         </div>
         <div class="metric-card">
-          <strong>ローカル重視</strong>
-          <span>音楽ライブラリの詳細は主に端末内で処理</span>
+          <strong data-i18n-ja="ローカル重視" data-i18n-en="Local First">ローカル重視</strong>
+          <span data-i18n-ja="音楽ライブラリの詳細は主に端末内で処理" data-i18n-en="Detailed library data is primarily handled on device">音楽ライブラリの詳細は主に端末内で処理</span>
         </div>
       </section>
 
       <section id="features" class="section">
         <div class="section-heading">
           <div>
-            <div class="eyebrow">Features</div>
-            <h2>再生回数だけで終わらない統計</h2>
+            <div class="eyebrow" data-i18n-ja="機能" data-i18n-en="Features">機能</div>
+            <h2 data-i18n-ja="再生回数だけで終わらない統計" data-i18n-en="Statistics beyond play counts">再生回数だけで終わらない統計</h2>
           </div>
-          <p>
-            SongBriefは、iOSが提供する音楽ライブラリのカウンターと
-            アプリ内の記録を組み合わせ、普段の聴き方を複数の角度で確認できます。
-          </p>
+          <p data-i18n-ja="SongBriefは、iOSが提供する音楽ライブラリのカウンターとアプリ内の記録を組み合わせ、普段の聴き方を複数の角度で確認できます。" data-i18n-en="SongBrief combines iOS music library counters with local records so you can review your listening from several angles.">SongBriefは、iOSが提供する音楽ライブラリのカウンターとアプリ内の記録を組み合わせ、普段の聴き方を複数の角度で確認できます。</p>
         </div>
 
         <div class="feature-grid">
           <article class="feature-card">
-            <h3>再生中の詳細</h3>
-            <p>
-              ジャケット、曲情報、再生回数、スキップ回数、登録プレイリスト、
-              歌詞などをひとつの画面で確認できます。
-            </p>
+            <h3 data-i18n-ja="再生中の詳細" data-i18n-en="Now Playing Details">再生中の詳細</h3>
+            <p data-i18n-ja="ジャケット、曲情報、再生回数、スキップ回数、登録プレイリスト、歌詞などをひとつの画面で確認できます。" data-i18n-en="Review artwork, metadata, play counts, skip counts, playlists, and lyrics on one screen.">ジャケット、曲情報、再生回数、スキップ回数、登録プレイリスト、歌詞などをひとつの画面で確認できます。</p>
           </article>
           <article class="feature-card">
-            <h3>ランキングの深掘り</h3>
-            <p>
-              トップ曲を主線に、期間切り替え、急上昇、再発見、順位変動などを
-              追加して、聴き方の変化を追えます。
-            </p>
+            <h3 data-i18n-ja="ランキングの深掘り" data-i18n-en="Ranking Deep Dives">ランキングの深掘り</h3>
+            <p data-i18n-ja="トップ曲を主線に、期間切り替え、急上昇、再発見、順位変動などを追加して、聴き方の変化を追えます。" data-i18n-en="Track changes with periods, rising songs, rediscovery lists, and ranking movement.">トップ曲を主線に、期間切り替え、急上昇、再発見、順位変動などを追加して、聴き方の変化を追えます。</p>
           </article>
           <article class="feature-card">
-            <h3>リスニングマップ</h3>
-            <p>
-              発売年、曜日、ジャンルなどの切り口で再生傾向を可視化し、
-              詳細ビューでは曲数表示にも切り替えられます。
-            </p>
+            <h3 data-i18n-ja="リスニングマップ" data-i18n-en="Listening Map">リスニングマップ</h3>
+            <p data-i18n-ja="発売年、曜日、ジャンルなどの切り口で再生傾向を可視化し、詳細ビューでは曲数表示にも切り替えられます。" data-i18n-en="Visualize listening by release year, weekday, and genre, with count-based views in detail mode.">発売年、曜日、ジャンルなどの切り口で再生傾向を可視化し、詳細ビューでは曲数表示にも切り替えられます。</p>
           </article>
           <article class="feature-card">
-            <h3>ライブラリ管理</h3>
-            <p>
-              曲、アーティスト、アルバム、ジャンル、プレイリストを検索し、
-              非表示条件やエクスポートで自分の見方に整えられます。
-            </p>
+            <h3 data-i18n-ja="ライブラリ管理" data-i18n-en="Library Browsing">ライブラリ管理</h3>
+            <p data-i18n-ja="曲、アーティスト、アルバム、ジャンル、プレイリストを検索し、非表示条件やエクスポートで自分の見方に整えられます。" data-i18n-en="Search tracks, artists, albums, genres, and playlists, then tune the view with hidden filters and exports.">曲、アーティスト、アルバム、ジャンル、プレイリストを検索し、非表示条件やエクスポートで自分の見方に整えられます。</p>
           </article>
+        </div>
+
+        <div class="feature-detail-list" aria-label="Detailed features">
+          <div class="feature-detail-row">
+            <strong data-i18n-ja="対応言語" data-i18n-en="Languages">対応言語</strong>
+            <span data-i18n-ja="日本語、英語、韓国語、中国語（簡体字）の表示に対応しています。" data-i18n-en="The app supports Japanese, English, Korean, and Simplified Chinese UI text.">日本語、英語、韓国語、中国語（簡体字）の表示に対応しています。</span>
+          </div>
+          <div class="feature-detail-row">
+            <strong data-i18n-ja="画面ロック" data-i18n-en="App lock">画面ロック</strong>
+            <span data-i18n-ja="端末認証でアプリ内容を保護し、バックグラウンド復帰時のプライバシースクリーンにも対応します。" data-i18n-en="Protect app contents with device authentication and a privacy screen when returning from the background.">端末認証でアプリ内容を保護し、バックグラウンド復帰時のプライバシースクリーンにも対応します。</span>
+          </div>
+          <div class="feature-detail-row">
+            <strong data-i18n-ja="除外条件" data-i18n-en="Exclusions">除外条件</strong>
+            <span data-i18n-ja="非表示にしたいプレイリスト、ジャンル、キーワードを管理し、一覧を自分向けに整えられます。" data-i18n-en="Manage playlists, genres, and keywords you want to hide so library views stay focused.">非表示にしたいプレイリスト、ジャンル、キーワードを管理し、一覧を自分向けに整えられます。</span>
+          </div>
+          <div class="feature-detail-row">
+            <strong data-i18n-ja="データ管理" data-i18n-en="Data management">データ管理</strong>
+            <span data-i18n-ja="一時キャッシュと日々の聴取記録を分けて削除でき、記録の保存をオフにする設定も用意しています。" data-i18n-en="Temporary cache and daily listening records can be managed separately, with an option to turn record saving off.">一時キャッシュと日々の聴取記録を分けて削除でき、記録の保存をオフにする設定も用意しています。</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="history" class="section history-section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow" data-i18n-ja="聴取記録" data-i18n-en="Listening History">聴取記録</div>
+            <h2 data-i18n-ja="日々の変化から、聴き方を読み解く" data-i18n-en="Read your listening through daily changes">日々の変化から、聴き方を読み解く</h2>
+          </div>
+          <p data-i18n-ja="SongBriefは、アプリが記録できた日のライブラリ状態を比べて、前回から増えた再生、曜日ごとの偏り、発売年ごとの集中度などを表示します。単なる累計ではなく、最近どう変わったかを確認できます。" data-i18n-en="SongBrief compares the library states it can record and shows what changed since the previous record, including recent play increases, weekday patterns, and release-year concentration. It is not just a lifetime total; it helps you see what changed recently.">SongBriefは、アプリが記録できた日のライブラリ状態を比べて、前回から増えた再生、曜日ごとの偏り、発売年ごとの集中度などを表示します。単なる累計ではなく、最近どう変わったかを確認できます。</p>
+        </div>
+
+        <div class="history-stack" aria-label="Listening history screenshots">
+          <div class="history-feature history-feature-phone">
+            <div class="history-feature-copy">
+              <article class="insight-card">
+                <strong data-i18n-ja="前回からの増加" data-i18n-en="Changes since the last record">前回からの増加</strong>
+                <span data-i18n-ja="直近の記録との差分から、最近よく聴いた曲を抽出します。" data-i18n-en="Find the songs that gained plays since the latest recorded state.">直近の記録との差分から、最近よく聴いた曲を抽出します。</span>
+              </article>
+              <article class="insight-card">
+                <strong data-i18n-ja="リキャップ" data-i18n-en="Recaps">リキャップ</strong>
+                <span data-i18n-ja="月間・年間の総再生、トップ曲、聴取時間を一枚にまとめます。" data-i18n-en="Summarize monthly and yearly plays, top tracks, and listening time in one view.">月間・年間の総再生、トップ曲、聴取時間を一枚にまとめます。</span>
+              </article>
+            </div>
+            <figure class="device-frame phone-frame history-phone">
+              <a
+                class="glightbox lightbox-link"
+                href="./assets/screenshot-iphone-history.png"
+                data-media-ja="./assets/screenshot-iphone-history.png"
+                data-media-en="./assets/screenshot-iphone-history-en.png"
+                data-gallery="songbrief-screens"
+                data-title="日々の聴取記録 / Daily records"
+                aria-label="日々の聴取記録画面を拡大"
+              >
+                <img
+                  src="./assets/screenshot-iphone-history.png"
+                  data-media-ja="./assets/screenshot-iphone-history.png"
+                  data-media-en="./assets/screenshot-iphone-history-en.png"
+                  alt="Listening map and history statistics on iPhone"
+                >
+              </a>
+              <figcaption data-i18n-ja="日々の聴取記録" data-i18n-en="Daily records">日々の聴取記録</figcaption>
+            </figure>
+          </div>
+
+          <div class="history-feature history-feature-wide">
+            <div class="history-feature-copy">
+              <article class="insight-card">
+                <strong data-i18n-ja="再生ヒートマップ" data-i18n-en="Playback heatmap">再生ヒートマップ</strong>
+                <span data-i18n-ja="日付や曜日ごとの再生活動を、濃淡で俯瞰できます。" data-i18n-en="Scan listening activity by date and weekday with density-based views.">日付や曜日ごとの再生活動を、濃淡で俯瞰できます。</span>
+              </article>
+              <article class="insight-card">
+                <strong data-i18n-ja="指標の切り替え" data-i18n-en="Switchable metrics">指標の切り替え</strong>
+                <span data-i18n-ja="発売年別の再生数と曲数など、見たい指標を切り替えられます。" data-i18n-en="Switch between metrics such as plays and track counts by release year.">発売年別の再生数と曲数など、見たい指標を切り替えられます。</span>
+              </article>
+            </div>
+            <figure class="device-frame tablet-frame history-tablet">
+              <a
+                class="glightbox lightbox-link"
+                href="./assets/screenshot-ipad-history.png"
+                data-media-ja="./assets/screenshot-ipad-history.png"
+                data-media-en="./assets/screenshot-ipad-history-en.png"
+                data-gallery="songbrief-screens"
+                data-title="リスニングマップ / Listening map"
+                aria-label="リスニングマップ画面を拡大"
+              >
+                <img
+                  src="./assets/screenshot-ipad-history.png"
+                  data-media-ja="./assets/screenshot-ipad-history.png"
+                  data-media-en="./assets/screenshot-ipad-history-en.png"
+                  alt="Listening map and heatmap on iPad"
+                >
+              </a>
+              <figcaption data-i18n-ja="リスニングマップ" data-i18n-en="Listening map">リスニングマップ</figcaption>
+            </figure>
+          </div>
         </div>
       </section>
 
       <section id="screens" class="section screenshot-section">
         <div class="section-heading">
           <div>
-            <div class="eyebrow">Screens</div>
-            <h2>iPhoneとiPadで同じデータを扱いやすく</h2>
+            <div class="eyebrow" data-i18n-ja="画面" data-i18n-en="Screens">画面</div>
+            <h2 data-i18n-ja="iPhoneとiPadで同じデータを扱いやすく" data-i18n-en="Designed for both iPhone and iPad">iPhoneとiPadで同じデータを扱いやすく</h2>
           </div>
-          <p>
-            スマートフォンではタブ中心、タブレットではサイドバー中心に切り替え、
-            ランキングやライブラリを広い画面で見渡せるようにしています。
-          </p>
+          <p data-i18n-ja="スマートフォンではタブ中心、タブレットではサイドバー中心に切り替え、ランキングやライブラリを広い画面で見渡せるようにしています。" data-i18n-en="The app uses tabs on phones and a sidebar on tablets so rankings and library views stay easy to scan.">スマートフォンではタブ中心、タブレットではサイドバー中心に切り替え、ランキングやライブラリを広い画面で見渡せるようにしています。</p>
         </div>
 
         <div class="screenshot-row">
           <figure class="device-frame phone-frame">
-            <img src="./assets/screenshot-iphone-overview.png" alt="Overview screen on iPhone">
-            <figcaption>概要 / Overview</figcaption>
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-iphone-overview.png"
+              data-media-ja="./assets/screenshot-iphone-overview.png"
+              data-media-en="./assets/screenshot-iphone-overview-en.png"
+              data-gallery="songbrief-screens"
+              data-title="概要 / Overview"
+              aria-label="概要画面を拡大"
+            >
+              <img
+                src="./assets/screenshot-iphone-overview.png"
+                data-media-ja="./assets/screenshot-iphone-overview.png"
+                data-media-en="./assets/screenshot-iphone-overview-en.png"
+                alt="Overview screen on iPhone"
+              >
+            </a>
+            <figcaption data-i18n-ja="概要" data-i18n-en="Overview">概要</figcaption>
           </figure>
           <figure class="device-frame phone-frame">
-            <img src="./assets/screenshot-iphone-rankings.png" alt="Rankings screen on iPhone">
-            <figcaption>ランキング / Rankings</figcaption>
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-iphone-rankings.png"
+              data-media-ja="./assets/screenshot-iphone-rankings.png"
+              data-media-en="./assets/screenshot-iphone-rankings-en.png"
+              data-gallery="songbrief-screens"
+              data-title="ランキング / Rankings"
+              aria-label="ランキング画面を拡大"
+            >
+              <img
+                src="./assets/screenshot-iphone-rankings.png"
+                data-media-ja="./assets/screenshot-iphone-rankings.png"
+                data-media-en="./assets/screenshot-iphone-rankings-en.png"
+                alt="Rankings screen on iPhone"
+              >
+            </a>
+            <figcaption data-i18n-ja="ランキング" data-i18n-en="Rankings">ランキング</figcaption>
           </figure>
           <figure class="device-frame tablet-frame">
-            <img src="./assets/screenshot-ipad-library.png" alt="Library screen on iPad">
-            <figcaption>ライブラリ / Library</figcaption>
+            <a
+              class="glightbox lightbox-link"
+              href="./assets/screenshot-ipad-library.png"
+              data-media-ja="./assets/screenshot-ipad-library.png"
+              data-media-en="./assets/screenshot-ipad-library-en.png"
+              data-gallery="songbrief-screens"
+              data-title="ライブラリ / Library"
+              aria-label="ライブラリ画面を拡大"
+            >
+              <img
+                src="./assets/screenshot-ipad-library.png"
+                data-media-ja="./assets/screenshot-ipad-library.png"
+                data-media-en="./assets/screenshot-ipad-library-en.png"
+                alt="Library screen on iPad"
+              >
+            </a>
+            <figcaption data-i18n-ja="ライブラリ" data-i18n-en="Library">ライブラリ</figcaption>
           </figure>
         </div>
       </section>
@@ -152,147 +317,71 @@
         <div class="section-heading">
           <div>
             <div class="eyebrow">FAQ</div>
-            <h2>よくある質問</h2>
+            <h2 data-i18n-ja="よくある質問" data-i18n-en="Frequently asked questions">よくある質問</h2>
           </div>
-          <p>
-            SongBriefのデータ取得、聴取記録、プライバシー、対応範囲について、
-            公開前によく確認される点をまとめています。
-          </p>
+          <p data-i18n-ja="SongBriefのデータ取得、聴取記録、プライバシー、対応範囲について、公開前によく確認される点をまとめています。" data-i18n-en="Answers to common questions about SongBrief's data sources, listening records, privacy, and supported use cases.">SongBriefのデータ取得、聴取記録、プライバシー、対応範囲について、公開前によく確認される点をまとめています。</p>
         </div>
 
         <div class="faq-list">
           <details class="faq-item" open>
-            <summary>SongBriefはどの音楽サービスのデータを使いますか？</summary>
-            <p>
-              iOSのミュージックライブラリから取得できる曲、アルバム、
-              アーティスト、再生回数、スキップ回数などを使います。
-              現時点ではSpotifyやAmazon Musicの再生履歴には対応していません。
-            </p>
-            <p lang="en">
-              SongBrief uses metadata available from the iOS music library,
-              including tracks, albums, artists, play counts, and skip counts.
-              Spotify and Amazon Music listening history are not supported at
-              this time.
-            </p>
+            <summary data-i18n-ja="SongBriefはどの音楽サービスのデータを使いますか？" data-i18n-en="Which music service data does SongBrief use?">SongBriefはどの音楽サービスのデータを使いますか？</summary>
+            <p data-lang-panel="ja">iOSのミュージックライブラリから取得できる曲、アルバム、アーティスト、再生回数、スキップ回数などを使います。現時点ではSpotifyやAmazon Musicの再生履歴には対応していません。</p>
+            <p data-lang-panel="en">SongBrief uses metadata available from the iOS music library, including tracks, albums, artists, play counts, and skip counts. Spotify and Amazon Music listening history are not supported at this time.</p>
           </details>
 
           <details class="faq-item">
-            <summary>Apple Musicのサブスクリプションは必要ですか？</summary>
-            <p>
-              SongBriefはストリーミング再生を提供するアプリではなく、
-              iOSが許可したミュージックライブラリ情報を整理するアプリです。
-              表示できる内容は、端末のミュージックライブラリに存在し、
-              iOSから読み取れる情報に依存します。
-            </p>
-            <p lang="en">
-              SongBrief is not a streaming app. It organizes the music library
-              information that iOS allows the app to read. Available details
-              depend on what exists in your device's music library and what iOS
-              exposes to apps.
-            </p>
+            <summary data-i18n-ja="Apple Musicのサブスクリプションは必要ですか？" data-i18n-en="Do I need an Apple Music subscription?">Apple Musicのサブスクリプションは必要ですか？</summary>
+            <p data-lang-panel="ja">SongBriefはストリーミング再生を提供するアプリではなく、iOSが許可したミュージックライブラリ情報を整理するアプリです。表示できる内容は、端末のミュージックライブラリに存在し、iOSから読み取れる情報に依存します。</p>
+            <p data-lang-panel="en">SongBrief is not a streaming app. It organizes the music library information that iOS allows the app to read. Available details depend on what exists in your device's music library and what iOS exposes to apps.</p>
           </details>
 
           <details class="faq-item">
-            <summary>聴取記録とは何ですか？</summary>
-            <p>
-              SongBriefが日ごとに保存するライブラリ統計の記録です。
-              複数日の記録を比較することで、再生数の増加、リキャップ、
-              急上昇、再発見、ヒートマップなどを表示します。
-            </p>
-            <p lang="en">
-              Listening records are daily snapshots of your library statistics.
-              SongBrief compares records from different days to show play-count
-              changes, recaps, rising tracks, rediscovery suggestions, and
-              activity maps.
-            </p>
+            <summary data-i18n-ja="聴取記録とは何ですか？" data-i18n-en="What are listening records?">聴取記録とは何ですか？</summary>
+            <p data-lang-panel="ja">SongBriefが日ごとに保存するライブラリ統計の記録です。複数日の記録を比較することで、再生数の増加、リキャップ、急上昇、再発見、ヒートマップなどを表示します。</p>
+            <p data-lang-panel="en">Listening records are daily snapshots of your library statistics. SongBrief compares records from different days to show play-count changes, recaps, rising tracks, rediscovery suggestions, and activity maps.</p>
           </details>
 
           <details class="faq-item">
-            <summary>聴取記録は毎日アプリを開かないと残りませんか？</summary>
-            <p>
-              アプリを開いた時や更新できたタイミングで記録を保存します。
-              iOSの制約により、常に完全なバックグラウンド取得を保証するものでは
-              ありません。記録が増えるほど、期間比較やリキャップが充実します。
-            </p>
-            <p lang="en">
-              SongBrief saves records when the app is opened or when an update
-              can run. Because iOS limits background work, continuous background
-              collection is not guaranteed. More records make trends and recaps
-              more useful.
-            </p>
+            <summary data-i18n-ja="聴取記録は毎日アプリを開かないと残りませんか？" data-i18n-en="Do I need to open the app every day?">聴取記録は毎日アプリを開かないと残りませんか？</summary>
+            <p data-lang-panel="ja">アプリを開いた時や更新できたタイミングで記録を保存します。iOSの制約により、常に完全なバックグラウンド取得を保証するものではありません。記録が増えるほど、期間比較やリキャップが充実します。</p>
+            <p data-lang-panel="en">SongBrief saves records when the app is opened or when an update can run. Because iOS limits background work, continuous background collection is not guaranteed. More records make trends and recaps more useful.</p>
           </details>
 
           <details class="faq-item">
-            <summary>音楽ライブラリの詳細は外部に送信されますか？</summary>
-            <p>
-              曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、
-              聴取記録などの詳細情報を、SongBrief開発者が管理するサーバーへ
-              送信しない方針です。広告、解析、クラッシュ診断にもこれらの
-              詳細情報を含めません。
-            </p>
-            <p lang="en">
-              SongBrief is designed not to send detailed music library
-              information, such as track titles, artist names, album names,
-              lyrics, playlists, or listening records, to a developer-operated
-              server. Those details are also not included in ads, analytics, or
-              crash reports.
-            </p>
+            <summary data-i18n-ja="音楽ライブラリの詳細は外部に送信されますか？" data-i18n-en="Is detailed music library data sent outside the device?">音楽ライブラリの詳細は外部に送信されますか？</summary>
+            <p data-lang-panel="ja">曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、聴取記録などの詳細情報を、SongBrief開発者が管理するサーバーへ送信しない方針です。広告、解析、クラッシュ診断にもこれらの詳細情報を含めません。</p>
+            <p data-lang-panel="en">SongBrief is designed not to send detailed music library information, such as track titles, artist names, album names, lyrics, playlists, or listening records, to a developer-operated server. Those details are also not included in ads, analytics, or crash reports.</p>
           </details>
 
           <details class="faq-item">
-            <summary>保存された聴取記録やキャッシュは削除できますか？</summary>
-            <p>
-              はい。設定画面から一時キャッシュと聴取記録を分けて管理できます。
-              聴取記録は期間を指定して古い記録だけ削除したり、
-              すべて削除したりできます。
-            </p>
-            <p lang="en">
-              Yes. Temporary caches and listening records can be managed
-              separately from Settings. You can keep a selected period, delete
-              older records, or remove all listening records.
-            </p>
+            <summary data-i18n-ja="保存された聴取記録やキャッシュは削除できますか？" data-i18n-en="Can I delete saved records and caches?">保存された聴取記録やキャッシュは削除できますか？</summary>
+            <p data-lang-panel="ja">はい。設定画面から一時キャッシュと聴取記録を分けて管理できます。聴取記録は期間を指定して古い記録だけ削除したり、すべて削除したりできます。</p>
+            <p data-lang-panel="en">Yes. Temporary caches and listening records can be managed separately from Settings. You can keep a selected period, delete older records, or remove all listening records.</p>
           </details>
 
           <details class="faq-item">
-            <summary>広告は表示されますか？</summary>
-            <p>
-              無料版では控えめな広告を表示する場合があります。広告が有効な場合も、
-              音楽ライブラリの詳細情報を広告リクエストに含めない方針です。
-            </p>
-            <p lang="en">
-              The free version may show subtle ads. Even when ads are enabled,
-              detailed music library information is not included in ad requests.
-            </p>
+            <summary data-i18n-ja="広告は表示されますか？" data-i18n-en="Does SongBrief show ads?">広告は表示されますか？</summary>
+            <p data-lang-panel="ja">無料版では控えめな広告を表示する場合があります。広告が有効な場合も、音楽ライブラリの詳細情報を広告リクエストに含めない方針です。</p>
+            <p data-lang-panel="en">The free version may show subtle ads. Even when ads are enabled, detailed music library information is not included in ad requests.</p>
           </details>
 
           <details class="faq-item">
-            <summary>iPadでも使えますか？</summary>
-            <p>
-              はい。iPhoneではタブ中心、iPadなどの広い画面ではサイドバー中心の
-              レイアウトに切り替わります。
-            </p>
-            <p lang="en">
-              Yes. SongBrief uses a tab-focused layout on iPhone and switches to
-              a sidebar-focused layout on wider screens such as iPad.
-            </p>
+            <summary data-i18n-ja="iPadでも使えますか？" data-i18n-en="Does SongBrief work on iPad?">iPadでも使えますか？</summary>
+            <p data-lang-panel="ja">はい。iPhoneではタブ中心、iPadなどの広い画面ではサイドバー中心のレイアウトに切り替わります。</p>
+            <p data-lang-panel="en">Yes. SongBrief uses a tab-focused layout on iPhone and switches to a sidebar-focused layout on wider screens such as iPad.</p>
           </details>
         </div>
       </section>
 
       <section class="section legal-note">
         <div>
-          <div class="eyebrow">Privacy</div>
-          <h2>音楽ライブラリの詳細は広告・解析・クラッシュ診断に含めません</h2>
-          <p>
-            SongBriefは、曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、
-            再生履歴などを広告リクエスト、解析イベント、クラッシュレポートに
-            含めない方針です。
-            詳細はプライバシーポリシーをご確認ください。
-          </p>
+          <div class="eyebrow" data-i18n-ja="プライバシー" data-i18n-en="Privacy">プライバシー</div>
+          <h2 data-i18n-ja="音楽ライブラリの詳細は広告・解析イベントに含めません" data-i18n-en="Detailed music library data stays out of ads and analytics events">音楽ライブラリの詳細は広告・解析イベントに含めません</h2>
+          <p data-i18n-ja="SongBriefは、曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、再生履歴などを広告リクエストや解析イベントに含めない方針です。詳細はプライバシーポリシーをご確認ください。" data-i18n-en="SongBrief does not include track titles, artist names, album names, lyrics, playlist names, or listening history in ad requests or analytics events. See the privacy policy for details.">SongBriefは、曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、再生履歴などを広告リクエストや解析イベントに含めない方針です。詳細はプライバシーポリシーをご確認ください。</p>
         </div>
         <div class="legal-actions">
-          <a class="button-link" href="./privacy/">Privacy Policy</a>
-          <a class="button-link secondary" href="./terms/">Terms of Use</a>
+          <a class="button-link" href="./privacy/" data-i18n-ja="プライバシーポリシー" data-i18n-en="Privacy Policy">プライバシーポリシー</a>
+          <a class="button-link secondary" href="./terms/" data-i18n-ja="利用規約" data-i18n-en="Terms of Use">利用規約</a>
         </div>
       </section>
     </main>
@@ -300,5 +389,11 @@
     <footer class="site-footer">
       <p>&copy; 2026 SongBrief. All rights reserved.</p>
     </footer>
-  </body>
+    <script
+      src="https://cdn.jsdelivr.net/npm/glightbox@3.3.1/dist/js/glightbox.min.js"
+      integrity="sha384-MZZbZ6RXJudK43v1qY1zOWKOU2yfeBPatuFoKyHAaAgHTUZhwblRTc9CphTt4IGQ"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+</body>
 </html>
