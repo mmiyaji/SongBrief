@@ -435,44 +435,32 @@ class _ArtworkPlaybackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.34),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+    return IconButton.filled(
+      style: ButtonStyle(
+        minimumSize: const WidgetStatePropertyAll(Size.square(48)),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled) || busy) {
+            return Colors.black.withValues(alpha: 0.38);
+          }
+          return Colors.black.withValues(alpha: 0.68);
+        }),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled) || busy) {
+            return Colors.white.withValues(alpha: 0.46);
+          }
+          return Colors.white;
+        }),
+        side: WidgetStatePropertyAll(
+          BorderSide(color: Colors.white.withValues(alpha: 0.26)),
+        ),
+        shape: const WidgetStatePropertyAll(CircleBorder()),
       ),
-      child: IconButton.filled(
-        style: ButtonStyle(
-          minimumSize: const WidgetStatePropertyAll(Size.square(48)),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          backgroundColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.disabled) || busy) {
-              return Colors.black.withValues(alpha: 0.38);
-            }
-            return Colors.black.withValues(alpha: 0.68);
-          }),
-          foregroundColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.disabled) || busy) {
-              return Colors.white.withValues(alpha: 0.46);
-            }
-            return Colors.white;
-          }),
-          side: WidgetStatePropertyAll(
-            BorderSide(color: Colors.white.withValues(alpha: 0.26)),
-          ),
-          shape: const WidgetStatePropertyAll(CircleBorder()),
-        ),
-        onPressed: onPressed,
-        tooltip: tooltip,
-        icon: Icon(
-          isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          size: 28,
-        ),
+      onPressed: onPressed,
+      tooltip: tooltip,
+      icon: Icon(
+        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+        size: 28,
       ),
     );
   }
@@ -492,13 +480,6 @@ class _HeroPlayCountOverlay extends StatelessWidget {
         color: Colors.black.withValues(alpha: 0.58),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

@@ -228,6 +228,54 @@ String _authorizationLabel(
   };
 }
 
+String _musicAccessStatusTooltipLabel(
+  BuildContext context,
+  bool isDemo,
+  MusicLibraryAuthorizationStatus status,
+) {
+  if (isDemo) {
+    return _t(context, 'Demo mode', 'デモモード', zh: '演示模式', ko: '데모 모드');
+  }
+
+  return switch (status) {
+    MusicLibraryAuthorizationStatus.notDetermined => _t(
+      context,
+      'Apple Music access not requested',
+      'Apple Musicアクセス未確認',
+      zh: '尚未请求 Apple Music 访问权限',
+      ko: 'Apple Music 접근 권한 미요청',
+    ),
+    MusicLibraryAuthorizationStatus.authorized => _t(
+      context,
+      'Apple Music authorized',
+      'Apple Music認証済み',
+      zh: 'Apple Music 已授权',
+      ko: 'Apple Music 인증됨',
+    ),
+    MusicLibraryAuthorizationStatus.denied => _t(
+      context,
+      'Apple Music access denied',
+      'Apple Musicアクセス拒否',
+      zh: 'Apple Music 访问被拒绝',
+      ko: 'Apple Music 접근 거부됨',
+    ),
+    MusicLibraryAuthorizationStatus.restricted => _t(
+      context,
+      'Apple Music access restricted',
+      'Apple Musicアクセス制限中',
+      zh: 'Apple Music 访问受限',
+      ko: 'Apple Music 접근 제한됨',
+    ),
+    MusicLibraryAuthorizationStatus.unsupported => _t(
+      context,
+      'Apple Music unavailable',
+      'Apple Music利用不可',
+      zh: 'Apple Music 不可用',
+      ko: 'Apple Music 사용 불가',
+    ),
+  };
+}
+
 String _themeStyleLabel(BuildContext context, SongBriefThemeStyle style) {
   return switch (style) {
     SongBriefThemeStyle.prism => _t(context, 'Prism', 'プリズム'),
@@ -922,33 +970,58 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _MusicAccessStatusPill extends StatelessWidget {
+class _MusicAccessStatusPill extends StatefulWidget {
   const _MusicAccessStatusPill({required this.isDemo, required this.status});
 
   final bool isDemo;
   final MusicLibraryAuthorizationStatus status;
 
   @override
+  State<_MusicAccessStatusPill> createState() => _MusicAccessStatusPillState();
+}
+
+class _MusicAccessStatusPillState extends State<_MusicAccessStatusPill> {
+  final _tooltipKey = GlobalKey<TooltipState>();
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = isDemo
-        ? _t(context, 'Demo mode', 'デモモード', zh: '演示模式', ko: '데모 모드')
-        : _authorizationLabel(context, status);
-    final icon = isDemo
+    final label = _musicAccessStatusTooltipLabel(
+      context,
+      widget.isDemo,
+      widget.status,
+    );
+    final icon = widget.isDemo
         ? Icons.science_outlined
-        : _musicAccessStatusIcon(status);
-    final color = _musicAccessStatusColor(theme, isDemo, status);
+        : _musicAccessStatusIcon(widget.status);
+    final color = _musicAccessStatusColor(theme, widget.isDemo, widget.status);
 
     return Tooltip(
+      key: _tooltipKey,
       message: label,
+      triggerMode: TooltipTriggerMode.manual,
+      showDuration: const Duration(seconds: 2),
       child: Semantics(
+        button: true,
         label: label,
-        child: GlassSurface(
-          padding: const EdgeInsets.all(10),
-          radius: 18,
-          tint: const Color(0x55FFFFFF),
-          shadowOpacity: 0.02,
-          child: Icon(icon, color: color, size: 22),
+        child: Material(
+          color: Colors.transparent,
+          child: InkResponse(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () {
+              _tooltipKey.currentState?.ensureTooltipVisible();
+            },
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GlassSurface(
+                padding: const EdgeInsets.all(10),
+                radius: 18,
+                tint: const Color(0x55FFFFFF),
+                shadowOpacity: 0.02,
+                child: Icon(icon, color: color, size: 22),
+              ),
+            ),
+          ),
         ),
       ),
     );
