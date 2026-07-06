@@ -19,7 +19,7 @@ void main() {
     expect(find.textContaining('City lights are waking slow'), findsOneWidget);
     expect(find.text('Show all lyrics'), findsOneWidget);
     expect(find.text('Recently played songs'), findsOneWidget);
-    expect(find.text('Demo'), findsOneWidget);
+    expect(find.byTooltip('Demo mode'), findsOneWidget);
   });
 
   testWidgets('expands and collapses long lyrics', (tester) async {
@@ -54,7 +54,7 @@ void main() {
     expect(find.text('再生回数'), findsWidgets);
     expect(find.text('今週の傾向'), findsOneWidget);
     expect(find.text('最近再生した曲'), findsOneWidget);
-    expect(find.text('デモ'), findsOneWidget);
+    expect(find.byTooltip('デモモード'), findsOneWidget);
   });
 
   testWidgets('shows playback feedback and allows pausing from the player', (

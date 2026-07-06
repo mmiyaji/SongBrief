@@ -158,14 +158,9 @@ class _HeroTrackPanel extends ConsumerWidget {
                       Positioned(
                         right: 18,
                         top: 18,
-                        child: IconButton.filledTonal(
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.black.withValues(
-                              alpha: 0.36,
-                            ),
-                            foregroundColor: theme.colorScheme.primary,
-                            minimumSize: const Size.square(46),
-                          ),
+                        child: _ArtworkPlaybackButton(
+                          isPlaying: isPlaying,
+                          busy: busy,
                           onPressed: busy
                               ? null
                               : () {
@@ -176,12 +171,6 @@ class _HeroTrackPanel extends ConsumerWidget {
                           tooltip: isPlaying
                               ? _t(context, 'Pause', '一時停止')
                               : _t(context, 'Play this track', 'この曲を再生'),
-                          icon: Icon(
-                            isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            size: 28,
-                          ),
                         ),
                       ),
                       Positioned(
@@ -241,24 +230,9 @@ class _HeroTrackPanel extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  number.format(track.playCount),
-                                  style: theme.textTheme.headlineMedium
-                                      ?.copyWith(
-                                        color: theme.colorScheme.primary,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                ),
-                                const SizedBox(height: 4),
-                                _SmallMetricPill(
-                                  label: _t(context, 'Plays', '再生回数'),
-                                  onDark: true,
-                                ),
-                              ],
+                            _HeroPlayCountOverlay(
+                              value: number.format(track.playCount),
+                              label: _t(context, 'Plays', '再生回数'),
                             ),
                           ],
                         ),
@@ -446,6 +420,114 @@ class _HeroTrackWideHeader extends StatelessWidget {
   }
 }
 
+class _ArtworkPlaybackButton extends StatelessWidget {
+  const _ArtworkPlaybackButton({
+    required this.isPlaying,
+    required this.busy,
+    required this.onPressed,
+    required this.tooltip,
+  });
+
+  final bool isPlaying;
+  final bool busy;
+  final VoidCallback? onPressed;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.34),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: IconButton.filled(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size.square(48)),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled) || busy) {
+              return Colors.black.withValues(alpha: 0.38);
+            }
+            return Colors.black.withValues(alpha: 0.68);
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled) || busy) {
+              return Colors.white.withValues(alpha: 0.46);
+            }
+            return Colors.white;
+          }),
+          side: WidgetStatePropertyAll(
+            BorderSide(color: Colors.white.withValues(alpha: 0.26)),
+          ),
+          shape: const WidgetStatePropertyAll(CircleBorder()),
+        ),
+        onPressed: onPressed,
+        tooltip: tooltip,
+        icon: Icon(
+          isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+          size: 28,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroPlayCountOverlay extends StatelessWidget {
+  const _HeroPlayCountOverlay({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: Colors.white.withValues(alpha: 0.88),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _HeroImageShade extends StatelessWidget {
   const _HeroImageShade();
 
@@ -483,21 +565,16 @@ class _HeroBadge extends StatelessWidget {
 }
 
 class _SmallMetricPill extends StatelessWidget {
-  const _SmallMetricPill({required this.label, this.onDark = false});
+  const _SmallMetricPill({required this.label});
 
   final String label;
-  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final foreground = theme.colorScheme.primary;
-    final background = onDark
-        ? Colors.black.withValues(alpha: 0.42)
-        : theme.colorScheme.primary.withValues(alpha: 0.1);
-    final border = onDark
-        ? foreground.withValues(alpha: 0.42)
-        : foreground.withValues(alpha: 0.28);
+    final background = theme.colorScheme.primary.withValues(alpha: 0.1);
+    final border = foreground.withValues(alpha: 0.28);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: background,

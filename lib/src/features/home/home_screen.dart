@@ -913,14 +913,75 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        _StatusPill(
-          label: overview.isDemo
-              ? _t(context, 'Demo', 'デモ')
-              : _authorizationLabel(context, stats.authorizationStatus),
+        _MusicAccessStatusPill(
+          isDemo: overview.isDemo,
+          status: stats.authorizationStatus,
         ),
       ],
     );
   }
+}
+
+class _MusicAccessStatusPill extends StatelessWidget {
+  const _MusicAccessStatusPill({required this.isDemo, required this.status});
+
+  final bool isDemo;
+  final MusicLibraryAuthorizationStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = isDemo
+        ? _t(context, 'Demo mode', 'デモモード', zh: '演示模式', ko: '데모 모드')
+        : _authorizationLabel(context, status);
+    final icon = isDemo
+        ? Icons.science_outlined
+        : _musicAccessStatusIcon(status);
+    final color = _musicAccessStatusColor(theme, isDemo, status);
+
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        label: label,
+        child: GlassSurface(
+          padding: const EdgeInsets.all(10),
+          radius: 18,
+          tint: const Color(0x55FFFFFF),
+          shadowOpacity: 0.02,
+          child: Icon(icon, color: color, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+IconData _musicAccessStatusIcon(MusicLibraryAuthorizationStatus status) {
+  return switch (status) {
+    MusicLibraryAuthorizationStatus.authorized => Icons.apple_rounded,
+    MusicLibraryAuthorizationStatus.notDetermined => Icons.music_note_outlined,
+    MusicLibraryAuthorizationStatus.denied ||
+    MusicLibraryAuthorizationStatus.restricted => Icons.lock_outline_rounded,
+    MusicLibraryAuthorizationStatus.unsupported => Icons.info_outline_rounded,
+  };
+}
+
+Color _musicAccessStatusColor(
+  ThemeData theme,
+  bool isDemo,
+  MusicLibraryAuthorizationStatus status,
+) {
+  if (isDemo) {
+    return theme.colorScheme.onSurfaceVariant;
+  }
+  return switch (status) {
+    MusicLibraryAuthorizationStatus.authorized => theme.colorScheme.primary,
+    MusicLibraryAuthorizationStatus.notDetermined =>
+      theme.colorScheme.onSurfaceVariant,
+    MusicLibraryAuthorizationStatus.denied ||
+    MusicLibraryAuthorizationStatus.restricted => theme.colorScheme.error,
+    MusicLibraryAuthorizationStatus.unsupported =>
+      theme.colorScheme.onSurfaceVariant,
+  };
 }
 
 class _StatusPill extends StatelessWidget {
