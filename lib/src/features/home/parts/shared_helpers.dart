@@ -19,37 +19,47 @@ class _SettingsRow extends StatelessWidget {
     final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(icon, color: theme.colorScheme.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final valueWidth = math.min(
+                  260.0,
+                  math.max(156.0, constraints.maxWidth * 0.38),
+                );
+                final labelText = Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                );
+                final valueText = _SettingsRowValue(
+                  value: value,
+                  showOpenIcon: onTap != null,
+                );
+
+                if (constraints.maxWidth < 360) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [labelText, const SizedBox(height: 4), valueText],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(child: labelText),
+                    const SizedBox(width: 16),
+                    SizedBox(width: valueWidth, child: valueText),
+                  ],
+                );
+              },
             ),
           ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: onTap == null ? null : theme.colorScheme.primary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          if (onTap != null) ...[
-            const SizedBox(width: 6),
-            Icon(
-              Icons.open_in_new_rounded,
-              color: theme.colorScheme.primary,
-              size: 18,
-            ),
-          ],
         ],
       ),
     );
@@ -62,6 +72,40 @@ class _SettingsRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: content,
+    );
+  }
+}
+
+class _SettingsRowValue extends StatelessWidget {
+  const _SettingsRowValue({required this.value, required this.showOpenIcon});
+
+  final String value;
+  final bool showOpenIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = showOpenIcon ? theme.colorScheme.primary : null;
+    return Row(
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.left,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        if (showOpenIcon) ...[
+          const SizedBox(width: 6),
+          Icon(Icons.open_in_new_rounded, color: color, size: 18),
+        ],
+      ],
     );
   }
 }
