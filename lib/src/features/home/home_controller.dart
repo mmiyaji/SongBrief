@@ -205,8 +205,13 @@ class PlaybackState {
 
 class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   @override
-  Future<MusicStatsState> build() {
-    return ref.watch(musicStatsRepositoryProvider).load();
+  Future<MusicStatsState> build() async {
+    final loadingPreviewDelay = _startupLoadingPreviewDelay();
+    final next = await ref.watch(musicStatsRepositoryProvider).load();
+    if (loadingPreviewDelay > Duration.zero) {
+      await Future<void>.delayed(loadingPreviewDelay);
+    }
+    return next;
   }
 
   Future<void> requestAccess() async {
@@ -303,6 +308,13 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       );
     }
   }
+}
+
+Duration _startupLoadingPreviewDelay() {
+  if (!Uri.base.queryParameters.containsKey('loading_preview')) {
+    return Duration.zero;
+  }
+  return const Duration(seconds: 4);
 }
 
 class PlaybackController extends Notifier<PlaybackState> {
