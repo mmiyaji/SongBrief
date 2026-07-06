@@ -96,6 +96,26 @@ void main() {
       expect(state.isPlaying, isTrue);
     },
   );
+
+  test('restart plays the active paused track from the beginning', () async {
+    final repository = _FakeMusicStatsRepository();
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(playbackControllerProvider.notifier);
+    await controller.playTrack('track-1');
+    await controller.pause();
+    await controller.restartTrack('track-1');
+
+    final state = container.read(playbackControllerProvider);
+    expect(repository.playTrackCalls, 2);
+    expect(repository.playCalls, 0);
+    expect(repository.pauseCalls, 1);
+    expect(state.activeTrackId, 'track-1');
+    expect(state.isPlaying, isTrue);
+  });
 }
 
 class _FakeMusicStatsRepository extends MusicStatsRepository {

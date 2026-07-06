@@ -75,7 +75,7 @@ void main() {
     expect(find.text('Paused'), findsWidgets);
   });
 
-  testWidgets('opens the playing tab from the mini player', (tester) async {
+  testWidgets('opens track details from the mini player', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -89,11 +89,12 @@ void main() {
 
     expect(find.text('Top Songs'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Open current track'));
+    await tester.tap(find.byTooltip('Show current track details'));
     await tester.pumpAndSettle();
 
-    expect(find.text('This week trend'), findsOneWidget);
+    expect(find.text('Top Songs'), findsOneWidget);
     expect(find.text('Lyrics'), findsOneWidget);
+    expect(find.byTooltip('Play from beginning'), findsOneWidget);
   });
 
   testWidgets('opens trend calculation details from the info button', (

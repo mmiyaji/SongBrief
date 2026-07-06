@@ -132,6 +132,11 @@ class _HeroTrackPanel extends ConsumerWidget {
                           .read(playbackControllerProvider.notifier)
                           .toggleTrack(track.id);
                     },
+                    onRestartPlayback: () {
+                      ref
+                          .read(playbackControllerProvider.notifier)
+                          .restartTrack(track.id);
+                    },
                   );
                 }
 
@@ -259,6 +264,7 @@ class _HeroTrackWideHeader extends StatelessWidget {
     required this.isActive,
     required this.isPlaying,
     required this.onTogglePlayback,
+    required this.onRestartPlayback,
   });
 
   final LibraryTrack track;
@@ -268,6 +274,7 @@ class _HeroTrackWideHeader extends StatelessWidget {
   final bool isActive;
   final bool isPlaying;
   final VoidCallback onTogglePlayback;
+  final VoidCallback onRestartPlayback;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +391,12 @@ class _HeroTrackWideHeader extends StatelessWidget {
                                 : Icons.play_arrow_rounded,
                             size: 31,
                           ),
+                        ),
+                        const SizedBox(width: 10),
+                        IconButton.filledTonal(
+                          onPressed: busy ? null : onRestartPlayback,
+                          tooltip: _playFromBeginningLabel(context),
+                          icon: const Icon(Icons.replay_rounded),
                         ),
                         const SizedBox(width: 14),
                         Column(
@@ -1278,6 +1291,19 @@ class _TrackActionSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
+            onPressed: playback.isBusy
+                ? null
+                : () {
+                    Navigator.of(context).pop();
+                    ref
+                        .read(playbackControllerProvider.notifier)
+                        .restartTrack(track.id);
+                  },
+            icon: const Icon(Icons.replay_rounded),
+            label: Text(_playFromBeginningLabel(context)),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
             onPressed: () {
               Navigator.of(context).pop();
               _showTrackDetailSheet(context, track);
@@ -2138,6 +2164,16 @@ class _AlbumArtwork extends StatelessWidget {
   }
 }
 
+String _playFromBeginningLabel(BuildContext context) {
+  return _t(
+    context,
+    'Play from beginning',
+    '最初から再生',
+    zh: '从头播放',
+    ko: '처음부터 재생',
+  );
+}
+
 class _PlaybackControls extends ConsumerWidget {
   const _PlaybackControls({required this.track});
 
@@ -2188,6 +2224,17 @@ class _PlaybackControls extends ConsumerWidget {
             isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
             size: 32,
           ),
+        ),
+        IconButton.filledTonal(
+          onPressed: busy
+              ? null
+              : () {
+                  ref
+                      .read(playbackControllerProvider.notifier)
+                      .restartTrack(track.id);
+                },
+          tooltip: _playFromBeginningLabel(context),
+          icon: const Icon(Icons.replay_rounded),
         ),
         IconButton.filledTonal(
           onPressed: busy || !state.isPlaying

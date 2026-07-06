@@ -339,7 +339,18 @@ class PlaybackController extends Notifier<PlaybackState> {
     return const PlaybackState();
   }
 
-  Future<void> playTrack(String trackId) async {
+  Future<void> playTrack(String trackId) {
+    return _startTrack(trackId, analyticsAction: 'play_track');
+  }
+
+  Future<void> restartTrack(String trackId) {
+    return _startTrack(trackId, analyticsAction: 'restart_track');
+  }
+
+  Future<void> _startTrack(
+    String trackId, {
+    required String analyticsAction,
+  }) async {
     final previous = state;
     state = PlaybackState(activeTrackId: trackId, isBusy: true);
     try {
@@ -350,7 +361,7 @@ class PlaybackController extends Notifier<PlaybackState> {
             .read(appAnalyticsProvider)
             .logEvent(
               'playback_control',
-              parameters: const {'action': 'play_track'},
+              parameters: {'action': analyticsAction},
             ),
       );
     } on Object catch (error) {

@@ -213,6 +213,7 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     let player = MPMusicPlayerController.systemMusicPlayer
     player.setQueue(with: MPMediaItemCollection(items: [item]))
     player.nowPlayingItem = item
+    player.currentPlaybackTime = 0
     player.play()
     result(nil)
   }

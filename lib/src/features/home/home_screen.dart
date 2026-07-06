@@ -686,13 +686,17 @@ class _MiniPlayerBar extends ConsumerWidget {
               child: Material(
                 color: Colors.transparent,
                 child: Tooltip(
-                  message: _t(context, 'Open current track', '再生中の曲を開く'),
+                  message: _t(
+                    context,
+                    'Show current track details',
+                    '再生中の曲の詳細を表示',
+                    zh: '显示当前歌曲详情',
+                    ko: '현재 곡 상세 보기',
+                  ),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
-                      ref
-                          .read(homeSectionProvider.notifier)
-                          .setSection(HomeSection.playing);
+                      _showTrackDetailSheet(context, track);
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
