@@ -2436,6 +2436,15 @@ String _rankingScopeLabel(BuildContext context, RankingScope scope) {
   };
 }
 
+String _rankingScopeCompactLabel(BuildContext context, RankingScope scope) {
+  return switch (scope) {
+    RankingScope.tracks => _t(context, 'Songs', '曲'),
+    RankingScope.artists => _t(context, 'Artist', '歌手', zh: '艺人', ko: '가수'),
+    RankingScope.albums => _t(context, 'Album', 'アルバム'),
+    RankingScope.recent => _t(context, 'Recent', '最近'),
+  };
+}
+
 String _libraryBrowseModeLabel(BuildContext context, _LibraryBrowseMode mode) {
   return switch (mode) {
     _LibraryBrowseMode.songs => _t(context, 'Songs', '曲'),

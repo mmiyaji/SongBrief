@@ -36,6 +36,7 @@ class _RankingPanel extends ConsumerWidget {
       ),
     );
     final theme = Theme.of(context);
+    final useCompactScopeLabels = MediaQuery.sizeOf(context).width < 480;
     final scopedFocus = focus?.scope == scope ? focus : null;
     final visibleEntries = _visibleRankingEntries(
       entries,
@@ -91,7 +92,7 @@ class _RankingPanel extends ConsumerWidget {
               style: ButtonStyle(
                 visualDensity: VisualDensity.compact,
                 padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                  EdgeInsets.symmetric(horizontal: 6, vertical: 9),
                 ),
                 side: WidgetStateProperty.resolveWith((states) {
                   final selected = states.contains(WidgetState.selected);
@@ -122,7 +123,16 @@ class _RankingPanel extends ConsumerWidget {
                   .map(
                     (value) => ButtonSegment<RankingScope>(
                       value: value,
-                      label: Text(_rankingScopeLabel(context, value)),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          useCompactScopeLabels
+                              ? _rankingScopeCompactLabel(context, value)
+                              : _rankingScopeLabel(context, value),
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
+                      ),
                     ),
                   )
                   .toList(),

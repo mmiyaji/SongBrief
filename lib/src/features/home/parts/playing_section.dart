@@ -602,20 +602,22 @@ class _PlaybackStatusChip extends StatelessWidget {
         ? theme.colorScheme.primary
         : theme.colorScheme.onSurfaceVariant;
     final darkColor = isPlaying
-        ? theme.colorScheme.primary
-        : Colors.white.withValues(alpha: 0.78);
+        ? Colors.white
+        : Colors.white.withValues(alpha: 0.82);
     final foreground = onDark ? darkColor : activeColor;
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: onDark
-            ? Colors.black.withValues(alpha: 0.42)
+            ? Colors.black.withValues(alpha: 0.56)
             : theme.colorScheme.primary.withValues(
                 alpha: isPlaying ? 0.14 : 0.08,
               ),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: foreground.withValues(alpha: onDark ? 0.42 : 0.28),
+          color: onDark
+              ? Colors.white.withValues(alpha: 0.28)
+              : foreground.withValues(alpha: 0.28),
         ),
       ),
       child: Padding(
