@@ -17,6 +17,7 @@
         <nav class="nav" aria-label="Site navigation">
           <a href="#features">Features</a>
           <a href="#screens">Screens</a>
+          <a href="#faq">FAQ</a>
           <a href="./privacy/">Privacy Policy</a>
           <a href="./terms/">Terms of Use</a>
         </nav>
@@ -144,6 +145,137 @@
             <img src="./assets/screenshot-ipad-library.png" alt="Library screen on iPad">
             <figcaption>ライブラリ / Library</figcaption>
           </figure>
+        </div>
+      </section>
+
+      <section id="faq" class="section faq-section">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">FAQ</div>
+            <h2>よくある質問</h2>
+          </div>
+          <p>
+            SongBriefのデータ取得、聴取記録、プライバシー、対応範囲について、
+            公開前によく確認される点をまとめています。
+          </p>
+        </div>
+
+        <div class="faq-list">
+          <details class="faq-item" open>
+            <summary>SongBriefはどの音楽サービスのデータを使いますか？</summary>
+            <p>
+              iOSのミュージックライブラリから取得できる曲、アルバム、
+              アーティスト、再生回数、スキップ回数などを使います。
+              現時点ではSpotifyやAmazon Musicの再生履歴には対応していません。
+            </p>
+            <p lang="en">
+              SongBrief uses metadata available from the iOS music library,
+              including tracks, albums, artists, play counts, and skip counts.
+              Spotify and Amazon Music listening history are not supported at
+              this time.
+            </p>
+          </details>
+
+          <details class="faq-item">
+            <summary>Apple Musicのサブスクリプションは必要ですか？</summary>
+            <p>
+              SongBriefはストリーミング再生を提供するアプリではなく、
+              iOSが許可したミュージックライブラリ情報を整理するアプリです。
+              表示できる内容は、端末のミュージックライブラリに存在し、
+              iOSから読み取れる情報に依存します。
+            </p>
+            <p lang="en">
+              SongBrief is not a streaming app. It organizes the music library
+              information that iOS allows the app to read. Available details
+              depend on what exists in your device's music library and what iOS
+              exposes to apps.
+            </p>
+          </details>
+
+          <details class="faq-item">
+            <summary>聴取記録とは何ですか？</summary>
+            <p>
+              SongBriefが日ごとに保存するライブラリ統計の記録です。
+              複数日の記録を比較することで、再生数の増加、リキャップ、
+              急上昇、再発見、ヒートマップなどを表示します。
+            </p>
+            <p lang="en">
+              Listening records are daily snapshots of your library statistics.
+              SongBrief compares records from different days to show play-count
+              changes, recaps, rising tracks, rediscovery suggestions, and
+              activity maps.
+            </p>
+          </details>
+
+          <details class="faq-item">
+            <summary>聴取記録は毎日アプリを開かないと残りませんか？</summary>
+            <p>
+              アプリを開いた時や更新できたタイミングで記録を保存します。
+              iOSの制約により、常に完全なバックグラウンド取得を保証するものでは
+              ありません。記録が増えるほど、期間比較やリキャップが充実します。
+            </p>
+            <p lang="en">
+              SongBrief saves records when the app is opened or when an update
+              can run. Because iOS limits background work, continuous background
+              collection is not guaranteed. More records make trends and recaps
+              more useful.
+            </p>
+          </details>
+
+          <details class="faq-item">
+            <summary>音楽ライブラリの詳細は外部に送信されますか？</summary>
+            <p>
+              曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、
+              聴取記録などの詳細情報を、SongBrief開発者が管理するサーバーへ
+              送信しない方針です。広告、解析、クラッシュ診断にもこれらの
+              詳細情報を含めません。
+            </p>
+            <p lang="en">
+              SongBrief is designed not to send detailed music library
+              information, such as track titles, artist names, album names,
+              lyrics, playlists, or listening records, to a developer-operated
+              server. Those details are also not included in ads, analytics, or
+              crash reports.
+            </p>
+          </details>
+
+          <details class="faq-item">
+            <summary>保存された聴取記録やキャッシュは削除できますか？</summary>
+            <p>
+              はい。設定画面から一時キャッシュと聴取記録を分けて管理できます。
+              聴取記録は期間を指定して古い記録だけ削除したり、
+              すべて削除したりできます。
+            </p>
+            <p lang="en">
+              Yes. Temporary caches and listening records can be managed
+              separately from Settings. You can keep a selected period, delete
+              older records, or remove all listening records.
+            </p>
+          </details>
+
+          <details class="faq-item">
+            <summary>広告は表示されますか？</summary>
+            <p>
+              無料版では控えめな広告を表示する場合があります。広告が有効な場合も、
+              音楽ライブラリの詳細情報を広告リクエストに含めない方針です。
+            </p>
+            <p lang="en">
+              The free version may show subtle ads. Even when ads are enabled,
+              detailed music library information is not included in ad requests.
+            </p>
+          </details>
+
+          <details class="faq-item">
+            <summary>iPadでも使えますか？</summary>
+            <p>
+              はい。iPhoneではタブ中心、iPadなどの広い画面ではサイドバー中心の
+              レイアウトに切り替わります。
+            </p>
+            <p lang="en">
+              Yes. SongBrief uses a tab-focused layout on iPhone and switches to
+              a sidebar-focused layout on wider screens such as iPad.
+            </p>
+          </details>
         </div>
       </section>
 

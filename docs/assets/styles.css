@@ -314,6 +314,60 @@ figcaption {
   padding: 10px 14px 14px;
 }
 
+.faq-list {
+  display: grid;
+  gap: 10px;
+}
+
+.faq-item {
+  background: #f9fbfa;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.faq-item summary {
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 900;
+  list-style: none;
+  padding: 16px 44px 16px 18px;
+  position: relative;
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-item summary::after {
+  color: var(--accent);
+  content: "+";
+  font-size: 1.2rem;
+  font-weight: 800;
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.faq-item[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.faq-item[open] summary::after {
+  content: "−";
+}
+
+.faq-item p {
+  color: var(--muted);
+  margin: 0;
+  padding: 14px 18px 0;
+}
+
+.faq-item p:last-child {
+  padding-bottom: 16px;
+}
+
 .legal-note {
   align-items: center;
   display: grid;
