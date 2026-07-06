@@ -461,12 +461,278 @@ class _EmptyLibraryPanel extends StatelessWidget {
   }
 }
 
-class _LoadingState extends StatelessWidget {
+class _LoadingState extends StatefulWidget {
   const _LoadingState();
 
   @override
+  State<_LoadingState> createState() => _LoadingStateState();
+}
+
+class _LoadingStateState extends State<_LoadingState>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Center(child: CircularProgressIndicator.adaptive());
+    final theme = Theme.of(context);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (reduceMotion && _controller.isAnimating) {
+      _controller.stop();
+    } else if (!reduceMotion && !_controller.isAnimating) {
+      _controller.repeat();
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              final value = reduceMotion ? 0.62 : _controller.value;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _LoadingBrandMark(progress: value),
+                  const SizedBox(height: 26),
+                  Text(
+                    _t(
+                      context,
+                      'Reading your library',
+                      'ライブラリを読み込んでいます',
+                      zh: '正在读取音乐库',
+                      ko: '라이브러리를 읽는 중',
+                    ),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _t(
+                      context,
+                      'Preparing play counts, rankings, and listening records.',
+                      '再生回数、ランキング、聴取記録を準備しています。',
+                      zh: '正在准备播放次数、排行榜和聆听记录。',
+                      ko: '재생 횟수, 랭킹, 감상 기록을 준비하고 있습니다.',
+                    ),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _LoadingProgressTrack(progress: value),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadingBrandMark extends StatelessWidget {
+  const _LoadingBrandMark({required this.progress});
+
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final t = Curves.easeInOutCubic.transform(progress);
+    final pulse = 0.96 + (math.sin(progress * math.pi * 2) + 1) * 0.025;
+    return SizedBox.square(
+      dimension: 142,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Transform.scale(
+            scale: pulse,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.16),
+                ),
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _LoadingOrbitPainter(
+                progress: progress,
+                primary: theme.colorScheme.primary,
+                secondary: theme.colorScheme.secondary,
+                outline: theme.colorScheme.outlineVariant,
+              ),
+            ),
+          ),
+          Transform.scale(
+            scale: 0.9 + t * 0.04,
+            child: Image.asset(
+              'assets/branding/songbrief_icon_foreground.png',
+              width: 98,
+              height: 98,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  Icons.multiline_chart_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 72,
+                );
+              },
+            ),
+          ),
+          Positioned(
+            left: 36,
+            bottom: 28,
+            child: _LoadingBeatBars(progress: progress),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingBeatBars extends StatelessWidget {
+  const _LoadingBeatBars({required this.progress});
+
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = [
+      theme.colorScheme.tertiary,
+      theme.colorScheme.primary,
+      theme.colorScheme.secondary,
+    ];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(3, (index) {
+        final phase = (progress + index * 0.18) % 1;
+        final height = 18 + Curves.easeInOut.transform(
+          (math.sin(phase * math.pi * 2) + 1) / 2,
+        ) * 26;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            width: 10,
+            height: height,
+            decoration: BoxDecoration(
+              color: colors[index].withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _LoadingProgressTrack extends StatelessWidget {
+  const _LoadingProgressTrack({required this.progress});
+
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final left = math.sin(progress * math.pi * 2) * 0.5 + 0.5;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: ColoredBox(
+        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.24),
+        child: SizedBox(
+          height: 6,
+          child: Align(
+            alignment: Alignment(-1 + left * 2, 0),
+            child: FractionallySizedBox(
+              widthFactor: 0.38,
+              alignment: Alignment.center,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  color: theme.colorScheme.primary,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadingOrbitPainter extends CustomPainter {
+  const _LoadingOrbitPainter({
+    required this.progress,
+    required this.primary,
+    required this.secondary,
+    required this.outline,
+  });
+
+  final double progress;
+  final Color primary;
+  final Color secondary;
+  final Color outline;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide / 2 - 8;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final base = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2
+      ..color = outline.withValues(alpha: 0.26);
+    canvas.drawCircle(center, radius, base);
+
+    final sweep = math.pi * 0.78;
+    final start = progress * math.pi * 2 - math.pi / 2;
+    final arc = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 4
+      ..shader = SweepGradient(
+        colors: [primary, secondary, primary],
+        transform: GradientRotation(start),
+      ).createShader(rect);
+    canvas.drawArc(rect, start, sweep, false, arc);
+  }
+
+  @override
+  bool shouldRepaint(covariant _LoadingOrbitPainter oldDelegate) {
+    return progress != oldDelegate.progress ||
+        primary != oldDelegate.primary ||
+        secondary != oldDelegate.secondary ||
+        outline != oldDelegate.outline;
   }
 }
 
