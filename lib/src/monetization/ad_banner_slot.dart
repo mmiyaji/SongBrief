@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../localization/app_text.dart';
+import 'ad_consent.dart';
 import 'ad_runtime.dart';
 import 'monetization_config.dart';
 import 'premium_controller.dart';
@@ -26,7 +27,7 @@ final adDisplayConfigProvider = Provider<AdDisplayConfig>((ref) {
 
 final adSdkInitializationProvider = FutureProvider<void>((ref) {
   final config = ref.watch(adDisplayConfigProvider);
-  if (!config.canLoadPlatformAd) {
+  if (!config.canPreparePlatformAd) {
     return Future<void>.value();
   }
   return initializeAdSdkIfSupported(config.mode);
@@ -50,7 +51,7 @@ class AdDisplayConfig {
   bool get shouldShowSlot =>
       premiumReady && mode.showsAdSlots && !premiumEntitled;
 
-  bool get canLoadPlatformAd =>
+  bool get canPreparePlatformAd =>
       shouldShowSlot && platformCanLoadAds && bannerAdUnitId != null;
 
   bool get missingLiveAdUnit =>
@@ -69,37 +70,68 @@ class AdBannerSlot extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    if (config.canLoadPlatformAd) {
-      final initialization = ref.watch(adSdkInitializationProvider);
-      return initialization.when(
-        data: (_) => _AdSlotFrame(
-          placement: placement,
-          child: PlatformBannerAdView(
-            adUnitId: config.bannerAdUnitId!,
-            placeholderBuilder: (context, state) =>
-                _AdPlaceholder(state: state, config: config),
-          ),
-        ),
+    if (config.canPreparePlatformAd) {
+      final consent = ref.watch(adConsentControllerProvider);
+      return consent.when(
+        data: (consentState) {
+          if (!consentState.canRequestAds) {
+            return const SizedBox.shrink();
+          }
+          return _InitializedAdBannerSlot(placement: placement, config: config);
+        },
         loading: () => _AdSlotFrame(
           placement: placement,
           child: _AdPlaceholder(
-            state: PlatformAdLoadState.loading,
+            state: PlatformAdLoadState.waitingForConsent,
             config: config,
           ),
         ),
-        error: (_, _) => _AdSlotFrame(
-          placement: placement,
-          child: _AdPlaceholder(
-            state: PlatformAdLoadState.failed,
-            config: config,
-          ),
-        ),
+        error: (_, _) => const SizedBox.shrink(),
       );
     }
 
     return _AdSlotFrame(
       placement: placement,
       child: _AdPlaceholder(state: PlatformAdLoadState.failed, config: config),
+    );
+  }
+}
+
+class _InitializedAdBannerSlot extends ConsumerWidget {
+  const _InitializedAdBannerSlot({
+    required this.placement,
+    required this.config,
+  });
+
+  final String placement;
+  final AdDisplayConfig config;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final initialization = ref.watch(adSdkInitializationProvider);
+    return initialization.when(
+      data: (_) => _AdSlotFrame(
+        placement: placement,
+        child: PlatformBannerAdView(
+          adUnitId: config.bannerAdUnitId!,
+          placeholderBuilder: (context, state) =>
+              _AdPlaceholder(state: state, config: config),
+        ),
+      ),
+      loading: () => _AdSlotFrame(
+        placement: placement,
+        child: _AdPlaceholder(
+          state: PlatformAdLoadState.loading,
+          config: config,
+        ),
+      ),
+      error: (_, _) => _AdSlotFrame(
+        placement: placement,
+        child: _AdPlaceholder(
+          state: PlatformAdLoadState.failed,
+          config: config,
+        ),
+      ),
     );
   }
 }
@@ -180,6 +212,13 @@ class _AdPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final message = switch (state) {
+      PlatformAdLoadState.waitingForConsent => appText(
+        context,
+        'Checking ad privacy settings',
+        '広告プライバシー設定を確認しています',
+        zh: '正在检查广告隐私设置',
+        ko: '광고 개인정보 설정을 확인하고 있습니다',
+      ),
       PlatformAdLoadState.loading => appText(
         context,
         'Loading a small banner ad',

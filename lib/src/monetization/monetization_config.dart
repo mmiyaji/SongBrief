@@ -38,6 +38,14 @@ class MonetizationConfig {
     'SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID',
   );
 
+  static const umpDebugGeographyEea = bool.fromEnvironment(
+    'SONGBRIEF_UMP_DEBUG_EEA',
+  );
+
+  static const umpDebugTestDeviceIds = String.fromEnvironment(
+    'SONGBRIEF_UMP_DEBUG_TEST_DEVICE_IDS',
+  );
+
   static AdLaunchMode get adMode {
     final normalized = rawAdMode.trim().toLowerCase().replaceAll('-', '');
     return switch (normalized) {

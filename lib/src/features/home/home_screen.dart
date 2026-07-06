@@ -22,6 +22,7 @@ import '../../domain/music_stats_state.dart';
 import '../../analytics/crash_reporting.dart';
 import '../../export/library_exporter.dart';
 import '../../localization/app_text.dart';
+import '../../monetization/ad_consent.dart';
 import '../../monetization/ad_banner_slot.dart';
 import '../../settings/app_lock.dart';
 import '../../settings/app_preferences.dart';

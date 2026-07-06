@@ -1,17 +1,22 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import 'ad_consent_state.dart';
 import 'monetization_config.dart';
 
-enum PlatformAdLoadState { loading, loaded, failed }
+enum PlatformAdLoadState { waitingForConsent, loading, loaded, failed }
 
 typedef PlatformAdPlaceholderBuilder =
     Widget Function(BuildContext context, PlatformAdLoadState state);
 
 const _androidTestBannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
 const _iosTestBannerAdUnitId = 'ca-app-pub-3940256099942544/2934735716';
+
+Future<InitializationStatus>? _mobileAdsInitialization;
 
 bool get adRuntimeCanLoadAds => Platform.isAndroid || Platform.isIOS;
 
@@ -40,7 +45,108 @@ Future<void> initializeAdSdkIfSupported(AdLaunchMode mode) async {
   await MobileAds.instance.updateRequestConfiguration(
     RequestConfiguration(maxAdContentRating: MaxAdContentRating.g),
   );
-  await MobileAds.instance.initialize();
+  _mobileAdsInitialization ??= MobileAds.instance.initialize();
+  await _mobileAdsInitialization;
+}
+
+Future<PlatformAdConsentResult> updateAdConsentIfSupported() async {
+  if (!adRuntimeCanLoadAds) {
+    return const PlatformAdConsentResult.unsupported();
+  }
+
+  final requestError = await _requestConsentInfoUpdate();
+  FormError? formError;
+  if (requestError == null) {
+    formError = await _loadAndShowConsentFormIfRequired();
+  }
+  return _readPlatformConsentResult(requestError ?? formError);
+}
+
+Future<PlatformAdConsentResult> showAdPrivacyOptionsIfSupported() async {
+  if (!adRuntimeCanLoadAds) {
+    return const PlatformAdConsentResult.unsupported();
+  }
+
+  final formError = await _showPrivacyOptionsForm();
+  return _readPlatformConsentResult(formError);
+}
+
+Future<FormError?> _requestConsentInfoUpdate() {
+  final completer = Completer<FormError?>();
+  ConsentInformation.instance.requestConsentInfoUpdate(
+    _consentRequestParameters(),
+    () => completer.complete(null),
+    completer.complete,
+  );
+  return completer.future;
+}
+
+ConsentRequestParameters _consentRequestParameters() {
+  return ConsentRequestParameters(
+    tagForUnderAgeOfConsent: false,
+    consentDebugSettings: _consentDebugSettings(),
+  );
+}
+
+ConsentDebugSettings? _consentDebugSettings() {
+  if (kReleaseMode) {
+    return null;
+  }
+
+  if (!MonetizationConfig.umpDebugGeographyEea &&
+      MonetizationConfig.umpDebugTestDeviceIds.trim().isEmpty) {
+    return null;
+  }
+
+  return ConsentDebugSettings(
+    debugGeography: MonetizationConfig.umpDebugGeographyEea
+        ? DebugGeography.debugGeographyEea
+        : null,
+    testIdentifiers: _debugTestDeviceIds(),
+  );
+}
+
+List<String>? _debugTestDeviceIds() {
+  final ids = MonetizationConfig.umpDebugTestDeviceIds
+      .split(',')
+      .map((id) => id.trim())
+      .where((id) => id.isNotEmpty)
+      .toList(growable: false);
+  return ids.isEmpty ? null : ids;
+}
+
+Future<FormError?> _loadAndShowConsentFormIfRequired() {
+  final completer = Completer<FormError?>();
+  ConsentForm.loadAndShowConsentFormIfRequired(completer.complete);
+  return completer.future;
+}
+
+Future<FormError?> _showPrivacyOptionsForm() {
+  final completer = Completer<FormError?>();
+  ConsentForm.showPrivacyOptionsForm(completer.complete);
+  return completer.future;
+}
+
+Future<PlatformAdConsentResult> _readPlatformConsentResult(
+  FormError? error,
+) async {
+  final canRequestAds = await ConsentInformation.instance.canRequestAds();
+  final privacyOptionsRequired =
+      await ConsentInformation.instance.getPrivacyOptionsRequirementStatus() ==
+      PrivacyOptionsRequirementStatus.required;
+  return PlatformAdConsentResult(
+    supported: true,
+    canRequestAds: canRequestAds,
+    privacyOptionsRequired: privacyOptionsRequired,
+    errorMessage: _consentErrorMessage(error),
+  );
+}
+
+String? _consentErrorMessage(FormError? error) {
+  if (error == null) {
+    return null;
+  }
+  return '${error.errorCode}: ${error.message}';
 }
 
 class PlatformBannerAdView extends StatefulWidget {

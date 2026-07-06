@@ -2132,6 +2132,7 @@ class _SettingsSection extends ConsumerWidget {
               _AppLockSetting(lockState: appLock),
               const SizedBox(height: 10),
               _CrashReportingSetting(state: crashReporting),
+              _AdPrivacySetting(),
             ],
           ),
         ),
@@ -4046,6 +4047,91 @@ String _crashReportingDescription(
     '有効にすると、SongBriefがクラッシュ診断を受け取れます。曲名、歌詞、プレイリスト、聴取履歴は含めません。',
     zh: '启用后，SongBrief 可以接收崩溃诊断。不会包含曲名、歌词、播放列表或收听历史。',
     ko: '활성화하면 SongBrief가 크래시 진단을 받을 수 있습니다. 곡명, 가사, 플레이리스트, 청취 기록은 포함하지 않습니다.',
+  );
+}
+
+class _AdPrivacySetting extends ConsumerWidget {
+  const _AdPrivacySetting();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final consent = ref.watch(adConsentControllerProvider);
+    return consent.when(
+      data: (state) {
+        if (!state.privacyOptionsRequired) {
+          return const SizedBox.shrink();
+        }
+        final theme = Theme.of(context);
+        return Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsRow(
+                icon: Icons.ads_click_outlined,
+                label: _t(
+                  context,
+                  'Ad privacy choices',
+                  '広告プライバシー設定',
+                  zh: '广告隐私设置',
+                  ko: '광고 개인정보 설정',
+                ),
+                value: state.updating
+                    ? _t(
+                        context,
+                        'Opening...',
+                        '表示中...',
+                        zh: '正在打开...',
+                        ko: '여는 중...',
+                      )
+                    : _t(context, 'Manage', '管理'),
+                onTap: state.updating
+                    ? null
+                    : () => _showAdPrivacyOptions(context, ref),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _t(
+                  context,
+                  'Change consent choices for ads when required in your region.',
+                  'お住まいの地域で必要な場合、広告に関する同意内容を変更できます。',
+                  zh: '如果你所在地区需要，可以更改广告相关的同意选择。',
+                  ko: '거주 지역에서 필요한 경우 광고 동의 선택을 변경할 수 있습니다.',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+Future<void> _showAdPrivacyOptions(BuildContext context, WidgetRef ref) async {
+  final result = await ref
+      .read(adConsentControllerProvider.notifier)
+      .showPrivacyOptions();
+  if (!context.mounted || result.errorMessage == null) {
+    return;
+  }
+  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+    SnackBar(
+      content: Text(
+        _t(
+          context,
+          'Could not open ad privacy settings.',
+          '広告プライバシー設定を開けませんでした。',
+          zh: '无法打开广告隐私设置。',
+          ko: '광고 개인정보 설정을 열 수 없습니다.',
+        ),
+      ),
+    ),
   );
 }
 

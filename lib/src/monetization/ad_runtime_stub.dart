@@ -1,8 +1,9 @@
 import 'package:flutter/widgets.dart';
 
+import 'ad_consent_state.dart';
 import 'monetization_config.dart';
 
-enum PlatformAdLoadState { loading, loaded, failed }
+enum PlatformAdLoadState { waitingForConsent, loading, loaded, failed }
 
 typedef PlatformAdPlaceholderBuilder =
     Widget Function(BuildContext context, PlatformAdLoadState state);
@@ -14,6 +15,14 @@ String? bannerAdUnitIdFor(AdLaunchMode mode) {
 }
 
 Future<void> initializeAdSdkIfSupported(AdLaunchMode mode) async {}
+
+Future<PlatformAdConsentResult> updateAdConsentIfSupported() async {
+  return const PlatformAdConsentResult.unsupported();
+}
+
+Future<PlatformAdConsentResult> showAdPrivacyOptionsIfSupported() async {
+  return const PlatformAdConsentResult.unsupported();
+}
 
 class PlatformBannerAdView extends StatelessWidget {
   const PlatformBannerAdView({
