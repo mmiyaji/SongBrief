@@ -47,7 +47,7 @@ class LibrarySnapshotRepository {
       source: source,
     );
     await _effectiveStore.writeSnapshot(snapshot);
-    return _limitSnapshotHistory(current.withSnapshot(snapshot));
+    return current.withSnapshot(snapshot);
   }
 
   Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
@@ -91,19 +91,6 @@ class LibrarySnapshotRepository {
     await preferences.setBool(_legacyMigrationPreferenceKey, true);
     _legacyMigrationChecked = true;
   }
-}
-
-SnapshotHistory _limitSnapshotHistory(SnapshotHistory history) {
-  if (history.snapshotCount <= maxSnapshotHistoryEntries) {
-    return history;
-  }
-  return SnapshotHistory(
-    snapshots: List.unmodifiable(
-      history.snapshots.sublist(
-        history.snapshotCount - maxSnapshotHistoryEntries,
-      ),
-    ),
-  );
 }
 
 Future<SnapshotHistory> _decodeLegacyHistory(String? raw) async {

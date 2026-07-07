@@ -261,6 +261,8 @@ enum SongBriefSnapshotRefresh {
 enum SnapshotFileStore {
   private static let snapshotFileNamePattern =
     #"^\d{4}-\d{2}-\d{2}\.json$"#
+  private static let snapshotIndexFileName = "_snapshot_index_v1.json"
+  private static let snapshotIndexVersion = 1
 
   static func readSnapshots() -> [[String: Any]] {
     guard let directory = snapshotsDirectory(create: false),
@@ -297,6 +299,7 @@ enum SnapshotFileStore {
     let url = directory.appendingPathComponent("\(dateKey).json")
     do {
       try data.write(to: url, options: [.atomic])
+      updateIndex(afterWriting: normalized, in: directory)
       return true
     } catch {
       return false
@@ -333,6 +336,71 @@ enum SnapshotFileStore {
       }
     }
     return directory
+  }
+
+  private static func updateIndex(afterWriting snapshot: [String: Any], in directory: URL) {
+    guard var snapshots = readIndexSnapshots(in: directory),
+          let dateKey = snapshot["dateKey"] as? String else {
+      return
+    }
+    snapshots.removeAll { ($0["dateKey"] as? String) == dateKey }
+    snapshots.append(summarySnapshot(snapshot))
+    snapshots.sort {
+      ($0["dateKey"] as? String ?? "") < ($1["dateKey"] as? String ?? "")
+    }
+
+    let payload: [String: Any] = [
+      "version": snapshotIndexVersion,
+      "updatedAtMillis": Int(Date().timeIntervalSince1970 * 1000),
+      "files": snapshotFileStates(in: directory),
+      "snapshots": snapshots,
+    ]
+    guard JSONSerialization.isValidJSONObject(payload),
+          let data = try? JSONSerialization.data(withJSONObject: payload) else {
+      return
+    }
+    let url = directory.appendingPathComponent(snapshotIndexFileName)
+    try? data.write(to: url, options: [.atomic])
+  }
+
+  private static func readIndexSnapshots(in directory: URL) -> [[String: Any]]? {
+    let url = directory.appendingPathComponent(snapshotIndexFileName)
+    guard let data = try? Data(contentsOf: url),
+          let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let snapshots = decoded["snapshots"] as? [[String: Any]] else {
+      return nil
+    }
+    return snapshots
+  }
+
+  private static func snapshotFileStates(in directory: URL) -> [[String: Any]] {
+    guard let files = try? FileManager.default.contentsOfDirectory(
+      at: directory,
+      includingPropertiesForKeys: [.contentModificationDateKey]
+    ) else {
+      return []
+    }
+    return files.compactMap { url -> [String: Any]? in
+      guard isSnapshotFile(url) else {
+        return nil
+      }
+      let dateKey = url.deletingPathExtension().lastPathComponent
+      let modified = (try? url.resourceValues(
+        forKeys: [.contentModificationDateKey]
+      ).contentModificationDate) ?? Date(timeIntervalSince1970: 0)
+      return [
+        "dateKey": dateKey,
+        "modifiedMillis": Int(modified.timeIntervalSince1970 * 1000),
+      ]
+    }.sorted {
+      ($0["dateKey"] as? String ?? "") < ($1["dateKey"] as? String ?? "")
+    }
+  }
+
+  private static func summarySnapshot(_ snapshot: [String: Any]) -> [String: Any] {
+    var summary = snapshot
+    summary.removeValue(forKey: "tracks")
+    return summary
   }
 
   private static func isSnapshotFile(_ url: URL) -> Bool {

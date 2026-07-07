@@ -46,16 +46,12 @@ void main() {
 
       final loaded = await repository.loadHistory();
       final preferences = await SharedPreferences.getInstance();
-      final files = await snapshotDirectory
-          .list()
-          .where((entity) => entity is File)
-          .cast<File>()
-          .toList();
       final totalBytes = await _directoryBytes(snapshotDirectory);
 
       expect(loaded.snapshotCount, 24);
       expect(loaded.latest?.dateKey, '2026-01-24');
-      expect(files, hasLength(24));
+      expect(await _snapshotFileCount(snapshotDirectory), 24);
+      expect(await _snapshotIndexExists(snapshotDirectory), isTrue);
       expect(totalBytes, greaterThan(1500000));
       expect(
         preferences.getString(librarySnapshotFallbackPreferencesKey),
@@ -142,9 +138,10 @@ void main() {
     expect(history.snapshotCount, 0);
   });
 
-  test('prunes snapshot files beyond the retained history cap', () async {
+  test('keeps more than one thousand daily snapshot files', () async {
+    const historyLength = 1100;
     final start = DateTime(2026, 1, 1);
-    for (var index = 0; index < maxSnapshotHistoryEntries + 5; index += 1) {
+    for (var index = 0; index < historyLength; index += 1) {
       await _writeSnapshotFile(
         snapshotDirectory,
         _snapshotOn(start.add(Duration(days: index))),
@@ -153,15 +150,12 @@ void main() {
 
     final history = await repository.loadHistory();
 
-    expect(history.snapshotCount, maxSnapshotHistoryEntries);
-    expect(history.snapshots.first.dateKey, '2026-01-06');
-    expect(
-      await _snapshotFileCount(snapshotDirectory),
-      maxSnapshotHistoryEntries,
-    );
+    expect(history.snapshotCount, historyLength);
+    expect(history.snapshots.first.dateKey, '2026-01-01');
+    expect(await _snapshotFileCount(snapshotDirectory), historyLength);
   });
 
-  test('loads older retained snapshots without track details', () async {
+  test('loads older snapshots from summaries without track details', () async {
     final start = DateTime(2026, 1, 1);
     for (
       var index = 0;
@@ -181,6 +175,8 @@ void main() {
     expect(history.snapshots[1].tracks, isEmpty);
     expect(history.snapshots[2].tracks, isNotEmpty);
     expect(history.latest?.tracks, isNotEmpty);
+    expect(await _snapshotFileCount(snapshotDirectory), 402);
+    expect(await _snapshotIndexExists(snapshotDirectory), isTrue);
   });
 
   test('records an overview snapshot and replaces the same day', () async {
@@ -277,8 +273,18 @@ Future<int> _snapshotFileCount(Directory directory) async {
   }
   return directory
       .list()
-      .where((entity) => entity is File && entity.path.endsWith('.json'))
+      .where(
+        (entity) =>
+            entity is File &&
+            RegExp(r'\d{4}-\d{2}-\d{2}\.json$').hasMatch(entity.path),
+      )
       .length;
+}
+
+Future<bool> _snapshotIndexExists(Directory directory) {
+  return File(
+    '${directory.path}${Platform.pathSeparator}_snapshot_index_v1.json',
+  ).exists();
 }
 
 Future<int> _directoryBytes(Directory directory) async {

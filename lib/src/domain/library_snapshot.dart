@@ -8,7 +8,6 @@ const legacyLibrarySnapshotPreferencesKeys = [
   'songbrief_daily_snapshots_v2',
 ];
 const maxSnapshotTrackCounters = 500;
-const maxSnapshotHistoryEntries = 1095;
 const detailedSnapshotHistoryEntries = 400;
 
 class TrackCounterSnapshot {
