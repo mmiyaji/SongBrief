@@ -11,16 +11,17 @@ import 'library_snapshot_store.dart';
 final librarySnapshotRepositoryProvider = Provider<LibrarySnapshotRepository>((
   ref,
 ) {
-  return const LibrarySnapshotRepository();
+  return LibrarySnapshotRepository();
 });
 
 class LibrarySnapshotRepository {
-  const LibrarySnapshotRepository({SnapshotStore? store}) : _store = store;
+  LibrarySnapshotRepository({SnapshotStore? store}) : _store = store;
 
   static const _legacyMigrationPreferenceKey =
       'songbrief_daily_snapshots_file_store_migrated_v1';
 
   final SnapshotStore? _store;
+  bool _legacyMigrationChecked = false;
 
   SnapshotStore get _effectiveStore => _store ?? createDefaultSnapshotStore();
 
@@ -39,14 +40,14 @@ class LibrarySnapshotRepository {
     }
 
     await _migrateLegacyHistoryIfNeeded();
-    await _effectiveStore.writeSnapshot(
-      DailyLibrarySnapshot.fromOverview(
-        overview,
-        capturedAt: capturedAt,
-        source: source,
-      ),
+    final current = await _effectiveStore.loadHistory();
+    final snapshot = DailyLibrarySnapshot.fromOverview(
+      overview,
+      capturedAt: capturedAt,
+      source: source,
     );
-    return _effectiveStore.loadHistory();
+    await _effectiveStore.writeSnapshot(snapshot);
+    return _limitSnapshotHistory(current.withSnapshot(snapshot));
   }
 
   Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
@@ -62,6 +63,9 @@ class LibrarySnapshotRepository {
   }
 
   Future<void> _migrateLegacyHistoryIfNeeded() async {
+    if (_legacyMigrationChecked) {
+      return;
+    }
     final preferences = await SharedPreferences.getInstance();
     await preferences.reload();
     final legacyValues = {
@@ -73,6 +77,7 @@ class LibrarySnapshotRepository {
     );
     if ((preferences.getBool(_legacyMigrationPreferenceKey) ?? false) &&
         !hasLegacyHistory) {
+      _legacyMigrationChecked = true;
       return;
     }
     final store = _effectiveStore;
@@ -84,7 +89,21 @@ class LibrarySnapshotRepository {
       await preferences.remove(entry.key);
     }
     await preferences.setBool(_legacyMigrationPreferenceKey, true);
+    _legacyMigrationChecked = true;
   }
+}
+
+SnapshotHistory _limitSnapshotHistory(SnapshotHistory history) {
+  if (history.snapshotCount <= maxSnapshotHistoryEntries) {
+    return history;
+  }
+  return SnapshotHistory(
+    snapshots: List.unmodifiable(
+      history.snapshots.sublist(
+        history.snapshotCount - maxSnapshotHistoryEntries,
+      ),
+    ),
+  );
 }
 
 Future<SnapshotHistory> _decodeLegacyHistory(String? raw) async {

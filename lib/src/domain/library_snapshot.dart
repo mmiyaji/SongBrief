@@ -8,6 +8,8 @@ const legacyLibrarySnapshotPreferencesKeys = [
   'songbrief_daily_snapshots_v2',
 ];
 const maxSnapshotTrackCounters = 500;
+const maxSnapshotHistoryEntries = 1095;
+const detailedSnapshotHistoryEntries = 400;
 
 class TrackCounterSnapshot {
   const TrackCounterSnapshot({
@@ -121,7 +123,10 @@ class DailyLibrarySnapshot {
     );
   }
 
-  factory DailyLibrarySnapshot.fromJson(Map<String, Object?> json) {
+  factory DailyLibrarySnapshot.fromJson(
+    Map<String, Object?> json, {
+    bool includeTracks = true,
+  }) {
     final rawTracks = json['tracks'];
     return DailyLibrarySnapshot(
       dateKey: _readString(json, 'dateKey'),
@@ -131,7 +136,7 @@ class DailyLibrarySnapshot {
       totalPlayCount: _readInt(json, 'totalPlayCount'),
       totalSkipCount: _readInt(json, 'totalSkipCount'),
       totalListeningSeconds: _readInt(json, 'totalListeningSeconds'),
-      tracks: rawTracks is List
+      tracks: includeTracks && rawTracks is List
           ? List.unmodifiable(
               _compactTrackCounters(
                 rawTracks.whereType<Map>().map(

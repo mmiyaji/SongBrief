@@ -62,7 +62,7 @@ MusicStatsState _state(String title) {
 
 class _ControlledMusicStatsRepository extends MusicStatsRepository {
   _ControlledMusicStatsRepository()
-    : super(const _NoopMusicLibraryClient(), const LibrarySnapshotRepository());
+    : super(const _NoopMusicLibraryClient(), LibrarySnapshotRepository());
 
   var _loadCount = 0;
   Completer<MusicStatsState>? _pendingRefresh;

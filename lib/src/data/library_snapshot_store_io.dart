@@ -29,13 +29,18 @@ class FileSnapshotStore implements SnapshotStore {
       return SnapshotHistory.empty;
     }
 
-    final rawSnapshots = <String>[];
-    await for (final entity in directory.list(followLinks: false)) {
-      if (entity is! File || !_isSnapshotFile(entity)) {
-        continue;
-      }
+    final snapshotFiles = await _snapshotFileRefs(directory);
+    final retainedFiles = await _pruneSnapshotRefs(snapshotFiles);
+    final rawSnapshots = <Map<String, Object?>>[];
+    final detailedStartIndex =
+        retainedFiles.length - detailedSnapshotHistoryEntries;
+    for (var index = 0; index < retainedFiles.length; index += 1) {
+      final ref = retainedFiles[index];
       try {
-        rawSnapshots.add(await entity.readAsString());
+        rawSnapshots.add({
+          'raw': await ref.file.readAsString(),
+          'includeTracks': index >= detailedStartIndex,
+        });
       } on FileSystemException {
         continue;
       }
@@ -58,10 +63,15 @@ class FileSnapshotStore implements SnapshotStore {
     final temp = File('${target.path}.tmp');
     final encoded = await compute(_encodeSnapshotFile, snapshot.toJson());
     await temp.writeAsString(encoded, flush: true);
-    if (await target.exists()) {
-      await target.delete();
+    try {
+      await temp.rename(target.path);
+    } on FileSystemException {
+      if (await target.exists()) {
+        await target.delete();
+      }
+      await temp.rename(target.path);
     }
-    await temp.rename(target.path);
+    await _pruneSnapshotRefs(await _snapshotFileRefs(directory));
   }
 
   @override
@@ -142,20 +152,79 @@ class FileSnapshotStore implements SnapshotStore {
     final separatorIndex = path.lastIndexOf(Platform.pathSeparator);
     return separatorIndex < 0 ? path : path.substring(separatorIndex + 1);
   }
+
+  Future<List<_SnapshotFileRef>> _snapshotFileRefs(Directory directory) async {
+    final refs = <_SnapshotFileRef>[];
+    await for (final entity in directory.list(followLinks: false)) {
+      if (entity is! File || !_isSnapshotFile(entity)) {
+        continue;
+      }
+      final dateKey = _dateKeyFromFile(entity);
+      if (dateKey == null) {
+        continue;
+      }
+      refs.add(_SnapshotFileRef(file: entity, dateKey: dateKey));
+    }
+    refs.sort((a, b) => a.dateKey.compareTo(b.dateKey));
+    return refs;
+  }
+
+  Future<List<_SnapshotFileRef>> _pruneSnapshotRefs(
+    List<_SnapshotFileRef> refs,
+  ) async {
+    if (refs.length <= maxSnapshotHistoryEntries) {
+      return refs;
+    }
+    final removeCount = refs.length - maxSnapshotHistoryEntries;
+    await _deleteSnapshotFiles(refs.take(removeCount));
+    return refs.skip(removeCount).toList(growable: false);
+  }
+
+  Future<void> _deleteSnapshotFiles(Iterable<_SnapshotFileRef> refs) async {
+    for (final ref in refs) {
+      try {
+        if (await ref.file.exists()) {
+          await ref.file.delete();
+        }
+      } on FileSystemException {
+        continue;
+      }
+    }
+  }
+}
+
+class _SnapshotFileRef {
+  const _SnapshotFileRef({required this.file, required this.dateKey});
+
+  final File file;
+  final String dateKey;
 }
 
 String _encodeSnapshotFile(Map<String, Object?> json) {
   return jsonEncode(json);
 }
 
-List<DailyLibrarySnapshot> _decodeSnapshotFiles(List<String> rawSnapshots) {
+List<DailyLibrarySnapshot> _decodeSnapshotFiles(
+  List<Map<String, Object?>> rawSnapshots,
+) {
   final snapshots = <DailyLibrarySnapshot>[];
-  for (final raw in rawSnapshots) {
+  for (final entry in rawSnapshots) {
+    final raw = entry['raw'];
+    if (raw is! String) {
+      continue;
+    }
+    final includeTracksValue = entry['includeTracks'];
+    final includeTracks = includeTracksValue is bool
+        ? includeTracksValue
+        : true;
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map) {
         snapshots.add(
-          DailyLibrarySnapshot.fromJson(decoded.cast<String, Object?>()),
+          DailyLibrarySnapshot.fromJson(
+            decoded.cast<String, Object?>(),
+            includeTracks: includeTracks,
+          ),
         );
       }
     } on FormatException {

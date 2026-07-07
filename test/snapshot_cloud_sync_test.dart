@@ -121,7 +121,7 @@ void main() {
     }) {
       return MusicStatsRepository(
         client,
-        const LibrarySnapshotRepository(),
+        LibrarySnapshotRepository(),
         snapshotRecordingEnabled: recordingEnabled,
         cloudSyncEnabled: cloudSyncEnabled,
       );

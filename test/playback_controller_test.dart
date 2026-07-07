@@ -124,7 +124,7 @@ class _FakeMusicStatsRepository extends MusicStatsRepository {
     Stream<MusicPlaybackSnapshot>? playbackEvents,
   }) : playbackEventsOverride =
            playbackEvents ?? const Stream<MusicPlaybackSnapshot>.empty(),
-       super(_NoopMusicLibraryClient(), const LibrarySnapshotRepository());
+       super(_NoopMusicLibraryClient(), LibrarySnapshotRepository());
 
   final MusicPlaybackSnapshot? currentPlaybackOverride;
   final Stream<MusicPlaybackSnapshot> playbackEventsOverride;
