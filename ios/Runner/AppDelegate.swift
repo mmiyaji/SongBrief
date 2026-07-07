@@ -22,12 +22,9 @@ import UIKit
 
 enum SongBriefSnapshotRefresh {
   private static let taskIdentifier = "app.songbrief.snapshot-refresh"
-  private static let preferencesKey = "flutter.songbrief_daily_snapshots_v2"
   private static let recordingEnabledPreferenceKey =
     "flutter.songbrief_snapshot_recording_enabled_v1"
-  private static let maxSnapshots = 180
   private static let maxSnapshotTracks = 500
-  private static let maxStoredSnapshotCharacters = 1_500_000
 
   static func register() {
     BGTaskScheduler.shared.register(
@@ -126,65 +123,28 @@ enum SongBriefSnapshotRefresh {
   }
 
   static func localSnapshots() -> [[String: Any]] {
-    readSnapshots(from: UserDefaults.standard.string(forKey: preferencesKey))
+    SnapshotFileStore.readSnapshots()
   }
 
   /// Replaces the given dateKeys in the stored history with already merged
-  /// snapshots coming from cloud sync, keeping the size-capped encoding.
+  /// snapshots coming from cloud sync.
   static func mergeExternalSnapshots(_ incoming: [[String: Any]]) -> Bool {
     guard !incoming.isEmpty else {
       return false
     }
 
-    var snapshots = localSnapshots()
+    var changed = false
     for snapshot in incoming {
-      guard let dateKey = snapshot["dateKey"] as? String, !dateKey.isEmpty else {
+      guard snapshot["dateKey"] as? String != nil else {
         continue
       }
-      snapshots.removeAll { item in
-        item["dateKey"] as? String == dateKey
-      }
-      snapshots.append(snapshot)
+      changed = SnapshotFileStore.write(snapshot: snapshot) || changed
     }
-    snapshots.sort { lhs, rhs in
-      (lhs["dateKey"] as? String ?? "") < (rhs["dateKey"] as? String ?? "")
-    }
-    if snapshots.count > maxSnapshots {
-      snapshots = Array(snapshots.suffix(maxSnapshots))
-    }
-
-    guard let json = encodedPayloadWithinSize(from: snapshots) else {
-      return false
-    }
-    UserDefaults.standard.set(json, forKey: preferencesKey)
-    return true
+    return changed
   }
 
   private static func write(snapshot: [String: Any]) -> Bool {
-    guard let dateKey = snapshot["dateKey"] as? String else {
-      return false
-    }
-
-    let defaults = UserDefaults.standard
-    let existing = defaults.string(forKey: preferencesKey)
-    var snapshots = readSnapshots(from: existing)
-    snapshots.removeAll { item in
-      item["dateKey"] as? String == dateKey
-    }
-    snapshots.append(snapshot)
-    snapshots.sort { lhs, rhs in
-      (lhs["dateKey"] as? String ?? "") < (rhs["dateKey"] as? String ?? "")
-    }
-    if snapshots.count > maxSnapshots {
-      snapshots = Array(snapshots.suffix(maxSnapshots))
-    }
-
-    guard let json = encodedPayloadWithinSize(from: snapshots) else {
-      return false
-    }
-
-    defaults.set(json, forKey: preferencesKey)
-    return true
+    SnapshotFileStore.write(snapshot: snapshot)
   }
 
   private static var isRecordingEnabled: Bool {
@@ -193,131 +153,6 @@ enum SongBriefSnapshotRefresh {
       return true
     }
     return defaults.bool(forKey: recordingEnabledPreferenceKey)
-  }
-
-  private static func encodedPayloadWithinSize(from snapshots: [[String: Any]]) -> String? {
-    let cappedSnapshots: [[String: Any]]
-    if snapshots.count > maxSnapshots {
-      cappedSnapshots = Array(snapshots.suffix(maxSnapshots))
-    } else {
-      cappedSnapshots = snapshots
-    }
-
-    if let encoded = encodedPayload(from: cappedSnapshots),
-       encoded.utf16.count <= maxStoredSnapshotCharacters {
-      return encoded
-    }
-
-    if let encoded = largestRecentTrackCounterPayload(from: cappedSnapshots) {
-      return encoded
-    }
-
-    let totalsOnlySnapshots = snapshotsKeepingRecentTrackCounters(
-      cappedSnapshots,
-      recentSnapshotsWithCounters: 0
-    )
-    return largestSnapshotWindowPayload(from: totalsOnlySnapshots)
-  }
-
-  private static func largestRecentTrackCounterPayload(from snapshots: [[String: Any]]) -> String? {
-    var best: String?
-    var low = 0
-    var high = snapshots.count
-    while low <= high {
-      let midpoint = (low + high) / 2
-      let candidate = snapshotsKeepingRecentTrackCounters(
-        snapshots,
-        recentSnapshotsWithCounters: midpoint
-      )
-      guard let encoded = encodedPayload(from: candidate) else {
-        high = midpoint - 1
-        continue
-      }
-      if encoded.utf16.count <= maxStoredSnapshotCharacters {
-        best = encoded
-        low = midpoint + 1
-      } else {
-        high = midpoint - 1
-      }
-    }
-    return best
-  }
-
-  private static func largestSnapshotWindowPayload(from snapshots: [[String: Any]]) -> String? {
-    var best = encodedPayload(from: [])
-    var low = 0
-    var high = snapshots.count
-    while low <= high {
-      let midpoint = (low + high) / 2
-      let candidate: [[String: Any]]
-      if midpoint <= 0 {
-        candidate = []
-      } else {
-        candidate = Array(snapshots.suffix(midpoint))
-      }
-      guard let encoded = encodedPayload(from: candidate) else {
-        high = midpoint - 1
-        continue
-      }
-      if encoded.utf16.count <= maxStoredSnapshotCharacters {
-        best = encoded
-        low = midpoint + 1
-      } else {
-        high = midpoint - 1
-      }
-    }
-    return best
-  }
-
-  private static func snapshotsKeepingRecentTrackCounters(
-    _ snapshots: [[String: Any]],
-    recentSnapshotsWithCounters: Int
-  ) -> [[String: Any]] {
-    let firstDetailedIndex = snapshots.count - recentSnapshotsWithCounters
-    return snapshots.enumerated().map { index, snapshot in
-      if index < firstDetailedIndex {
-        return snapshotWithoutTrackCounters(snapshot)
-      }
-      return snapshot
-    }
-  }
-
-  private static func snapshotWithoutTrackCounters(_ snapshot: [String: Any]) -> [String: Any] {
-    guard let tracks = snapshot["tracks"] as? [Any], !tracks.isEmpty else {
-      return snapshot
-    }
-    var copy = snapshot
-    copy["tracks"] = [] as [Any]
-    return copy
-  }
-
-  private static func encodedPayload(from snapshots: [[String: Any]]) -> String? {
-    let payload: [String: Any] = [
-      "version": 1,
-      "updatedAtMillis": Int(Date().timeIntervalSince1970 * 1000),
-      "snapshots": snapshots
-    ]
-
-    guard
-      JSONSerialization.isValidJSONObject(payload),
-      let data = try? JSONSerialization.data(withJSONObject: payload),
-      let json = String(data: data, encoding: .utf8)
-    else {
-      return nil
-    }
-    return json
-  }
-
-  private static func readSnapshots(from json: String?) -> [[String: Any]] {
-    guard
-      let json,
-      let data = json.data(using: .utf8),
-      let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-      let snapshots = decoded["snapshots"] as? [[String: Any]]
-    else {
-      return []
-    }
-    return snapshots
   }
 
   private static func trackSnapshot(from item: MPMediaItem) -> [String: Any] {
@@ -420,6 +255,98 @@ enum SongBriefSnapshotRefresh {
     }
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
+enum SnapshotFileStore {
+  private static let snapshotFileNamePattern =
+    #"^\d{4}-\d{2}-\d{2}\.json$"#
+
+  static func readSnapshots() -> [[String: Any]] {
+    guard let directory = snapshotsDirectory(create: false),
+          let files = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+          ) else {
+      return []
+    }
+
+    let snapshots = files.compactMap { readSnapshot(from: $0) }.sorted { lhs, rhs in
+      (lhs["dateKey"] as? String ?? "") < (rhs["dateKey"] as? String ?? "")
+    }
+    return snapshots
+  }
+
+  static func write(snapshot: [String: Any]) -> Bool {
+    guard
+      let dateKey = snapshot["dateKey"] as? String,
+      isValidDateKey(dateKey),
+      let directory = snapshotsDirectory(create: true)
+    else {
+      return false
+    }
+
+    let normalized = SnapshotMerge.normalized(snapshot)
+    guard
+      JSONSerialization.isValidJSONObject(normalized),
+      let data = try? JSONSerialization.data(withJSONObject: normalized)
+    else {
+      return false
+    }
+
+    let url = directory.appendingPathComponent("\(dateKey).json")
+    do {
+      try data.write(to: url, options: [.atomic])
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private static func readSnapshot(from url: URL) -> [String: Any]? {
+    guard isSnapshotFile(url),
+          let data = try? Data(contentsOf: url),
+          let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return nil
+    }
+    return SnapshotMerge.normalized(decoded)
+  }
+
+  private static func snapshotsDirectory(create: Bool) -> URL? {
+    guard let support = FileManager.default.urls(
+      for: .applicationSupportDirectory,
+      in: .userDomainMask
+    ).first else {
+      return nil
+    }
+    let directory = support
+      .appendingPathComponent("SongBrief", isDirectory: true)
+      .appendingPathComponent("Snapshots", isDirectory: true)
+    if create {
+      do {
+        try FileManager.default.createDirectory(
+          at: directory,
+          withIntermediateDirectories: true
+        )
+      } catch {
+        return nil
+      }
+    }
+    return directory
+  }
+
+  private static func isSnapshotFile(_ url: URL) -> Bool {
+    url.lastPathComponent.range(
+      of: snapshotFileNamePattern,
+      options: .regularExpression
+    ) != nil
+  }
+
+  private static func isValidDateKey(_ value: String) -> Bool {
+    value.range(
+      of: #"^\d{4}-\d{2}-\d{2}$"#,
+      options: .regularExpression
+    ) != nil
   }
 }
 

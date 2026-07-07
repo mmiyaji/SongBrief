@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/data/library_snapshot_repository.dart';
+import 'package:songbrief/src/data/library_snapshot_store_io.dart';
 import 'package:songbrief/src/domain/library_overview.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
@@ -10,71 +12,93 @@ import 'package:songbrief/src/domain/library_track.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
+  late Directory snapshotDirectory;
+  late LibrarySnapshotRepository repository;
 
-  test('trims oversized stored history instead of clearing it', () async {
-    final history = SnapshotHistory(
-      snapshots: List.unmodifiable(
-        List.generate(24, (index) => _largeSnapshot(index)),
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    snapshotDirectory = await Directory.systemTemp.createTemp(
+      'songbrief_snapshots_',
+    );
+    repository = LibrarySnapshotRepository(
+      store: FileSnapshotStore(
+        directoryProvider: () async => snapshotDirectory,
       ),
     );
-    final raw = jsonEncode(history.toJson());
-    expect(raw.length, greaterThan(1500000));
-
-    SharedPreferences.setMockInitialValues({
-      librarySnapshotPreferencesKey: raw,
-    });
-
-    final loaded = await const LibrarySnapshotRepository().loadHistory();
-    final preferences = await SharedPreferences.getInstance();
-    final saved = preferences.getString(librarySnapshotPreferencesKey);
-
-    expect(loaded.snapshotCount, 24);
-    expect(loaded.latest?.dateKey, '2026-01-24');
-    expect(saved, isNotNull);
-    expect(saved!.length, lessThanOrEqualTo(1500000));
-    expect(saved.length, lessThan(raw.length));
   });
+
+  tearDown(() async {
+    if (await snapshotDirectory.exists()) {
+      await snapshotDirectory.delete(recursive: true);
+    }
+  });
+
+  test(
+    'stores large histories as per-day files without a preferences cap',
+    () async {
+      final store = FileSnapshotStore(
+        directoryProvider: () async => snapshotDirectory,
+      );
+      final snapshots = List.generate(24, (index) => _largeSnapshot(index));
+      for (final snapshot in snapshots) {
+        await store.writeSnapshot(snapshot);
+      }
+
+      final loaded = await repository.loadHistory();
+      final preferences = await SharedPreferences.getInstance();
+      final files = await snapshotDirectory
+          .list()
+          .where((entity) => entity is File)
+          .cast<File>()
+          .toList();
+      final totalBytes = await _directoryBytes(snapshotDirectory);
+
+      expect(loaded.snapshotCount, 24);
+      expect(loaded.latest?.dateKey, '2026-01-24');
+      expect(files, hasLength(24));
+      expect(totalBytes, greaterThan(1500000));
+      expect(
+        preferences.getString(librarySnapshotFallbackPreferencesKey),
+        isNull,
+      );
+    },
+  );
 
   test('removes legacy snapshot keys only once', () async {
     SharedPreferences.setMockInitialValues({
-      legacyLibrarySnapshotPreferencesKeys.single: 'legacy-history',
+      legacyLibrarySnapshotPreferencesKeys.first: 'legacy-history',
     });
-    final repository = const LibrarySnapshotRepository();
 
     await repository.loadHistory();
     final preferences = await SharedPreferences.getInstance();
     expect(
-      preferences.getString(legacyLibrarySnapshotPreferencesKeys.single),
+      preferences.getString(legacyLibrarySnapshotPreferencesKeys.first),
       isNull,
     );
 
     await preferences.setString(
-      legacyLibrarySnapshotPreferencesKeys.single,
+      legacyLibrarySnapshotPreferencesKeys.first,
       'newly-written-legacy-value',
     );
     await repository.loadHistory();
 
     expect(
-      preferences.getString(legacyLibrarySnapshotPreferencesKeys.single),
+      preferences.getString(legacyLibrarySnapshotPreferencesKeys.first),
       'newly-written-legacy-value',
     );
   });
 
-  test('returns empty history for malformed stored payloads', () async {
-    SharedPreferences.setMockInitialValues({
-      librarySnapshotPreferencesKey: '{not-json',
-    });
+  test('ignores malformed stored snapshot files', () async {
+    await File(
+      '${snapshotDirectory.path}${Platform.pathSeparator}2026-01-01.json',
+    ).writeAsString('{not-json');
 
-    final history = await const LibrarySnapshotRepository().loadHistory();
+    final history = await repository.loadHistory();
 
     expect(history.snapshotCount, 0);
   });
 
   test('records an overview snapshot and replaces the same day', () async {
-    final repository = const LibrarySnapshotRepository();
     final first = await repository.recordSnapshot(
       _overview(playCount: 4),
       capturedAt: DateTime(2026, 7, 7, 8),
@@ -91,69 +115,95 @@ void main() {
     expect(second.latest?.source, 'manual');
     expect(second.latest?.totalPlayCount, 9);
     expect(reloaded.latest?.totalPlayCount, 9);
+    expect(await _snapshotFileCount(snapshotDirectory), 1);
   });
 
   test('does not record empty overviews', () async {
-    final existing = SnapshotHistory(
-      snapshots: List.unmodifiable([_snapshotOn(DateTime(2026, 1, 1))]),
+    await _writeSnapshotFile(
+      snapshotDirectory,
+      _snapshotOn(DateTime(2026, 1, 1)),
     );
-    SharedPreferences.setMockInitialValues({
-      librarySnapshotPreferencesKey: jsonEncode(existing.toJson()),
-    });
 
-    final result = await const LibrarySnapshotRepository().recordSnapshot(
+    final result = await repository.recordSnapshot(
       LibraryOverview.empty(isDemo: false),
     );
 
     expect(result.snapshotCount, 1);
     expect(result.latest?.dateKey, '2026-01-01');
+    expect(await _snapshotFileCount(snapshotDirectory), 1);
   });
 
   test(
     'deletes snapshots older than a cutoff and persists the result',
     () async {
-      final history = SnapshotHistory(
-        snapshots: List.unmodifiable([
-          _snapshotOn(DateTime(2026, 1, 1)),
-          _snapshotOn(DateTime(2026, 1, 20)),
-          _snapshotOn(DateTime(2026, 2, 1)),
-        ]),
+      await _writeSnapshotFile(
+        snapshotDirectory,
+        _snapshotOn(DateTime(2026, 1, 1)),
       );
-      SharedPreferences.setMockInitialValues({
-        librarySnapshotPreferencesKey: jsonEncode(history.toJson()),
-      });
+      await _writeSnapshotFile(
+        snapshotDirectory,
+        _snapshotOn(DateTime(2026, 1, 20)),
+      );
+      await _writeSnapshotFile(
+        snapshotDirectory,
+        _snapshotOn(DateTime(2026, 2, 1)),
+      );
 
-      final repository = const LibrarySnapshotRepository();
       final trimmed = await repository.deleteSnapshotsOlderThan(
         DateTime(2026, 1, 15),
       );
-      final preferences = await SharedPreferences.getInstance();
       final reloaded = await repository.loadHistory();
 
       expect(trimmed.snapshotCount, 2);
       expect(trimmed.snapshots.first.dateKey, '2026-01-20');
-      expect(preferences.getString(librarySnapshotPreferencesKey), isNotNull);
       expect(reloaded.snapshotCount, 2);
       expect(reloaded.snapshots.first.dateKey, '2026-01-20');
+      expect(await _snapshotFileCount(snapshotDirectory), 2);
     },
   );
 
   test('clears stored snapshot history', () async {
-    final history = SnapshotHistory(
-      snapshots: List.unmodifiable([_snapshotOn(DateTime(2026, 1, 1))]),
+    await _writeSnapshotFile(
+      snapshotDirectory,
+      _snapshotOn(DateTime(2026, 1, 1)),
     );
-    SharedPreferences.setMockInitialValues({
-      librarySnapshotPreferencesKey: jsonEncode(history.toJson()),
-    });
 
-    final repository = const LibrarySnapshotRepository();
     final cleared = await repository.clearHistory();
-    final preferences = await SharedPreferences.getInstance();
 
     expect(cleared.snapshotCount, 0);
-    expect(preferences.getString(librarySnapshotPreferencesKey), isNull);
+    expect(await _snapshotFileCount(snapshotDirectory), 0);
     expect((await repository.loadHistory()).snapshotCount, 0);
   });
+}
+
+Future<void> _writeSnapshotFile(
+  Directory directory,
+  DailyLibrarySnapshot snapshot,
+) async {
+  await directory.create(recursive: true);
+  await File(
+    '${directory.path}${Platform.pathSeparator}${snapshot.dateKey}.json',
+  ).writeAsString(jsonEncode(snapshot.toJson()));
+}
+
+Future<int> _snapshotFileCount(Directory directory) async {
+  if (!await directory.exists()) {
+    return 0;
+  }
+  return directory
+      .list()
+      .where((entity) => entity is File && entity.path.endsWith('.json'))
+      .length;
+}
+
+Future<int> _directoryBytes(Directory directory) async {
+  var bytes = 0;
+  await for (final entity in directory.list()) {
+    if (entity is File) {
+      bytes += await entity.length();
+    }
+  }
+  return bytes;
 }
 
 DailyLibrarySnapshot _snapshotOn(DateTime capturedAt) {

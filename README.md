@@ -42,6 +42,13 @@ scanned in the app. Each snapshot stores the cumulative counters exposed by iOS
 so the app can compare the latest scan with the previous scan and show observed
 play-count deltas.
 
+Local snapshot history is stored as one JSON file per day under the app's
+Application Support directory (`SongBrief/Snapshots`). Settings remain in
+SharedPreferences/UserDefaults, but the listening-record payload no longer uses
+a single UserDefaults JSON string. This keeps large libraries from forcing
+multi-megabyte preference rewrites and allows cleanup to delete only the
+affected day files.
+
 The iOS app also registers a `BGAppRefreshTask` to attempt a daily background
 snapshot. iOS decides whether and when that task actually runs, so foreground
 launch, resume, and manual refresh scans remain the reliable source of truth.
@@ -59,6 +66,11 @@ best effort. Deleting history inside the app also deletes the matching cloud
 records so cleared data does not resurface on the next sync. Users can opt out
 with the "Sync records with iCloud" toggle in settings (stored under
 `songbrief_snapshot_cloud_sync_enabled_v1`, default on).
+
+Cloud sync fetches deterministic daily record IDs rather than using CloudKit
+queries. It checks all locally known days plus a trailing 1,095-day window, so
+normal multi-device use and reinstall recovery cover roughly three years
+without requiring query indexes.
 
 Release checklist for this feature:
 

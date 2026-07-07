@@ -9,7 +9,7 @@ enum SnapshotCloudSync {
   static let recordType = "DailySnapshot"
   private static let cloudSyncEnabledPreferenceKey =
     "flutter.songbrief_snapshot_cloud_sync_enabled_v1"
-  private static let maxTrackedDays = 400
+  private static let maxTrackedDays = 1095
   private static let modifyBatchSize = 200
 
   private static let payloadField = "payload"
@@ -191,7 +191,10 @@ enum SnapshotCloudSync {
     }
 
     withAvailableAccount(completion) {
-      let ids = candidateRecordIDs(localDateKeys: []).filter { id in
+      let localDateKeys = Set(SongBriefSnapshotRefresh.localSnapshots().compactMap {
+        $0["dateKey"] as? String
+      })
+      let ids = candidateRecordIDs(localDateKeys: localDateKeys).filter { id in
         guard let cutoffDateKey else {
           return true
         }

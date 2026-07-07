@@ -1,10 +1,13 @@
 import 'library_overview.dart';
 import 'library_track.dart';
 
-const librarySnapshotPreferencesKey = 'songbrief_daily_snapshots_v2';
-const legacyLibrarySnapshotPreferencesKeys = ['songbrief_daily_snapshots_v1'];
+const librarySnapshotFallbackPreferencesKey =
+    'songbrief_daily_snapshots_fallback_v1';
+const legacyLibrarySnapshotPreferencesKeys = [
+  'songbrief_daily_snapshots_v1',
+  'songbrief_daily_snapshots_v2',
+];
 const maxSnapshotTrackCounters = 500;
-const maxSnapshotHistoryEntries = 180;
 
 class TrackCounterSnapshot {
   const TrackCounterSnapshot({
@@ -194,10 +197,7 @@ class SnapshotHistory {
       snapshot,
     ]..sort((a, b) => a.dateKey.compareTo(b.dateKey));
 
-    final trimmed = next.length <= maxSnapshotHistoryEntries
-        ? next
-        : next.sublist(next.length - maxSnapshotHistoryEntries);
-    return SnapshotHistory(snapshots: List.unmodifiable(trimmed));
+    return SnapshotHistory(snapshots: List.unmodifiable(next));
   }
 
   factory SnapshotHistory.fromJson(Map<String, Object?> json) {
@@ -216,10 +216,7 @@ class SnapshotHistory {
             )
             .toList()
           ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
-    final trimmed = snapshots.length <= maxSnapshotHistoryEntries
-        ? snapshots
-        : snapshots.sublist(snapshots.length - maxSnapshotHistoryEntries);
-    return SnapshotHistory(snapshots: List.unmodifiable(trimmed));
+    return SnapshotHistory(snapshots: List.unmodifiable(snapshots));
   }
 
   Map<String, Object?> toJson() {

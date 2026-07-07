@@ -165,14 +165,14 @@ class MusicStatsRepository {
   }
 
   Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
-    final history = await _snapshotRepository.deleteSnapshotsOlderThan(cutoff);
     await _propagateCloudDeletion(olderThanDateKey: snapshotDateKey(cutoff));
+    final history = await _snapshotRepository.deleteSnapshotsOlderThan(cutoff);
     return history;
   }
 
   Future<SnapshotHistory> clearSnapshotHistory() async {
-    final history = await _snapshotRepository.clearHistory();
     await _propagateCloudDeletion();
+    final history = await _snapshotRepository.clearHistory();
     return history;
   }
 

@@ -3,7 +3,7 @@
 - Generated: 2026-07-07
 - Command: `flutter test --coverage`
 - Gate: 95% or higher
-- Result: 980/1030 lines (95.15%)
+- Result: 907/950 lines (95.47%)
 
 ## Scope
 
@@ -13,10 +13,10 @@ This report measures unit-testable Dart logic: domain models, snapshot storage, 
 
 | File | Covered | Total | Coverage |
 | --- | ---: | ---: | ---: |
-| `lib/src/data/library_snapshot_repository.dart` | 81 | 102 | 79.41% |
+| `lib/src/data/library_snapshot_repository.dart` | 26 | 26 | 100.00% |
 | `lib/src/domain/apple_music_link.dart` | 22 | 22 | 100.00% |
 | `lib/src/domain/library_overview.dart` | 190 | 198 | 95.96% |
-| `lib/src/domain/library_snapshot.dart` | 204 | 215 | 94.88% |
+| `lib/src/domain/library_snapshot.dart` | 186 | 211 | 88.15% |
 | `lib/src/domain/library_track.dart` | 70 | 76 | 92.11% |
 | `lib/src/domain/music_library_authorization.dart` | 10 | 10 | 100.00% |
 | `lib/src/domain/music_stats_state.dart` | 7 | 7 | 100.00% |
