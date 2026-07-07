@@ -64,7 +64,7 @@ void main() {
     },
   );
 
-  test('removes legacy snapshot keys only once', () async {
+  test('cleans malformed legacy snapshot keys during migration', () async {
     SharedPreferences.setMockInitialValues({
       legacyLibrarySnapshotPreferencesKeys.first: 'legacy-history',
     });
@@ -84,9 +84,53 @@ void main() {
 
     expect(
       preferences.getString(legacyLibrarySnapshotPreferencesKeys.first),
-      'newly-written-legacy-value',
+      isNull,
     );
   });
+
+  test('migrates legacy preferences snapshots into per-day files', () async {
+    final legacyHistory = SnapshotHistory.empty
+        .withSnapshot(_snapshotOn(DateTime(2026, 1, 3)))
+        .withSnapshot(_snapshotOn(DateTime(2026, 1, 4)));
+    SharedPreferences.setMockInitialValues({
+      legacyLibrarySnapshotPreferencesKeys.last: jsonEncode(
+        legacyHistory.toJson(),
+      ),
+    });
+
+    final loaded = await repository.loadHistory();
+    final preferences = await SharedPreferences.getInstance();
+
+    expect(loaded.snapshotCount, 2);
+    expect(loaded.snapshots.first.dateKey, '2026-01-03');
+    expect(loaded.latest?.dateKey, '2026-01-04');
+    expect(await _snapshotFileCount(snapshotDirectory), 2);
+    expect(
+      preferences.getString(legacyLibrarySnapshotPreferencesKeys.last),
+      isNull,
+    );
+  });
+
+  test(
+    'migrates remaining legacy snapshots even when migration was flagged',
+    () async {
+      final legacyHistory = SnapshotHistory.empty.withSnapshot(
+        _snapshotOn(DateTime(2026, 1, 5)),
+      );
+      SharedPreferences.setMockInitialValues({
+        'songbrief_daily_snapshots_file_store_migrated_v1': true,
+        legacyLibrarySnapshotPreferencesKeys.last: jsonEncode(
+          legacyHistory.toJson(),
+        ),
+      });
+
+      final loaded = await repository.loadHistory();
+
+      expect(loaded.snapshotCount, 1);
+      expect(loaded.latest?.dateKey, '2026-01-05');
+      expect(await _snapshotFileCount(snapshotDirectory), 1);
+    },
+  );
 
   test('ignores malformed stored snapshot files', () async {
     await File(

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,7 +24,7 @@ class LibrarySnapshotRepository {
   SnapshotStore get _effectiveStore => _store ?? createDefaultSnapshotStore();
 
   Future<SnapshotHistory> loadHistory() async {
-    await _removeLegacyHistoryIfNeeded();
+    await _migrateLegacyHistoryIfNeeded();
     return _effectiveStore.loadHistory();
   }
 
@@ -35,7 +37,7 @@ class LibrarySnapshotRepository {
       return loadHistory();
     }
 
-    await _removeLegacyHistoryIfNeeded();
+    await _migrateLegacyHistoryIfNeeded();
     await _effectiveStore.writeSnapshot(
       DailyLibrarySnapshot.fromOverview(
         overview,
@@ -47,25 +49,54 @@ class LibrarySnapshotRepository {
   }
 
   Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
-    await _removeLegacyHistoryIfNeeded();
+    await _migrateLegacyHistoryIfNeeded();
     await _effectiveStore.deleteSnapshotsOlderThan(cutoff);
     return _effectiveStore.loadHistory();
   }
 
   Future<SnapshotHistory> clearHistory() async {
-    await _removeLegacyHistoryIfNeeded();
+    await _migrateLegacyHistoryIfNeeded();
     await _effectiveStore.clearHistory();
     return SnapshotHistory.empty;
   }
 
-  Future<void> _removeLegacyHistoryIfNeeded() async {
+  Future<void> _migrateLegacyHistoryIfNeeded() async {
     final preferences = await SharedPreferences.getInstance();
-    if (preferences.getBool(_legacyMigrationPreferenceKey) ?? false) {
+    await preferences.reload();
+    final legacyValues = {
+      for (final key in legacyLibrarySnapshotPreferencesKeys)
+        key: preferences.getString(key),
+    };
+    final hasLegacyHistory = legacyValues.values.any(
+      (value) => value != null && value.isNotEmpty,
+    );
+    if ((preferences.getBool(_legacyMigrationPreferenceKey) ?? false) &&
+        !hasLegacyHistory) {
       return;
     }
-    for (final key in legacyLibrarySnapshotPreferencesKeys) {
-      await preferences.remove(key);
+    final store = _effectiveStore;
+    for (final entry in legacyValues.entries) {
+      final history = _decodeLegacyHistory(entry.value);
+      for (final snapshot in history.snapshots) {
+        await store.writeSnapshot(snapshot);
+      }
+      await preferences.remove(entry.key);
     }
     await preferences.setBool(_legacyMigrationPreferenceKey, true);
   }
+}
+
+SnapshotHistory _decodeLegacyHistory(String? raw) {
+  if (raw == null || raw.isEmpty) {
+    return SnapshotHistory.empty;
+  }
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is Map) {
+      return SnapshotHistory.fromJson(decoded.cast<String, Object?>());
+    }
+  } on FormatException {
+    return SnapshotHistory.empty;
+  }
+  return SnapshotHistory.empty;
 }
