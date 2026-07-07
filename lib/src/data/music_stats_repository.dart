@@ -12,6 +12,7 @@ import 'library_snapshot_repository.dart';
 import 'music_library_channel.dart';
 
 const _largeDemoTrackCount = int.fromEnvironment('SONGBRIEF_DEMO_TRACK_COUNT');
+const _overviewBuildIsolateTrackThreshold = 700;
 const _demoArtworkAssets = [
   'assets/demo_art/skyline_echo.png',
   'assets/demo_art/glass_harbor.png',
@@ -58,7 +59,10 @@ class MusicStatsRepository {
           ? _largeSampleTracks(_largeDemoTrackCount)
           : _sampleTracks();
       final filteredTracks = _filteredTracks(tracks);
-      final overview = LibraryOverview.fromTracks(filteredTracks, isDemo: true);
+      final overview = await _buildLibraryOverview(
+        filteredTracks,
+        isDemo: true,
+      );
       return MusicStatsState(
         authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
         overview: overview,
@@ -86,7 +90,7 @@ class MusicStatsRepository {
       await _client.scheduleSnapshotRefresh();
     }
     final tracks = _filteredTracks(await _client.fetchTracks());
-    final overview = LibraryOverview.fromTracks(tracks, isDemo: false);
+    final overview = await _buildLibraryOverview(tracks, isDemo: false);
     final snapshotHistory = snapshotRecordingEnabled
         ? await _snapshotRepository.recordSnapshot(overview)
         : await _snapshotRepository.loadHistory();
@@ -519,4 +523,33 @@ class MusicStatsRepository {
 
 bool get _isIosMusicRuntime {
   return !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+}
+
+Future<LibraryOverview> _buildLibraryOverview(
+  List<LibraryTrack> tracks, {
+  required bool isDemo,
+}) {
+  if (tracks.length < _overviewBuildIsolateTrackThreshold) {
+    return Future.value(LibraryOverview.fromTracks(tracks, isDemo: isDemo));
+  }
+  return compute(
+    _buildLibraryOverviewInIsolate,
+    _LibraryOverviewBuildInput(tracks: tracks, isDemo: isDemo),
+  );
+}
+
+LibraryOverview _buildLibraryOverviewInIsolate(
+  _LibraryOverviewBuildInput input,
+) {
+  return LibraryOverview.fromTracks(input.tracks, isDemo: input.isDemo);
+}
+
+class _LibraryOverviewBuildInput {
+  const _LibraryOverviewBuildInput({
+    required this.tracks,
+    required this.isDemo,
+  });
+
+  final List<LibraryTrack> tracks;
+  final bool isDemo;
 }

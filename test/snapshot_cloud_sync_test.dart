@@ -217,6 +217,30 @@ void main() {
 
       expect(client.deleteCalls, 0);
     });
+
+    test('loads a large library through the overview build path', () async {
+      final client = _CloudSyncSpyClient()
+        ..tracks = List.generate(
+          800,
+          (index) => LibraryTrack(
+            id: 'large-track-$index',
+            title: 'Large Track $index',
+            artist: 'Artist ${index % 25}',
+            albumTitle: 'Album ${index % 40}',
+            duration: const Duration(minutes: 3),
+            playCount: 800 - index,
+            skipCount: index % 9,
+            isCloudItem: false,
+          ),
+        );
+
+      final stats = await repository(client, recordingEnabled: false).load();
+
+      expect(stats.overview.totalTracks, 800);
+      expect(stats.overview.tracksByPlayCount.first.title, 'Large Track 0');
+      expect(stats.snapshotRecordingEnabled, isFalse);
+      expect(stats.snapshotHistory.snapshotCount, 0);
+    });
   });
 }
 
@@ -226,6 +250,7 @@ class _CloudSyncSpyClient implements MusicLibraryClient {
   String? lastDeleteCutoff;
   bool throwOnSync = false;
   bool throwOnDelete = false;
+  List<LibraryTrack> tracks = const [];
   SnapshotSyncResult syncResult = const SnapshotSyncResult(
     status: SnapshotSyncStatus.unchanged,
   );
@@ -263,7 +288,7 @@ class _CloudSyncSpyClient implements MusicLibraryClient {
 
   @override
   Future<List<LibraryTrack>> fetchTracks() async {
-    return const [];
+    return tracks;
   }
 
   @override
