@@ -2266,12 +2266,15 @@ List<_TrackTrendValue> _trackTrendValues({
   required BuildContext context,
   required String trackId,
   required SnapshotHistory history,
+  DailyLibrarySnapshot? provisionalCurrentSnapshot,
   required TrendRange range,
 }) {
   final buckets = _trackTrendBuckets(context, range);
   final values = List<int>.filled(buckets.length, 0);
-  final snapshots = history.snapshots.toList(growable: false)
-    ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
+  final snapshots = _snapshotsWithProvisionalCurrent(
+    history,
+    provisionalCurrentSnapshot,
+  );
 
   if (snapshots.length >= 2) {
     for (var index = 1; index < snapshots.length; index++) {
@@ -2288,6 +2291,10 @@ List<_TrackTrendValue> _trackTrendValues({
         previous: snapshots[index - 1],
         current: current,
         trackId: trackId,
+        bucket: buckets[bucketIndex],
+        allowRecentFallback:
+            provisionalCurrentSnapshot != null &&
+            current.dateKey == provisionalCurrentSnapshot.dateKey,
       );
     }
   }
@@ -2296,6 +2303,19 @@ List<_TrackTrendValue> _trackTrendValues({
     for (final indexed in buckets.indexed)
       _TrackTrendValue(label: indexed.$2.label, playDelta: values[indexed.$1]),
   ];
+}
+
+List<DailyLibrarySnapshot> _snapshotsWithProvisionalCurrent(
+  SnapshotHistory history,
+  DailyLibrarySnapshot? provisionalCurrentSnapshot,
+) {
+  final provisionalDateKey = provisionalCurrentSnapshot?.dateKey;
+  final snapshots = <DailyLibrarySnapshot>[
+    for (final snapshot in history.snapshots)
+      if (snapshot.dateKey != provisionalDateKey) snapshot,
+    ?provisionalCurrentSnapshot,
+  ]..sort((a, b) => a.dateKey.compareTo(b.dateKey));
+  return List.unmodifiable(snapshots);
 }
 
 List<_TrackTrendBucket> _trackTrendBuckets(
@@ -2362,14 +2382,37 @@ int _trackPlayDeltaBetween({
   required DailyLibrarySnapshot previous,
   required DailyLibrarySnapshot current,
   required String trackId,
+  required _TrackTrendBucket bucket,
+  required bool allowRecentFallback,
 }) {
   final previousTrack = _trackSnapshotById(previous, trackId);
   final currentTrack = _trackSnapshotById(current, trackId);
-  if (previousTrack == null || currentTrack == null) {
+  if (currentTrack == null) {
     return 0;
   }
+  if (previousTrack == null) {
+    return allowRecentFallback
+        ? _recentPlayFallbackDelta(currentTrack, bucket)
+        : 0;
+  }
   final delta = currentTrack.playCount - previousTrack.playCount;
-  return delta < 0 ? 0 : delta;
+  if (delta > 0) {
+    return delta;
+  }
+  return allowRecentFallback
+      ? _recentPlayFallbackDelta(currentTrack, bucket)
+      : 0;
+}
+
+int _recentPlayFallbackDelta(
+  TrackCounterSnapshot track,
+  _TrackTrendBucket bucket,
+) {
+  final lastPlayedAt = track.lastPlayedAt;
+  if (lastPlayedAt == null) {
+    return 0;
+  }
+  return bucket.contains(_localDateOnly(lastPlayedAt)) ? 1 : 0;
 }
 
 TrackCounterSnapshot? _trackSnapshotById(

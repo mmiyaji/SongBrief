@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:songbrief/src/app.dart';
+import 'package:songbrief/src/domain/library_overview.dart';
+import 'package:songbrief/src/domain/library_snapshot.dart';
+import 'package:songbrief/src/domain/library_track.dart';
+import 'package:songbrief/src/domain/music_library_authorization.dart';
+import 'package:songbrief/src/domain/music_stats_state.dart';
 import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
 import 'package:songbrief/src/settings/snapshot_preferences.dart';
@@ -111,6 +116,49 @@ void main() {
       find.textContaining('compares daily listening records'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('uses current library state as a provisional trend record', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 16);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final currentTrack = LibraryTrack(
+      id: 'provisional-track',
+      title: 'Provisional Song',
+      artist: 'SongBrief Artist',
+      albumTitle: 'SongBrief Album',
+      duration: const Duration(minutes: 3),
+      playCount: 10,
+      skipCount: 0,
+      lastPlayedAt: today,
+      isCloudItem: false,
+    );
+    final currentOverview = LibraryOverview.fromTracks([
+      currentTrack,
+    ], isDemo: false);
+    final yesterdayOverview = LibraryOverview.fromTracks([
+      currentTrack.copyWith(lastPlayedAt: yesterday),
+    ], isDemo: false);
+    final stats = MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+      overview: currentOverview,
+      snapshotHistory: SnapshotHistory.empty.withSnapshot(
+        DailyLibrarySnapshot.fromOverview(
+          yesterdayOverview,
+          capturedAt: yesterday,
+        ),
+      ),
+      snapshotRecordingEnabled: true,
+    );
+
+    await _pumpApp(tester, AppLanguage.english, statsState: stats);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Provisional Song'), findsWidgets);
+    expect(find.text('This week trend'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
   });
 
   testWidgets('switches to the light appearance from settings', (tester) async {
@@ -299,6 +347,7 @@ Future<void> _pumpApp(
   WidgetTester tester,
   AppLanguage language, {
   bool snapshotRecordingEnabled = true,
+  MusicStatsState? statsState,
 }) {
   return tester.pumpWidget(
     ProviderScope(
@@ -309,10 +358,25 @@ Future<void> _pumpApp(
         snapshotRecordingProvider.overrideWith(
           () => _FixedSnapshotRecordingController(snapshotRecordingEnabled),
         ),
+        if (statsState != null)
+          musicStatsControllerProvider.overrideWith(
+            () => _FixedMusicStatsController(statsState),
+          ),
       ],
       child: const SongBriefApp(),
     ),
   );
+}
+
+class _FixedMusicStatsController extends MusicStatsController {
+  _FixedMusicStatsController(this.stats);
+
+  final MusicStatsState stats;
+
+  @override
+  Future<MusicStatsState> build() async {
+    return stats;
+  }
 }
 
 class _FixedLanguageController extends AppLanguageController {

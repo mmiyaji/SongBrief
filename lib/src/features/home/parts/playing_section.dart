@@ -38,7 +38,11 @@ class _NowPlayingSection extends ConsumerWidget {
         _HeroTrackPanel(track: track, artwork: artwork),
         if (stats.snapshotRecordingEnabled) ...[
           const SizedBox(height: 14),
-          _TrendPanel(track: track, history: stats.snapshotHistory),
+          _TrendPanel(
+            track: track,
+            overview: overview,
+            history: stats.snapshotHistory,
+          ),
         ],
         const SizedBox(height: 14),
         _NowPlayingLyricsPanel(track: track),
@@ -791,22 +795,37 @@ class _HeroStat extends StatelessWidget {
 }
 
 class _TrendPanel extends ConsumerWidget {
-  const _TrendPanel({required this.track, required this.history});
+  const _TrendPanel({
+    required this.track,
+    required this.overview,
+    required this.history,
+  });
 
   final LibraryTrack track;
+  final LibraryOverview overview;
   final SnapshotHistory history;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final range = ref.watch(trendRangeProvider);
+    final provisionalCurrentSnapshot = DailyLibrarySnapshot.fromOverview(
+      overview,
+      capturedAt: DateTime.now(),
+      source: 'current',
+    );
+    final snapshots = _snapshotsWithProvisionalCurrent(
+      history,
+      provisionalCurrentSnapshot,
+    );
     final values = _trackTrendValues(
       context: context,
       trackId: track.id,
       history: history,
+      provisionalCurrentSnapshot: provisionalCurrentSnapshot,
       range: range,
     );
-    final hasSnapshotData = history.snapshots.length >= 2;
+    final hasSnapshotData = snapshots.length >= 2;
     return GlassSurface(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       radius: 26,
