@@ -211,7 +211,19 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     if (loadingPreviewDelay > Duration.zero) {
       await Future<void>.delayed(loadingPreviewDelay);
     }
+    unawaited(syncCloudSnapshots());
     return next;
+  }
+
+  /// Merges the local history with iCloud in the background and refreshes
+  /// the visible history when other devices contributed records.
+  Future<void> syncCloudSnapshots() async {
+    final repository = ref.read(musicStatsRepositoryProvider);
+    final result = await repository.syncCloudSnapshots();
+    if (result == null || !result.changedLocally) {
+      return;
+    }
+    _replaceSnapshotHistory(await repository.loadSnapshotHistory());
   }
 
   Future<void> requestAccess() async {
@@ -297,6 +309,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
             ),
       );
       await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
+      unawaited(syncCloudSnapshots());
     } else if (next.hasError) {
       unawaited(
         ref

@@ -149,4 +149,18 @@ class _NoopMusicLibraryClient implements MusicLibraryClient {
   Future<void> scheduleSnapshotRefresh() {
     return Future.value();
   }
+
+  @override
+  Future<SnapshotSyncResult> syncSnapshotHistory() {
+    return Future.value(
+      const SnapshotSyncResult(status: SnapshotSyncStatus.unchanged),
+    );
+  }
+
+  @override
+  Future<SnapshotSyncResult> deleteCloudSnapshots({String? olderThanDateKey}) {
+    return Future.value(
+      const SnapshotSyncResult(status: SnapshotSyncStatus.unchanged),
+    );
+  }
 }

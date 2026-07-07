@@ -60,6 +60,16 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     case "scheduleSnapshotRefresh":
       SongBriefSnapshotRefresh.schedule()
       result(nil)
+    case "syncSnapshotHistory":
+      SnapshotCloudSync.sync { payload in
+        result(payload)
+      }
+    case "deleteCloudSnapshots":
+      let arguments = call.arguments as? [String: Any]
+      let cutoffDateKey = arguments?["olderThanDateKey"] as? String
+      SnapshotCloudSync.deleteCloudSnapshots(olderThan: cutoffDateKey) { payload in
+        result(payload)
+      }
     default:
       result(FlutterMethodNotImplemented)
     }

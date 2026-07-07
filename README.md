@@ -48,6 +48,35 @@ launch, resume, and manual refresh scans remain the reliable source of truth.
 When scans are several days apart, the app treats the result as an observed
 multi-day window rather than exact per-day listening history.
 
+## iCloud Sync Notes
+
+Daily records can sync through the user's private CloudKit database
+(`iCloud.app.songbrief.songbrief`, record type `DailySnapshot`, one record per
+day keyed by the local dateKey). Counters are monotonic, so devices converge by
+max-merging totals and per-track counters regardless of sync order. Sync runs
+after each library scan, and the background refresh task uploads its own day
+best effort. Deleting history inside the app also deletes the matching cloud
+records so cleared data does not resurface on the next sync. Users can opt out
+with the "Sync records with iCloud" toggle in settings (stored under
+`songbrief_snapshot_cloud_sync_enabled_v1`, default on).
+
+Release checklist for this feature:
+
+- In Apple Developer > Identifiers, enable iCloud / CloudKit for
+  `app.songbrief.songbrief` and assign the `iCloud.app.songbrief.songbrief`
+  Cloud Container. Changing this capability invalidates existing provisioning
+  profiles, so regenerate profiles or let Xcode/GitHub Actions automatic
+  signing recreate them before the next upload.
+- In CloudKit Database, the Development and Production schemas must include
+  record type `DailySnapshot` with fields: `payload` (String),
+  `capturedAtMillis` (Int64), `trackCount` (Int64), `totalPlayCount` (Int64),
+  `totalSkipCount` (Int64), and `totalListeningSeconds` (Int64).
+- After modifying the Development schema, deploy it to Production in CloudKit
+  Dashboard before the App Store build (Console > CloudKit > Deploy Schema
+  Changes).
+- No query indexes are required: sync fetches records by deterministic
+  record IDs (dateKeys) instead of running CloudKit queries.
+
 ## Liquid Glass Notes
 
 Native iOS Liquid Glass APIs such as SwiftUI `.glassEffect` are not directly

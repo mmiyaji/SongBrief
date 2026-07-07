@@ -61,31 +61,41 @@ enum SongBriefSnapshotRefresh {
   private static func handle(_ task: BGAppRefreshTask) {
     schedule()
 
-    let expiration = SnapshotRefreshExpiration()
+    let completion = SnapshotRefreshCompletion(task)
     task.expirationHandler = {
-      expiration.expire()
+      completion.complete(success: false)
     }
 
     DispatchQueue.global(qos: .utility).async {
-      let success = !expiration.isExpired && captureSnapshot()
-      DispatchQueue.main.async {
-        task.setTaskCompleted(success: success)
+      guard !completion.isCompleted, let dateKey = captureSnapshot() else {
+        completion.complete(success: false)
+        return
+      }
+
+      // The local capture already succeeded; the cloud upload is best effort
+      // and must not fail the refresh task.
+      guard SnapshotCloudSync.isEnabled, !completion.isCompleted else {
+        completion.complete(success: true)
+        return
+      }
+      SnapshotCloudSync.uploadLocalSnapshot(dateKey: dateKey) { _ in
+        completion.complete(success: true)
       }
     }
   }
 
-  private static func captureSnapshot() -> Bool {
+  private static func captureSnapshot() -> String? {
     guard isRecordingEnabled else {
-      return false
+      return nil
     }
 
     guard MPMediaLibrary.authorizationStatus() == .authorized else {
-      return false
+      return nil
     }
 
     let items = MPMediaQuery.songs().items ?? []
     guard !items.isEmpty else {
-      return false
+      return nil
     }
 
     let now = Date()
@@ -100,8 +110,9 @@ enum SongBriefSnapshotRefresh {
       total + Int(item.playbackDuration.rounded()) * item.playCount
     }
 
+    let capturedDateKey = dateKey(for: now)
     let snapshot: [String: Any] = [
-      "dateKey": dateKey(for: now),
+      "dateKey": capturedDateKey,
       "capturedAtMillis": Int(now.timeIntervalSince1970 * 1000),
       "source": "background",
       "trackCount": items.count,
@@ -111,7 +122,42 @@ enum SongBriefSnapshotRefresh {
       "tracks": tracks
     ]
 
-    return write(snapshot: snapshot)
+    return write(snapshot: snapshot) ? capturedDateKey : nil
+  }
+
+  static func localSnapshots() -> [[String: Any]] {
+    readSnapshots(from: UserDefaults.standard.string(forKey: preferencesKey))
+  }
+
+  /// Replaces the given dateKeys in the stored history with already merged
+  /// snapshots coming from cloud sync, keeping the size-capped encoding.
+  static func mergeExternalSnapshots(_ incoming: [[String: Any]]) -> Bool {
+    guard !incoming.isEmpty else {
+      return false
+    }
+
+    var snapshots = localSnapshots()
+    for snapshot in incoming {
+      guard let dateKey = snapshot["dateKey"] as? String, !dateKey.isEmpty else {
+        continue
+      }
+      snapshots.removeAll { item in
+        item["dateKey"] as? String == dateKey
+      }
+      snapshots.append(snapshot)
+    }
+    snapshots.sort { lhs, rhs in
+      (lhs["dateKey"] as? String ?? "") < (rhs["dateKey"] as? String ?? "")
+    }
+    if snapshots.count > maxSnapshots {
+      snapshots = Array(snapshots.suffix(maxSnapshots))
+    }
+
+    guard let json = encodedPayloadWithinSize(from: snapshots) else {
+      return false
+    }
+    UserDefaults.standard.set(json, forKey: preferencesKey)
+    return true
   }
 
   private static func write(snapshot: [String: Any]) -> Bool {
@@ -377,19 +423,31 @@ enum SongBriefSnapshotRefresh {
   }
 }
 
-private final class SnapshotRefreshExpiration {
+/// Guarantees `setTaskCompleted` is called exactly once even when the
+/// expiration handler races the cloud upload completion.
+private final class SnapshotRefreshCompletion {
   private let lock = NSLock()
-  private var expired = false
+  private var completed = false
+  private let task: BGAppRefreshTask
 
-  var isExpired: Bool {
-    lock.lock()
-    defer { lock.unlock() }
-    return expired
+  init(_ task: BGAppRefreshTask) {
+    self.task = task
   }
 
-  func expire() {
+  var isCompleted: Bool {
     lock.lock()
-    expired = true
+    defer { lock.unlock() }
+    return completed
+  }
+
+  func complete(success: Bool) {
+    lock.lock()
+    let alreadyCompleted = completed
+    completed = true
     lock.unlock()
+    if alreadyCompleted {
+      return
+    }
+    task.setTaskCompleted(success: success)
   }
 }

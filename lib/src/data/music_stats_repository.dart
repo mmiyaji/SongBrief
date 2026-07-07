@@ -32,6 +32,7 @@ final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
     ref.watch(musicLibraryClientProvider),
     ref.watch(librarySnapshotRepositoryProvider),
     snapshotRecordingEnabled: ref.watch(snapshotRecordingProvider),
+    cloudSyncEnabled: ref.watch(snapshotCloudSyncProvider),
     libraryFilters: ref.watch(libraryFilterPreferencesProvider),
   );
 });
@@ -41,12 +42,14 @@ class MusicStatsRepository {
     this._client,
     this._snapshotRepository, {
     this.snapshotRecordingEnabled = true,
+    this.cloudSyncEnabled = true,
     this.libraryFilters,
   });
 
   final MusicLibraryClient _client;
   final LibrarySnapshotRepository _snapshotRepository;
   final bool snapshotRecordingEnabled;
+  final bool cloudSyncEnabled;
   final LibraryFilterPreferences? libraryFilters;
 
   Future<MusicStatsState> load({bool requestAccess = false}) async {
@@ -161,12 +164,48 @@ class MusicStatsRepository {
     return _snapshotRepository.recordSnapshot(overview);
   }
 
-  Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) {
-    return _snapshotRepository.deleteSnapshotsOlderThan(cutoff);
+  Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
+    final history = await _snapshotRepository.deleteSnapshotsOlderThan(cutoff);
+    await _propagateCloudDeletion(olderThanDateKey: snapshotDateKey(cutoff));
+    return history;
   }
 
-  Future<SnapshotHistory> clearSnapshotHistory() {
-    return _snapshotRepository.clearHistory();
+  Future<SnapshotHistory> clearSnapshotHistory() async {
+    final history = await _snapshotRepository.clearHistory();
+    await _propagateCloudDeletion();
+    return history;
+  }
+
+  bool get canSyncCloudSnapshots =>
+      _isIosMusicRuntime && snapshotRecordingEnabled && cloudSyncEnabled;
+
+  /// Merges local and iCloud snapshot histories. Returns null when cloud
+  /// sync does not apply to this runtime or configuration.
+  Future<SnapshotSyncResult?> syncCloudSnapshots() async {
+    if (!canSyncCloudSnapshots) {
+      return null;
+    }
+    try {
+      return await _client.syncSnapshotHistory();
+    } on Object {
+      return const SnapshotSyncResult(status: SnapshotSyncStatus.error);
+    }
+  }
+
+  Future<SnapshotHistory> loadSnapshotHistory() {
+    return _snapshotRepository.loadHistory();
+  }
+
+  Future<void> _propagateCloudDeletion({String? olderThanDateKey}) async {
+    if (!_isIosMusicRuntime || !cloudSyncEnabled) {
+      return;
+    }
+    try {
+      await _client.deleteCloudSnapshots(olderThanDateKey: olderThanDateKey);
+    } on Object {
+      // Cloud deletion is best effort; local deletion already succeeded and
+      // the next successful deletion request converges the cloud copy.
+    }
   }
 
   List<LibraryTrack> _filteredTracks(List<LibraryTrack> tracks) {

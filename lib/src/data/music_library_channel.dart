@@ -27,6 +27,10 @@ abstract class MusicLibraryClient {
   Future<void> skipToPrevious();
 
   Future<void> scheduleSnapshotRefresh();
+
+  Future<SnapshotSyncResult> syncSnapshotHistory();
+
+  Future<SnapshotSyncResult> deleteCloudSnapshots({String? olderThanDateKey});
 }
 
 class PlatformMusicLibraryClient implements MusicLibraryClient {
@@ -111,6 +115,80 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
   @override
   Future<void> scheduleSnapshotRefresh() {
     return _channel.invokeMethod<void>('scheduleSnapshotRefresh');
+  }
+
+  @override
+  Future<SnapshotSyncResult> syncSnapshotHistory() async {
+    final payload = await _channel.invokeMethod<Object?>('syncSnapshotHistory');
+    return SnapshotSyncResult.fromPlatformValue(payload);
+  }
+
+  @override
+  Future<SnapshotSyncResult> deleteCloudSnapshots({
+    String? olderThanDateKey,
+  }) async {
+    final payload = await _channel.invokeMethod<Object?>(
+      'deleteCloudSnapshots',
+      {'olderThanDateKey': ?olderThanDateKey},
+    );
+    return SnapshotSyncResult.fromPlatformValue(payload);
+  }
+}
+
+enum SnapshotSyncStatus {
+  synced,
+  unchanged,
+  partial,
+  disabled,
+  noAccount,
+  unavailable,
+  error;
+
+  static SnapshotSyncStatus fromPlatformValue(Object? value) {
+    return switch (value) {
+      'synced' => SnapshotSyncStatus.synced,
+      'unchanged' => SnapshotSyncStatus.unchanged,
+      'partial' => SnapshotSyncStatus.partial,
+      'disabled' => SnapshotSyncStatus.disabled,
+      'noAccount' => SnapshotSyncStatus.noAccount,
+      'unavailable' => SnapshotSyncStatus.unavailable,
+      _ => SnapshotSyncStatus.error,
+    };
+  }
+}
+
+class SnapshotSyncResult {
+  const SnapshotSyncResult({
+    required this.status,
+    this.downloaded = 0,
+    this.uploaded = 0,
+    this.deleted = 0,
+  });
+
+  final SnapshotSyncStatus status;
+  final int downloaded;
+  final int uploaded;
+  final int deleted;
+
+  bool get changedLocally => downloaded > 0;
+
+  static SnapshotSyncResult fromPlatformValue(Object? value) {
+    if (value is! Map) {
+      return const SnapshotSyncResult(status: SnapshotSyncStatus.error);
+    }
+    return SnapshotSyncResult(
+      status: SnapshotSyncStatus.fromPlatformValue(value['status']),
+      downloaded: _readCount(value['downloaded']),
+      uploaded: _readCount(value['uploaded']),
+      deleted: _readCount(value['deleted']),
+    );
+  }
+
+  static int _readCount(Object? value) {
+    if (value is int && value > 0) {
+      return value;
+    }
+    return 0;
   }
 }
 

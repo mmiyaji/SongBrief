@@ -3398,6 +3398,11 @@ class _DataManagementSetting extends ConsumerWidget {
       children: [
         _SnapshotRecordingSetting(enabled: snapshotRecordingEnabled),
         const SizedBox(height: 10),
+        _SnapshotCloudSyncSetting(
+          enabled: ref.watch(snapshotCloudSyncProvider),
+          recordingEnabled: snapshotRecordingEnabled,
+        ),
+        const SizedBox(height: 10),
         _SettingsRow(
           icon: Icons.cleaning_services_outlined,
           label: _t(context, 'Temporary caches', '一時キャッシュ'),
@@ -3435,6 +3440,93 @@ class _DataManagementSetting extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SnapshotCloudSyncSetting extends ConsumerWidget {
+  const _SnapshotCloudSyncSetting({
+    required this.enabled,
+    required this.recordingEnabled,
+  });
+
+  final bool enabled;
+  final bool recordingEnabled;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final active = enabled && recordingEnabled;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.28,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_sync_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _t(
+                      context,
+                      'Sync records with iCloud',
+                      'iCloudで聴取記録を同期',
+                      zh: '通过iCloud同步收听记录',
+                      ko: 'iCloud로 청취 기록 동기화',
+                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    active
+                        ? _t(
+                            context,
+                            'Daily records merge across devices on the same Apple ID.',
+                            '同じApple IDの端末間で日々の記録を統合します。',
+                            zh: '在使用同一Apple ID的设备之间合并每日记录。',
+                            ko: '동일한 Apple ID의 기기 간에 일일 기록을 병합합니다.',
+                          )
+                        : _t(
+                            context,
+                            'Records stay only on this device.',
+                            '記録はこの端末にのみ保存されます。',
+                            zh: '记录仅保存在此设备上。',
+                            ko: '기록은 이 기기에만 저장됩니다.',
+                          ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: enabled,
+              onChanged: recordingEnabled
+                  ? (value) {
+                      ref
+                          .read(snapshotCloudSyncProvider.notifier)
+                          .setEnabled(value);
+                    }
+                  : null,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

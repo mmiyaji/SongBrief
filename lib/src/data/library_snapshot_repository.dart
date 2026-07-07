@@ -22,6 +22,9 @@ class LibrarySnapshotRepository {
 
   Future<SnapshotHistory> loadHistory() async {
     final preferences = await SharedPreferences.getInstance();
+    // The iOS background task and CloudKit sync write this key natively, so
+    // the Dart-side cache must be refreshed before reading.
+    await preferences.reload();
     await _removeLegacyHistoryIfNeeded(preferences);
     final raw = preferences.getString(librarySnapshotPreferencesKey);
     if (raw == null || raw.isEmpty) {
