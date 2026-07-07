@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../domain/library_snapshot.dart';
@@ -28,16 +29,21 @@ class FileSnapshotStore implements SnapshotStore {
       return SnapshotHistory.empty;
     }
 
-    final snapshots = <DailyLibrarySnapshot>[];
+    final rawSnapshots = <String>[];
     await for (final entity in directory.list(followLinks: false)) {
       if (entity is! File || !_isSnapshotFile(entity)) {
         continue;
       }
-      final snapshot = await _readSnapshot(entity);
-      if (snapshot != null) {
-        snapshots.add(snapshot);
+      try {
+        rawSnapshots.add(await entity.readAsString());
+      } on FileSystemException {
+        continue;
       }
     }
+    if (rawSnapshots.isEmpty) {
+      return SnapshotHistory.empty;
+    }
+    final snapshots = await compute(_decodeSnapshotFiles, rawSnapshots);
     snapshots.sort((a, b) => a.dateKey.compareTo(b.dateKey));
     return SnapshotHistory(snapshots: List.unmodifiable(snapshots));
   }
@@ -50,7 +56,8 @@ class FileSnapshotStore implements SnapshotStore {
     final directory = await _directory(create: true);
     final target = File(_snapshotPath(directory, snapshot.dateKey));
     final temp = File('${target.path}.tmp');
-    await temp.writeAsString(jsonEncode(snapshot.toJson()), flush: true);
+    final encoded = await compute(_encodeSnapshotFile, snapshot.toJson());
+    await temp.writeAsString(encoded, flush: true);
     if (await target.exists()) {
       await target.delete();
     }
@@ -135,19 +142,25 @@ class FileSnapshotStore implements SnapshotStore {
     final separatorIndex = path.lastIndexOf(Platform.pathSeparator);
     return separatorIndex < 0 ? path : path.substring(separatorIndex + 1);
   }
+}
 
-  static Future<DailyLibrarySnapshot?> _readSnapshot(File file) async {
+String _encodeSnapshotFile(Map<String, Object?> json) {
+  return jsonEncode(json);
+}
+
+List<DailyLibrarySnapshot> _decodeSnapshotFiles(List<String> rawSnapshots) {
+  final snapshots = <DailyLibrarySnapshot>[];
+  for (final raw in rawSnapshots) {
     try {
-      final raw = await file.readAsString();
       final decoded = jsonDecode(raw);
       if (decoded is Map) {
-        return DailyLibrarySnapshot.fromJson(decoded.cast<String, Object?>());
+        snapshots.add(
+          DailyLibrarySnapshot.fromJson(decoded.cast<String, Object?>()),
+        );
       }
-    } on FileSystemException {
-      return null;
     } on FormatException {
-      return null;
+      continue;
     }
-    return null;
   }
+  return snapshots;
 }

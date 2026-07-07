@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -76,7 +77,7 @@ class LibrarySnapshotRepository {
     }
     final store = _effectiveStore;
     for (final entry in legacyValues.entries) {
-      final history = _decodeLegacyHistory(entry.value);
+      final history = await _decodeLegacyHistory(entry.value);
       for (final snapshot in history.snapshots) {
         await store.writeSnapshot(snapshot);
       }
@@ -86,10 +87,14 @@ class LibrarySnapshotRepository {
   }
 }
 
-SnapshotHistory _decodeLegacyHistory(String? raw) {
+Future<SnapshotHistory> _decodeLegacyHistory(String? raw) async {
   if (raw == null || raw.isEmpty) {
     return SnapshotHistory.empty;
   }
+  return compute(_decodeSnapshotHistory, raw);
+}
+
+SnapshotHistory _decodeSnapshotHistory(String raw) {
   try {
     final decoded = jsonDecode(raw);
     if (decoded is Map) {
