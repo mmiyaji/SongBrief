@@ -57,11 +57,16 @@ void main() {
     expect(find.text('Era mix'), findsOneWidget);
     expect(find.text('Activity heatmap'), findsWidgets);
     expect(find.text('Selected day'), findsWidgets);
+    expect(find.text('Mo'), findsWidgets);
     expect(find.text('Su'), findsWidgets);
     expect(find.text('Sa'), findsWidgets);
     expect(find.text('Calendar'), findsOneWidget);
     expect(find.text('Weekdays'), findsOneWidget);
     expect(find.text('Highlights'), findsWidgets);
+    expect(
+      tester.getTopLeft(find.text('Mo').first).dy,
+      lessThan(tester.getTopLeft(find.text('Su').first).dy),
+    );
 
     await tester.tap(find.text('Weekdays'));
     await tester.pumpAndSettle();

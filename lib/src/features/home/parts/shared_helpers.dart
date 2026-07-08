@@ -2012,7 +2012,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
 }) {
   final today = _localDateOnly(DateTime.now());
   final rawStart = today.subtract(const Duration(days: 83));
-  final start = rawStart.subtract(Duration(days: rawStart.weekday % 7));
+  final start = _mondayOfWeek(rawStart);
   final valuesByDay = <String, int>{};
   final trackDeltasByDay = <String, List<TrackCounterDelta>>{};
 
@@ -2229,13 +2229,13 @@ String _activityHeatmapViewLabel(
 }
 
 const _calendarWeekdayOrder = <int>[
-  DateTime.sunday,
   DateTime.monday,
   DateTime.tuesday,
   DateTime.wednesday,
   DateTime.thursday,
   DateTime.friday,
   DateTime.saturday,
+  DateTime.sunday,
 ];
 
 String _weekdayLabel(BuildContext context, int weekday) {
@@ -2260,6 +2260,11 @@ bool _isWeekend(int weekday) {
 DateTime _localDateOnly(DateTime date) {
   final local = date.toLocal();
   return DateTime(local.year, local.month, local.day);
+}
+
+DateTime _mondayOfWeek(DateTime date) {
+  final localDay = _localDateOnly(date);
+  return localDay.subtract(Duration(days: localDay.weekday - DateTime.monday));
 }
 
 List<_TrackTrendValue> _trackTrendValues({
