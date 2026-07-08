@@ -1,21 +1,37 @@
 # SongBrief
 
-SongBrief is a Flutter/Riverpod prototype for a SongsInfo-style iOS music
-library statistics app.
+SongBrief is a Flutter/Riverpod iOS music-library statistics app for exploring
+Apple Music / Music app play counts, skips, recent playback, and listening
+trends.
 
-The current MVP reads iOS Music library metadata through a Swift
-`MPMediaLibrary`/`MPMediaQuery` bridge and renders rankings in Flutter.
-Non-iOS platforms use sample data so the dashboard can be developed without an
-iPhone attached.
+The iOS app reads Music library metadata through a Swift
+`MPMediaLibrary`/`MPMediaQuery` bridge and renders the experience in Flutter.
+Non-iOS platforms use sample data so the dashboard can be developed and reviewed
+without an iPhone attached.
 
-## Current Scope
+## Release Status
 
-- Track ranking by play count
-- Artist and album aggregations
-- Recent plays from `lastPlayedDate`
-- Total tracks, plays, skips, and estimated listening hours
-- Music library authorization flow on iOS
-- Lightweight glass UI using `liquid_glass_renderer` `FakeGlass`
+- Current App Store release: `1.0.0`
+- Public site: https://songbrief.ruhenheim.org/
+- Privacy Policy: https://songbrief.ruhenheim.org/privacy/
+- Terms of Use: https://songbrief.ruhenheim.org/terms/
+- Initial release notes: [docs/release-notes/v1.0.0.md](docs/release-notes/v1.0.0.md)
+
+## 1.0.0 Scope
+
+- Current playback view with artwork, playback controls, lyrics, recent plays,
+  and Apple Music / web search links
+- Track, artist, album, and recent-play rankings with drilldown
+- Overview statistics, smart lists, listening maps, activity heatmaps, recaps,
+  diversity, milestones, burnout, and album-completion views
+- Library browsing with search, sort, playlist and genre views, exclusion rules,
+  and CSV / JSON export
+- Daily listening records stored locally as per-day files with optional private
+  iCloud sync
+- Music library authorization flow on iOS and temporary demo-data mode for empty
+  or inaccessible libraries
+- Theme, appearance, language, app lock, privacy screen, crash report, cache,
+  history cleanup, ad privacy, and iCloud sync settings
 
 ## Architecture
 
