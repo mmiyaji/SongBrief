@@ -877,6 +877,7 @@ class _StatsContent extends ConsumerWidget {
           .read(musicStatsControllerProvider.notifier)
           .refreshStatsSilently(),
       child: CustomScrollView(
+        key: PageStorageKey<HomeSection>(selectedSection),
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(

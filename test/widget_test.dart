@@ -340,6 +340,37 @@ void main() {
     expect(find.text('Keywords (0)'), findsOneWidget);
   });
 
+  testWidgets('keeps scroll positions independent between tabs', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -520));
+    await tester.pumpAndSettle();
+    final headerTitle = find.byWidgetPredicate(
+      (widget) =>
+          widget is Text &&
+          widget.data == 'SongBrief' &&
+          (widget.style?.fontSize ?? 0) >= 28,
+    );
+    expect(tester.getTopLeft(headerTitle).dy, lessThan(0));
+
+    await tester.tap(find.text('Playing'));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(headerTitle).dy, greaterThanOrEqualTo(0));
+    expect(find.text('Skyline Echo'), findsWidgets);
+  });
+
   testWidgets('hides record-based panels when daily records are off', (
     tester,
   ) async {
