@@ -161,6 +161,45 @@ void main() {
     expect(find.text('1'), findsOneWidget);
   });
 
+  testWidgets('uses last played date when provisional trend delta is zero', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 16);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final previousDay = today.subtract(const Duration(days: 2));
+    final currentTrack = LibraryTrack(
+      id: 'recent-fallback-track',
+      title: 'Recent Fallback Song',
+      artist: 'SongBrief Artist',
+      albumTitle: 'SongBrief Album',
+      duration: const Duration(minutes: 3),
+      playCount: 10,
+      skipCount: 0,
+      lastPlayedAt: yesterday,
+      isCloudItem: false,
+    );
+    final previousTrack = currentTrack.copyWith(lastPlayedAt: previousDay);
+    final stats = MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+      overview: LibraryOverview.fromTracks([currentTrack], isDemo: false),
+      snapshotHistory: SnapshotHistory.empty.withSnapshot(
+        DailyLibrarySnapshot.fromOverview(
+          LibraryOverview.fromTracks([previousTrack], isDemo: false),
+          capturedAt: previousDay,
+        ),
+      ),
+      snapshotRecordingEnabled: true,
+    );
+
+    await _pumpApp(tester, AppLanguage.english, statsState: stats);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recent Fallback Song'), findsWidgets);
+    expect(find.text('This week trend'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+  });
+
   testWidgets('switches to the light appearance from settings', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;

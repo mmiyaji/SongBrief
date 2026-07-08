@@ -2299,6 +2299,13 @@ List<_TrackTrendValue> _trackTrendValues({
     }
   }
 
+  _applyProvisionalRecentPlayFallback(
+    values: values,
+    buckets: buckets,
+    provisionalCurrentSnapshot: provisionalCurrentSnapshot,
+    trackId: trackId,
+  );
+
   return [
     for (final indexed in buckets.indexed)
       _TrackTrendValue(label: indexed.$2.label, playDelta: values[indexed.$1]),
@@ -2413,6 +2420,31 @@ int _recentPlayFallbackDelta(
     return 0;
   }
   return bucket.contains(_localDateOnly(lastPlayedAt)) ? 1 : 0;
+}
+
+void _applyProvisionalRecentPlayFallback({
+  required List<int> values,
+  required List<_TrackTrendBucket> buckets,
+  required DailyLibrarySnapshot? provisionalCurrentSnapshot,
+  required String trackId,
+}) {
+  if (provisionalCurrentSnapshot == null || values.any((value) => value > 0)) {
+    return;
+  }
+
+  final track = _trackSnapshotById(provisionalCurrentSnapshot, trackId);
+  final lastPlayedAt = track?.lastPlayedAt;
+  if (lastPlayedAt == null) {
+    return;
+  }
+
+  final playedDay = _localDateOnly(lastPlayedAt);
+  final bucketIndex = buckets.indexWhere(
+    (bucket) => bucket.contains(playedDay),
+  );
+  if (bucketIndex >= 0) {
+    values[bucketIndex] = math.max(values[bucketIndex], 1);
+  }
 }
 
 TrackCounterSnapshot? _trackSnapshotById(
