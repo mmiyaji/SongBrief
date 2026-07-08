@@ -81,6 +81,23 @@ void main() {
     expect(find.text('Quiet days'), findsOneWidget);
   });
 
+  testWidgets('selects today before the peak day in activity heatmap', (
+    tester,
+  ) async {
+    await _pumpOverview(
+      tester,
+      tracks: _heatmapSelectionTracks(),
+      snapshotRecordingEnabled: true,
+    );
+    await tester.pumpAndSettle();
+
+    await _openExpandedListeningMaps(tester);
+
+    expect(find.text('Selected day'), findsWidgets);
+    expect(find.text('Today Heatmap Track - Today Artist'), findsWidgets);
+    expect(find.text('Yesterday Peak Track - Peak Artist'), findsNothing);
+  });
+
   testWidgets('switches release year map to song count in expanded view', (
     tester,
   ) async {
@@ -194,7 +211,11 @@ Future<void> _openExpandedListeningMaps(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _pumpOverview(WidgetTester tester, {List<LibraryTrack>? tracks}) {
+Future<void> _pumpOverview(
+  WidgetTester tester, {
+  List<LibraryTrack>? tracks,
+  bool snapshotRecordingEnabled = false,
+}) {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(900, 1200);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -211,7 +232,10 @@ Future<void> _pumpOverview(WidgetTester tester, {List<LibraryTrack>? tracks}) {
         ),
         if (tracks != null)
           musicStatsControllerProvider.overrideWith(
-            () => _FixedMusicStatsController(tracks),
+            () => _FixedMusicStatsController(
+              tracks,
+              snapshotRecordingEnabled: snapshotRecordingEnabled,
+            ),
           ),
       ],
       child: const SongBriefApp(),
@@ -220,9 +244,13 @@ Future<void> _pumpOverview(WidgetTester tester, {List<LibraryTrack>? tracks}) {
 }
 
 class _FixedMusicStatsController extends MusicStatsController {
-  _FixedMusicStatsController(this.tracks);
+  _FixedMusicStatsController(
+    this.tracks, {
+    required this.snapshotRecordingEnabled,
+  });
 
   final List<LibraryTrack> tracks;
+  final bool snapshotRecordingEnabled;
 
   @override
   Future<MusicStatsState> build() async {
@@ -230,7 +258,7 @@ class _FixedMusicStatsController extends MusicStatsController {
       authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
       overview: LibraryOverview.fromTracks(tracks, isDemo: true),
       snapshotHistory: SnapshotHistory.empty,
-      snapshotRecordingEnabled: false,
+      snapshotRecordingEnabled: snapshotRecordingEnabled,
     );
   }
 }
@@ -273,4 +301,34 @@ List<LibraryTrack> _albumCompletionTracks() {
       isCloudItem: false,
     );
   }, growable: false);
+}
+
+List<LibraryTrack> _heatmapSelectionTracks() {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day, 9);
+  final yesterday = today.subtract(const Duration(days: 1));
+  return [
+    LibraryTrack(
+      id: 'heatmap-today',
+      title: 'Today Heatmap Track',
+      artist: 'Today Artist',
+      albumTitle: 'Daily Signals',
+      playCount: 16,
+      skipCount: 0,
+      duration: const Duration(minutes: 3),
+      lastPlayedAt: today,
+      isCloudItem: false,
+    ),
+    LibraryTrack(
+      id: 'heatmap-yesterday-peak',
+      title: 'Yesterday Peak Track',
+      artist: 'Peak Artist',
+      albumTitle: 'Daily Signals',
+      playCount: 160,
+      skipCount: 0,
+      duration: const Duration(minutes: 3),
+      lastPlayedAt: yesterday,
+      isCloudItem: false,
+    ),
+  ];
 }

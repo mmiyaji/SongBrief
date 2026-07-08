@@ -2207,6 +2207,29 @@ _ActivityHeatmapDay? _validSelectedActivityDay(
   return null;
 }
 
+_ActivityHeatmapDay? _defaultSelectedActivityDay(
+  List<_ActivityHeatmapDay> days,
+) {
+  if (days.isEmpty) {
+    return null;
+  }
+
+  final today = _localDateOnly(DateTime.now());
+  for (final day in days.reversed) {
+    if (_sameLocalDate(day.date, today) && day.playCount > 0) {
+      return day;
+    }
+  }
+
+  for (final day in days.reversed) {
+    if (day.playCount > 0) {
+      return day;
+    }
+  }
+
+  return days.last;
+}
+
 bool _sameActivityDate(
   _ActivityHeatmapDay? first,
   _ActivityHeatmapDay? second,
@@ -2214,7 +2237,11 @@ bool _sameActivityDate(
   if (first == null || second == null) {
     return false;
   }
-  return snapshotDateKey(first.date) == snapshotDateKey(second.date);
+  return _sameLocalDate(first.date, second.date);
+}
+
+bool _sameLocalDate(DateTime first, DateTime second) {
+  return snapshotDateKey(first) == snapshotDateKey(second);
 }
 
 String _activityHeatmapViewLabel(

@@ -743,8 +743,7 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
         : _t(context, 'Recent-track estimate', '最近再生からの推定');
     final selectedDay =
         _validSelectedActivityDay(days, _selectedDay) ??
-        summary.peakDay ??
-        (days.isEmpty ? null : days.last);
+        _defaultSelectedActivityDay(days);
 
     return _OverviewAnalysisCard(
       icon: Icons.grid_on_rounded,
