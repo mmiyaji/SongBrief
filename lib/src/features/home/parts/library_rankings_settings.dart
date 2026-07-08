@@ -2006,6 +2006,7 @@ class _SettingsSection extends ConsumerWidget {
     final appLock = ref.watch(appLockControllerProvider);
     final crashReporting = ref.watch(crashReportingControllerProvider);
     final libraryFilters = ref.watch(libraryFilterPreferencesProvider);
+    final temporaryDemoLibraryEnabled = ref.watch(temporaryDemoLibraryProvider);
     final appVersion = ref
         .watch(_appVersionLabelProvider)
         .maybeWhen(
@@ -2038,6 +2039,12 @@ class _SettingsSection extends ConsumerWidget {
                     ? _t(context, 'Sample library', 'サンプルライブラリ')
                     : _t(context, 'iOS Music library', 'iOSミュージックライブラリ'),
               ),
+              const SizedBox(height: 10),
+              _TemporaryDemoLibrarySetting(
+                enabled: temporaryDemoLibraryEnabled,
+                stats: stats,
+              ),
+              const SizedBox(height: 10),
               _SettingsRow(
                 icon: Icons.update,
                 label: _t(context, 'Last record', '最終記録'),
@@ -2277,6 +2284,110 @@ class _SettingsGroup extends StatelessWidget {
           const SizedBox(height: 14),
           child,
         ],
+      ),
+    );
+  }
+}
+
+class _TemporaryDemoLibrarySetting extends ConsumerWidget {
+  const _TemporaryDemoLibrarySetting({
+    required this.enabled,
+    required this.stats,
+  });
+
+  final bool enabled;
+  final MusicStatsState stats;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final realLibraryAvailable =
+        stats.authorizationStatus.canReadLibrary && stats.overview.hasTracks;
+    final active = enabled && stats.overview.isDemo;
+    final description = active
+        ? _t(
+            context,
+            'Temporary demo data is visible. It is not saved or synced.',
+            '一時的なデモデータを表示中です。保存や同期の対象にはなりません。',
+            zh: '正在显示临时演示数据。它不会被保存或同步。',
+            ko: '임시 데모 데이터를 표시 중입니다. 저장되거나 동기화되지 않습니다.',
+          )
+        : realLibraryAvailable
+        ? _t(
+            context,
+            'Your Music library is available, so real data is shown first.',
+            'ミュージックライブラリを利用できるため、実データを優先して表示しています。',
+            zh: '可以使用你的音乐资料库，因此优先显示真实数据。',
+            ko: '음악 보관함을 사용할 수 있으므로 실제 데이터를 우선 표시합니다.',
+          )
+        : _t(
+            context,
+            'When Music access is unavailable or no songs are found, show sample data so you can try the app.',
+            'ミュージックにアクセスできない場合や曲が見つからない場合に、アプリを試せるサンプルデータを表示します。',
+            zh: '当无法访问音乐或找不到歌曲时，显示示例数据以便试用应用。',
+            ko: '음악 접근이 불가능하거나 곡을 찾을 수 없을 때 앱을 시험해 볼 수 있는 샘플 데이터를 표시합니다.',
+          );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.22,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.preview_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _t(
+                      context,
+                      'Temporary demo data',
+                      '一時的なデモデータ',
+                      zh: '临时演示数据',
+                      ko: '임시 데모 데이터',
+                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    description,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: enabled,
+              onChanged: (value) async {
+                if (value) {
+                  await _enableTemporaryDemoLibrary(context, ref);
+                  return;
+                }
+                ref
+                    .read(temporaryDemoLibraryProvider.notifier)
+                    .setEnabled(false);
+                await ref
+                    .read(musicStatsControllerProvider.notifier)
+                    .refreshStats();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

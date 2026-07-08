@@ -478,31 +478,125 @@ class _RankingArtwork extends StatelessWidget {
   }
 }
 
-class _EmptyLibraryPanel extends StatelessWidget {
+class _EmptyLibraryPanel extends ConsumerWidget {
   const _EmptyLibraryPanel();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return GlassSurface(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.album, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _t(
-                context,
-                'No Music library songs were returned by iOS.',
-                'iOSからミュージックライブラリの曲が返されませんでした。',
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.album, color: theme.colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _t(
+                        context,
+                        'No Apple Music songs are available yet.',
+                        'Apple Musicの曲をまだ利用できません。',
+                        zh: '还没有可用的 Apple Music 歌曲。',
+                        ko: '아직 사용할 수 있는 Apple Music 곡이 없습니다.',
+                      ),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _t(
+                        context,
+                        'Allow Music access or add songs to your Music library. Until then, you can preview SongBrief with temporary demo data.',
+                        'ミュージックへのアクセスを許可するか、ミュージックライブラリに曲を追加してください。それまでは、一時的なデモデータでSongBriefを試せます。',
+                        zh: '请允许访问音乐，或将歌曲添加到你的音乐资料库。在此之前，你可以使用临时演示数据预览 SongBrief。',
+                        ko: '음악 접근을 허용하거나 음악 보관함에 곡을 추가해 주세요. 그전까지는 임시 데모 데이터로 SongBrief를 미리 볼 수 있습니다.',
+                      ),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              style: theme.textTheme.bodyMedium,
+            ],
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: () => _enableTemporaryDemoLibrary(context, ref),
+              icon: const Icon(Icons.preview_rounded),
+              label: Text(
+                _t(
+                  context,
+                  'Show demo data',
+                  'デモデータを表示',
+                  zh: '显示演示数据',
+                  ko: '데모 데이터 표시',
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+Future<void> _enableTemporaryDemoLibrary(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(
+        _t(
+          context,
+          'Show temporary demo data?',
+          '一時的なデモデータを表示しますか？',
+          zh: '显示临时演示数据？',
+          ko: '임시 데모 데이터를 표시할까요?',
+        ),
+      ),
+      content: Text(
+        _t(
+          context,
+          'SongBrief will show sample songs and listening records so you can try the app. Demo data is not saved to your listening records or synced with iCloud. If Music access is allowed later, or songs are added to your Music library, the real library will automatically replace the demo data.',
+          'SongBriefを試せるように、サンプルの曲と聴取記録を表示します。デモデータは聴取記録として保存されず、iCloudにも同期されません。あとでミュージックへのアクセスが許可された場合、またはミュージックライブラリに曲が追加された場合は、実際のライブラリに自動で置き換わります。',
+          zh: 'SongBrief 将显示示例歌曲和聆听记录，方便你试用应用。演示数据不会保存为聆听记录，也不会同步到 iCloud。之后如果允许访问音乐，或向音乐资料库添加歌曲，真实资料库会自动替换演示数据。',
+          ko: 'SongBrief를 시험해 볼 수 있도록 샘플 곡과 청취 기록을 표시합니다. 데모 데이터는 청취 기록으로 저장되지 않으며 iCloud와 동기화되지 않습니다. 나중에 음악 접근을 허용하거나 음악 보관함에 곡을 추가하면 실제 보관함이 데모 데이터를 자동으로 대체합니다.',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(_t(context, 'Cancel', 'キャンセル')),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(
+            _t(context, 'Show demo', 'デモを表示', zh: '显示演示', ko: '데모 표시'),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true || !context.mounted) {
+    return;
+  }
+
+  ref.read(temporaryDemoLibraryProvider.notifier).setEnabled(true);
+  await ref.read(musicStatsControllerProvider.notifier).refreshStats();
 }
 
 class _LoadingState extends StatefulWidget {

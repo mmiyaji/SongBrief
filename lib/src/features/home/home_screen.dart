@@ -26,6 +26,7 @@ import '../../monetization/ad_consent.dart';
 import '../../monetization/ad_banner_slot.dart';
 import '../../settings/app_lock.dart';
 import '../../settings/app_preferences.dart';
+import '../../settings/demo_library_preferences.dart';
 import '../../settings/library_filter_preferences.dart';
 import '../../settings/snapshot_preferences.dart';
 import '../../theme/app_theme.dart';

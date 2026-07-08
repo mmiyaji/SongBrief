@@ -6,6 +6,7 @@ import '../domain/library_snapshot.dart';
 import '../domain/library_track.dart';
 import '../domain/music_library_authorization.dart';
 import '../domain/music_stats_state.dart';
+import '../settings/demo_library_preferences.dart';
 import '../settings/library_filter_preferences.dart';
 import '../settings/snapshot_preferences.dart';
 import 'library_snapshot_repository.dart';
@@ -34,6 +35,7 @@ final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
     ref.watch(librarySnapshotRepositoryProvider),
     snapshotRecordingEnabled: ref.watch(snapshotRecordingProvider),
     cloudSyncEnabled: ref.watch(snapshotCloudSyncProvider),
+    temporaryDemoLibraryEnabled: ref.watch(temporaryDemoLibraryProvider),
     libraryFilters: ref.watch(libraryFilterPreferencesProvider),
   );
 });
@@ -44,6 +46,7 @@ class MusicStatsRepository {
     this._snapshotRepository, {
     this.snapshotRecordingEnabled = true,
     this.cloudSyncEnabled = true,
+    this.temporaryDemoLibraryEnabled = false,
     this.libraryFilters,
   });
 
@@ -51,26 +54,12 @@ class MusicStatsRepository {
   final LibrarySnapshotRepository _snapshotRepository;
   final bool snapshotRecordingEnabled;
   final bool cloudSyncEnabled;
+  final bool temporaryDemoLibraryEnabled;
   final LibraryFilterPreferences? libraryFilters;
 
   Future<MusicStatsState> load({bool requestAccess = false}) async {
     if (!_isIosMusicRuntime) {
-      final tracks = _largeDemoTrackCount > 0
-          ? _largeSampleTracks(_largeDemoTrackCount)
-          : _sampleTracks();
-      final filteredTracks = _filteredTracks(tracks);
-      final overview = await _buildLibraryOverview(
-        filteredTracks,
-        isDemo: true,
-      );
-      return MusicStatsState(
-        authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
-        overview: overview,
-        snapshotHistory: snapshotRecordingEnabled
-            ? _sampleSnapshotHistory(overview)
-            : SnapshotHistory.empty,
-        snapshotRecordingEnabled: snapshotRecordingEnabled,
-      );
+      return _buildDemoState(MusicLibraryAuthorizationStatus.unsupported);
     }
 
     final status = requestAccess
@@ -78,6 +67,9 @@ class MusicStatsRepository {
         : await _client.authorizationStatus();
 
     if (!status.canReadLibrary) {
+      if (temporaryDemoLibraryEnabled) {
+        return _buildDemoState(status);
+      }
       return MusicStatsState(
         authorizationStatus: status,
         overview: LibraryOverview.empty(isDemo: false),
@@ -86,10 +78,14 @@ class MusicStatsRepository {
       );
     }
 
+    final tracks = _filteredTracks(await _client.fetchTracks());
+    if (tracks.isEmpty && temporaryDemoLibraryEnabled) {
+      return _buildDemoState(status);
+    }
+
     if (snapshotRecordingEnabled) {
       await _client.scheduleSnapshotRefresh();
     }
-    final tracks = _filteredTracks(await _client.fetchTracks());
     final overview = await _buildLibraryOverview(tracks, isDemo: false);
     final snapshotHistory = snapshotRecordingEnabled
         ? await _snapshotRepository.recordSnapshot(overview)
@@ -98,6 +94,24 @@ class MusicStatsRepository {
       authorizationStatus: status,
       overview: overview,
       snapshotHistory: snapshotHistory,
+      snapshotRecordingEnabled: snapshotRecordingEnabled,
+    );
+  }
+
+  Future<MusicStatsState> _buildDemoState(
+    MusicLibraryAuthorizationStatus authorizationStatus,
+  ) async {
+    final tracks = _largeDemoTrackCount > 0
+        ? _largeSampleTracks(_largeDemoTrackCount)
+        : _sampleTracks();
+    final filteredTracks = _filteredTracks(tracks);
+    final overview = await _buildLibraryOverview(filteredTracks, isDemo: true);
+    return MusicStatsState(
+      authorizationStatus: authorizationStatus,
+      overview: overview,
+      snapshotHistory: snapshotRecordingEnabled
+          ? _sampleSnapshotHistory(overview)
+          : SnapshotHistory.empty,
       snapshotRecordingEnabled: snapshotRecordingEnabled,
     );
   }

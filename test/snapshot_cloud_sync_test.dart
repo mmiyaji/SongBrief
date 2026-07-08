@@ -7,6 +7,7 @@ import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/data/music_stats_repository.dart';
 import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/domain/music_library_authorization.dart';
+import 'package:songbrief/src/settings/demo_library_preferences.dart';
 import 'package:songbrief/src/settings/snapshot_preferences.dart';
 
 void main() {
@@ -47,6 +48,45 @@ void main() {
       expect(
         preferences.getBool(snapshotCloudSyncEnabledPreferenceKey),
         isFalse,
+      );
+    });
+  });
+
+  group('TemporaryDemoLibraryController', () {
+    test('defaults to disabled', () async {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(temporaryDemoLibraryProvider), isFalse);
+    });
+
+    test('restores a saved opt-in', () async {
+      SharedPreferences.setMockInitialValues({
+        temporaryDemoLibraryEnabledPreferenceKey: true,
+      });
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(temporaryDemoLibraryProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(temporaryDemoLibraryProvider), isTrue);
+    });
+
+    test('persists user changes', () async {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      container.read(temporaryDemoLibraryProvider.notifier).setEnabled(true);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(temporaryDemoLibraryProvider), isTrue);
+      final preferences = await SharedPreferences.getInstance();
+      expect(
+        preferences.getBool(temporaryDemoLibraryEnabledPreferenceKey),
+        isTrue,
       );
     });
   });
@@ -118,12 +158,14 @@ void main() {
       _CloudSyncSpyClient client, {
       bool recordingEnabled = true,
       bool cloudSyncEnabled = true,
+      bool temporaryDemoLibraryEnabled = false,
     }) {
       return MusicStatsRepository(
         client,
         LibrarySnapshotRepository(),
         snapshotRecordingEnabled: recordingEnabled,
         cloudSyncEnabled: cloudSyncEnabled,
+        temporaryDemoLibraryEnabled: temporaryDemoLibraryEnabled,
       );
     }
 
@@ -241,16 +283,81 @@ void main() {
       expect(stats.snapshotRecordingEnabled, isFalse);
       expect(stats.snapshotHistory.snapshotCount, 0);
     });
+
+    test('shows temporary demo data when music access is denied', () async {
+      final client = _CloudSyncSpyClient()
+        ..authorizationStatusValue = MusicLibraryAuthorizationStatus.denied;
+
+      final stats = await repository(
+        client,
+        temporaryDemoLibraryEnabled: true,
+      ).load();
+
+      expect(stats.authorizationStatus, MusicLibraryAuthorizationStatus.denied);
+      expect(stats.overview.isDemo, isTrue);
+      expect(stats.overview.totalTracks, greaterThan(0));
+      expect(client.fetchTrackCalls, 0);
+    });
+
+    test(
+      'shows temporary demo data when the authorized library is empty',
+      () async {
+        final client = _CloudSyncSpyClient();
+
+        final stats = await repository(
+          client,
+          recordingEnabled: false,
+          temporaryDemoLibraryEnabled: true,
+        ).load();
+
+        expect(
+          stats.authorizationStatus,
+          MusicLibraryAuthorizationStatus.authorized,
+        );
+        expect(stats.overview.isDemo, isTrue);
+        expect(stats.overview.totalTracks, greaterThan(0));
+        expect(stats.snapshotHistory.snapshotCount, 0);
+      },
+    );
+
+    test('prefers real music library over temporary demo data', () async {
+      final client = _CloudSyncSpyClient()
+        ..tracks = [
+          LibraryTrack(
+            id: 'real-track',
+            title: 'Real Track',
+            artist: 'Real Artist',
+            albumTitle: 'Real Album',
+            duration: const Duration(minutes: 3),
+            playCount: 12,
+            skipCount: 1,
+            isCloudItem: false,
+          ),
+        ];
+
+      final stats = await repository(
+        client,
+        recordingEnabled: false,
+        temporaryDemoLibraryEnabled: true,
+      ).load();
+
+      expect(stats.overview.isDemo, isFalse);
+      expect(stats.overview.totalTracks, 1);
+      expect(stats.overview.latestTrack?.title, 'Real Track');
+    });
   });
 }
 
 class _CloudSyncSpyClient implements MusicLibraryClient {
   int syncCalls = 0;
   int deleteCalls = 0;
+  int fetchTrackCalls = 0;
   String? lastDeleteCutoff;
   bool throwOnSync = false;
   bool throwOnDelete = false;
   List<LibraryTrack> tracks = const [];
+  MusicLibraryAuthorizationStatus authorizationStatusValue =
+      MusicLibraryAuthorizationStatus.authorized;
   SnapshotSyncResult syncResult = const SnapshotSyncResult(
     status: SnapshotSyncStatus.unchanged,
   );
@@ -278,16 +385,17 @@ class _CloudSyncSpyClient implements MusicLibraryClient {
 
   @override
   Future<MusicLibraryAuthorizationStatus> authorizationStatus() async {
-    return MusicLibraryAuthorizationStatus.authorized;
+    return authorizationStatusValue;
   }
 
   @override
   Future<MusicLibraryAuthorizationStatus> requestAuthorization() async {
-    return MusicLibraryAuthorizationStatus.authorized;
+    return authorizationStatusValue;
   }
 
   @override
   Future<List<LibraryTrack>> fetchTracks() async {
+    fetchTrackCalls += 1;
     return tracks;
   }
 

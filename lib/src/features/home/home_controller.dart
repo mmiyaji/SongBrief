@@ -211,7 +211,9 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     if (loadingPreviewDelay > Duration.zero) {
       await Future<void>.delayed(loadingPreviewDelay);
     }
-    unawaited(syncCloudSnapshots());
+    if (!next.overview.isDemo) {
+      unawaited(syncCloudSnapshots());
+    }
     return next;
   }
 
@@ -309,7 +311,9 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
             ),
       );
       await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
-      unawaited(syncCloudSnapshots());
+      if (!overview.isDemo) {
+        unawaited(syncCloudSnapshots());
+      }
     } else if (next.hasError) {
       unawaited(
         ref
