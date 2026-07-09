@@ -1097,8 +1097,8 @@ class _AuthorizationPanel extends ConsumerWidget {
     final message = status == MusicLibraryAuthorizationStatus.notDetermined
         ? _t(
             context,
-            'Allow Music access to read play counts and skip counts.',
-            '再生回数とスキップ回数を読み取るため、ミュージックへのアクセスを許可してください。',
+            'SongBrief uses Music access to read play counts and skip counts.',
+            'SongBriefは再生回数とスキップ回数を読み取るためにミュージックアクセスを使用します。',
           )
         : _t(
             context,
@@ -1117,8 +1117,8 @@ class _AuthorizationPanel extends ConsumerWidget {
             onPressed: () {
               ref.read(musicStatsControllerProvider.notifier).requestAccess();
             },
-            icon: const Icon(Icons.lock_open),
-            label: Text(_t(context, 'Allow', '許可')),
+            icon: const Icon(Icons.arrow_forward),
+            label: Text(_t(context, 'Continue', '続ける', zh: '继续', ko: '계속')),
           );
 
           final content = Row(

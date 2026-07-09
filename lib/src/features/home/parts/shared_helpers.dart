@@ -513,10 +513,10 @@ class _EmptyLibraryPanel extends ConsumerWidget {
                     Text(
                       _t(
                         context,
-                        'Allow Music access or add songs to your Music library. Until then, you can preview SongBrief with temporary demo data.',
-                        'ミュージックへのアクセスを許可するか、ミュージックライブラリに曲を追加してください。それまでは、一時的なデモデータでSongBriefを試せます。',
-                        zh: '请允许访问音乐，或将歌曲添加到你的音乐资料库。在此之前，你可以使用临时演示数据预览 SongBrief。',
-                        ko: '음악 접근을 허용하거나 음악 보관함에 곡을 추가해 주세요. 그전까지는 임시 데모 데이터로 SongBrief를 미리 볼 수 있습니다.',
+                        'Music access or songs in your Music library are needed for real data. Until then, you can preview SongBrief with temporary demo data.',
+                        '実データの表示には、ミュージックアクセスまたはミュージックライブラリ内の曲が必要です。それまでは、一時的なデモデータでSongBriefを試せます。',
+                        zh: '显示真实数据需要音乐访问权限或音乐资料库中的歌曲。在此之前，你可以使用临时演示数据预览 SongBrief。',
+                        ko: '실제 데이터를 표시하려면 음악 접근 권한 또는 음악 보관함의 곡이 필요합니다. 그전까지는 임시 데모 데이터로 SongBrief를 미리 볼 수 있습니다.',
                       ),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,

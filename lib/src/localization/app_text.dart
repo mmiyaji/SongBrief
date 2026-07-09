@@ -99,6 +99,7 @@ const _copyTranslations = <String, _LocalizedCopy>{
   'Allow': _LocalizedCopy(ja: '許可', zh: '允许', ko: '허용'),
   'Refresh': _LocalizedCopy(ja: '更新', zh: '刷新', ko: '새로 고침'),
   'Cancel': _LocalizedCopy(ja: 'キャンセル', zh: '取消', ko: '취소'),
+  'Continue': _LocalizedCopy(ja: '続ける', zh: '继续', ko: '계속'),
   'Add': _LocalizedCopy(ja: '追加', zh: '添加', ko: '추가'),
   'None': _LocalizedCopy(ja: 'なし', zh: '无', ko: '없음'),
   'Open': _LocalizedCopy(ja: '開く', zh: '打开', ko: '열기'),
@@ -723,11 +724,12 @@ const _copyTranslations = <String, _LocalizedCopy>{
     zh: '跟随设备外观设置。',
     ko: '기기의 화면 설정을 따릅니다.',
   ),
-  'Allow Music access to read play counts and skip counts.': _LocalizedCopy(
-    ja: '再生回数とスキップ回数を読むためにミュージックアクセスを許可してください。',
-    zh: '请允许访问音乐，以读取播放次数和跳过次数。',
-    ko: '재생 횟수와 스킵 횟수를 읽기 위해 음악 접근을 허용하세요.',
-  ),
+  'SongBrief uses Music access to read play counts and skip counts.':
+      _LocalizedCopy(
+        ja: 'SongBriefは再生回数とスキップ回数を読むためにミュージックアクセスを使用します。',
+        zh: 'SongBrief 会使用音乐访问权限来读取播放次数和跳过次数。',
+        ko: 'SongBrief는 재생 횟수와 스킵 횟수를 읽기 위해 음악 접근을 사용합니다.',
+      ),
   'Demo data shown until iOS Music access is available.': _LocalizedCopy(
     ja: 'iOSのミュージックアクセスが利用可能になるまでデモデータを表示しています。',
     zh: '在 iOS 音乐访问可用前显示演示数据。',
