@@ -43,6 +43,10 @@ void main() {
   ) async {
     var taps = 0;
     final protector = _FakeAppLockPrivacyProtector();
+    final privateActionFocusNode = FocusNode(
+      debugLabel: 'private-action-focus',
+    );
+    addTearDown(privateActionFocusNode.dispose);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -54,6 +58,7 @@ void main() {
         child: MaterialApp(
           home: AppLockGate(
             child: TextButton(
+              focusNode: privateActionFocusNode,
               onPressed: () {
                 taps += 1;
               },
@@ -67,11 +72,16 @@ void main() {
 
     expect(find.byKey(const ValueKey('app-lock-initializing')), findsOneWidget);
     expect(find.byKey(const ValueKey('app-lock-privacy-mark')), findsOneWidget);
+    expect(find.semantics.byLabel('Private action'), findsNothing);
+
+    privateActionFocusNode.requestFocus();
+    await tester.pump();
 
     await tester.tap(find.text('Private action'), warnIfMissed: false);
     await tester.pump();
 
     expect(taps, 0);
+    expect(privateActionFocusNode.hasFocus, isFalse);
     expect(protector.lockStates, contains(true));
   });
 
@@ -80,6 +90,8 @@ void main() {
   ) async {
     var sheetActions = 0;
     final protector = _FakeAppLockPrivacyProtector();
+    final sheetActionFocusNode = FocusNode(debugLabel: 'sheet-action-focus');
+    addTearDown(sheetActionFocusNode.dispose);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -107,6 +119,7 @@ void main() {
                           return SafeArea(
                             child: TextButton(
                               key: const ValueKey('sheet-action'),
+                              focusNode: sheetActionFocusNode,
                               onPressed: () {
                                 sheetActions += 1;
                               },
@@ -131,13 +144,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sheet action'), findsOneWidget);
+    sheetActionFocusNode.requestFocus();
+    await tester.pump();
+    expect(sheetActionFocusNode.hasFocus, isTrue);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump();
 
     expect(find.text('SongBrief is locked'), findsOneWidget);
     expect(find.byKey(const ValueKey('app-lock-privacy-mark')), findsOneWidget);
+    expect(find.semantics.byLabel('Sheet action'), findsNothing);
+    expect(find.semantics.byLabel('Unlock'), findsOne);
+    expect(sheetActionFocusNode.hasFocus, isFalse);
     expect(protector.lockStates, contains(true));
+
+    sheetActionFocusNode.requestFocus();
+    await tester.pump();
+    expect(sheetActionFocusNode.hasFocus, isFalse);
 
     await tester.tap(
       find.byKey(const ValueKey('sheet-action')),

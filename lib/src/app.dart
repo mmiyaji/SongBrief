@@ -141,16 +141,22 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     final asyncState = ref.watch(appLockControllerProvider);
     final initialLockEnabled = ref.watch(initialAppLockEnabledProvider);
     final state = asyncState.value;
-    final initializing =
-        initialLockEnabled && asyncState.isLoading && state == null;
+    final initializing = initialLockEnabled && state == null;
     final locked = state?.locked ?? false;
+    final contentBlocked = initializing || locked;
     final protectionActive =
         initializing ||
         (state?.enabled == true && state?.supported == true && locked);
     _syncPrivacyProtection(protectionActive);
     return Stack(
       children: [
-        widget.child,
+        IgnorePointer(
+          ignoring: contentBlocked,
+          child: ExcludeSemantics(
+            excluding: contentBlocked,
+            child: ExcludeFocus(excluding: contentBlocked, child: widget.child),
+          ),
+        ),
         if (initializing) const _AppLockInitializingScreen(),
         if (locked) _AppLockScreen(state: state!),
       ],

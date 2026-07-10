@@ -16,6 +16,10 @@ final localAuthenticationProvider = Provider<LocalAuthentication>(
   (ref) => LocalAuthentication(),
 );
 
+final appLockSupportCheckTimeoutProvider = Provider<Duration>(
+  (ref) => const Duration(seconds: 2),
+);
+
 final appLockControllerProvider =
     AsyncNotifierProvider<AppLockController, AppLockState>(
       AppLockController.new,
@@ -110,8 +114,8 @@ class AppLockController extends AsyncNotifier<AppLockState> {
       return;
     }
 
-    final supported = await _isSupported();
-    if (!supported) {
+    final support = await _checkSupport();
+    if (support == _AppLockSupport.unsupported) {
       await _saveEnabled(false);
       state = AsyncData(
         current.copyWith(
@@ -190,12 +194,17 @@ class AppLockController extends AsyncNotifier<AppLockState> {
   }
 
   Future<void> _verifySavedLockSupport() async {
-    final supported = await _isSupported();
+    final support = await _checkSupport();
     final current = state.value;
     if (current == null || !current.enabled) {
       return;
     }
-    if (!supported) {
+    if (support == _AppLockSupport.indeterminate) {
+      // A timeout or transient platform failure must not silently remove a
+      // saved lock. Keep the app locked and allow authentication to be retried.
+      return;
+    }
+    if (support == _AppLockSupport.unsupported) {
       await _saveEnabled(false);
       state = AsyncData(
         current.copyWith(enabled: false, locked: false, supported: false),
@@ -205,17 +214,22 @@ class AppLockController extends AsyncNotifier<AppLockState> {
     state = AsyncData(current.copyWith(supported: true));
   }
 
-  Future<bool> _isSupported() async {
+  Future<_AppLockSupport> _checkSupport() async {
     if (kIsWeb) {
-      return false;
+      return _AppLockSupport.unsupported;
     }
     try {
-      return ref
+      final supported = await ref
           .read(localAuthenticationProvider)
           .isDeviceSupported()
-          .timeout(const Duration(seconds: 2), onTimeout: () => false);
+          .timeout(ref.read(appLockSupportCheckTimeoutProvider));
+      return supported
+          ? _AppLockSupport.supported
+          : _AppLockSupport.unsupported;
+    } on TimeoutException {
+      return _AppLockSupport.indeterminate;
     } on Object {
-      return false;
+      return _AppLockSupport.indeterminate;
     }
   }
 
@@ -237,3 +251,5 @@ class AppLockController extends AsyncNotifier<AppLockState> {
         const AppLockState(enabled: false, locked: false, supported: false);
   }
 }
+
+enum _AppLockSupport { supported, unsupported, indeterminate }
