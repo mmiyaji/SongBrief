@@ -12,14 +12,26 @@ without an iPhone attached.
 ## Release Status
 
 - Latest App Store version: `1.0.0` (currently removed from sale in App Store Connect)
-- Next release candidate: `1.0.1` (source build `2`; TestFlight may assign a newer build number)
+- Next release candidate: `1.0.1` (source build `2`)
+- Latest accepted TestFlight upload: `1.0.1` (`CFBundleVersion` `2607101442`),
+  built by [iOS TestFlight #37](https://github.com/mmiyaji/SongBrief/actions/runs/29100791603)
+  on 2026-07-10
 - Public site: https://songbrief.ruhenheim.org/
 - Privacy Policy: https://songbrief.ruhenheim.org/privacy/
 - Terms of Use: https://songbrief.ruhenheim.org/terms/
 - Initial release notes: [docs/release-notes/v1.0.0.md](docs/release-notes/v1.0.0.md)
 - Next release notes: [docs/release-notes/v1.0.1.md](docs/release-notes/v1.0.1.md)
 
-## 1.0.0 Scope
+Release readiness for `1.0.1`:
+
+- [x] Deploy the `DailySnapshot.filterSignature` String field to the Production
+  CloudKit schema.
+- [x] Pass Dart coverage, native iOS unit tests, IPA verification, and App Store
+  Connect upload in the TestFlight workflow.
+- [ ] Restore App Store availability under Pricing and Availability.
+- [ ] Complete App Store Connect metadata and submit `1.0.1` for review.
+
+## Product Scope
 
 - Current playback view with artwork, playback controls, lyrics, recent plays,
   and Apple Music / web search links
@@ -90,24 +102,25 @@ queries. It checks all locally known days plus a trailing 1,095-day window, so
 normal multi-device use and reinstall recovery cover roughly three years
 without requiring query indexes.
 
-Release checklist for this feature:
+CloudKit release checklist:
 
-- In Apple Developer > Identifiers, enable iCloud / CloudKit for
+- [x] In Apple Developer > Identifiers, enable iCloud / CloudKit for
   `app.songbrief.songbrief` and assign the `iCloud.app.songbrief.songbrief`
   Cloud Container. Changing this capability invalidates existing provisioning
   profiles, so regenerate profiles or let Xcode/GitHub Actions automatic
   signing recreate them before the next upload.
-- In CloudKit Database, the Development and Production schemas must include
-  record type `DailySnapshot` with fields: `payload` (String),
-  `capturedAtMillis` (Int64), `trackCount` (Int64), `totalPlayCount` (Int64),
-  `totalSkipCount` (Int64), `totalListeningSeconds` (Int64), and
+- [x] In CloudKit Database, keep the Development and Production schemas aligned.
+  Both currently include record type `DailySnapshot` with fields: `payload`
+  (String), `capturedAtMillis` (Int64), `trackCount` (Int64), `totalPlayCount`
+  (Int64), `totalSkipCount` (Int64), `totalListeningSeconds` (Int64), and
   `filterSignature` (String).
-- After modifying the Development schema, deploy it to Production in CloudKit
-  Dashboard before the App Store build (Console > CloudKit > Deploy Schema
-  Changes).
-- In App Store Connect, restore availability under Pricing and Availability
+- [x] After modifying the Development schema, deploy it to Production in
+  CloudKit Dashboard before the App Store build (Console > CloudKit > Deploy
+  Schema Changes). The `filterSignature` change was deployed and verified in
+  Production on 2026-07-10.
+- [ ] In App Store Connect, restore availability under Pricing and Availability
   before submitting the next version for release.
-- No query indexes are required: sync fetches records by deterministic
+- [x] No query indexes are required: sync fetches records by deterministic
   record IDs (dateKeys) instead of running CloudKit queries.
 
 ## Liquid Glass Notes
@@ -121,8 +134,17 @@ a small SwiftUI platform view for specific surfaces instead of rewriting the app
 
 ```sh
 flutter analyze
-flutter test
+flutter test --coverage
+dart run tool/coverage_report.dart coverage/lcov.info test/coverage_report.md
 ```
+
+The manually dispatched `.github/workflows/ios-testflight.yml` workflow is the
+release gate for iOS. It selects an available simulator from `simctl` JSON,
+runs the native `RunnerTests` suite with simulator signing enabled, creates and
+verifies the production IPA, stores the IPA as a workflow artifact, and uploads
+it to App Store Connect when `upload_to_testflight` is enabled. Its optional
+`build_number` input overrides `CFBundleVersion`; when omitted, CI uses the UTC
+`yyMMddHHmm` timestamp.
 
 ## Crash Reporting Notes
 
