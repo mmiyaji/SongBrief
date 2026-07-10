@@ -1,17 +1,21 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../domain/library_snapshot.dart';
 import 'library_snapshot_store_base.dart';
+import 'library_snapshot_store_channel.dart';
 
 typedef SnapshotDirectoryProvider = Future<Directory> Function();
 
 SnapshotStore createSnapshotStore() {
-  return const FileSnapshotStore();
+  return Platform.isIOS
+      ? const MethodChannelSnapshotStore()
+      : const FileSnapshotStore();
 }
 
 class FileSnapshotStore implements SnapshotStore {
@@ -68,9 +72,16 @@ class FileSnapshotStore implements SnapshotStore {
         await directory.create(recursive: true);
       }
       final target = File(_snapshotPath(directory, snapshot.dateKey));
-      final encoded = await compute(_encodeSnapshotFile, snapshot.toJson());
+      final persistedSnapshot = await _mergeWithStoredSnapshot(
+        target,
+        snapshot,
+      );
+      final encoded = await compute(
+        _encodeSnapshotFile,
+        persistedSnapshot.toJson(),
+      );
       await _writeFileSafely(target, encoded);
-      await _updateSnapshotIndexAfterWrite(directory, snapshot);
+      await _updateSnapshotIndexAfterWrite(directory, persistedSnapshot);
     });
   }
 
@@ -255,6 +266,26 @@ class FileSnapshotStore implements SnapshotStore {
     final snapshots = await compute(_decodeSnapshotFiles, rawSnapshots);
     snapshots.sort((a, b) => a.dateKey.compareTo(b.dateKey));
     return snapshots;
+  }
+
+  Future<DailyLibrarySnapshot> _mergeWithStoredSnapshot(
+    File target,
+    DailyLibrarySnapshot incoming,
+  ) async {
+    if (!await target.exists()) {
+      return incoming;
+    }
+    try {
+      final decoded = await compute(_decodeSnapshotFiles, [
+        {'raw': await target.readAsString(), 'includeTracks': true},
+      ]);
+      if (decoded.isEmpty) {
+        return incoming;
+      }
+      return _mergeSnapshotsForWrite(decoded.single, incoming);
+    } on FileSystemException {
+      return incoming;
+    }
   }
 
   Future<void> _updateSnapshotIndexAfterWrite(
@@ -597,6 +628,108 @@ DailyLibrarySnapshot _summaryOnly(DailyLibrarySnapshot snapshot) {
     tracks: const [],
     filterSignature: snapshot.filterSignature,
   );
+}
+
+DailyLibrarySnapshot _mergeSnapshotsForWrite(
+  DailyLibrarySnapshot existing,
+  DailyLibrarySnapshot incoming,
+) {
+  if (existing.dateKey != incoming.dateKey) {
+    return incoming;
+  }
+  final existingSignature = _normalizedSignature(existing.filterSignature);
+  final incomingSignature = _normalizedSignature(incoming.filterSignature);
+  final incomingIsNewerOrSame = !incoming.capturedAt.isBefore(
+    existing.capturedAt,
+  );
+  if (existingSignature != incomingSignature) {
+    return incomingIsNewerOrSame ? incoming : existing;
+  }
+
+  final newer = incomingIsNewerOrSame ? incoming : existing;
+  final older = identical(newer, incoming) ? existing : incoming;
+  return DailyLibrarySnapshot(
+    dateKey: newer.dateKey,
+    capturedAt: newer.capturedAt,
+    source: newer.source,
+    trackCount: math.max(existing.trackCount, incoming.trackCount),
+    totalPlayCount: math.max(existing.totalPlayCount, incoming.totalPlayCount),
+    totalSkipCount: math.max(existing.totalSkipCount, incoming.totalSkipCount),
+    totalListeningSeconds: math.max(
+      existing.totalListeningSeconds,
+      incoming.totalListeningSeconds,
+    ),
+    tracks: List.unmodifiable(_mergeTrackCounters(older.tracks, newer.tracks)),
+    filterSignature: newer.filterSignature ?? older.filterSignature,
+  );
+}
+
+List<TrackCounterSnapshot> _mergeTrackCounters(
+  List<TrackCounterSnapshot> older,
+  List<TrackCounterSnapshot> newer,
+) {
+  final byId = <String, TrackCounterSnapshot>{
+    for (final track in older) track.id: track,
+  };
+  for (final track in newer) {
+    final previous = byId[track.id];
+    if (previous == null) {
+      byId[track.id] = track;
+      continue;
+    }
+    byId[track.id] = TrackCounterSnapshot(
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      albumTitle: track.albumTitle,
+      albumArtist: track.albumArtist ?? previous.albumArtist,
+      genre: track.genre ?? previous.genre,
+      playCount: math.max(previous.playCount, track.playCount),
+      skipCount: math.max(previous.skipCount, track.skipCount),
+      listeningSeconds: math.max(
+        previous.listeningSeconds,
+        track.listeningSeconds,
+      ),
+      lastPlayedAt: _latestDate(previous.lastPlayedAt, track.lastPlayedAt),
+    );
+  }
+  final ranked = byId.values.toList(growable: false)
+    ..sort((a, b) {
+      final playComparison = b.playCount.compareTo(a.playCount);
+      if (playComparison != 0) {
+        return playComparison;
+      }
+      final skipComparison = b.skipCount.compareTo(a.skipCount);
+      if (skipComparison != 0) {
+        return skipComparison;
+      }
+      final lastPlayedComparison = (b.lastPlayedAt?.millisecondsSinceEpoch ?? 0)
+          .compareTo(a.lastPlayedAt?.millisecondsSinceEpoch ?? 0);
+      if (lastPlayedComparison != 0) {
+        return lastPlayedComparison;
+      }
+      return a.id.compareTo(b.id);
+    });
+  final compacted = ranked.length > maxSnapshotTrackCounters
+      ? ranked.sublist(0, maxSnapshotTrackCounters)
+      : ranked;
+  compacted.sort((a, b) => a.id.compareTo(b.id));
+  return compacted;
+}
+
+DateTime? _latestDate(DateTime? a, DateTime? b) {
+  if (a == null) {
+    return b;
+  }
+  if (b == null) {
+    return a;
+  }
+  return a.isAfter(b) ? a : b;
+}
+
+String? _normalizedSignature(String? value) {
+  final normalized = value?.trim();
+  return normalized == null || normalized.isEmpty ? null : normalized;
 }
 
 Map<String, Object?> _snapshotSummaryJson(DailyLibrarySnapshot snapshot) {

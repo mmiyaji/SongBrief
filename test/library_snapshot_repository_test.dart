@@ -199,6 +199,23 @@ void main() {
     expect(await _snapshotFileCount(snapshotDirectory), 1);
   });
 
+  test('recordSnapshot returns the monotonic same-day value', () async {
+    await repository.recordSnapshot(
+      _overview(playCount: 9),
+      capturedAt: DateTime(2026, 7, 7, 20),
+      filterSignature: 'profile-a',
+    );
+
+    final result = await repository.recordSnapshot(
+      _overview(playCount: 4),
+      capturedAt: DateTime(2026, 7, 7, 8),
+      filterSignature: 'profile-a',
+    );
+
+    expect(result.latest?.capturedAt, DateTime(2026, 7, 7, 20));
+    expect(result.latest?.totalPlayCount, 9);
+  });
+
   test('serializes concurrent writes that replace the same day', () async {
     final stores = List.generate(
       2,
@@ -231,6 +248,58 @@ void main() {
     expect(await _snapshotFileCount(snapshotDirectory), 1);
     expect(await _snapshotIndexExists(snapshotDirectory), isTrue);
     expect(leftovers, isEmpty);
+  });
+
+  test(
+    'same-day writes cannot move capture time or counters backwards',
+    () async {
+      final store = FileSnapshotStore(
+        directoryProvider: () async => snapshotDirectory,
+      );
+      final newer = _snapshotWithValues(
+        capturedAt: DateTime(2026, 7, 7, 20),
+        playCount: 9,
+        filterSignature: 'profile-a',
+      );
+      final delayedOlder = _snapshotWithValues(
+        capturedAt: DateTime(2026, 7, 7, 8),
+        playCount: 12,
+        filterSignature: 'profile-a',
+      );
+
+      await store.writeSnapshot(newer);
+      await store.writeSnapshot(delayedOlder);
+
+      final loaded = await store.loadHistory();
+      expect(loaded.latest?.capturedAt, newer.capturedAt);
+      expect(loaded.latest?.totalPlayCount, 12);
+      expect(loaded.latest?.tracks.single.playCount, 12);
+    },
+  );
+
+  test('same-day writes do not max-merge different filter profiles', () async {
+    final store = FileSnapshotStore(
+      directoryProvider: () async => snapshotDirectory,
+    );
+    await store.writeSnapshot(
+      _snapshotWithValues(
+        capturedAt: DateTime(2026, 7, 7, 8),
+        playCount: 12,
+        filterSignature: 'unfiltered',
+      ),
+    );
+    await store.writeSnapshot(
+      _snapshotWithValues(
+        capturedAt: DateTime(2026, 7, 7, 20),
+        playCount: 3,
+        filterSignature: 'filtered',
+      ),
+    );
+
+    final loaded = await store.loadHistory();
+    expect(loaded.latest?.capturedAt, DateTime(2026, 7, 7, 20));
+    expect(loaded.latest?.totalPlayCount, 3);
+    expect(loaded.latest?.filterSignature, 'filtered');
   });
 
   test('does not record empty overviews', () async {
@@ -379,6 +448,35 @@ DailyLibrarySnapshot _sameDaySnapshot(int index) {
     totalSkipCount: 0,
     totalListeningSeconds: (index + 1) * 180,
     tracks: const [],
+  );
+}
+
+DailyLibrarySnapshot _snapshotWithValues({
+  required DateTime capturedAt,
+  required int playCount,
+  required String filterSignature,
+}) {
+  return DailyLibrarySnapshot(
+    dateKey: snapshotDateKey(capturedAt),
+    capturedAt: capturedAt,
+    source: 'foreground',
+    trackCount: 1,
+    totalPlayCount: playCount,
+    totalSkipCount: 0,
+    totalListeningSeconds: playCount * 180,
+    tracks: [
+      TrackCounterSnapshot(
+        id: 'track-1',
+        title: 'Tracked Song',
+        artist: 'Tracked Artist',
+        albumTitle: 'Tracked Album',
+        playCount: playCount,
+        skipCount: 0,
+        listeningSeconds: playCount * 180,
+        lastPlayedAt: capturedAt,
+      ),
+    ],
+    filterSignature: filterSignature,
   );
 }
 

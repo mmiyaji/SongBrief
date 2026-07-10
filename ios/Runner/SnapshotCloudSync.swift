@@ -11,6 +11,9 @@ enum SnapshotCloudSync {
     "flutter.songbrief_snapshot_cloud_sync_enabled_v1"
   private static let maxTrackedDays = 1095
   private static let modifyBatchSize = 200
+  private static let operationCoordinator = SnapshotOperationCoordinator(
+    label: "app.songbrief.snapshot-cloud-operations"
+  )
 
   private static let payloadField = "payload"
   private static let capturedAtField = "capturedAtMillis"
@@ -18,9 +21,10 @@ enum SnapshotCloudSync {
   private static let totalPlayField = "totalPlayCount"
   private static let totalSkipField = "totalSkipCount"
   private static let totalListeningField = "totalListeningSeconds"
+  private static let filterSignatureField = "filterSignature"
   private static let summaryFields = [
     capturedAtField, trackCountField, totalPlayField, totalSkipField,
-    totalListeningField,
+    totalListeningField, filterSignatureField,
   ]
 
   static var isEnabled: Bool {
@@ -40,6 +44,15 @@ enum SnapshotCloudSync {
   /// Merges local and cloud snapshot histories in both directions.
   /// Completion payload: status plus downloaded/uploaded record counts.
   static func sync(completion: @escaping ([String: Any]) -> Void) {
+    operationCoordinator.enqueue { finished in
+      performSync { payload in
+        completion(payload)
+        finished()
+      }
+    }
+  }
+
+  private static func performSync(completion: @escaping ([String: Any]) -> Void) {
     guard isEnabled else {
       finish(completion, status: "disabled")
       return
@@ -90,8 +103,19 @@ enum SnapshotCloudSync {
             }
             let merged: [String: Any]
             if let local = localByDateKey[dateKey] {
-              merged = SnapshotMerge.merge(local, cloudSnapshot)
+              merged = SnapshotMerge.merge(
+                local,
+                cloudSnapshot,
+                preferredFilterSignature: SongBriefSnapshotRefresh.activeFilterSignature
+              )
             } else {
+              guard SnapshotMerge.canImportCloudOnlySnapshot(
+                cloudSnapshot,
+                activeFilterSignature: SongBriefSnapshotRefresh.activeFilterSignature,
+                hasActiveExclusions: SongBriefSnapshotRefresh.hasActiveExclusions
+              ) else {
+                continue
+              }
               merged = cloudSnapshot
             }
             if !NSDictionary(dictionary: merged).isEqual(to: cloudSnapshot) {
@@ -146,6 +170,18 @@ enum SnapshotCloudSync {
   /// Uploads the local snapshot for one dateKey, max-merging with any
   /// existing cloud record. Used by the background refresh task.
   static func uploadLocalSnapshot(dateKey: String, completion: @escaping (Bool) -> Void) {
+    operationCoordinator.enqueue { finished in
+      performUploadLocalSnapshot(dateKey: dateKey) { uploaded in
+        completion(uploaded)
+        finished()
+      }
+    }
+  }
+
+  private static func performUploadLocalSnapshot(
+    dateKey: String,
+    completion: @escaping (Bool) -> Void
+  ) {
     guard isEnabled else {
       completion(false)
       return
@@ -164,7 +200,11 @@ enum SnapshotCloudSync {
       let merged: [String: Any]
       let record: CKRecord
       if let existing, let cloudSnapshot = snapshot(from: existing) {
-        merged = SnapshotMerge.merge(local, cloudSnapshot)
+        merged = SnapshotMerge.merge(
+          local,
+          cloudSnapshot,
+          preferredFilterSignature: SongBriefSnapshotRefresh.activeFilterSignature
+        )
         record = existing
       } else {
         merged = local
@@ -185,6 +225,18 @@ enum SnapshotCloudSync {
     olderThan cutoffDateKey: String?,
     completion: @escaping ([String: Any]) -> Void
   ) {
+    operationCoordinator.enqueue { finished in
+      performDeleteCloudSnapshots(olderThan: cutoffDateKey) { payload in
+        completion(payload)
+        finished()
+      }
+    }
+  }
+
+  private static func performDeleteCloudSnapshots(
+    olderThan cutoffDateKey: String?,
+    completion: @escaping ([String: Any]) -> Void
+  ) {
     withAvailableAccount(completion) {
       let localDateKeys = Set(SongBriefSnapshotRefresh.localSnapshots().compactMap {
         $0["dateKey"] as? String
@@ -202,6 +254,15 @@ enum SnapshotCloudSync {
             status: deleted > 0 ? "partial" : "error",
             deleted: deleted,
             message: error.localizedDescription
+          )
+          return
+        }
+        guard SnapshotFileStore.deleteSnapshots(olderThan: cutoffDateKey) else {
+          finish(
+            completion,
+            status: "error",
+            deleted: deleted,
+            message: "Cloud history was deleted, but local history cleanup failed."
           )
           return
         }
@@ -282,6 +343,7 @@ enum SnapshotCloudSync {
       || intValue(local["totalPlayCount"]) != intValue(cloud[totalPlayField])
       || intValue(local["totalSkipCount"]) != intValue(cloud[totalSkipField])
       || intValue(local["totalListeningSeconds"]) != intValue(cloud[totalListeningField])
+      || (local["filterSignature"] as? String) != (cloud[filterSignatureField] as? String)
   }
 
   private static func snapshot(from record: CKRecord) -> [String: Any]? {
@@ -315,6 +377,12 @@ enum SnapshotCloudSync {
     record[totalSkipField] = intValue(compactedSnapshot["totalSkipCount"]) as CKRecordValue
     record[totalListeningField] =
       intValue(compactedSnapshot["totalListeningSeconds"]) as CKRecordValue
+    if let signature = compactedSnapshot["filterSignature"] as? String,
+       !signature.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      record[filterSignatureField] = signature as CKRecordValue
+    } else {
+      record[filterSignatureField] = nil
+    }
     return record
   }
 
@@ -465,6 +533,56 @@ enum SnapshotCloudSync {
   }
 }
 
+final class SnapshotOperationCoordinator {
+  typealias Operation = (@escaping () -> Void) -> Void
+
+  private struct PendingOperation {
+    let identifier: UInt64
+    let operation: Operation
+  }
+
+  private let queue: DispatchQueue
+  private var pending: [PendingOperation] = []
+  private var activeIdentifier: UInt64?
+  private var nextIdentifier: UInt64 = 0
+
+  init(label: String) {
+    queue = DispatchQueue(label: label)
+  }
+
+  func enqueue(_ operation: @escaping Operation) {
+    queue.async {
+      let identifier = self.nextIdentifier
+      self.nextIdentifier &+= 1
+      self.pending.append(
+        PendingOperation(identifier: identifier, operation: operation)
+      )
+      self.startNextIfNeeded()
+    }
+  }
+
+  private func startNextIfNeeded() {
+    guard activeIdentifier == nil, !pending.isEmpty else {
+      return
+    }
+    let next = pending.removeFirst()
+    activeIdentifier = next.identifier
+    next.operation { [weak self] in
+      self?.complete(next.identifier)
+    }
+  }
+
+  private func complete(_ identifier: UInt64) {
+    queue.async {
+      guard self.activeIdentifier == identifier else {
+        return
+      }
+      self.activeIdentifier = nil
+      self.startNextIfNeeded()
+    }
+  }
+}
+
 /// Profile-aware merge for daily snapshots. Counters are max-merged only when
 /// both snapshots used the same library-exclusion profile. A changed profile
 /// replaces the prior observation so excluded tracks cannot survive forever.
@@ -484,7 +602,11 @@ enum SnapshotMerge {
     return compacted
   }
 
-  static func merge(_ a: [String: Any], _ b: [String: Any]) -> [String: Any] {
+  static func merge(
+    _ a: [String: Any],
+    _ b: [String: Any],
+    preferredFilterSignature: String? = nil
+  ) -> [String: Any] {
     let aCaptured = intValue(a["capturedAtMillis"])
     let bCaptured = intValue(b["capturedAtMillis"])
     let newer = aCaptured >= bCaptured ? a : b
@@ -492,7 +614,21 @@ enum SnapshotMerge {
     let aSignature = stringValue(a["filterSignature"])
     let bSignature = stringValue(b["filterSignature"])
     if aSignature != bSignature, aSignature != nil || bSignature != nil {
-      return normalized(newer)
+      if let preferred = stringValue(preferredFilterSignature) {
+        if aSignature == preferred, bSignature != preferred {
+          return normalized(a)
+        }
+        if bSignature == preferred, aSignature != preferred {
+          return normalized(b)
+        }
+      }
+      if aSignature != nil, bSignature == nil {
+        return normalized(a)
+      }
+      if bSignature != nil, aSignature == nil {
+        return normalized(b)
+      }
+      return normalized(morePrivacyPreserving(a, b, newer: newer))
     }
 
     var merged: [String: Any] = [:]
@@ -517,6 +653,39 @@ enum SnapshotMerge {
       newer: newer["tracks"] as? [[String: Any]] ?? []
     )
     return merged
+  }
+
+  static func canImportCloudOnlySnapshot(
+    _ snapshot: [String: Any],
+    activeFilterSignature: String,
+    hasActiveExclusions: Bool
+  ) -> Bool {
+    guard hasActiveExclusions else {
+      return true
+    }
+    return stringValue(snapshot["filterSignature"])
+      == stringValue(activeFilterSignature)
+  }
+
+  /// When neither snapshot matches this device's active profile, retain the
+  /// observation exposing fewer library counters. This is deliberately
+  /// conservative: profile intent cannot be reconstructed from a hash alone.
+  private static func morePrivacyPreserving(
+    _ a: [String: Any],
+    _ b: [String: Any],
+    newer: [String: Any]
+  ) -> [String: Any] {
+    let exposureKeys = [
+      "trackCount", "totalPlayCount", "totalListeningSeconds", "totalSkipCount",
+    ]
+    for key in exposureKeys {
+      let aValue = intValue(a[key])
+      let bValue = intValue(b[key])
+      if aValue != bValue {
+        return aValue < bValue ? a : b
+      }
+    }
+    return newer
   }
 
   /// Union by track id. Metadata comes from the newer snapshot when both

@@ -135,6 +135,14 @@ enum SongBriefSnapshotRefresh {
     filteredLibraryItems(using: exclusionRules)
   }
 
+  static var activeFilterSignature: String {
+    exclusionRules.signature
+  }
+
+  static var hasActiveExclusions: Bool {
+    !exclusionRules.isEmpty
+  }
+
   /// Replaces the given dateKeys in the stored history with already merged
   /// snapshots coming from cloud sync.
   static func mergeExternalSnapshots(_ incoming: [[String: Any]]) -> Bool {
@@ -307,6 +315,10 @@ enum SongBriefSnapshotRefresh {
     let excludedGenres: [String]
     let excludedKeywords: [String]
 
+    var isEmpty: Bool {
+      excludedPlaylists.isEmpty && excludedGenres.isEmpty && excludedKeywords.isEmpty
+    }
+
     var needsPlaylistNames: Bool {
       !excludedPlaylists.isEmpty || !excludedKeywords.isEmpty
     }
@@ -365,23 +377,33 @@ enum SnapshotFileStore {
     #"^\d{4}-\d{2}-\d{2}\.json$"#
   private static let snapshotIndexFileName = "_snapshot_index_v1.json"
   private static let snapshotIndexVersion = 1
+  private static let operationLock = NSRecursiveLock()
 
   static func readSnapshots() -> [[String: Any]] {
-    guard let directory = snapshotsDirectory(create: false),
-          let files = try? FileManager.default.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: nil
-          ) else {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+    guard let directory = snapshotsDirectory(create: false) else {
       return []
     }
+    return readSnapshots(in: directory)
+  }
 
-    let snapshots = files.compactMap { readSnapshot(from: $0) }.sorted { lhs, rhs in
-      (lhs["dateKey"] as? String ?? "") < (rhs["dateKey"] as? String ?? "")
+  static func readSnapshotsForFlutter(detailedLimit: Int) -> [[String: Any]] {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+    guard let directory = snapshotsDirectory(create: false) else {
+      return []
     }
-    return snapshots
+    let snapshots = readSnapshots(in: directory)
+    let summaryCount = max(0, snapshots.count - max(0, detailedLimit))
+    return snapshots.enumerated().map { index, snapshot in
+      index < summaryCount ? summarySnapshot(snapshot) : snapshot
+    }
   }
 
   static func write(snapshot: [String: Any]) -> Bool {
+    operationLock.lock()
+    defer { operationLock.unlock() }
     guard
       let dateKey = snapshot["dateKey"] as? String,
       isValidDateKey(dateKey),
@@ -390,7 +412,18 @@ enum SnapshotFileStore {
       return false
     }
 
-    let normalized = SnapshotMerge.normalized(snapshot)
+    let incoming = SnapshotMerge.normalized(snapshot)
+    let url = directory.appendingPathComponent("\(dateKey).json")
+    let normalized: [String: Any]
+    if let existing = readSnapshot(from: url) {
+      normalized = SnapshotMerge.merge(
+        existing,
+        incoming,
+        preferredFilterSignature: SongBriefSnapshotRefresh.activeFilterSignature
+      )
+    } else {
+      normalized = incoming
+    }
     guard
       JSONSerialization.isValidJSONObject(normalized),
       let data = try? JSONSerialization.data(withJSONObject: normalized)
@@ -398,12 +431,35 @@ enum SnapshotFileStore {
       return false
     }
 
-    let url = directory.appendingPathComponent("\(dateKey).json")
     do {
       try data.write(to: url, options: [.atomic])
       updateIndex(afterWriting: normalized, in: directory)
       return true
     } catch {
+      return false
+    }
+  }
+
+  static func deleteSnapshots(olderThan cutoffDateKey: String?) -> Bool {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+    guard let directory = snapshotsDirectory(create: false) else {
+      return true
+    }
+    do {
+      let files = try FileManager.default.contentsOfDirectory(
+        at: directory,
+        includingPropertiesForKeys: nil
+      )
+      for url in files where isSnapshotFile(url) {
+        let dateKey = url.deletingPathExtension().lastPathComponent
+        if cutoffDateKey.map({ dateKey < $0 }) ?? true {
+          try FileManager.default.removeItem(at: url)
+        }
+      }
+      return rebuildIndex(in: directory)
+    } catch {
+      _ = rebuildIndex(in: directory)
       return false
     }
   }
@@ -441,28 +497,69 @@ enum SnapshotFileStore {
   }
 
   private static func updateIndex(afterWriting snapshot: [String: Any], in directory: URL) {
-    guard var snapshots = readIndexSnapshots(in: directory),
-          let dateKey = snapshot["dateKey"] as? String else {
+    guard let dateKey = snapshot["dateKey"] as? String else {
       return
     }
+    var snapshots = readIndexSnapshots(in: directory) ?? readSnapshots(in: directory)
     snapshots.removeAll { ($0["dateKey"] as? String) == dateKey }
     snapshots.append(summarySnapshot(snapshot))
     snapshots.sort {
       ($0["dateKey"] as? String ?? "") < ($1["dateKey"] as? String ?? "")
     }
 
+    _ = writeIndex(snapshots: snapshots, in: directory)
+  }
+
+  private static func rebuildIndex(in directory: URL) -> Bool {
+    let snapshots = readSnapshots(in: directory)
+    if snapshots.isEmpty {
+      let indexURL = directory.appendingPathComponent(snapshotIndexFileName)
+      guard FileManager.default.fileExists(atPath: indexURL.path) else {
+        return true
+      }
+      do {
+        try FileManager.default.removeItem(at: indexURL)
+        return true
+      } catch {
+        return false
+      }
+    }
+    return writeIndex(snapshots: snapshots, in: directory)
+  }
+
+  private static func readSnapshots(in directory: URL) -> [[String: Any]] {
+    guard let files = try? FileManager.default.contentsOfDirectory(
+      at: directory,
+      includingPropertiesForKeys: nil
+    ) else {
+      return []
+    }
+    return files.compactMap { readSnapshot(from: $0) }.sorted { lhs, rhs in
+      (lhs["dateKey"] as? String ?? "") < (rhs["dateKey"] as? String ?? "")
+    }
+  }
+
+  private static func writeIndex(
+    snapshots: [[String: Any]],
+    in directory: URL
+  ) -> Bool {
     let payload: [String: Any] = [
       "version": snapshotIndexVersion,
       "updatedAtMillis": Int(Date().timeIntervalSince1970 * 1000),
       "files": snapshotFileStates(in: directory),
-      "snapshots": snapshots,
+      "snapshots": snapshots.map(summarySnapshot),
     ]
     guard JSONSerialization.isValidJSONObject(payload),
           let data = try? JSONSerialization.data(withJSONObject: payload) else {
-      return
+      return false
     }
     let url = directory.appendingPathComponent(snapshotIndexFileName)
-    try? data.write(to: url, options: [.atomic])
+    do {
+      try data.write(to: url, options: [.atomic])
+      return true
+    } catch {
+      return false
+    }
   }
 
   private static func readIndexSnapshots(in directory: URL) -> [[String: Any]]? {

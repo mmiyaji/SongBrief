@@ -111,6 +111,63 @@ void main() {
       throwsStateError,
     );
   });
+
+  test('history deletion waits for an in-flight cloud sync', () async {
+    final repository = _SnapshotRaceRepository();
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(musicStatsControllerProvider.future);
+    await repository.syncStarted.future;
+
+    final deletion = container
+        .read(musicStatsControllerProvider.notifier)
+        .clearSnapshotHistory();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(repository.clearStarted, isFalse);
+
+    repository.releaseSync();
+    await deletion;
+
+    expect(repository.clearStarted, isTrue);
+    expect(
+      container
+          .read(musicStatsControllerProvider)
+          .requireValue
+          .snapshotHistory
+          .snapshotCount,
+      0,
+    );
+  });
+
+  test('stats recording waits for an in-flight cloud sync', () async {
+    final repository = _SnapshotRaceRepository();
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(musicStatsControllerProvider.future);
+    await repository.syncStarted.future;
+
+    final refresh = container
+        .read(musicStatsControllerProvider.notifier)
+        .refreshStatsSilently();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(repository.loadCount, 1);
+
+    repository.releaseSync();
+    await refresh;
+
+    expect(repository.loadCount, 2);
+    await container
+        .read(musicStatsControllerProvider.notifier)
+        .syncCloudSnapshots();
+  });
 }
 
 MusicStatsState _state(String title) {
@@ -159,6 +216,66 @@ class _ControlledMusicStatsRepository extends MusicStatsRepository {
   @override
   Future<MusicPlaybackSnapshot?> currentPlayback() {
     return Future.value();
+  }
+}
+
+class _SnapshotRaceRepository extends MusicStatsRepository {
+  _SnapshotRaceRepository()
+    : super(const _NoopMusicLibraryClient(), LibrarySnapshotRepository());
+
+  final syncStarted = Completer<void>();
+  final _syncRelease = Completer<void>();
+  var clearStarted = false;
+  var loadCount = 0;
+
+  final _history = SnapshotHistory(
+    snapshots: [
+      DailyLibrarySnapshot(
+        dateKey: '2026-07-09',
+        capturedAt: DateTime(2026, 7, 9, 12),
+        source: 'foreground',
+        trackCount: 1,
+        totalPlayCount: 4,
+        totalSkipCount: 0,
+        totalListeningSeconds: 720,
+        tracks: const [],
+      ),
+    ],
+  );
+
+  @override
+  Future<MusicStatsState> load({bool requestAccess = false}) {
+    loadCount += 1;
+    return Future.value(_libraryState(_history));
+  }
+
+  @override
+  Future<SnapshotSyncResult?> syncCloudSnapshots() async {
+    if (!syncStarted.isCompleted) {
+      syncStarted.complete();
+    }
+    await _syncRelease.future;
+    return const SnapshotSyncResult(
+      status: SnapshotSyncStatus.synced,
+      downloaded: 1,
+    );
+  }
+
+  @override
+  Future<SnapshotHistory> loadSnapshotHistory() {
+    return Future.value(_history);
+  }
+
+  @override
+  Future<SnapshotHistory> clearSnapshotHistory() async {
+    clearStarted = true;
+    return SnapshotHistory.empty;
+  }
+
+  void releaseSync() {
+    if (!_syncRelease.isCompleted) {
+      _syncRelease.complete();
+    }
   }
 }
 
@@ -241,4 +358,24 @@ class _NoopMusicLibraryClient implements MusicLibraryClient {
       const SnapshotSyncResult(status: SnapshotSyncStatus.unchanged),
     );
   }
+}
+
+MusicStatsState _libraryState(SnapshotHistory history) {
+  return MusicStatsState(
+    authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+    overview: LibraryOverview.fromTracks([
+      LibraryTrack(
+        id: 'library-track',
+        title: 'Library Track',
+        artist: 'Test Artist',
+        albumTitle: 'Test Album',
+        duration: const Duration(minutes: 3),
+        playCount: 4,
+        skipCount: 0,
+        lastPlayedAt: DateTime(2026, 7, 9),
+        isCloudItem: false,
+      ),
+    ], isDemo: false),
+    snapshotHistory: history,
+  );
 }

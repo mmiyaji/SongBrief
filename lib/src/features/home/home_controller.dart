@@ -206,13 +206,16 @@ class PlaybackState {
 
 class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   Future<void>? _refreshInFlight;
+  Future<void> _snapshotHistoryOperationTail = Future<void>.value();
 
   @override
   Future<MusicStatsState> build() async {
     final loadingPreviewDelay = _startupLoadingPreviewDelay();
     ref.watch(musicStatsRepositoryProvider);
     await ref.watch(musicDataPreferencesReadyProvider.future);
-    final next = await ref.read(musicStatsRepositoryProvider).load();
+    final next = await _runSnapshotHistoryOperation(
+      () => ref.read(musicStatsRepositoryProvider).load(),
+    );
     if (loadingPreviewDelay > Duration.zero) {
       await Future<void>.delayed(loadingPreviewDelay);
     }
@@ -224,19 +227,23 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
 
   /// Merges the local history with iCloud in the background and refreshes
   /// the visible history when other devices contributed records.
-  Future<void> syncCloudSnapshots() async {
-    final repository = ref.read(musicStatsRepositoryProvider);
-    final result = await repository.syncCloudSnapshots();
-    if (result == null || !result.changedLocally) {
-      return;
-    }
-    _replaceSnapshotHistory(await repository.loadSnapshotHistory());
+  Future<void> syncCloudSnapshots() {
+    return _runSnapshotHistoryOperation(() async {
+      final repository = ref.read(musicStatsRepositoryProvider);
+      final result = await repository.syncCloudSnapshots();
+      if (result == null || !result.changedLocally) {
+        return;
+      }
+      _replaceSnapshotHistory(await repository.loadSnapshotHistory());
+    });
   }
 
   Future<void> requestAccess() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => ref.read(musicStatsRepositoryProvider).load(requestAccess: true),
+      () => _runSnapshotHistoryOperation(
+        () => ref.read(musicStatsRepositoryProvider).load(requestAccess: true),
+      ),
     );
     if (state.hasValue) {
       unawaited(ref.read(appAnalyticsProvider).logEvent('music_access_loaded'));
@@ -279,23 +286,44 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
 
   Future<SnapshotHistory?> deleteSnapshotsOlderThan(DateTime cutoff) async {
     _ensureMutableSnapshotHistory();
-    final history = await ref
-        .read(musicStatsRepositoryProvider)
-        .deleteSnapshotsOlderThan(cutoff);
-    _replaceSnapshotHistory(history);
-    return history;
+    return _runSnapshotHistoryOperation(() async {
+      final history = await ref
+          .read(musicStatsRepositoryProvider)
+          .deleteSnapshotsOlderThan(cutoff);
+      _replaceSnapshotHistory(history);
+      return history;
+    });
   }
 
   Future<SnapshotHistory?> clearSnapshotHistory() async {
     _ensureMutableSnapshotHistory();
-    final history = await ref
-        .read(musicStatsRepositoryProvider)
-        .clearSnapshotHistory();
-    _replaceSnapshotHistory(history);
-    return history;
+    return _runSnapshotHistoryOperation(() async {
+      final history = await ref
+          .read(musicStatsRepositoryProvider)
+          .clearSnapshotHistory();
+      _replaceSnapshotHistory(history);
+      return history;
+    });
+  }
+
+  Future<T> _runSnapshotHistoryOperation<T>(Future<T> Function() operation) {
+    final previous = _snapshotHistoryOperationTail;
+    final completion = Completer<void>();
+    _snapshotHistoryOperationTail = completion.future;
+    return () async {
+      await previous;
+      try {
+        return await operation();
+      } finally {
+        completion.complete();
+      }
+    }();
   }
 
   void _replaceSnapshotHistory(SnapshotHistory history) {
+    if (!ref.mounted) {
+      return;
+    }
     final current = state.asData?.value;
     if (current == null) {
       return;
@@ -316,7 +344,9 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       state = const AsyncLoading();
     }
     final next = await AsyncValue.guard(
-      () => ref.read(musicStatsRepositoryProvider).load(),
+      () => _runSnapshotHistoryOperation(
+        () => ref.read(musicStatsRepositoryProvider).load(),
+      ),
     );
     state = switch (next) {
       AsyncData() => next,

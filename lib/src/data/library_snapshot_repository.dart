@@ -41,7 +41,6 @@ class LibrarySnapshotRepository {
     }
 
     await _migrateLegacyHistoryIfNeeded();
-    final current = await _effectiveStore.loadHistory();
     final snapshot = DailyLibrarySnapshot.fromOverview(
       overview,
       capturedAt: capturedAt,
@@ -49,7 +48,7 @@ class LibrarySnapshotRepository {
       filterSignature: filterSignature,
     );
     await _effectiveStore.writeSnapshot(snapshot);
-    return current.withSnapshot(snapshot);
+    return _effectiveStore.loadHistory();
   }
 
   Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {

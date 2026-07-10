@@ -4,6 +4,10 @@ import UIKit
 
 final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
   private let player = MPMusicPlayerController.systemMusicPlayer
+  private let snapshotStoreQueue = DispatchQueue(
+    label: "app.songbrief.snapshot-store-channel",
+    qos: .utility
+  )
   private var eventSink: FlutterEventSink?
 
   private override init() {
@@ -79,8 +83,46 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       SnapshotCloudSync.deleteCloudSnapshots(olderThan: cutoffDateKey) { payload in
         result(payload)
       }
+    case "loadLocalSnapshotHistory":
+      let arguments = call.arguments as? [String: Any]
+      let requestedLimit = (arguments?["detailedLimit"] as? NSNumber)?.intValue ?? 400
+      let detailedLimit = max(0, min(requestedLimit, 500))
+      runSnapshotStoreOperation(result: result) {
+        SnapshotFileStore.readSnapshotsForFlutter(detailedLimit: detailedLimit)
+      }
+    case "writeLocalSnapshot":
+      guard let arguments = call.arguments as? [String: Any],
+            let snapshot = arguments["snapshot"] as? [String: Any] else {
+        result(false)
+        return
+      }
+      runSnapshotStoreOperation(result: result) {
+        SnapshotFileStore.write(snapshot: snapshot)
+      }
+    case "deleteLocalSnapshots":
+      let arguments = call.arguments as? [String: Any]
+      let cutoffDateKey = arguments?["olderThanDateKey"] as? String
+      runSnapshotStoreOperation(result: result) {
+        SnapshotFileStore.deleteSnapshots(olderThan: cutoffDateKey)
+      }
+    case "clearLocalSnapshotHistory":
+      runSnapshotStoreOperation(result: result) {
+        SnapshotFileStore.deleteSnapshots(olderThan: nil)
+      }
     default:
       result(FlutterMethodNotImplemented)
+    }
+  }
+
+  private func runSnapshotStoreOperation(
+    result: @escaping FlutterResult,
+    operation: @escaping () -> Any?
+  ) {
+    snapshotStoreQueue.async {
+      let payload = operation()
+      DispatchQueue.main.async {
+        result(payload)
+      }
     }
   }
 
