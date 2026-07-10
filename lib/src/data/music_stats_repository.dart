@@ -88,7 +88,10 @@ class MusicStatsRepository {
     }
     final overview = await _buildLibraryOverview(tracks, isDemo: false);
     final snapshotHistory = snapshotRecordingEnabled
-        ? await _snapshotRepository.recordSnapshot(overview)
+        ? await _snapshotRepository.recordSnapshot(
+            overview,
+            filterSignature: libraryFilters?.snapshotSignature,
+          )
         : await _snapshotRepository.loadHistory();
     return MusicStatsState(
       authorizationStatus: status,
@@ -179,7 +182,10 @@ class MusicStatsRepository {
     if (!_isIosMusicRuntime || overview.isDemo) {
       return Future.value(SnapshotHistory.empty);
     }
-    return _snapshotRepository.recordSnapshot(overview);
+    return _snapshotRepository.recordSnapshot(
+      overview,
+      filterSignature: libraryFilters?.snapshotSignature,
+    );
   }
 
   Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
@@ -215,14 +221,14 @@ class MusicStatsRepository {
   }
 
   Future<void> _propagateCloudDeletion({String? olderThanDateKey}) async {
-    if (!_isIosMusicRuntime || !cloudSyncEnabled) {
+    if (!_isIosMusicRuntime) {
       return;
     }
-    try {
-      await _client.deleteCloudSnapshots(olderThanDateKey: olderThanDateKey);
-    } on Object {
-      // Cloud deletion is best effort; local deletion already succeeded and
-      // the next successful deletion request converges the cloud copy.
+    final result = await _client.deleteCloudSnapshots(
+      olderThanDateKey: olderThanDateKey,
+    );
+    if (!result.deletionCompleted) {
+      throw SnapshotCloudDeletionException(result.status);
     }
   }
 
@@ -533,6 +539,15 @@ class MusicStatsRepository {
     }
     return List<int>.unmodifiable(fitted);
   }
+}
+
+class SnapshotCloudDeletionException implements Exception {
+  const SnapshotCloudDeletionException(this.status);
+
+  final SnapshotSyncStatus status;
+
+  @override
+  String toString() => 'Snapshot cloud deletion failed: ${status.name}';
 }
 
 bool get _isIosMusicRuntime {

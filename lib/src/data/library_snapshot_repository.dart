@@ -34,6 +34,7 @@ class LibrarySnapshotRepository {
     LibraryOverview overview, {
     DateTime? capturedAt,
     String source = 'foreground',
+    String? filterSignature,
   }) async {
     if (!overview.hasTracks) {
       return loadHistory();
@@ -45,6 +46,7 @@ class LibrarySnapshotRepository {
       overview,
       capturedAt: capturedAt,
       source: source,
+      filterSignature: filterSignature,
     );
     await _effectiveStore.writeSnapshot(snapshot);
     return current.withSnapshot(snapshot);

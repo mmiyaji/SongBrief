@@ -24,6 +24,12 @@ enum SongBriefSnapshotRefresh {
   private static let taskIdentifier = "app.songbrief.snapshot-refresh"
   private static let recordingEnabledPreferenceKey =
     "flutter.songbrief_snapshot_recording_enabled_v1"
+  private static let excludedPlaylistsPreferenceKey =
+    "flutter.songbrief_excluded_playlists_v1"
+  private static let excludedGenresPreferenceKey =
+    "flutter.songbrief_excluded_genres_v1"
+  private static let excludedKeywordsPreferenceKey =
+    "flutter.songbrief_excluded_keywords_v1"
   private static let maxSnapshotTracks = 500
 
   static func register() {
@@ -90,9 +96,15 @@ enum SongBriefSnapshotRefresh {
       return nil
     }
 
-    let items = MPMediaQuery.songs().items ?? []
-    guard !items.isEmpty else {
-      return nil
+    let rules = exclusionRules
+    let playlistNamesByItemID: [UInt64: [String]] = rules.needsPlaylistNames
+      ? MusicLibraryBridge.playlistNamesByItemID()
+      : [:]
+    let items = (MPMediaQuery.songs().items ?? []).filter { item in
+      !rules.excludes(
+        item,
+        playlistNames: playlistNamesByItemID[item.persistentID] ?? []
+      )
     }
 
     let now = Date()
@@ -116,7 +128,8 @@ enum SongBriefSnapshotRefresh {
       "totalPlayCount": totalPlayCount,
       "totalSkipCount": totalSkipCount,
       "totalListeningSeconds": totalListeningSeconds,
-      "tracks": tracks
+      "tracks": tracks,
+      "filterSignature": rules.signature
     ]
 
     return write(snapshot: snapshot) ? capturedDateKey : nil
@@ -153,6 +166,28 @@ enum SongBriefSnapshotRefresh {
       return true
     }
     return defaults.bool(forKey: recordingEnabledPreferenceKey)
+  }
+
+  private static var exclusionRules: LibraryExclusionRules {
+    let defaults = UserDefaults.standard
+    return LibraryExclusionRules(
+      excludedPlaylists: normalizedRules(
+        defaults.stringArray(forKey: excludedPlaylistsPreferenceKey) ?? []
+      ),
+      excludedGenres: normalizedRules(
+        defaults.stringArray(forKey: excludedGenresPreferenceKey) ?? []
+      ),
+      excludedKeywords: normalizedRules(
+        defaults.stringArray(forKey: excludedKeywordsPreferenceKey) ?? []
+      )
+    )
+  }
+
+  private static func normalizedRules(_ values: [String]) -> [String] {
+    Array(Set(values.compactMap { value -> String? in
+      let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+      return normalized.isEmpty ? nil : normalized
+    })).sorted()
   }
 
   private static func trackSnapshot(from item: MPMediaItem) -> [String: Any] {
@@ -255,6 +290,63 @@ enum SongBriefSnapshotRefresh {
     }
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private struct LibraryExclusionRules {
+    let excludedPlaylists: [String]
+    let excludedGenres: [String]
+    let excludedKeywords: [String]
+
+    var needsPlaylistNames: Bool {
+      !excludedPlaylists.isEmpty || !excludedKeywords.isEmpty
+    }
+
+    var signature: String {
+      let canonical = [
+        "p:\(excludedPlaylists.joined(separator: "\u{001f}"))",
+        "g:\(excludedGenres.joined(separator: "\u{001f}"))",
+        "k:\(excludedKeywords.joined(separator: "\u{001f}"))",
+      ].joined(separator: "\u{001e}")
+      var hash: UInt32 = 0x811c9dc5
+      for codeUnit in canonical.utf16 {
+        hash ^= UInt32(codeUnit)
+        hash = hash &* 0x01000193
+      }
+      return String(format: "%08x", hash)
+    }
+
+    func excludes(_ item: MPMediaItem, playlistNames: [String]) -> Bool {
+      if !excludedPlaylists.isEmpty {
+        let playlistKeys = Set(playlistNames.map {
+          $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        })
+        if excludedPlaylists.contains(where: { playlistKeys.contains($0) }) {
+          return true
+        }
+      }
+
+      if let genre = SongBriefSnapshotRefresh.nonEmpty(item.genre)?.lowercased(),
+         excludedGenres.contains(genre) {
+        return true
+      }
+
+      guard !excludedKeywords.isEmpty else {
+        return false
+      }
+      let searchValues: [String?] = [
+        item.title,
+        item.artist,
+        item.albumTitle,
+        item.albumArtist,
+        item.genre,
+      ] + playlistNames.map(Optional.some)
+      let searchText = searchValues
+        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+        .joined(separator: " ")
+        .lowercased()
+      return excludedKeywords.contains { searchText.contains($0) }
+    }
   }
 }
 

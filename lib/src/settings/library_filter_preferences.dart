@@ -5,9 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/library_track.dart';
 
-const _excludedPlaylistsPreferenceKey = 'songbrief_excluded_playlists_v1';
-const _excludedGenresPreferenceKey = 'songbrief_excluded_genres_v1';
-const _excludedKeywordsPreferenceKey = 'songbrief_excluded_keywords_v1';
+const excludedPlaylistsPreferenceKey = 'songbrief_excluded_playlists_v1';
+const excludedGenresPreferenceKey = 'songbrief_excluded_genres_v1';
+const excludedKeywordsPreferenceKey = 'songbrief_excluded_keywords_v1';
 
 final libraryFilterPreferencesProvider =
     NotifierProvider<
@@ -37,6 +37,20 @@ class LibraryFilterPreferences {
       excludedPlaylists.length +
       excludedGenres.length +
       excludedKeywords.length;
+
+  String get snapshotSignature {
+    final canonical = [
+      'p:${excludedPlaylists.map(_ruleKey).join('\u001f')}',
+      'g:${excludedGenres.map(_ruleKey).join('\u001f')}',
+      'k:${excludedKeywords.map(_searchKey).join('\u001f')}',
+    ].join('\u001e');
+    var hash = 0x811c9dc5;
+    for (final codeUnit in canonical.codeUnits) {
+      hash ^= codeUnit;
+      hash = (hash * 0x01000193) & 0xffffffff;
+    }
+    return hash.toRadixString(16).padLeft(8, '0');
+  }
 
   LibraryFilterPreferences copyWith({
     List<String>? excludedPlaylists,
@@ -112,6 +126,11 @@ class _CompiledLibraryFilterPreferences {
 class LibraryFilterPreferencesController
     extends Notifier<LibraryFilterPreferences> {
   var _changedByUser = false;
+  var _restoreStarted = false;
+  final _restored = Completer<void>();
+
+  Future<void> get restored =>
+      _restoreStarted ? _restored.future : Future<void>.value();
 
   @override
   LibraryFilterPreferences build() {
@@ -174,25 +193,32 @@ class LibraryFilterPreferencesController
   }
 
   void _restore() {
+    _restoreStarted = true;
     var disposed = false;
     ref.onDispose(() {
       disposed = true;
     });
     unawaited(() async {
-      final preferences = await SharedPreferences.getInstance();
-      final restored = LibraryFilterPreferences(
-        excludedPlaylists:
-            preferences.getStringList(_excludedPlaylistsPreferenceKey) ??
-            const <String>[],
-        excludedGenres:
-            preferences.getStringList(_excludedGenresPreferenceKey) ??
-            const <String>[],
-        excludedKeywords:
-            preferences.getStringList(_excludedKeywordsPreferenceKey) ??
-            const <String>[],
-      );
-      if (!disposed && !_changedByUser) {
-        state = restored;
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        final restored = LibraryFilterPreferences(
+          excludedPlaylists:
+              preferences.getStringList(excludedPlaylistsPreferenceKey) ??
+              const <String>[],
+          excludedGenres:
+              preferences.getStringList(excludedGenresPreferenceKey) ??
+              const <String>[],
+          excludedKeywords:
+              preferences.getStringList(excludedKeywordsPreferenceKey) ??
+              const <String>[],
+        );
+        if (!disposed && !_changedByUser) {
+          state = restored;
+        }
+      } finally {
+        if (!_restored.isCompleted) {
+          _restored.complete();
+        }
       }
     }());
   }
@@ -200,15 +226,15 @@ class LibraryFilterPreferencesController
   Future<void> _save(LibraryFilterPreferences preferences) async {
     final storage = await SharedPreferences.getInstance();
     await storage.setStringList(
-      _excludedPlaylistsPreferenceKey,
+      excludedPlaylistsPreferenceKey,
       preferences.excludedPlaylists,
     );
     await storage.setStringList(
-      _excludedGenresPreferenceKey,
+      excludedGenresPreferenceKey,
       preferences.excludedGenres,
     );
     await storage.setStringList(
-      _excludedKeywordsPreferenceKey,
+      excludedKeywordsPreferenceKey,
       preferences.excludedKeywords,
     );
   }

@@ -199,6 +199,40 @@ void main() {
     expect(await _snapshotFileCount(snapshotDirectory), 1);
   });
 
+  test('serializes concurrent writes that replace the same day', () async {
+    final stores = List.generate(
+      2,
+      (_) =>
+          FileSnapshotStore(directoryProvider: () async => snapshotDirectory),
+    );
+    final snapshots = List.generate(8, (index) => _sameDaySnapshot(index));
+
+    await Future.wait([
+      for (var index = 0; index < snapshots.length; index += 1)
+        stores[index % stores.length].writeSnapshot(snapshots[index]),
+    ]);
+
+    final loaded = await stores.first.loadHistory();
+    final leftovers = await snapshotDirectory
+        .list()
+        .where(
+          (entity) =>
+              entity is File &&
+              (entity.path.endsWith('.tmp') || entity.path.endsWith('.backup')),
+        )
+        .toList();
+
+    expect(loaded.snapshotCount, 1);
+    expect(loaded.latest?.dateKey, '2026-07-07');
+    expect(
+      snapshots.map((snapshot) => snapshot.totalPlayCount),
+      contains(loaded.latest?.totalPlayCount),
+    );
+    expect(await _snapshotFileCount(snapshotDirectory), 1);
+    expect(await _snapshotIndexExists(snapshotDirectory), isTrue);
+    expect(leftovers, isEmpty);
+  });
+
   test('does not record empty overviews', () async {
     await _writeSnapshotFile(
       snapshotDirectory,
@@ -331,6 +365,20 @@ DailyLibrarySnapshot _snapshotWithTrack(DateTime capturedAt) {
         lastPlayedAt: capturedAt,
       ),
     ],
+  );
+}
+
+DailyLibrarySnapshot _sameDaySnapshot(int index) {
+  final capturedAt = DateTime(2026, 7, 7, 8 + index);
+  return DailyLibrarySnapshot(
+    dateKey: snapshotDateKey(capturedAt),
+    capturedAt: capturedAt,
+    source: 'foreground',
+    trackCount: 1,
+    totalPlayCount: index + 1,
+    totalSkipCount: 0,
+    totalListeningSeconds: (index + 1) * 180,
+    tracks: const [],
   );
 }
 

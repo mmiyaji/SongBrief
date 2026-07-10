@@ -172,6 +172,10 @@ class SnapshotSyncResult {
 
   bool get changedLocally => downloaded > 0;
 
+  bool get deletionCompleted =>
+      status == SnapshotSyncStatus.synced ||
+      status == SnapshotSyncStatus.unchanged;
+
   static SnapshotSyncResult fromPlatformValue(Object? value) {
     if (value is! Map) {
       return const SnapshotSyncResult(status: SnapshotSyncStatus.error);

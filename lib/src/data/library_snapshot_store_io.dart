@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -21,35 +22,39 @@ class FileSnapshotStore implements SnapshotStore {
   static final _dateKeyPattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
   static const _snapshotIndexFileName = '_snapshot_index_v1.json';
   static const _snapshotIndexVersion = 1;
+  static final Map<String, Future<void>> _directoryOperationTails = {};
+  static int _temporaryFileSequence = 0;
 
   final SnapshotDirectoryProvider? _directoryProvider;
 
   @override
   Future<SnapshotHistory> loadHistory() async {
     final directory = await _directory(create: false);
-    if (!await directory.exists()) {
-      return SnapshotHistory.empty;
-    }
+    return _runDirectoryOperation(directory, () async {
+      if (!await directory.exists()) {
+        return SnapshotHistory.empty;
+      }
 
-    final snapshotFiles = await _snapshotFileRefs(directory);
-    if (snapshotFiles.isEmpty) {
-      await _deleteSnapshotIndex(directory);
-      return SnapshotHistory.empty;
-    }
+      final snapshotFiles = await _snapshotFileRefs(directory);
+      if (snapshotFiles.isEmpty) {
+        await _deleteSnapshotIndex(directory);
+        return SnapshotHistory.empty;
+      }
 
-    final summaries = await _loadSnapshotSummaries(directory, snapshotFiles);
-    if (summaries.isEmpty) {
-      return SnapshotHistory.empty;
-    }
+      final summaries = await _loadSnapshotSummaries(directory, snapshotFiles);
+      if (summaries.isEmpty) {
+        return SnapshotHistory.empty;
+      }
 
-    final detailedSnapshots = await _loadDetailedSnapshots(snapshotFiles);
-    final snapshotsByDateKey = {
-      for (final snapshot in summaries) snapshot.dateKey: snapshot,
-      for (final snapshot in detailedSnapshots) snapshot.dateKey: snapshot,
-    };
-    final snapshots = snapshotsByDateKey.values.toList(growable: false)
-      ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
-    return SnapshotHistory(snapshots: List.unmodifiable(snapshots));
+      final detailedSnapshots = await _loadDetailedSnapshots(snapshotFiles);
+      final snapshotsByDateKey = {
+        for (final snapshot in summaries) snapshot.dateKey: snapshot,
+        for (final snapshot in detailedSnapshots) snapshot.dateKey: snapshot,
+      };
+      final snapshots = snapshotsByDateKey.values.toList(growable: false)
+        ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
+      return SnapshotHistory(snapshots: List.unmodifiable(snapshots));
+    });
   }
 
   @override
@@ -57,53 +62,53 @@ class FileSnapshotStore implements SnapshotStore {
     if (!_dateKeyPattern.hasMatch(snapshot.dateKey)) {
       return;
     }
-    final directory = await _directory(create: true);
-    final target = File(_snapshotPath(directory, snapshot.dateKey));
-    final temp = File('${target.path}.tmp');
-    final encoded = await compute(_encodeSnapshotFile, snapshot.toJson());
-    await temp.writeAsString(encoded, flush: true);
-    try {
-      await temp.rename(target.path);
-    } on FileSystemException {
-      if (await target.exists()) {
-        await target.delete();
+    final directory = await _directory(create: false);
+    await _runDirectoryOperation(directory, () async {
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
       }
-      await temp.rename(target.path);
-    }
-    await _updateSnapshotIndexAfterWrite(directory, snapshot);
+      final target = File(_snapshotPath(directory, snapshot.dateKey));
+      final encoded = await compute(_encodeSnapshotFile, snapshot.toJson());
+      await _writeFileSafely(target, encoded);
+      await _updateSnapshotIndexAfterWrite(directory, snapshot);
+    });
   }
 
   @override
   Future<void> deleteSnapshotsOlderThan(DateTime cutoff) async {
     final directory = await _directory(create: false);
-    if (!await directory.exists()) {
-      return;
-    }
-    final cutoffKey = snapshotDateKey(cutoff);
-    await for (final entity in directory.list(followLinks: false)) {
-      if (entity is! File || !_isSnapshotFile(entity)) {
-        continue;
+    await _runDirectoryOperation(directory, () async {
+      if (!await directory.exists()) {
+        return;
       }
-      final dateKey = _dateKeyFromFile(entity);
-      if (dateKey != null && dateKey.compareTo(cutoffKey) < 0) {
-        await entity.delete();
+      final cutoffKey = snapshotDateKey(cutoff);
+      await for (final entity in directory.list(followLinks: false)) {
+        if (entity is! File || !_isSnapshotFile(entity)) {
+          continue;
+        }
+        final dateKey = _dateKeyFromFile(entity);
+        if (dateKey != null && dateKey.compareTo(cutoffKey) < 0) {
+          await entity.delete();
+        }
       }
-    }
-    await _reconcileSnapshotIndex(directory);
+      await _reconcileSnapshotIndex(directory);
+    });
   }
 
   @override
   Future<void> clearHistory() async {
     final directory = await _directory(create: false);
-    if (!await directory.exists()) {
-      return;
-    }
-    await for (final entity in directory.list(followLinks: false)) {
-      if (entity is File && _isSnapshotFile(entity)) {
-        await entity.delete();
+    await _runDirectoryOperation(directory, () async {
+      if (!await directory.exists()) {
+        return;
       }
-    }
-    await _deleteSnapshotIndex(directory);
+      await for (final entity in directory.list(followLinks: false)) {
+        if (entity is File && _isSnapshotFile(entity)) {
+          await entity.delete();
+        }
+      }
+      await _deleteSnapshotIndex(directory);
+    });
   }
 
   Future<Directory> _directory({required bool create}) async {
@@ -299,7 +304,6 @@ class FileSnapshotStore implements SnapshotStore {
     List<_SnapshotFileRef> refs,
   ) async {
     final indexFile = File(_snapshotIndexPath(directory));
-    final temp = File('${indexFile.path}.tmp');
     final payload = <String, Object?>{
       'version': _snapshotIndexVersion,
       'updatedAtMillis': DateTime.now().millisecondsSinceEpoch,
@@ -314,14 +318,100 @@ class FileSnapshotStore implements SnapshotStore {
       'snapshots': summaries.map(_snapshotSummaryJson).toList(growable: false),
     };
     final encoded = await compute(_encodeSnapshotFile, payload);
-    await temp.writeAsString(encoded, flush: true);
+    await _writeFileSafely(indexFile, encoded);
+  }
+
+  Future<T> _runDirectoryOperation<T>(
+    Directory directory,
+    Future<T> Function() operation,
+  ) async {
+    final absolutePath = directory.absolute.path;
+    final key = Platform.isWindows ? absolutePath.toLowerCase() : absolutePath;
+    final previous = _directoryOperationTails[key] ?? Future<void>.value();
+    final completion = Completer<void>();
+    _directoryOperationTails[key] = completion.future;
+    await previous;
     try {
-      await temp.rename(indexFile.path);
-    } on FileSystemException {
-      if (await indexFile.exists()) {
-        await indexFile.delete();
+      return await operation();
+    } finally {
+      completion.complete();
+      if (identical(_directoryOperationTails[key], completion.future)) {
+        _directoryOperationTails.remove(key);
       }
-      await temp.rename(indexFile.path);
+    }
+  }
+
+  Future<void> _writeFileSafely(File target, String contents) async {
+    final temporary = await _createUniqueSiblingFile(target, 'tmp');
+    try {
+      await temporary.writeAsString(contents, flush: true);
+      await _replaceFile(temporary, target);
+    } finally {
+      await _deleteFileIfPresent(temporary);
+    }
+  }
+
+  Future<File> _createUniqueSiblingFile(File target, String role) async {
+    for (var attempt = 0; attempt < 100; attempt += 1) {
+      final sequence = _temporaryFileSequence++;
+      final candidate = File(
+        '${target.path}.$pid.'
+        '${DateTime.now().microsecondsSinceEpoch}.$sequence.$role',
+      );
+      try {
+        return await candidate.create(exclusive: true);
+      } on FileSystemException {
+        continue;
+      }
+    }
+    throw FileSystemException(
+      'Unable to create a unique temporary file',
+      target.path,
+    );
+  }
+
+  Future<void> _replaceFile(File replacement, File target) async {
+    try {
+      await replacement.rename(target.path);
+      return;
+    } on FileSystemException {
+      if (!await target.exists()) {
+        rethrow;
+      }
+    }
+
+    final backup = _uniqueSiblingPath(target, 'backup');
+    await target.rename(backup.path);
+    try {
+      await replacement.rename(target.path);
+    } catch (error, stackTrace) {
+      try {
+        if (!await target.exists() && await backup.exists()) {
+          await backup.rename(target.path);
+        }
+      } on FileSystemException {
+        // Keep the backup in place when restoration also fails.
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+    await _deleteFileIfPresent(backup);
+  }
+
+  File _uniqueSiblingPath(File target, String role) {
+    final sequence = _temporaryFileSequence++;
+    return File(
+      '${target.path}.$pid.'
+      '${DateTime.now().microsecondsSinceEpoch}.$sequence.$role',
+    );
+  }
+
+  Future<void> _deleteFileIfPresent(File file) async {
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } on FileSystemException {
+      return;
     }
   }
 
@@ -505,6 +595,7 @@ DailyLibrarySnapshot _summaryOnly(DailyLibrarySnapshot snapshot) {
     totalSkipCount: snapshot.totalSkipCount,
     totalListeningSeconds: snapshot.totalListeningSeconds,
     tracks: const [],
+    filterSignature: snapshot.filterSignature,
   );
 }
 
@@ -517,5 +608,7 @@ Map<String, Object?> _snapshotSummaryJson(DailyLibrarySnapshot snapshot) {
     'totalPlayCount': snapshot.totalPlayCount,
     'totalSkipCount': snapshot.totalSkipCount,
     'totalListeningSeconds': snapshot.totalListeningSeconds,
+    if (snapshot.filterSignature != null)
+      'filterSignature': snapshot.filterSignature,
   };
 }

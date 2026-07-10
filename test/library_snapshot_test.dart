@@ -68,6 +68,19 @@ void main() {
     expect(snapshot.trackCount, maxSnapshotTrackCounters + 100);
     expect(snapshot.tracks, hasLength(maxSnapshotTrackCounters));
   });
+
+  test('round-trips the library filter signature', () {
+    final snapshot = DailyLibrarySnapshot.fromOverview(
+      _overview(playCount: 3),
+      capturedAt: DateTime(2026, 7, 1, 8),
+      filterSignature: 'deadbeef',
+    );
+
+    final decoded = DailyLibrarySnapshot.fromJson(snapshot.toJson());
+
+    expect(decoded.filterSignature, 'deadbeef');
+    expect(decoded.toJson(), snapshot.toJson());
+  });
 }
 
 LibraryOverview _overview({required int playCount, int skipCount = 0}) {

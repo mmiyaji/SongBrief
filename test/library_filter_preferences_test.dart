@@ -84,6 +84,24 @@ void main() {
     expect(changed.isEmpty, isFalse);
   });
 
+  test('snapshot signature is normalized and changes with the rules', () {
+    final first = LibraryFilterPreferences(
+      excludedPlaylists: [' Focus ', 'Daily'],
+      excludedGenres: ['Ambient'],
+      excludedKeywords: ['Secret'],
+    );
+    final equivalent = LibraryFilterPreferences(
+      excludedPlaylists: ['daily', 'focus'],
+      excludedGenres: ['ambient'],
+      excludedKeywords: ['secret'],
+    );
+    final changed = equivalent.copyWith(excludedKeywords: ['different']);
+
+    expect(first.snapshotSignature, equivalent.snapshotSignature);
+    expect(changed.snapshotSignature, isNot(first.snapshotSignature));
+    expect(first.snapshotSignature, hasLength(8));
+  });
+
   test('returns the original track list when there are no filter rules', () {
     final filters = LibraryFilterPreferences();
     final tracks = [
@@ -111,7 +129,7 @@ void main() {
     addTearDown(container.dispose);
 
     container.read(libraryFilterPreferencesProvider);
-    await _drainPreferenceRestore();
+    await container.read(libraryFilterPreferencesProvider.notifier).restored;
 
     expect(container.read(libraryFilterPreferencesProvider).excludedPlaylists, [
       'Focus',

@@ -185,11 +185,6 @@ enum SnapshotCloudSync {
     olderThan cutoffDateKey: String?,
     completion: @escaping ([String: Any]) -> Void
   ) {
-    guard isEnabled else {
-      finish(completion, status: "disabled")
-      return
-    }
-
     withAvailableAccount(completion) {
       let localDateKeys = Set(SongBriefSnapshotRefresh.localSnapshots().compactMap {
         $0["dateKey"] as? String
@@ -201,8 +196,13 @@ enum SnapshotCloudSync {
         return id.recordName < cutoffDateKey
       }
       deleteRecords(ids) { deleted, error in
-        if let error, deleted == 0 {
-          finish(completion, status: "error", message: error.localizedDescription)
+        if let error {
+          finish(
+            completion,
+            status: deleted > 0 ? "partial" : "error",
+            deleted: deleted,
+            message: error.localizedDescription
+          )
           return
         }
         finish(completion, status: "synced", deleted: deleted)
@@ -465,9 +465,9 @@ enum SnapshotCloudSync {
   }
 }
 
-/// Max-merge for daily snapshots: counters are monotonic, so taking the
-/// larger value per field (and the union of per-track counters) converges
-/// regardless of merge order.
+/// Profile-aware merge for daily snapshots. Counters are max-merged only when
+/// both snapshots used the same library-exclusion profile. A changed profile
+/// replaces the prior observation so excluded tracks cannot survive forever.
 enum SnapshotMerge {
   private static let maxMergedTracks = 500
   private static let counterKeys = [
@@ -489,11 +489,19 @@ enum SnapshotMerge {
     let bCaptured = intValue(b["capturedAtMillis"])
     let newer = aCaptured >= bCaptured ? a : b
     let older = aCaptured >= bCaptured ? b : a
+    let aSignature = stringValue(a["filterSignature"])
+    let bSignature = stringValue(b["filterSignature"])
+    if aSignature != bSignature, aSignature != nil || bSignature != nil {
+      return normalized(newer)
+    }
 
     var merged: [String: Any] = [:]
     merged["dateKey"] = newer["dateKey"] ?? older["dateKey"] ?? ""
     merged["capturedAtMillis"] = max(aCaptured, bCaptured)
     merged["source"] = newer["source"] ?? "foreground"
+    if let filterSignature = aSignature ?? bSignature {
+      merged["filterSignature"] = filterSignature
+    }
     merged["trackCount"] = max(intValue(a["trackCount"]), intValue(b["trackCount"]))
     merged["totalPlayCount"] = max(
       intValue(a["totalPlayCount"]), intValue(b["totalPlayCount"])
@@ -576,5 +584,13 @@ enum SnapshotMerge {
 
   private static func trackID(_ track: [String: Any]) -> String {
     track["id"] as? String ?? ""
+  }
+
+  private static func stringValue(_ value: Any?) -> String? {
+    guard let value = value as? String else {
+      return nil
+    }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
   }
 }

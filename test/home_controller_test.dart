@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/data/library_snapshot_repository.dart';
 import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/data/music_stats_repository.dart';
@@ -12,8 +13,13 @@ import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/domain/music_library_authorization.dart';
 import 'package:songbrief/src/domain/music_stats_state.dart';
 import 'package:songbrief/src/features/home/home_controller.dart';
+import 'package:songbrief/src/settings/snapshot_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   test('silent stats refresh keeps previous data while loading', () async {
     final repository = _ControlledMusicStatsRepository();
     final container = ProviderContainer(
@@ -37,6 +43,73 @@ void main() {
 
     final afterRefresh = container.read(musicStatsControllerProvider);
     expect(afterRefresh.requireValue.overview.latestTrack?.title, 'Updated');
+  });
+
+  test('overlapping stats refreshes share one repository load', () async {
+    final repository = _ControlledMusicStatsRepository();
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(musicStatsControllerProvider.future);
+    final notifier = container.read(musicStatsControllerProvider.notifier);
+
+    final silentRefresh = notifier.refreshStatsSilently();
+    final manualRefresh = notifier.refreshStats();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(identical(silentRefresh, manualRefresh), isTrue);
+    expect(repository.loadCount, 2);
+
+    repository.completeRefresh(_state('Coalesced'));
+    await Future.wait([silentRefresh, manualRefresh]);
+
+    expect(
+      container
+          .read(musicStatsControllerProvider)
+          .requireValue
+          .overview
+          .latestTrack
+          ?.title,
+      'Coalesced',
+    );
+
+    await notifier.refreshStatsSilently();
+    expect(repository.loadCount, 3);
+  });
+
+  test('initial load waits for persisted music data settings', () async {
+    SharedPreferences.setMockInitialValues({
+      snapshotRecordingEnabledPreferenceKey: false,
+    });
+    final repository = _ControlledMusicStatsRepository();
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(musicStatsControllerProvider.future);
+
+    expect(container.read(snapshotRecordingProvider), isFalse);
+    expect(repository.loadCount, 1);
+  });
+
+  test('demo state cannot delete persisted listening history', () async {
+    final repository = _ControlledMusicStatsRepository();
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(musicStatsControllerProvider.future);
+
+    await expectLater(
+      container
+          .read(musicStatsControllerProvider.notifier)
+          .clearSnapshotHistory(),
+      throwsStateError,
+    );
   });
 }
 
@@ -66,6 +139,8 @@ class _ControlledMusicStatsRepository extends MusicStatsRepository {
 
   var _loadCount = 0;
   Completer<MusicStatsState>? _pendingRefresh;
+
+  int get loadCount => _loadCount;
 
   @override
   Future<MusicStatsState> load({bool requestAccess = false}) {

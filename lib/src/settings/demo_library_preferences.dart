@@ -13,6 +13,11 @@ final temporaryDemoLibraryProvider =
 
 class TemporaryDemoLibraryController extends Notifier<bool> {
   var _changedByUser = false;
+  var _restoreStarted = false;
+  final _restored = Completer<void>();
+
+  Future<void> get restored =>
+      _restoreStarted ? _restored.future : Future<void>.value();
 
   @override
   bool build() {
@@ -27,17 +32,24 @@ class TemporaryDemoLibraryController extends Notifier<bool> {
   }
 
   void _restore() {
+    _restoreStarted = true;
     var disposed = false;
     ref.onDispose(() {
       disposed = true;
     });
     unawaited(() async {
-      final preferences = await SharedPreferences.getInstance();
-      final enabled = preferences.getBool(
-        temporaryDemoLibraryEnabledPreferenceKey,
-      );
-      if (!disposed && !_changedByUser && enabled != null) {
-        state = enabled;
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        final enabled = preferences.getBool(
+          temporaryDemoLibraryEnabledPreferenceKey,
+        );
+        if (!disposed && !_changedByUser && enabled != null) {
+          state = enabled;
+        }
+      } finally {
+        if (!_restored.isCompleted) {
+          _restored.complete();
+        }
       }
     }());
   }

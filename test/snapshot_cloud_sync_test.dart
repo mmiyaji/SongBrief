@@ -243,21 +243,43 @@ void main() {
       expect(client.lastDeleteCutoff, '2026-07-01');
     });
 
-    test('cloud deletion failures do not break local deletion', () async {
+    test('cloud deletion failures stop local deletion', () async {
       final client = _CloudSyncSpyClient()..throwOnDelete = true;
 
-      final history = await repository(client).clearSnapshotHistory();
+      await expectLater(
+        repository(client).clearSnapshotHistory(),
+        throwsA(isA<StateError>()),
+      );
 
-      expect(history.snapshots, isEmpty);
       expect(client.deleteCalls, 1);
     });
 
-    test('skips cloud deletion when the cloud toggle is off', () async {
+    test('explicit deletion reaches cloud even when sync is off', () async {
       final client = _CloudSyncSpyClient();
 
       await repository(client, cloudSyncEnabled: false).clearSnapshotHistory();
 
-      expect(client.deleteCalls, 0);
+      expect(client.deleteCalls, 1);
+    });
+
+    test('cloud deletion status errors stop local deletion', () async {
+      final client = _CloudSyncSpyClient()
+        ..deleteResult = const SnapshotSyncResult(
+          status: SnapshotSyncStatus.noAccount,
+        );
+
+      await expectLater(
+        repository(client).clearSnapshotHistory(),
+        throwsA(
+          isA<SnapshotCloudDeletionException>().having(
+            (error) => error.status,
+            'status',
+            SnapshotSyncStatus.noAccount,
+          ),
+        ),
+      );
+
+      expect(client.deleteCalls, 1);
     });
 
     test('loads a large library through the overview build path', () async {
@@ -361,6 +383,9 @@ class _CloudSyncSpyClient implements MusicLibraryClient {
   SnapshotSyncResult syncResult = const SnapshotSyncResult(
     status: SnapshotSyncStatus.unchanged,
   );
+  SnapshotSyncResult deleteResult = const SnapshotSyncResult(
+    status: SnapshotSyncStatus.synced,
+  );
 
   @override
   Future<SnapshotSyncResult> syncSnapshotHistory() async {
@@ -380,7 +405,7 @@ class _CloudSyncSpyClient implements MusicLibraryClient {
     if (throwOnDelete) {
       throw StateError('delete failed');
     }
-    return const SnapshotSyncResult(status: SnapshotSyncStatus.synced);
+    return deleteResult;
   }
 
   @override

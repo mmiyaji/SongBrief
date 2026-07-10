@@ -271,7 +271,7 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     return track
   }
 
-  private static func playlistNamesByItemID() -> [UInt64: [String]] {
+  static func playlistNamesByItemID() -> [UInt64: [String]] {
     var namesByID: [UInt64: Set<String>] = [:]
     let playlists = MPMediaQuery.playlists().collections ?? []
 

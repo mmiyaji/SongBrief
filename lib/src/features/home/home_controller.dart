@@ -9,6 +9,7 @@ import '../../data/music_library_channel.dart';
 import '../../domain/library_overview.dart';
 import '../../domain/library_snapshot.dart';
 import '../../domain/music_stats_state.dart';
+import '../../settings/music_data_preferences.dart';
 
 enum TrendRange { week, month, year }
 
@@ -204,10 +205,14 @@ class PlaybackState {
 }
 
 class MusicStatsController extends AsyncNotifier<MusicStatsState> {
+  Future<void>? _refreshInFlight;
+
   @override
   Future<MusicStatsState> build() async {
     final loadingPreviewDelay = _startupLoadingPreviewDelay();
-    final next = await ref.watch(musicStatsRepositoryProvider).load();
+    ref.watch(musicStatsRepositoryProvider);
+    await ref.watch(musicDataPreferencesReadyProvider.future);
+    final next = await ref.read(musicStatsRepositoryProvider).load();
     if (loadingPreviewDelay > Duration.zero) {
       await Future<void>.delayed(loadingPreviewDelay);
     }
@@ -239,25 +244,37 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     }
   }
 
-  Future<void> refreshStats() async {
-    unawaited(
-      ref
-          .read(appAnalyticsProvider)
-          .logEvent('library_refresh', parameters: const {'mode': 'manual'}),
-    );
-    await _load(showLoading: true);
+  Future<void> refreshStats() {
+    return _refreshStats(showLoading: true);
   }
 
-  Future<void> refreshStatsSilently() async {
+  Future<void> refreshStatsSilently() {
+    return _refreshStats(showLoading: false);
+  }
+
+  Future<void> _refreshStats({required bool showLoading}) {
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) {
+      return inFlight;
+    }
+    final mode = showLoading ? 'manual' : 'silent';
     unawaited(
       ref
           .read(appAnalyticsProvider)
-          .logEvent('library_refresh', parameters: const {'mode': 'silent'}),
+          .logEvent('library_refresh', parameters: {'mode': mode}),
     );
-    await _load(showLoading: false);
+    late final Future<void> operation;
+    operation = _load(showLoading: showLoading).whenComplete(() {
+      if (identical(_refreshInFlight, operation)) {
+        _refreshInFlight = null;
+      }
+    });
+    _refreshInFlight = operation;
+    return operation;
   }
 
   Future<SnapshotHistory?> deleteSnapshotsOlderThan(DateTime cutoff) async {
+    _ensureMutableSnapshotHistory();
     final history = await ref
         .read(musicStatsRepositoryProvider)
         .deleteSnapshotsOlderThan(cutoff);
@@ -266,6 +283,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   }
 
   Future<SnapshotHistory?> clearSnapshotHistory() async {
+    _ensureMutableSnapshotHistory();
     final history = await ref
         .read(musicStatsRepositoryProvider)
         .clearSnapshotHistory();
@@ -279,6 +297,13 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       return;
     }
     state = AsyncData(current.withSnapshotHistory(history));
+  }
+
+  void _ensureMutableSnapshotHistory() {
+    final current = state.asData?.value;
+    if (current == null || current.overview.isDemo) {
+      throw StateError('Demo listening records cannot modify saved history.');
+    }
   }
 
   Future<void> _load({required bool showLoading}) async {

@@ -92,6 +92,7 @@ class DailyLibrarySnapshot {
     required this.totalSkipCount,
     required this.totalListeningSeconds,
     required this.tracks,
+    this.filterSignature,
   });
 
   final String dateKey;
@@ -102,11 +103,13 @@ class DailyLibrarySnapshot {
   final int totalSkipCount;
   final int totalListeningSeconds;
   final List<TrackCounterSnapshot> tracks;
+  final String? filterSignature;
 
   factory DailyLibrarySnapshot.fromOverview(
     LibraryOverview overview, {
     DateTime? capturedAt,
     String source = 'foreground',
+    String? filterSignature,
   }) {
     final now = capturedAt ?? DateTime.now();
     final tracks = _snapshotTrackCounters(overview);
@@ -119,6 +122,7 @@ class DailyLibrarySnapshot {
       totalSkipCount: overview.totalSkipCount,
       totalListeningSeconds: overview.totalListeningSeconds,
       tracks: List.unmodifiable(tracks),
+      filterSignature: filterSignature,
     );
   }
 
@@ -146,6 +150,7 @@ class DailyLibrarySnapshot {
               ),
             )
           : const [],
+      filterSignature: _readNullableString(json, 'filterSignature'),
     );
   }
 
@@ -159,6 +164,7 @@ class DailyLibrarySnapshot {
       'totalSkipCount': totalSkipCount,
       'totalListeningSeconds': totalListeningSeconds,
       'tracks': tracks.map((track) => track.toJson()).toList(growable: false),
+      if (filterSignature != null) 'filterSignature': filterSignature,
     };
   }
 }
