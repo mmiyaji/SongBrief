@@ -311,6 +311,78 @@ void main() {
     expect(find.text('한국어 (Korean)'), findsOneWidget);
   });
 
+  testWidgets('preference sheets announce the selected option', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final semantics = tester.ensureSemantics();
+
+    await _pumpApp(
+      tester,
+      AppLanguage.english,
+      statsState: _settingsDemoStats(),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Theme'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Theme'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ember'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Theme'));
+    await tester.pumpAndSettle();
+
+    final selectedEmber = find.bySemanticsLabel('Ember');
+    expect(selectedEmber, findsOneWidget);
+    expect(
+      tester.getSemantics(selectedEmber),
+      isSemantics(
+        label: 'Ember',
+        hint: 'Pink and amber music-focused theme.',
+        isSelected: true,
+        hasSelectedState: true,
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('demo history is labeled as sample data and cannot be managed', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(
+      tester,
+      AppLanguage.english,
+      statsState: _settingsDemoStats(),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    final sampleRecords = find.text('Sample records');
+    await tester.scrollUntilVisible(
+      sampleRecords,
+      420,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(sampleRecords, findsOneWidget);
+    final manageRecords = find.widgetWithText(OutlinedButton, 'Manage records');
+    expect(manageRecords, findsOneWidget);
+    expect(tester.widget<OutlinedButton>(manageRecords).onPressed, isNull);
+  });
+
   testWidgets('shows library exclusion controls in settings', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -469,4 +541,24 @@ class _FixedSnapshotRecordingController extends SnapshotRecordingController {
   bool build() {
     return enabled;
   }
+}
+
+MusicStatsState _settingsDemoStats() {
+  return MusicStatsState(
+    authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
+    overview: LibraryOverview.fromTracks([
+      LibraryTrack(
+        id: 'settings-demo-track',
+        title: 'Settings Demo Track',
+        artist: 'Demo Artist',
+        albumTitle: 'Demo Album',
+        playCount: 8,
+        skipCount: 1,
+        duration: const Duration(minutes: 3),
+        isCloudItem: false,
+      ),
+    ], isDemo: true),
+    snapshotHistory: SnapshotHistory.empty,
+    snapshotRecordingEnabled: true,
+  );
 }

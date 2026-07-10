@@ -362,7 +362,7 @@ class _ThemeTokens {
         surface: Color(0xFF050507),
         surfaceHigh: Color(0xFF1B1B20),
         primary: Color(0xFFFF3D78),
-        onPrimary: Color(0xFFFFFFFF),
+        onPrimary: Color(0xFF28000D),
         secondary: Color(0xFFFF9B52),
         tertiary: Color(0xFF6FE5C4),
         onSurface: Color(0xFFF8F7FA),

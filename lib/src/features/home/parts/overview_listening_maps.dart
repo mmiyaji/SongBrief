@@ -608,6 +608,18 @@ class _InteractiveReleaseYearChartState
             curve: Curves.easeOutCubic,
           ),
         ),
+        const SizedBox(height: 8),
+        _ReleaseYearDataSelector(
+          buckets: buckets,
+          metric: widget.metric,
+          selectedBucket: selectedBucket,
+          onChanged: (bucket) {
+            setState(() {
+              _selectedBucket = bucket;
+            });
+          },
+        ),
+        const SizedBox(height: 8),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
           child: selectedBucket == null
@@ -632,6 +644,68 @@ class _InteractiveReleaseYearChartState
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _ReleaseYearDataSelector extends StatelessWidget {
+  const _ReleaseYearDataSelector({
+    required this.buckets,
+    required this.metric,
+    required this.selectedBucket,
+    required this.onChanged,
+  });
+
+  final List<_ReleaseYearBucket> buckets;
+  final _ReleaseYearMetric metric;
+  final _ReleaseYearBucket? selectedBucket;
+  final ValueChanged<_ReleaseYearBucket> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final selectedIndex = selectedBucket == null
+        ? -1
+        : buckets.indexWhere((bucket) => bucket.year == selectedBucket!.year);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<int>(
+            key: const ValueKey('release-year-data-selector'),
+            value: selectedIndex < 0 ? null : selectedIndex,
+            isExpanded: true,
+            menuMaxHeight: 360,
+            borderRadius: BorderRadius.circular(14),
+            hint: Text(_t(context, 'Select year data', '年別データを選択')),
+            items: buckets.indexed
+                .map(
+                  (entry) => DropdownMenuItem<int>(
+                    value: entry.$1,
+                    child: Text(
+                      '${entry.$2.year} - '
+                      '${_releaseYearMetricDetail(context, metric, entry.$2)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: (index) {
+              if (index != null) {
+                onChanged(buckets[index]);
+              }
+            },
+          ),
+        ),
+      ),
     );
   }
 }
@@ -784,6 +858,19 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                ],
+                if (!widget.expanded ||
+                    _view == _ActivityHeatmapView.calendar) ...[
+                  _ActivityDaySelector(
+                    days: days,
+                    selectedDay: selectedDay,
+                    onSelectDay: (day) {
+                      setState(() {
+                        _selectedDay = day;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
                 ],
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
@@ -940,6 +1027,104 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
       },
     );
   }
+}
+
+class _ActivityDaySelector extends StatelessWidget {
+  const _ActivityDaySelector({
+    required this.days,
+    required this.selectedDay,
+    required this.onSelectDay,
+  });
+
+  final List<_ActivityHeatmapDay> days;
+  final _ActivityHeatmapDay? selectedDay;
+  final ValueChanged<_ActivityHeatmapDay> onSelectDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final selectedIndex = selectedDay == null
+        ? -1
+        : days.indexWhere((day) => _sameActivityDate(day, selectedDay));
+    return Row(
+      children: [
+        IconButton(
+          constraints: const BoxConstraints.tightFor(
+            width: kMinInteractiveDimension,
+            height: kMinInteractiveDimension,
+          ),
+          onPressed: selectedIndex > 0
+              ? () => onSelectDay(days[selectedIndex - 1])
+              : null,
+          icon: const Icon(Icons.chevron_left_rounded),
+          tooltip: _t(context, 'Previous day', '前の日'),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.32,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  key: const ValueKey('activity-day-selector'),
+                  value: selectedIndex < 0 ? null : selectedIndex,
+                  isExpanded: true,
+                  menuMaxHeight: 360,
+                  borderRadius: BorderRadius.circular(14),
+                  items: days.indexed
+                      .map(
+                        (entry) => DropdownMenuItem<int>(
+                          value: entry.$1,
+                          child: Text(
+                            _activityDaySelectorLabel(context, entry.$2),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                  onChanged: (index) {
+                    if (index != null) {
+                      onSelectDay(days[index]);
+                    }
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        IconButton(
+          constraints: const BoxConstraints.tightFor(
+            width: kMinInteractiveDimension,
+            height: kMinInteractiveDimension,
+          ),
+          onPressed: selectedIndex >= 0 && selectedIndex < days.length - 1
+              ? () => onSelectDay(days[selectedIndex + 1])
+              : null,
+          icon: const Icon(Icons.chevron_right_rounded),
+          tooltip: _t(context, 'Next day', '次の日'),
+        ),
+      ],
+    );
+  }
+}
+
+String _activityDaySelectorLabel(
+  BuildContext context,
+  _ActivityHeatmapDay day,
+) {
+  return '${DateFormat.yMMMd(_localeName(context)).format(day.date)} - '
+      '${_playCountLabel(context, day.playCount)}';
 }
 
 class _ActivityWeekdayHeader extends StatelessWidget {
@@ -1370,6 +1555,38 @@ class _GenreStackedReleaseBarsCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  key: const ValueKey('genre-year-data-selector'),
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: _t(context, 'Open year data', '年別データを開く'),
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: stacks.indexed
+                      .map(
+                        (entry) => DropdownMenuItem<int>(
+                          value: entry.$1,
+                          child: Text(
+                            '${entry.$2.year} - '
+                            '${_playCountLabel(context, entry.$2.playCount)}',
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                  onChanged: (index) {
+                    if (index == null) {
+                      return;
+                    }
+                    _showGenreYearTracks(
+                      context: context,
+                      overview: overview,
+                      stack: stacks[index],
+                      segment: null,
+                      legendItems: legendItems,
                     );
                   },
                 ),
@@ -1829,40 +2046,50 @@ class _ActivityHeatmapCell extends StatelessWidget {
           '${_playCountLabel(context, day.playCount)}',
     );
 
-    return Tooltip(
-      message: label,
-      triggerMode: TooltipTriggerMode.tap,
-      showDuration: const Duration(seconds: 3),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: size,
-          height: size,
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: EdgeInsets.all(selected ? 2 : 1.5),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.42,
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label: label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        triggerMode: TooltipTriggerMode.tap,
+        showDuration: const Duration(seconds: 3),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: size,
+            height: size,
+            margin: const EdgeInsets.only(bottom: 4),
+            padding: EdgeInsets.all(selected ? 2 : 1.5),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.42,
+              ),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.28),
+                width: selected ? 1.8 : 1,
+              ),
             ),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: selected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.28),
-              width: selected ? 1.8 : 1,
-            ),
-          ),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: double.infinity,
-              height: day.playCount <= 0 ? 0 : math.max(3, (size - 4) * ratio),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2.5),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: double.infinity,
+                height: day.playCount <= 0
+                    ? 0
+                    : math.max(3, (size - 4) * ratio),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
               ),
             ),
           ),

@@ -85,64 +85,67 @@ class _RankingPanel extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<RankingScope>(
-              showSelectedIcon: false,
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-                ),
-                side: WidgetStateProperty.resolveWith((states) {
-                  final selected = states.contains(WidgetState.selected);
-                  return BorderSide(
-                    color: selected
-                        ? theme.colorScheme.primary.withValues(alpha: 0.55)
-                        : theme.colorScheme.outlineVariant.withValues(
-                            alpha: 0.48,
-                          ),
-                  );
-                }),
-                backgroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return theme.colorScheme.primary.withValues(alpha: 0.18);
-                  }
-                  return theme.colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.72,
-                  );
-                }),
-                foregroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return theme.colorScheme.primary;
-                  }
-                  return theme.colorScheme.onSurfaceVariant;
-                }),
-              ),
-              segments: RankingScope.values
-                  .map(
-                    (value) => ButtonSegment<RankingScope>(
-                      value: value,
-                      label: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          useCompactScopeLabels
-                              ? _rankingScopeCompactLabel(context, value)
-                              : _rankingScopeLabel(context, value),
-                          maxLines: 1,
-                          softWrap: false,
-                        ),
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: SegmentedButton<RankingScope>(
+                  showSelectedIcon: false,
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    padding: const WidgetStatePropertyAll(
+                      EdgeInsets.symmetric(horizontal: 6, vertical: 9),
                     ),
-                  )
-                  .toList(),
-              selected: {scope},
-              onSelectionChanged: (selection) {
-                ref.read(rankingFocusProvider.notifier).clear();
-                ref
-                    .read(rankingScopeProvider.notifier)
-                    .setScope(selection.first);
-              },
+                    side: WidgetStateProperty.resolveWith((states) {
+                      final selected = states.contains(WidgetState.selected);
+                      return BorderSide(
+                        color: selected
+                            ? theme.colorScheme.primary.withValues(alpha: 0.55)
+                            : theme.colorScheme.outlineVariant.withValues(
+                                alpha: 0.48,
+                              ),
+                      );
+                    }),
+                    backgroundColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.selected)) {
+                        return theme.colorScheme.primary.withValues(
+                          alpha: 0.18,
+                        );
+                      }
+                      return theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.72);
+                    }),
+                    foregroundColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.selected)) {
+                        return theme.colorScheme.primary;
+                      }
+                      return theme.colorScheme.onSurfaceVariant;
+                    }),
+                  ),
+                  segments: RankingScope.values
+                      .map(
+                        (value) => ButtonSegment<RankingScope>(
+                          value: value,
+                          label: Text(
+                            useCompactScopeLabels
+                                ? _rankingScopeCompactLabel(context, value)
+                                : _rankingScopeLabel(context, value),
+                            maxLines: 1,
+                            softWrap: false,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  selected: {scope},
+                  onSelectionChanged: (selection) {
+                    ref.read(rankingFocusProvider.notifier).clear();
+                    ref
+                        .read(rankingScopeProvider.notifier)
+                        .setScope(selection.first);
+                  },
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -2300,7 +2303,6 @@ class _TemporaryDemoLibrarySetting extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final realLibraryAvailable =
         stats.authorizationStatus.canReadLibrary && stats.overview.hasTracks;
     final active = enabled && stats.overview.isDemo;
@@ -2328,65 +2330,77 @@ class _TemporaryDemoLibrarySetting extends ConsumerWidget {
             ko: '음악 접근이 불가능하거나 곡을 찾을 수 없을 때 앱을 시험해 볼 수 있는 샘플 데이터를 표시합니다.',
           );
 
+    return _SettingsSwitchCard(
+      icon: Icons.preview_rounded,
+      title: _t(
+        context,
+        'Temporary demo data',
+        '一時的なデモデータ',
+        zh: '临时演示数据',
+        ko: '임시 데모 데이터',
+      ),
+      description: description,
+      value: enabled,
+      surfaceAlpha: 0.22,
+      onChanged: (value) async {
+        if (value) {
+          await _enableTemporaryDemoLibrary(context, ref);
+          return;
+        }
+        ref.read(temporaryDemoLibraryProvider.notifier).setEnabled(false);
+        await ref.read(musicStatsControllerProvider.notifier).refreshStats();
+      },
+    );
+  }
+}
+
+class _SettingsSwitchCard extends StatelessWidget {
+  const _SettingsSwitchCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.value,
+    required this.onChanged,
+    this.surfaceAlpha = 0.28,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final double surfaceAlpha;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.22,
+          alpha: surfaceAlpha,
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(Icons.preview_rounded, color: theme.colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _t(
-                      context,
-                      'Temporary demo data',
-                      '一時的なデモデータ',
-                      zh: '临时演示数据',
-                      ko: '임시 데모 데이터',
-                    ),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    description,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Switch(
-              value: enabled,
-              onChanged: (value) async {
-                if (value) {
-                  await _enableTemporaryDemoLibrary(context, ref);
-                  return;
-                }
-                ref
-                    .read(temporaryDemoLibraryProvider.notifier)
-                    .setEnabled(false);
-                await ref
-                    .read(musicStatsControllerProvider.notifier)
-                    .refreshStats();
-              },
-            ),
-          ],
+      child: SwitchListTile(
+        value: value,
+        onChanged: onChanged,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        secondary: Icon(icon, color: theme.colorScheme.primary),
+        title: Text(
+          title,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        subtitle: Text(
+          description,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -2630,69 +2644,80 @@ class _PreferenceOptionRow<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: selected
-                ? theme.colorScheme.primary.withValues(alpha: 0.14)
-                : theme.colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.22,
-                  ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label: option.label,
+      hint: option.description,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Ink(
+            decoration: BoxDecoration(
               color: selected
-                  ? theme.colorScheme.primary.withValues(alpha: 0.38)
-                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+                  ? theme.colorScheme.primary.withValues(alpha: 0.14)
+                  : theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.22,
+                    ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected
+                    ? theme.colorScheme.primary.withValues(alpha: 0.38)
+                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.38),
+              ),
             ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          if (option.leading != null) ...[
-                            option.leading!,
-                            const SizedBox(width: 10),
-                          ],
-                          Expanded(
-                            child: Text(
-                              option.label,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.w900,
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            if (option.leading != null) ...[
+                              option.leading!,
+                              const SizedBox(width: 10),
+                            ],
+                            Expanded(
+                              child: Text(
+                                option.label,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        option.description,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
+                          ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 3),
+                        Text(
+                          option.description,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Icon(
-                  selected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                  color: selected
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Icon(
+                    selected
+                        ? Icons.check_circle_rounded
+                        : Icons.circle_outlined,
+                    color: selected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -3533,14 +3558,16 @@ class _DataManagementSetting extends ConsumerWidget {
         const SizedBox(height: 10),
         _SettingsRow(
           icon: Icons.calendar_month_outlined,
-          label: _t(context, 'Listening record history', '聴取記録の履歴'),
+          label: stats.overview.isDemo
+              ? _t(context, 'Sample records', 'サンプル記録', zh: '示例记录', ko: '샘플 기록')
+              : _t(context, 'Listening record history', '聴取記録の履歴'),
           value:
               '${_dayCountLabel(context, history.snapshotCount)} / $rangeLabel',
         ),
         Align(
           alignment: Alignment.centerRight,
           child: OutlinedButton.icon(
-            onPressed: history.snapshotCount == 0
+            onPressed: stats.overview.isDemo || history.snapshotCount == 0
                 ? null
                 : () =>
                       _showListeningRecordManagementSheet(context, ref, stats),
@@ -3566,78 +3593,37 @@ class _SnapshotCloudSyncSetting extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final active = enabled && recordingEnabled;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.28,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
-        ),
+    return _SettingsSwitchCard(
+      icon: Icons.cloud_sync_rounded,
+      title: _t(
+        context,
+        'Sync records with iCloud',
+        'iCloudで聴取記録を同期',
+        zh: '通过iCloud同步收听记录',
+        ko: 'iCloud로 청취 기록 동기화',
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(Icons.cloud_sync_rounded, color: theme.colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _t(
-                      context,
-                      'Sync records with iCloud',
-                      'iCloudで聴取記録を同期',
-                      zh: '通过iCloud同步收听记录',
-                      ko: 'iCloud로 청취 기록 동기화',
-                    ),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    active
-                        ? _t(
-                            context,
-                            'Daily records merge across devices on the same Apple ID.',
-                            '同じApple IDの端末間で日々の記録を統合します。',
-                            zh: '在使用同一Apple ID的设备之间合并每日记录。',
-                            ko: '동일한 Apple ID의 기기 간에 일일 기록을 병합합니다.',
-                          )
-                        : _t(
-                            context,
-                            'Records stay only on this device.',
-                            '記録はこの端末にのみ保存されます。',
-                            zh: '记录仅保存在此设备上。',
-                            ko: '기록은 이 기기에만 저장됩니다.',
-                          ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+      description: active
+          ? _t(
+              context,
+              'Daily records merge across devices on the same Apple ID.',
+              '同じApple IDの端末間で日々の記録を統合します。',
+              zh: '在使用同一Apple ID的设备之间合并每日记录。',
+              ko: '동일한 Apple ID의 기기 간에 일일 기록을 병합합니다.',
+            )
+          : _t(
+              context,
+              'Records stay only on this device.',
+              '記録はこの端末にのみ保存されます。',
+              zh: '记录仅保存在此设备上。',
+              ko: '기록은 이 기기에만 저장됩니다.',
             ),
-            Switch(
-              value: enabled,
-              onChanged: recordingEnabled
-                  ? (value) {
-                      ref
-                          .read(snapshotCloudSyncProvider.notifier)
-                          .setEnabled(value);
-                    }
-                  : null,
-            ),
-          ],
-        ),
-      ),
+      value: enabled,
+      onChanged: recordingEnabled
+          ? (value) {
+              ref.read(snapshotCloudSyncProvider.notifier).setEnabled(value);
+            }
+          : null,
     );
   }
 }
@@ -3649,63 +3635,24 @@ class _SnapshotRecordingSetting extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.28,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(Icons.auto_graph_rounded, color: theme.colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _t(context, 'Save daily listening records', '日々の聴取記録を保存'),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    enabled
-                        ? _t(
-                            context,
-                            'Record-based trends and recaps are visible.',
-                            '聴取記録を使った傾向・リキャップを表示します。',
-                          )
-                        : _t(
-                            context,
-                            'Record-based trends and recaps are hidden.',
-                            '聴取記録を使った傾向・リキャップは非表示です。',
-                          ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+    return _SettingsSwitchCard(
+      icon: Icons.auto_graph_rounded,
+      title: _t(context, 'Save daily listening records', '日々の聴取記録を保存'),
+      description: enabled
+          ? _t(
+              context,
+              'Record-based trends and recaps are visible.',
+              '聴取記録を使った傾向・リキャップを表示します。',
+            )
+          : _t(
+              context,
+              'Record-based trends and recaps are hidden.',
+              '聴取記録を使った傾向・リキャップは非表示です。',
             ),
-            Switch(
-              value: enabled,
-              onChanged: (value) {
-                ref.read(snapshotRecordingProvider.notifier).setEnabled(value);
-              },
-            ),
-          ],
-        ),
-      ),
+      value: enabled,
+      onChanged: (value) {
+        ref.read(snapshotRecordingProvider.notifier).setEnabled(value);
+      },
     );
   }
 }
@@ -4007,65 +3954,72 @@ class _SnapshotDeletionActionTile extends StatelessWidget {
     final borderColor = selected
         ? theme.colorScheme.primary.withValues(alpha: 0.62)
         : theme.colorScheme.outlineVariant.withValues(alpha: 0.38);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onSelected,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(
-              alpha: selected ? 0.34 : 0.18,
+    final title = _snapshotDeletionActionTitle(context, action);
+    final subtitle = _snapshotDeletionActionSubtitle(context, action, estimate);
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label: title,
+      hint: subtitle,
+      onTap: onSelected,
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onSelected,
+          child: Ink(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: selected ? 0.34 : 0.18,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
             ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Icon(
-                  action == _SnapshotDeletionAction.deleteAll
-                      ? Icons.history_toggle_off_outlined
-                      : Icons.auto_delete_outlined,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _snapshotDeletionActionTitle(context, action),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _snapshotDeletionActionSubtitle(
-                          context,
-                          action,
-                          estimate,
-                        ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Icon(
+                    action == _SnapshotDeletionAction.deleteAll
+                        ? Icons.history_toggle_off_outlined
+                        : Icons.auto_delete_outlined,
+                    color: theme.colorScheme.primary,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Icon(
-                  selected
-                      ? Icons.radio_button_checked_rounded
-                      : Icons.radio_button_unchecked_rounded,
-                  color: selected
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: selected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

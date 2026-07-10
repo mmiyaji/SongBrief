@@ -68,12 +68,18 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Su').first).dy),
     );
 
-    await tester.tap(find.text('Weekdays'));
+    final weekdaysTab = find.text('Weekdays');
+    await tester.ensureVisible(weekdaysTab);
+    await tester.pumpAndSettle();
+    await tester.tap(weekdaysTab);
     await tester.pumpAndSettle();
 
     expect(find.text('Mon'), findsOneWidget);
 
-    await tester.tap(find.text('Highlights').last);
+    final highlightsTab = find.text('Highlights').last;
+    await tester.ensureVisible(highlightsTab);
+    await tester.pumpAndSettle();
+    await tester.tap(highlightsTab);
     await tester.pumpAndSettle();
 
     expect(find.text('Peak day'), findsOneWidget);
@@ -114,6 +120,55 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Release year x songs'), findsOneWidget);
+  });
+
+  testWidgets('release year chart provides an accessible data selector', (
+    tester,
+  ) async {
+    await _pumpOverview(tester, tracks: _releaseYearAccessibilityTracks());
+    await tester.pumpAndSettle();
+
+    final dataSelector = find.byKey(
+      const ValueKey('release-year-data-selector'),
+    );
+    expect(dataSelector, findsOneWidget);
+    expect(find.text('Select year data'), findsOneWidget);
+
+    await tester.tap(dataSelector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('2019 -').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tap a year point'), findsNothing);
+  });
+
+  testWidgets('activity heatmap provides a full-size day selector', (
+    tester,
+  ) async {
+    await _pumpOverview(
+      tester,
+      tracks: _heatmapSelectionTracks(),
+      snapshotRecordingEnabled: true,
+    );
+    await tester.pumpAndSettle();
+
+    final previousDay = find.byTooltip('Previous day');
+    await tester.scrollUntilVisible(
+      previousDay,
+      420,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    final targetSize = tester.getSize(previousDay);
+    expect(targetSize.width, greaterThanOrEqualTo(kMinInteractiveDimension));
+    expect(targetSize.height, greaterThanOrEqualTo(kMinInteractiveDimension));
+    expect(find.byKey(const ValueKey('activity-day-selector')), findsOneWidget);
+
+    await tester.tap(previousDay);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Yesterday Peak Track - Peak Artist'), findsOneWidget);
   });
 
   testWidgets('shows recap and collection insight panels', (tester) async {
@@ -330,5 +385,22 @@ List<LibraryTrack> _heatmapSelectionTracks() {
       lastPlayedAt: yesterday,
       isCloudItem: false,
     ),
+  ];
+}
+
+List<LibraryTrack> _releaseYearAccessibilityTracks() {
+  return [
+    for (var index = 0; index < 3; index++)
+      LibraryTrack(
+        id: 'release-year-accessibility-$index',
+        title: 'Release Year Track $index',
+        artist: 'Accessibility Artist',
+        albumTitle: 'Release Years',
+        playCount: 10 + index,
+        skipCount: 0,
+        duration: const Duration(minutes: 3),
+        releaseDate: DateTime(2019 + index, 1, 1),
+        isCloudItem: false,
+      ),
   ];
 }
