@@ -151,6 +151,31 @@ jobs:
           set -euo pipefail
           find ios -name "Podfile" -execdir pod install \;
 
+      - name: Validate Crashlytics symbol upload configuration
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          from pathlib import Path
+
+          app_id_path = Path("ios/firebase_app_id_file.json")
+          config = json.loads(app_id_path.read_text())
+          expected = {
+              "GOOGLE_APP_ID": "1:635263972708:ios:e884ba44856bad539b7671",
+              "FIREBASE_PROJECT_ID": "songbrief-7c9c0",
+              "GCM_SENDER_ID": "635263972708",
+          }
+          for key, value in expected.items():
+              if config.get(key) != value:
+                  raise SystemExit(f"Unexpected {key} in {app_id_path}")
+
+          project = Path("ios/Runner.xcodeproj/project.pbxproj").read_text()
+          if "FirebaseCrashlytics/upload-symbols" not in project:
+              raise SystemExit(
+                  "CocoaPods did not add the Crashlytics dSYM upload build phase"
+              )
+          PY
+
       - name: Run iOS unit tests
         run: |
           set -euo pipefail
@@ -309,12 +334,24 @@ jobs:
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
           echo "Produced IPA: $IPA_PATH"
 
+          DSYM_PATH="build/ios/archive/Runner.xcarchive/dSYMs/Runner.app.dSYM"
+          if [ ! -d "$DSYM_PATH" ]; then
+            echo "Runner dSYM was not produced at $DSYM_PATH."
+            find build/ios -name '*.dSYM' -print || true
+            exit 1
+          fi
+          echo "DSYM_PATH=$DSYM_PATH" >> "$GITHUB_ENV"
+          echo "Produced dSYM: $DSYM_PATH"
+          dwarfdump --uuid "$DSYM_PATH"
+
       - name: Upload IPA artifact
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
           name: songbrief-ios-${{ github.run_number }}
-          path: build/ios/ipa/*.ipa
+          path: |
+            build/ios/ipa/*.ipa
+            build/ios/archive/Runner.xcarchive/dSYMs/*.dSYM
           if-no-files-found: error
 
       - name: Upload to App Store Connect

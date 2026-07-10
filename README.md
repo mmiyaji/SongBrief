@@ -163,8 +163,11 @@ Do not add track titles, artist names, album names, playlist names, lyrics, or
 music library identifiers to Crashlytics logs, custom keys, or recorded errors.
 
 The iOS `Info.plist` keeps native Crashlytics collection disabled at launch so
-collection follows the user's SongBrief setting. Release symbolication may still
-require Firebase dSYM upload configuration in CI before App Store release.
+collection follows the user's SongBrief setting. The iOS Firebase app ID file
+allows the Crashlytics CocoaPod to add its dSYM upload build phase during
+`pod install`. The TestFlight workflow verifies that the phase was added,
+requires the release archive to contain `Runner.app.dSYM`, and stores the dSYM
+with the IPA artifact for manual recovery.
 
 ## Monetization Notes
 
