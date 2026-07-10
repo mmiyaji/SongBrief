@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/library_track.dart';
+import 'music_data_preferences_storage.dart';
 
 const excludedPlaylistsPreferenceKey = 'songbrief_excluded_playlists_v1';
 const excludedGenresPreferenceKey = 'songbrief_excluded_genres_v1';
@@ -128,12 +129,22 @@ class LibraryFilterPreferencesController
   var _changedByUser = false;
   var _restoreStarted = false;
   final _restored = Completer<void>();
+  late Future<SharedPreferences?> _preferencesFuture;
+  SharedPreferences? _preferences;
 
   Future<void> get restored =>
       _restoreStarted ? _restored.future : Future<void>.value();
 
   @override
   LibraryFilterPreferences build() {
+    _restoreStarted = true;
+    final preferences = ref.watch(musicDataSharedPreferencesProvider);
+    _preferences = preferences;
+    if (preferences != null) {
+      _completeRestore();
+      return _readPreferences(preferences);
+    }
+    _preferencesFuture = ref.watch(musicDataPreferencesFallbackProvider);
     _restore();
     return LibraryFilterPreferences();
   }
@@ -193,50 +204,78 @@ class LibraryFilterPreferencesController
   }
 
   void _restore() {
-    _restoreStarted = true;
     var disposed = false;
     ref.onDispose(() {
       disposed = true;
     });
     unawaited(() async {
       try {
-        final preferences = await SharedPreferences.getInstance();
-        final restored = LibraryFilterPreferences(
-          excludedPlaylists:
-              preferences.getStringList(excludedPlaylistsPreferenceKey) ??
-              const <String>[],
-          excludedGenres:
-              preferences.getStringList(excludedGenresPreferenceKey) ??
-              const <String>[],
-          excludedKeywords:
-              preferences.getStringList(excludedKeywordsPreferenceKey) ??
-              const <String>[],
-        );
+        final preferences = await _preferencesFuture;
+        if (preferences == null) {
+          return;
+        }
+        _preferences ??= preferences;
         if (!disposed && !_changedByUser) {
-          state = restored;
+          state = _readPreferences(preferences);
         }
+      } on Object {
+        // Keep empty filters when preference restoration is unavailable.
       } finally {
-        if (!_restored.isCompleted) {
-          _restored.complete();
-        }
+        _completeRestore();
       }
     }());
   }
 
   Future<void> _save(LibraryFilterPreferences preferences) async {
-    final storage = await SharedPreferences.getInstance();
-    await storage.setStringList(
-      excludedPlaylistsPreferenceKey,
-      preferences.excludedPlaylists,
+    try {
+      final storage = _preferences ?? await _preferencesFuture;
+      if (storage == null) {
+        return;
+      }
+      _preferences ??= storage;
+      await storage.setStringList(
+        excludedPlaylistsPreferenceKey,
+        preferences.excludedPlaylists,
+      );
+      await storage.setStringList(
+        excludedGenresPreferenceKey,
+        preferences.excludedGenres,
+      );
+      await storage.setStringList(
+        excludedKeywordsPreferenceKey,
+        preferences.excludedKeywords,
+      );
+    } on Object {
+      // The in-memory rules remain valid when persistence is unavailable.
+    }
+  }
+
+  LibraryFilterPreferences _readPreferences(SharedPreferences preferences) {
+    return LibraryFilterPreferences(
+      excludedPlaylists: _readStringList(
+        preferences,
+        excludedPlaylistsPreferenceKey,
+      ),
+      excludedGenres: _readStringList(preferences, excludedGenresPreferenceKey),
+      excludedKeywords: _readStringList(
+        preferences,
+        excludedKeywordsPreferenceKey,
+      ),
     );
-    await storage.setStringList(
-      excludedGenresPreferenceKey,
-      preferences.excludedGenres,
-    );
-    await storage.setStringList(
-      excludedKeywordsPreferenceKey,
-      preferences.excludedKeywords,
-    );
+  }
+
+  List<String> _readStringList(SharedPreferences preferences, String key) {
+    try {
+      return preferences.getStringList(key) ?? const <String>[];
+    } on Object {
+      return const <String>[];
+    }
+  }
+
+  void _completeRestore() {
+    if (!_restored.isCompleted) {
+      _restored.complete();
+    }
   }
 }
 

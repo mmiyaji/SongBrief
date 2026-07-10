@@ -5,15 +5,35 @@ import 'library_filter_preferences.dart';
 import 'snapshot_preferences.dart';
 
 final musicDataPreferencesReadyProvider = FutureProvider<void>((ref) async {
-  ref.read(snapshotRecordingProvider);
-  ref.read(snapshotCloudSyncProvider);
-  ref.read(temporaryDemoLibraryProvider);
-  ref.read(libraryFilterPreferencesProvider);
-
   await Future.wait([
-    ref.read(snapshotRecordingProvider.notifier).restored,
-    ref.read(snapshotCloudSyncProvider.notifier).restored,
-    ref.read(temporaryDemoLibraryProvider.notifier).restored,
-    ref.read(libraryFilterPreferencesProvider.notifier).restored,
+    _waitForPreferenceRestore(
+      initialize: () => ref.read(snapshotRecordingProvider),
+      restored: () => ref.read(snapshotRecordingProvider.notifier).restored,
+    ),
+    _waitForPreferenceRestore(
+      initialize: () => ref.read(snapshotCloudSyncProvider),
+      restored: () => ref.read(snapshotCloudSyncProvider.notifier).restored,
+    ),
+    _waitForPreferenceRestore(
+      initialize: () => ref.read(temporaryDemoLibraryProvider),
+      restored: () => ref.read(temporaryDemoLibraryProvider.notifier).restored,
+    ),
+    _waitForPreferenceRestore(
+      initialize: () => ref.read(libraryFilterPreferencesProvider),
+      restored: () =>
+          ref.read(libraryFilterPreferencesProvider.notifier).restored,
+    ),
   ]);
 });
+
+Future<void> _waitForPreferenceRestore({
+  required void Function() initialize,
+  required Future<void> Function() restored,
+}) async {
+  try {
+    initialize();
+    await restored();
+  } on Object {
+    // A single unavailable preference must not block the initial library load.
+  }
+}

@@ -6,6 +6,7 @@ import 'src/app.dart';
 import 'src/analytics/app_analytics.dart';
 import 'src/analytics/crash_reporting.dart';
 import 'src/settings/app_lock.dart';
+import 'src/settings/music_data_preferences_storage.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,7 @@ Future<void> main() async {
         appAnalyticsProvider.overrideWithValue(analytics),
         initialCrashReportingStateProvider.overrideWithValue(crashReporting),
         initialAppLockEnabledProvider.overrideWithValue(appLockEnabled),
+        musicDataSharedPreferencesProvider.overrideWithValue(preferences),
       ],
       child: const SongBriefApp(),
     ),
