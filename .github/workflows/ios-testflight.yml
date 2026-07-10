@@ -151,7 +151,7 @@ jobs:
           set -euo pipefail
           find ios -name "Podfile" -execdir pod install \;
 
-      - name: Validate Crashlytics symbol upload configuration
+      - name: Validate Crashlytics symbol uploader
         run: |
           set -euo pipefail
           python3 <<'PY'
@@ -168,13 +168,12 @@ jobs:
           for key, value in expected.items():
               if config.get(key) != value:
                   raise SystemExit(f"Unexpected {key} in {app_id_path}")
-
-          project = Path("ios/Runner.xcodeproj/project.pbxproj").read_text()
-          if "FirebaseCrashlytics/upload-symbols" not in project:
-              raise SystemExit(
-                  "CocoaPods did not add the Crashlytics dSYM upload build phase"
-              )
           PY
+          UPLOAD_SYMBOLS="ios/Pods/FirebaseCrashlytics/upload-symbols"
+          if [ ! -x "$UPLOAD_SYMBOLS" ]; then
+            echo "Crashlytics upload-symbols was not installed at $UPLOAD_SYMBOLS."
+            exit 1
+          fi
 
       - name: Run iOS unit tests
         run: |
@@ -343,6 +342,16 @@ jobs:
           echo "DSYM_PATH=$DSYM_PATH" >> "$GITHUB_ENV"
           echo "Produced dSYM: $DSYM_PATH"
           dwarfdump --uuid "$DSYM_PATH"
+
+      - name: Upload dSYMs to Firebase Crashlytics
+        run: |
+          set -euo pipefail
+          UPLOAD_SYMBOLS="ios/Pods/FirebaseCrashlytics/upload-symbols"
+          DSYM_DIRECTORY="build/ios/archive/Runner.xcarchive/dSYMs"
+          "$UPLOAD_SYMBOLS" \
+            --flutter-project "ios/firebase_app_id_file.json" \
+            -p ios \
+            "$DSYM_DIRECTORY"
 
       - name: Upload IPA artifact
         continue-on-error: true
