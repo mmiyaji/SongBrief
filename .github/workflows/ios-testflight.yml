@@ -180,8 +180,7 @@ jobs:
             -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -only-testing:RunnerTests \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            -parallel-testing-enabled NO
 
       - name: Create App Store export options
         run: |
