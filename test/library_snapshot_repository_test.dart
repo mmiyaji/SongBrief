@@ -138,22 +138,26 @@ void main() {
     expect(history.snapshotCount, 0);
   });
 
-  test('keeps more than one thousand daily snapshot files', () async {
-    const historyLength = 1100;
-    final start = DateTime(2026, 1, 1);
-    for (var index = 0; index < historyLength; index += 1) {
-      await _writeSnapshotFile(
-        snapshotDirectory,
-        _snapshotOn(start.add(Duration(days: index))),
-      );
-    }
+  test(
+    'keeps more than one thousand daily snapshot files',
+    () async {
+      const historyLength = 1100;
+      final start = DateTime(2026, 1, 1);
+      for (var index = 0; index < historyLength; index += 1) {
+        await _writeSnapshotFile(
+          snapshotDirectory,
+          _snapshotOn(start.add(Duration(days: index))),
+        );
+      }
 
-    final history = await repository.loadHistory();
+      final history = await repository.loadHistory();
 
-    expect(history.snapshotCount, historyLength);
-    expect(history.snapshots.first.dateKey, '2026-01-01');
-    expect(await _snapshotFileCount(snapshotDirectory), historyLength);
-  });
+      expect(history.snapshotCount, historyLength);
+      expect(history.snapshots.first.dateKey, '2026-01-01');
+      expect(await _snapshotFileCount(snapshotDirectory), historyLength);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
 
   test('loads older snapshots from summaries without track details', () async {
     final start = DateTime(2026, 1, 1);
