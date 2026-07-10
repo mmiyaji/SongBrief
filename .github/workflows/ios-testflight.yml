@@ -155,11 +155,21 @@ jobs:
         run: |
           set -euo pipefail
           SIMULATOR_ID="$(
-            xcrun simctl list devices available |
-              sed -nE 's/^[[:space:]]*iPhone.*\(([0-9A-F-]{36})\) \((Shutdown|Booted)\)$/\1/p' |
-              sed -n '1p'
+            xcrun simctl list devices available --json |
+              /usr/bin/python3 -c '
+          import json
+          import sys
+
+          runtimes = json.load(sys.stdin).get("devices", {}).values()
+          for devices in runtimes:
+              for device in devices:
+                  if device.get("isAvailable", True) and device.get("name", "").startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit
+          '
           )"
           if [ -z "$SIMULATOR_ID" ]; then
+            xcrun simctl list devices available
             echo "No available iPhone simulator was found."
             exit 1
           fi
