@@ -684,7 +684,15 @@ class _ReleaseYearDataSelector extends StatelessWidget {
             isExpanded: true,
             menuMaxHeight: 360,
             borderRadius: BorderRadius.circular(14),
-            hint: Text(_t(context, 'Select year data', '年別データを選択')),
+            hint: Text(
+              _t(
+                context,
+                'Select year data',
+                '年別データを選択',
+                zh: '选择年份数据',
+                ko: '연도 데이터 선택',
+              ),
+            ),
             items: buckets.indexed
                 .map(
                   (entry) => DropdownMenuItem<int>(
@@ -1057,7 +1065,7 @@ class _ActivityDaySelector extends StatelessWidget {
               ? () => onSelectDay(days[selectedIndex - 1])
               : null,
           icon: const Icon(Icons.chevron_left_rounded),
-          tooltip: _t(context, 'Previous day', '前の日'),
+          tooltip: _t(context, 'Previous day', '前の日', zh: '前一天', ko: '이전 날'),
         ),
         const SizedBox(width: 4),
         Expanded(
@@ -1112,7 +1120,7 @@ class _ActivityDaySelector extends StatelessWidget {
               ? () => onSelectDay(days[selectedIndex + 1])
               : null,
           icon: const Icon(Icons.chevron_right_rounded),
-          tooltip: _t(context, 'Next day', '次の日'),
+          tooltip: _t(context, 'Next day', '次の日', zh: '后一天', ko: '다음 날'),
         ),
       ],
     );
@@ -1563,7 +1571,13 @@ class _GenreStackedReleaseBarsCard extends StatelessWidget {
                   key: const ValueKey('genre-year-data-selector'),
                   isExpanded: true,
                   decoration: InputDecoration(
-                    labelText: _t(context, 'Open year data', '年別データを開く'),
+                    labelText: _t(
+                      context,
+                      'Open year data',
+                      '年別データを開く',
+                      zh: '打开年份数据',
+                      ko: '연도 데이터 열기',
+                    ),
                     border: const OutlineInputBorder(),
                   ),
                   items: stacks.indexed
