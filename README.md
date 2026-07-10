@@ -13,9 +13,9 @@ without an iPhone attached.
 
 - Latest App Store version: `1.0.0` (currently removed from sale in App Store Connect)
 - Next release candidate: `1.0.1` (source build `2`)
-- Latest accepted TestFlight upload: `1.0.1` (`CFBundleVersion` `2607101442`),
-  built by [iOS TestFlight #37](https://github.com/mmiyaji/SongBrief/actions/runs/29100791603)
-  on 2026-07-10
+- Latest accepted TestFlight upload: `1.0.1` (`CFBundleVersion` `2607102045`),
+  built by [iOS TestFlight #40](https://github.com/mmiyaji/SongBrief/actions/runs/29122438513)
+  on 2026-07-11
 - Public site: https://songbrief.ruhenheim.org/
 - Privacy Policy: https://songbrief.ruhenheim.org/privacy/
 - Terms of Use: https://songbrief.ruhenheim.org/terms/
@@ -26,8 +26,8 @@ Release readiness for `1.0.1`:
 
 - [x] Deploy the `DailySnapshot.filterSignature` String field to the Production
   CloudKit schema.
-- [x] Pass Dart coverage, native iOS unit tests, IPA verification, and App Store
-  Connect upload in the TestFlight workflow.
+- [x] Pass Dart coverage, native iOS unit tests, IPA verification, Crashlytics
+  dSYM upload, and App Store Connect upload in the TestFlight workflow.
 - [ ] Restore App Store availability under Pricing and Availability.
 - [ ] Complete App Store Connect metadata and submit `1.0.1` for review.
 

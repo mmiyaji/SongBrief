@@ -17,8 +17,10 @@ Reliability, recovery, and accessibility update for the next App Store release.
 ### Changed
 
 - Updated the source version to `1.0.1+2`. The accepted TestFlight build uses
-  `CFBundleVersion` `2607101442`.
+  `CFBundleVersion` `2607102045`.
 - Added Dart coverage and native iOS unit-test gates to the TestFlight release workflow.
+- Added verified Firebase Crashlytics dSYM uploads and retained release dSYMs
+  with the workflow artifact for manual recovery.
 - Made simulator discovery compatible with current Xcode runners and restored
   simulator test signing so the native test host can launch reliably.
 
@@ -26,9 +28,9 @@ Reliability, recovery, and accessibility update for the next App Store release.
 
 - Added `filterSignature` (String) to the CloudKit `DailySnapshot` record type
   and deployed the schema change to Production.
-- Passed the complete TestFlight workflow, including IPA verification and App
-  Store Connect upload, in
-  [iOS TestFlight #37](https://github.com/mmiyaji/SongBrief/actions/runs/29100791603).
+- Passed the complete TestFlight workflow, including IPA verification,
+  Crashlytics dSYM upload, and App Store Connect upload, in
+  [iOS TestFlight #40](https://github.com/mmiyaji/SongBrief/actions/runs/29122438513).
 - App Store availability and review submission remain pending.
 
 ## [1.0.0] - 2026-07-09
