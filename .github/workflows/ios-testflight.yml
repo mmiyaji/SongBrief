@@ -155,19 +155,20 @@ jobs:
         run: |
           set -euo pipefail
           python3 <<'PY'
-          import json
+          import plistlib
           from pathlib import Path
 
-          app_id_path = Path("ios/firebase_app_id_file.json")
-          config = json.loads(app_id_path.read_text())
+          service_file_path = Path("ios/Runner/GoogleService-Info.plist")
+          config = plistlib.loads(service_file_path.read_bytes())
           expected = {
               "GOOGLE_APP_ID": "1:635263972708:ios:e884ba44856bad539b7671",
-              "FIREBASE_PROJECT_ID": "songbrief-7c9c0",
+              "PROJECT_ID": "songbrief-7c9c0",
               "GCM_SENDER_ID": "635263972708",
+              "BUNDLE_ID": "app.songbrief.songbrief",
           }
           for key, value in expected.items():
               if config.get(key) != value:
-                  raise SystemExit(f"Unexpected {key} in {app_id_path}")
+                  raise SystemExit(f"Unexpected {key} in {service_file_path}")
           PY
           UPLOAD_SYMBOLS="ios/Pods/FirebaseCrashlytics/upload-symbols"
           if [ ! -x "$UPLOAD_SYMBOLS" ]; then
@@ -349,7 +350,7 @@ jobs:
           UPLOAD_SYMBOLS="ios/Pods/FirebaseCrashlytics/upload-symbols"
           DSYM_DIRECTORY="build/ios/archive/Runner.xcarchive/dSYMs"
           "$UPLOAD_SYMBOLS" \
-            --flutter-project "ios/firebase_app_id_file.json" \
+            -gsp "ios/Runner/GoogleService-Info.plist" \
             -p ios \
             "$DSYM_DIRECTORY"
 
