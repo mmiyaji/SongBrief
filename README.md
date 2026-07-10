@@ -11,11 +11,13 @@ without an iPhone attached.
 
 ## Release Status
 
-- Current App Store release: `1.0.0`
+- Latest App Store version: `1.0.0` (currently removed from sale in App Store Connect)
+- Next release candidate: `1.0.1` (source build `2`; TestFlight may assign a newer build number)
 - Public site: https://songbrief.ruhenheim.org/
 - Privacy Policy: https://songbrief.ruhenheim.org/privacy/
 - Terms of Use: https://songbrief.ruhenheim.org/terms/
 - Initial release notes: [docs/release-notes/v1.0.0.md](docs/release-notes/v1.0.0.md)
+- Next release notes: [docs/release-notes/v1.0.1.md](docs/release-notes/v1.0.1.md)
 
 ## 1.0.0 Scope
 
@@ -98,10 +100,13 @@ Release checklist for this feature:
 - In CloudKit Database, the Development and Production schemas must include
   record type `DailySnapshot` with fields: `payload` (String),
   `capturedAtMillis` (Int64), `trackCount` (Int64), `totalPlayCount` (Int64),
-  `totalSkipCount` (Int64), and `totalListeningSeconds` (Int64).
+  `totalSkipCount` (Int64), `totalListeningSeconds` (Int64), and
+  `filterSignature` (String).
 - After modifying the Development schema, deploy it to Production in CloudKit
   Dashboard before the App Store build (Console > CloudKit > Deploy Schema
   Changes).
+- In App Store Connect, restore availability under Pricing and Availability
+  before submitting the next version for release.
 - No query indexes are required: sync fetches records by deterministic
   record IDs (dateKeys) instead of running CloudKit queries.
 

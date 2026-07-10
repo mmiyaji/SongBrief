@@ -1893,7 +1893,7 @@ class _GroupSummaryValue {
   final String value;
 }
 
-const _fallbackAppVersionLabel = '1.0.0+1';
+const _fallbackAppVersionLabel = '1.0.1+2';
 
 String _hoursLabel(int listeningSeconds) {
   final hours = listeningSeconds / 3600;

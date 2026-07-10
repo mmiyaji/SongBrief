@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.1] - 2026-07-10
+
+Reliability, recovery, and accessibility update for the next App Store release.
+
+### Fixed
+
+- Protected listening records from overlapping refreshes and concurrent snapshot writes.
+- Kept local and iCloud snapshot history consistent when filters differ between devices or cloud deletion fails.
+- Prevented temporary demo data from being recorded, synced, or managed as real listening history.
+- Made App Lock fail closed when authentication times out or cannot be completed.
+- Restored full filtered-library playback queues instead of starting single-track queues.
+- Added recovery actions for denied Music access and failed library scans.
+- Improved chart, heatmap, settings, selection, text-scaling, and dark-theme accessibility.
+
+### Changed
+
+- Updated the app version to `1.0.1` with build number `2`.
+- Added Dart coverage and native iOS unit-test gates to the TestFlight release workflow.
+
 ## [1.0.0] - 2026-07-09
 
 Initial App Store release candidate.
