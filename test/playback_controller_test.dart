@@ -185,6 +185,9 @@ class _NoopMusicLibraryClient implements MusicLibraryClient {
   }
 
   @override
+  Future<bool> openAppSettings() async => false;
+
+  @override
   Future<List<LibraryTrack>> fetchTracks() async => const [];
 
   @override

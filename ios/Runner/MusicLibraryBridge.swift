@@ -1,5 +1,6 @@
 import Flutter
 import MediaPlayer
+import UIKit
 
 final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
   private let player = MPMusicPlayerController.systemMusicPlayer
@@ -36,6 +37,14 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
         DispatchQueue.main.async {
           result(Self.authorizationStatusString(status))
         }
+      }
+    case "openAppSettings":
+      guard let url = URL(string: UIApplication.openSettingsURLString) else {
+        result(false)
+        return
+      }
+      UIApplication.shared.open(url, options: [:]) { opened in
+        result(opened)
       }
     case "fetchTracks":
       fetchTracks(result: result)
@@ -221,7 +230,11 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     }
 
     let player = MPMusicPlayerController.systemMusicPlayer
-    player.setQueue(with: MPMediaItemCollection(items: [item]))
+    var queueItems = SongBriefSnapshotRefresh.filteredLibraryItems()
+    if !queueItems.contains(where: { $0.persistentID == item.persistentID }) {
+      queueItems.append(item)
+    }
+    player.setQueue(with: MPMediaItemCollection(items: queueItems))
     player.nowPlayingItem = item
     player.currentPlaybackTime = 0
     player.play()

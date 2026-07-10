@@ -419,6 +419,9 @@ class _CloudSyncSpyClient implements MusicLibraryClient {
   }
 
   @override
+  Future<bool> openAppSettings() async => false;
+
+  @override
   Future<List<LibraryTrack>> fetchTracks() async {
     fetchTrackCalls += 1;
     return tracks;

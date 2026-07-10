@@ -36,10 +36,15 @@ void main() {
       MusicLibraryAuthorizationStatus.notDetermined.canAskForAccess,
       isTrue,
     );
-    expect(MusicLibraryAuthorizationStatus.denied.canAskForAccess, isTrue);
-    expect(MusicLibraryAuthorizationStatus.restricted.canAskForAccess, isTrue);
+    expect(MusicLibraryAuthorizationStatus.denied.canAskForAccess, isFalse);
+    expect(MusicLibraryAuthorizationStatus.restricted.canAskForAccess, isFalse);
     expect(
       MusicLibraryAuthorizationStatus.unsupported.canAskForAccess,
+      isFalse,
+    );
+    expect(MusicLibraryAuthorizationStatus.denied.canOpenSettings, isTrue);
+    expect(
+      MusicLibraryAuthorizationStatus.notDetermined.canOpenSettings,
       isFalse,
     );
   });

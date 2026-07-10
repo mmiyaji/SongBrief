@@ -807,11 +807,11 @@ class _LoadingOrbitPainter extends CustomPainter {
   }
 }
 
-class _ErrorState extends StatelessWidget {
+class _ErrorState extends ConsumerWidget {
   const _ErrorState();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Center(
       child: Padding(
@@ -842,6 +842,16 @@ class _ErrorState extends StatelessWidget {
                 ),
                 style: theme.textTheme.bodySmall,
                 textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => ref
+                    .read(musicStatsControllerProvider.notifier)
+                    .refreshStats(),
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(
+                  _t(context, 'Try again', '再試行', zh: '重试', ko: '다시 시도'),
+                ),
               ),
             ],
           ),

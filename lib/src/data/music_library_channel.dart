@@ -8,6 +8,8 @@ abstract class MusicLibraryClient {
 
   Future<MusicLibraryAuthorizationStatus> requestAuthorization();
 
+  Future<bool> openAppSettings();
+
   Future<List<LibraryTrack>> fetchTracks();
 
   Future<MusicPlaybackSnapshot?> currentPlayback();
@@ -53,6 +55,11 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
   Future<MusicLibraryAuthorizationStatus> requestAuthorization() async {
     final status = await _channel.invokeMethod<Object?>('requestAuthorization');
     return MusicLibraryAuthorizationStatus.fromPlatformValue(status);
+  }
+
+  @override
+  Future<bool> openAppSettings() async {
+    return await _channel.invokeMethod<bool>('openAppSettings') ?? false;
   }
 
   @override

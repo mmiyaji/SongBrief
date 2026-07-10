@@ -8,9 +8,9 @@ enum MusicLibraryAuthorizationStatus {
   bool get canReadLibrary => this == MusicLibraryAuthorizationStatus.authorized;
 
   bool get canAskForAccess =>
-      this == MusicLibraryAuthorizationStatus.notDetermined ||
-      this == MusicLibraryAuthorizationStatus.denied ||
-      this == MusicLibraryAuthorizationStatus.restricted;
+      this == MusicLibraryAuthorizationStatus.notDetermined;
+
+  bool get canOpenSettings => this == MusicLibraryAuthorizationStatus.denied;
 
   static MusicLibraryAuthorizationStatus fromPlatformValue(Object? value) {
     return switch (value) {

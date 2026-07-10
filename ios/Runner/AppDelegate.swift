@@ -97,15 +97,7 @@ enum SongBriefSnapshotRefresh {
     }
 
     let rules = exclusionRules
-    let playlistNamesByItemID: [UInt64: [String]] = rules.needsPlaylistNames
-      ? MusicLibraryBridge.playlistNamesByItemID()
-      : [:]
-    let items = (MPMediaQuery.songs().items ?? []).filter { item in
-      !rules.excludes(
-        item,
-        playlistNames: playlistNamesByItemID[item.persistentID] ?? []
-      )
-    }
+    let items = filteredLibraryItems(using: rules)
 
     let now = Date()
     let tracks = compactTrackSnapshots(from: items)
@@ -137,6 +129,10 @@ enum SongBriefSnapshotRefresh {
 
   static func localSnapshots() -> [[String: Any]] {
     SnapshotFileStore.readSnapshots()
+  }
+
+  static func filteredLibraryItems() -> [MPMediaItem] {
+    filteredLibraryItems(using: exclusionRules)
   }
 
   /// Replaces the given dateKeys in the stored history with already merged
@@ -181,6 +177,20 @@ enum SongBriefSnapshotRefresh {
         defaults.stringArray(forKey: excludedKeywordsPreferenceKey) ?? []
       )
     )
+  }
+
+  private static func filteredLibraryItems(
+    using rules: LibraryExclusionRules
+  ) -> [MPMediaItem] {
+    let playlistNamesByItemID: [UInt64: [String]] = rules.needsPlaylistNames
+      ? MusicLibraryBridge.playlistNamesByItemID()
+      : [:]
+    return (MPMediaQuery.songs().items ?? []).filter { item in
+      !rules.excludes(
+        item,
+        playlistNames: playlistNamesByItemID[item.persistentID] ?? []
+      )
+    }
   }
 
   private static func normalizedRules(_ values: [String]) -> [String] {

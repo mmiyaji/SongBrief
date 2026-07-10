@@ -126,6 +126,13 @@ class MusicStatsRepository {
     return _client.fetchArtwork(trackId, size: size);
   }
 
+  Future<bool> openAppSettings() {
+    if (!_isIosMusicRuntime) {
+      return Future.value(false);
+    }
+    return _client.openAppSettings();
+  }
+
   Future<MusicPlaybackSnapshot?> currentPlayback() {
     if (!_isIosMusicRuntime) {
       return Future<MusicPlaybackSnapshot?>.value();

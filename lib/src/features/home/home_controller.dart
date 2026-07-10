@@ -244,6 +244,10 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     }
   }
 
+  Future<bool> openMusicSettings() {
+    return ref.read(musicStatsRepositoryProvider).openAppSettings();
+  }
+
   Future<void> refreshStats() {
     return _refreshStats(showLoading: true);
   }

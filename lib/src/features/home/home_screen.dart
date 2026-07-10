@@ -1094,32 +1094,57 @@ class _AuthorizationPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final message = status == MusicLibraryAuthorizationStatus.notDetermined
-        ? _t(
-            context,
-            'SongBrief uses Music access to read play counts and skip counts.',
-            'SongBriefは再生回数とスキップ回数を読み取るためにミュージックアクセスを使用します。',
-          )
-        : _t(
-            context,
-            'Music access is ${_authorizationLabel(context, status).toLowerCase()}.',
-            'ミュージックアクセスは「${_authorizationLabel(context, status)}」です。',
-            zh: '音乐访问权限：${_authorizationLabel(context, status)}。',
-            ko: '음악 접근 상태: ${_authorizationLabel(context, status)}.',
-          );
+    final message = switch (status) {
+      MusicLibraryAuthorizationStatus.notDetermined => _t(
+        context,
+        'SongBrief uses Music access to read play counts and skip counts.',
+        'SongBriefは再生回数とスキップ回数を読み取るためにミュージックアクセスを使用します。',
+      ),
+      MusicLibraryAuthorizationStatus.denied => _t(
+        context,
+        'Music access is off. Allow access in iOS Settings to scan your library.',
+        'ミュージックアクセスはオフです。ライブラリを読み込むにはiOS設定でアクセスを許可してください。',
+        zh: '音乐访问已关闭。请在 iOS 设置中允许访问以扫描音乐资料库。',
+        ko: '음악 접근이 꺼져 있습니다. 보관함을 스캔하려면 iOS 설정에서 접근을 허용하세요.',
+      ),
+      MusicLibraryAuthorizationStatus.restricted => _t(
+        context,
+        'Music access is restricted on this device.',
+        'この端末ではミュージックアクセスが制限されています。',
+        zh: '此设备上的音乐访问受到限制。',
+        ko: '이 기기에서는 음악 접근이 제한되어 있습니다.',
+      ),
+      _ => _t(
+        context,
+        'Music access is unavailable on this device.',
+        'この端末ではミュージックアクセスを利用できません。',
+        zh: '此设备无法使用音乐访问。',
+        ko: '이 기기에서는 음악 접근을 사용할 수 없습니다.',
+      ),
+    };
 
     return GlassSurface(
       tint: const Color(0x5CFFFFFF),
       radius: 18,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final action = FilledButton.icon(
-            onPressed: () {
-              ref.read(musicStatsControllerProvider.notifier).requestAccess();
-            },
-            icon: const Icon(Icons.arrow_forward),
-            label: Text(_t(context, 'Continue', '続ける', zh: '继续', ko: '계속')),
-          );
+          final action = switch (status) {
+            MusicLibraryAuthorizationStatus.notDetermined => FilledButton.icon(
+              onPressed: () {
+                ref.read(musicStatsControllerProvider.notifier).requestAccess();
+              },
+              icon: const Icon(Icons.arrow_forward),
+              label: Text(_t(context, 'Continue', '続ける', zh: '继续', ko: '계속')),
+            ),
+            MusicLibraryAuthorizationStatus.denied => FilledButton.icon(
+              onPressed: () => _openMusicSettings(context, ref),
+              icon: const Icon(Icons.settings_outlined),
+              label: Text(
+                _t(context, 'Open Settings', '設定を開く', zh: '打开设置', ko: '설정 열기'),
+              ),
+            ),
+            _ => null,
+          };
 
           final content = Row(
             children: [
@@ -1134,8 +1159,10 @@ class _AuthorizationPanel extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 content,
-                const SizedBox(height: 12),
-                Align(alignment: Alignment.centerRight, child: action),
+                if (action != null) ...[
+                  const SizedBox(height: 12),
+                  Align(alignment: Alignment.centerRight, child: action),
+                ],
               ],
             );
           }
@@ -1143,14 +1170,35 @@ class _AuthorizationPanel extends ConsumerWidget {
           return Row(
             children: [
               Expanded(child: content),
-              const SizedBox(width: 12),
-              action,
+              if (action != null) ...[const SizedBox(width: 12), action],
             ],
           );
         },
       ),
     );
   }
+}
+
+Future<void> _openMusicSettings(BuildContext context, WidgetRef ref) async {
+  final opened = await ref
+      .read(musicStatsControllerProvider.notifier)
+      .openMusicSettings();
+  if (opened || !context.mounted) {
+    return;
+  }
+  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+    SnackBar(
+      content: Text(
+        _t(
+          context,
+          'Could not open iOS Settings.',
+          'iOS設定を開けませんでした。',
+          zh: '无法打开 iOS 设置。',
+          ko: 'iOS 설정을 열 수 없습니다.',
+        ),
+      ),
+    ),
+  );
 }
 
 class _DemoBanner extends StatelessWidget {
