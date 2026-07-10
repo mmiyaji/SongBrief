@@ -85,6 +85,44 @@ void main() {
     expect(protector.lockStates, contains(true));
   });
 
+  testWidgets('keeps preview protection while app lock state initializes', (
+    tester,
+  ) async {
+    final protector = _FakeAppLockPrivacyProtector();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          initialAppLockEnabledProvider.overrideWithValue(true),
+          appLockControllerProvider.overrideWith(_LoadingAppLockController.new),
+          appLockPrivacyProtectorProvider.overrideWithValue(protector),
+        ],
+        child: const MaterialApp(
+          home: AppLockGate(child: Text('Private content')),
+        ),
+      ),
+    );
+    await tester.pump();
+    protector.lockStates.clear();
+
+    for (final lifecycleState in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+    ]) {
+      protector.lockStates.clear();
+      tester.binding.handleAppLifecycleStateChanged(lifecycleState);
+      await tester.pump();
+
+      expect(protector.lockStates, isNotEmpty, reason: '$lifecycleState');
+      expect(
+        protector.lockStates,
+        everyElement(isTrue),
+        reason: '$lifecycleState',
+      );
+    }
+  });
+
   testWidgets('locks above modal sheets and blocks sheet actions', (
     tester,
   ) async {

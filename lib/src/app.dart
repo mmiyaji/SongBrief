@@ -127,9 +127,14 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       final lockState = ref.read(appLockControllerProvider).value;
-      if (lockState?.enabled == true && lockState?.supported == true) {
+      final initializingWithSavedLock =
+          lockState == null && ref.read(initialAppLockEnabledProvider);
+      if (initializingWithSavedLock ||
+          (lockState?.enabled == true && lockState?.supported == true)) {
         unawaited(_privacyProtector.setLocked(true));
-        unawaited(ref.read(appLockControllerProvider.notifier).lock());
+        if (lockState != null) {
+          unawaited(ref.read(appLockControllerProvider.notifier).lock());
+        }
       } else {
         unawaited(_privacyProtector.setLocked(false));
       }
