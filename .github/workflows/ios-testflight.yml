@@ -143,12 +143,35 @@ jobs:
         run: |
           set -euo pipefail
           flutter analyze
-          flutter test
+          flutter test --coverage
+          dart run tool/coverage_report.dart coverage/lcov.info "$RUNNER_TEMP/coverage_report.md"
 
       - name: Install CocoaPods dependencies
         run: |
           set -euo pipefail
           find ios -name "Podfile" -execdir pod install \;
+
+      - name: Run iOS unit tests
+        run: |
+          set -euo pipefail
+          SIMULATOR_ID="$(
+            xcrun simctl list devices available |
+              sed -nE 's/^[[:space:]]*iPhone.*\(([0-9A-F-]{36})\) \((Shutdown|Booted)\)$/\1/p' |
+              sed -n '1p'
+          )"
+          if [ -z "$SIMULATOR_ID" ]; then
+            echo "No available iPhone simulator was found."
+            exit 1
+          fi
+          xcodebuild test \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -only-testing:RunnerTests \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
 
       - name: Create App Store export options
         run: |

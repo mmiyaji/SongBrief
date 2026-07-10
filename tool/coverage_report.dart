@@ -25,9 +25,20 @@ void main(List<String> args) {
   final lcovPath = args.isEmpty ? _defaultLcovPath : args[0];
   final reportPath = args.length < 2 ? _defaultReportPath : args[1];
   final records = _parseLcov(File(lcovPath));
-  final targetRecords = [
+  final missingTargets = [
     for (final target in _unitCoverageTargets)
-      records[target] ?? CoverageRecord(file: target),
+      if (records[target] == null || records[target]!.totalLines == 0) target,
+  ];
+  if (missingTargets.isNotEmpty) {
+    stderr.writeln(
+      'Coverage data is missing for required targets:\n'
+      '${missingTargets.map((target) => '- $target').join('\n')}',
+    );
+    exitCode = 1;
+    return;
+  }
+  final targetRecords = [
+    for (final target in _unitCoverageTargets) records[target]!,
   ]..sort((a, b) => a.file.compareTo(b.file));
 
   final summary = CoverageSummary(targetRecords);
