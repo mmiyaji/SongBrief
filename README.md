@@ -13,7 +13,7 @@ without an iPhone attached.
 
 - Latest App Store version: `1.0.0` (currently removed from sale in App Store Connect)
 - Next release candidate: `1.0.1` (source build `2`)
-- Latest accepted TestFlight upload: `1.0.1` (`CFBundleVersion` `2607102045`),
+- Previous accepted TestFlight upload: `1.0.1` (`CFBundleVersion` `2607102045`),
   built by [iOS TestFlight #40](https://github.com/mmiyaji/SongBrief/actions/runs/29122438513)
   on 2026-07-11
 - Public site: https://songbrief.ruhenheim.org/
@@ -28,6 +28,9 @@ Release readiness for `1.0.1`:
   CloudKit schema.
 - [x] Pass Dart coverage, native iOS unit tests, IPA verification, Crashlytics
   dSYM upload, and App Store Connect upload in the TestFlight workflow.
+- [ ] Register the widget App ID and App Group, install its App Store
+  provisioning profile in GitHub Actions, and create a new TestFlight build
+  containing the widget and recap updates.
 - [ ] Restore App Store availability under Pricing and Availability.
 - [ ] Complete App Store Connect metadata and submit `1.0.1` for review.
 
@@ -42,6 +45,12 @@ Release readiness for `1.0.1`:
   and CSV / JSON export
 - Daily listening records stored locally as per-day files with optional private
   iCloud sync
+- Listening-record health with last-record age, iCloud sync status, and manual
+  retry
+- Weekly, monthly, and yearly recaps with previous-period comparisons,
+  listening time, skips, and privacy-aware PNG sharing
+- Small and medium iOS home-screen widgets for the latest observed listening
+  changes
 - Music library authorization flow on iOS and temporary demo-data mode for empty
   or inaccessible libraries
 - Theme, appearance, language, app lock, privacy screen, crash report, cache,
@@ -129,6 +138,27 @@ Native iOS Liquid Glass APIs such as SwiftUI `.glassEffect` are not directly
 available inside Flutter widgets. The MVP uses `FakeGlass` for a similar, lower
 cost visual layer. If exact iOS 26 Liquid Glass behavior becomes a priority, add
 a small SwiftUI platform view for specific surfaces instead of rewriting the app.
+
+## Home Widget Notes
+
+The WidgetKit extension uses bundle ID `app.songbrief.songbrief.widget` and the
+App Group `group.app.songbrief.songbrief`. The Flutter app writes a compact
+summary of the latest local listening-record delta to shared `UserDefaults`;
+the widget never reads the Music library or CloudKit directly. Background
+snapshot capture also refreshes the widget's last-record timestamp.
+
+Before creating a release build:
+
+1. Register `app.songbrief.songbrief.widget` as an App ID in Apple Developer.
+2. Register `group.app.songbrief.songbrief` and enable it for both the main app
+   and widget App IDs.
+3. Regenerate the main app provisioning profile because its entitlements now
+   include the App Group.
+4. Create an App Store provisioning profile for the widget extension and save
+   its base64 content as the GitHub secret
+   `IOS_PROVISIONING_PROFILE_WIDGET_BASE64`.
+5. Update `IOS_PROVISIONING_PROFILE_APP_BASE64` with the regenerated main app
+   profile, then run the iOS TestFlight workflow.
 
 ## Validation
 
