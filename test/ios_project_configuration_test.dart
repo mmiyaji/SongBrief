@@ -3,6 +3,15 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('widget extension declares a non-empty bundle name', () {
+    final infoPlist = File('ios/SongBriefWidget/Info.plist').readAsStringSync();
+
+    expect(
+      infoPlist,
+      contains('<key>CFBundleName</key>\n\t<string>\$(PRODUCT_NAME)</string>'),
+    );
+  });
+
   test('widget extension does not inherit Runner linker flags', () {
     final project = File(
       'ios/Runner.xcodeproj/project.pbxproj',
