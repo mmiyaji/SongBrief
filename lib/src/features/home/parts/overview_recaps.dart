@@ -170,13 +170,64 @@ class _RecapSummaryCard extends StatefulWidget {
 class _RecapSummaryCardState extends State<_RecapSummaryCard> {
   final _captureKey = GlobalKey();
   bool _isExporting = false;
-  static const _fileStem = 'songbrief-recap-summary';
+  bool _hideListeningDetails = false;
+  _RecapShareScope _shareScope = _RecapShareScope.week;
+
+  String get _fileStem => 'songbrief-recap-${_shareScope.name}';
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Row(
+          children: [
+            Expanded(
+              child: SegmentedButton<_RecapShareScope>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(
+                    value: _RecapShareScope.week,
+                    label: Text(_t(context, 'Week', '週間')),
+                  ),
+                  ButtonSegment(
+                    value: _RecapShareScope.month,
+                    label: Text(_t(context, 'Month', '月間')),
+                  ),
+                  ButtonSegment(
+                    value: _RecapShareScope.summary,
+                    label: Text(_t(context, 'Summary', '総合')),
+                  ),
+                ],
+                selected: {_shareScope},
+                onSelectionChanged: _isExporting
+                    ? null
+                    : (selection) {
+                        setState(() => _shareScope = selection.first);
+                      },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              tooltip: _hideListeningDetails
+                  ? _t(context, 'Show song details', '曲の情報を表示')
+                  : _t(context, 'Hide song details', '曲の情報を隠す'),
+              onPressed: _isExporting
+                  ? null
+                  : () {
+                      setState(
+                        () => _hideListeningDetails = !_hideListeningDetails,
+                      );
+                    },
+              icon: Icon(
+                _hideListeningDetails
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
         RepaintBoundary(
           key: _captureKey,
           child: _RecapSummaryCardContent(
@@ -186,6 +237,8 @@ class _RecapSummaryCardState extends State<_RecapSummaryCard> {
             year: widget.year,
             milestones: widget.milestones,
             burnout: widget.burnout,
+            shareScope: _shareScope,
+            hideListeningDetails: _hideListeningDetails,
           ),
         ),
         if (widget.hasExportData) ...[
@@ -313,8 +366,8 @@ class _RecapSummaryCardState extends State<_RecapSummaryCard> {
         final title = _t(context, 'SongBrief Recap', 'SongBriefリキャップ');
         final shareText = _t(
           context,
-          'My SongBrief listening recap',
-          'SongBriefのリスニングリキャップ',
+          'My SongBrief ${_shareScope.name} listening recap',
+          'SongBriefの${_recapShareScopeLabel(context, _shareScope)}リキャップ',
         );
         final unavailableMessage = _t(
           context,
@@ -358,6 +411,8 @@ class _RecapSummaryCardContent extends StatelessWidget {
     required this.year,
     required this.milestones,
     required this.burnout,
+    required this.shareScope,
+    required this.hideListeningDetails,
   });
 
   final LibraryOverview overview;
@@ -366,12 +421,18 @@ class _RecapSummaryCardContent extends StatelessWidget {
   final _PeriodRecap year;
   final List<_MilestoneForecast> milestones;
   final _BurnoutSummary burnout;
+  final _RecapShareScope shareScope;
+  final bool hideListeningDetails;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final number = _numberFormat(context);
-    final topRecapTrack = _strongestRecapTrack(week, month, year);
+    final topRecapTrack = switch (shareScope) {
+      _RecapShareScope.week => week.topTrack,
+      _RecapShareScope.month => month.topTrack,
+      _RecapShareScope.summary => _strongestRecapTrack(week, month, year),
+    };
     final borderColor = Color.lerp(
       theme.colorScheme.outlineVariant,
       theme.colorScheme.primary,
@@ -442,7 +503,7 @@ class _RecapSummaryCardContent extends StatelessWidget {
             const SizedBox(height: 18),
             LayoutBuilder(
               builder: (context, constraints) {
-                final periodCards = [
+                final allPeriodCards = [
                   _RecapPeriodSummaryTile(
                     title: _t(context, 'This week', '今週'),
                     icon: Icons.date_range_rounded,
@@ -459,24 +520,35 @@ class _RecapSummaryCardContent extends StatelessWidget {
                     recap: year,
                   ),
                 ];
+                final periodCards = switch (shareScope) {
+                  _RecapShareScope.week => [allPeriodCards[0]],
+                  _RecapShareScope.month => [allPeriodCards[1]],
+                  _RecapShareScope.summary => allPeriodCards,
+                };
                 if (constraints.maxWidth >= 780) {
                   return Row(
                     children: [
-                      Expanded(child: periodCards[0]),
-                      const SizedBox(width: 10),
-                      Expanded(child: periodCards[1]),
-                      const SizedBox(width: 10),
-                      Expanded(child: periodCards[2]),
+                      for (
+                        var index = 0;
+                        index < periodCards.length;
+                        index++
+                      ) ...[
+                        if (index > 0) const SizedBox(width: 10),
+                        Expanded(child: periodCards[index]),
+                      ],
                     ],
                   );
                 }
                 return Column(
                   children: [
-                    periodCards[0],
-                    const SizedBox(height: 10),
-                    periodCards[1],
-                    const SizedBox(height: 10),
-                    periodCards[2],
+                    for (
+                      var index = 0;
+                      index < periodCards.length;
+                      index++
+                    ) ...[
+                      if (index > 0) const SizedBox(height: 10),
+                      periodCards[index],
+                    ],
                   ],
                 );
               },
@@ -490,6 +562,8 @@ class _RecapSummaryCardContent extends StatelessWidget {
                   label: _t(context, 'Top song', 'トップ曲'),
                   value: topRecapTrack == null
                       ? _t(context, 'None yet', 'まだありません')
+                      : hideListeningDetails
+                      ? _t(context, 'Hidden for sharing', '共有用に非表示')
                       : '${topRecapTrack.title} +${number.format(topRecapTrack.playDelta)}',
                 ),
                 const SizedBox(height: 10),
@@ -508,8 +582,9 @@ class _RecapSummaryCardContent extends StatelessWidget {
                   _RecapLine(
                     icon: milestones.first.icon,
                     label: _t(context, 'Next milestone', '次の節目'),
-                    value:
-                        '${milestones.first.label} / ${milestones.first.daysLabel}',
+                    value: hideListeningDetails
+                        ? _t(context, 'Hidden for sharing', '共有用に非表示')
+                        : '${milestones.first.label} / ${milestones.first.daysLabel}',
                   ),
                 ],
                 const SizedBox(height: 10),
@@ -517,9 +592,13 @@ class _RecapSummaryCardContent extends StatelessWidget {
                   icon: Icons.local_fire_department_rounded,
                   label: _t(context, 'Listening curve', '聴き方の変化'),
                   value:
-                      burnout.burnoutTrack?.title ??
-                      burnout.evergreenTrack?.title ??
-                      _t(context, 'No sharp change', '大きな変化なし'),
+                      (hideListeningDetails &&
+                          (burnout.burnoutTrack != null ||
+                              burnout.evergreenTrack != null))
+                      ? _t(context, 'Hidden for sharing', '共有用に非表示')
+                      : burnout.burnoutTrack?.title ??
+                            burnout.evergreenTrack?.title ??
+                            _t(context, 'No sharp change', '大きな変化なし'),
                 ),
               ],
             ),
@@ -1096,6 +1175,16 @@ class _RecapLine extends StatelessWidget {
       ],
     );
   }
+}
+
+enum _RecapShareScope { week, month, summary }
+
+String _recapShareScopeLabel(BuildContext context, _RecapShareScope scope) {
+  return switch (scope) {
+    _RecapShareScope.week => _t(context, 'weekly', '週間'),
+    _RecapShareScope.month => _t(context, 'monthly', '月間'),
+    _RecapShareScope.summary => _t(context, 'summary', '総合'),
+  };
 }
 
 enum _RecapPeriod { week, month, year }
