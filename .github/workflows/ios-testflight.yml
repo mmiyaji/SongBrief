@@ -24,6 +24,7 @@ env:
   FLUTTER_VERSION: "3.41.6"
   APPLE_TEAM_ID: "B8LGAS7YHH"
   BUNDLE_ID: "app.songbrief.songbrief"
+  WIDGET_BUNDLE_ID: "app.songbrief.songbrief.widget"
   KEYCHAIN_NAME: "songbrief-build.keychain-db"
   SONGBRIEF_AD_MODE: "admobLive"
   SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID: "ca-app-pub-5321136982470738/2315074663"
@@ -90,6 +91,7 @@ jobs:
           IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
           IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           IOS_PROVISIONING_PROFILE_APP_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_APP_BASE64 }}
+          IOS_PROVISIONING_PROFILE_WIDGET_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_WIDGET_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.IOS_BUILD_KEYCHAIN_PASSWORD }}
         run: |
           set -euo pipefail
@@ -97,6 +99,7 @@ jobs:
           : "${IOS_DISTRIBUTION_CERTIFICATE_BASE64:?Missing IOS_DISTRIBUTION_CERTIFICATE_BASE64 secret}"
           : "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD:?Missing IOS_DISTRIBUTION_CERTIFICATE_PASSWORD secret}"
           : "${IOS_PROVISIONING_PROFILE_APP_BASE64:?Missing IOS_PROVISIONING_PROFILE_APP_BASE64 secret}"
+          : "${IOS_PROVISIONING_PROFILE_WIDGET_BASE64:?Missing IOS_PROVISIONING_PROFILE_WIDGET_BASE64 secret}"
 
           KEYCHAIN_PASSWORD="${KEYCHAIN_PASSWORD:-$(uuidgen)}"
           CERTIFICATE_PATH="$RUNNER_TEMP/distribution.p12"
@@ -125,9 +128,20 @@ jobs:
           IOS_APP_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$PROFILE_PLIST")
           cp "$PROFILE_PATH" "$PROFILE_DIR/$IOS_APP_PROFILE_UUID.mobileprovision"
           echo "Installed provisioning profile: $IOS_APP_PROFILE_NAME ($IOS_APP_PROFILE_UUID)"
+
+          WIDGET_PROFILE_PATH="$RUNNER_TEMP/songbrief-widget-app-store.mobileprovision"
+          WIDGET_PROFILE_PLIST="$RUNNER_TEMP/songbrief-widget-app-store.plist"
+          echo "$IOS_PROVISIONING_PROFILE_WIDGET_BASE64" | base64 --decode > "$WIDGET_PROFILE_PATH"
+          security cms -D -i "$WIDGET_PROFILE_PATH" > "$WIDGET_PROFILE_PLIST"
+          IOS_WIDGET_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$WIDGET_PROFILE_PLIST")
+          IOS_WIDGET_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$WIDGET_PROFILE_PLIST")
+          cp "$WIDGET_PROFILE_PATH" "$PROFILE_DIR/$IOS_WIDGET_PROFILE_UUID.mobileprovision"
+          echo "Installed widget provisioning profile: $IOS_WIDGET_PROFILE_NAME ($IOS_WIDGET_PROFILE_UUID)"
           {
             echo "IOS_APP_PROFILE_UUID=$IOS_APP_PROFILE_UUID"
             echo "IOS_APP_PROFILE_NAME=$IOS_APP_PROFILE_NAME"
+            echo "IOS_WIDGET_PROFILE_UUID=$IOS_WIDGET_PROFILE_UUID"
+            echo "IOS_WIDGET_PROFILE_NAME=$IOS_WIDGET_PROFILE_NAME"
           } >> "$GITHUB_ENV"
 
       - name: Install Flutter dependencies
@@ -225,6 +239,8 @@ jobs:
             <dict>
               <key>${BUNDLE_ID}</key>
               <string>${IOS_APP_PROFILE_NAME}</string>
+              <key>${WIDGET_BUNDLE_ID}</key>
+              <string>${IOS_WIDGET_PROFILE_NAME}</string>
             </dict>
             <key>signingCertificate</key>
             <string>Apple Distribution</string>
@@ -251,9 +267,18 @@ jobs:
           project_path = Path("ios/Runner.xcodeproj/project.pbxproj")
           text = project_path.read_text()
           bundle_id = os.environ["BUNDLE_ID"]
-          profile_name = os.environ["IOS_APP_PROFILE_NAME"]
-          profile_uuid = os.environ["IOS_APP_PROFILE_UUID"]
+          widget_bundle_id = os.environ["WIDGET_BUNDLE_ID"]
           team_id = os.environ["APPLE_TEAM_ID"]
+          signing_profiles = {
+              bundle_id: (
+                  os.environ["IOS_APP_PROFILE_NAME"],
+                  os.environ["IOS_APP_PROFILE_UUID"],
+              ),
+              widget_bundle_id: (
+                  os.environ["IOS_WIDGET_PROFILE_NAME"],
+                  os.environ["IOS_WIDGET_PROFILE_UUID"],
+              ),
+          }
 
           def upsert_setting(block: str, key: str, value: str) -> str:
               quoted_key = f'"{key}"' if "[" in key or "]" in key else key
@@ -292,7 +317,16 @@ jobs:
               block = text[start:end]
               output.append(text[cursor:start])
 
-              if f"PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};" in block:
+              matched_bundle_id = next(
+                  (
+                      candidate
+                      for candidate in signing_profiles
+                      if f"PRODUCT_BUNDLE_IDENTIFIER = {candidate};" in block
+                  ),
+                  None,
+              )
+              if matched_bundle_id is not None:
+                  profile_name, profile_uuid = signing_profiles[matched_bundle_id]
                   block = upsert_setting(block, "CODE_SIGN_IDENTITY", '"Apple Distribution"')
                   block = upsert_setting(block, "CODE_SIGN_IDENTITY[sdk=iphoneos*]", '"Apple Distribution"')
                   block = upsert_setting(block, "CODE_SIGN_STYLE", "Manual")
@@ -300,13 +334,15 @@ jobs:
                   block = upsert_setting(block, "PROVISIONING_PROFILE", profile_uuid)
                   block = upsert_setting(block, "PROVISIONING_PROFILE_SPECIFIER", f'"{profile_name}"')
                   configured += 1
-                  print(f"Configured manual signing for {bundle_id}: {profile_name} ({profile_uuid})")
+                  print(f"Configured manual signing for {matched_bundle_id}: {profile_name} ({profile_uuid})")
 
               output.append(block)
               cursor = end
 
-          if configured == 0:
-              raise RuntimeError(f"No build settings block found for {bundle_id}")
+          if configured < 6:
+              raise RuntimeError(
+                  f"Expected app and widget signing settings in 6 blocks, configured {configured}"
+              )
 
           project_path.write_text("".join(output))
           PY

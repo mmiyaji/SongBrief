@@ -10,6 +10,7 @@ import '../../domain/library_overview.dart';
 import '../../domain/library_snapshot.dart';
 import '../../domain/music_stats_state.dart';
 import '../../settings/music_data_preferences.dart';
+import '../../widgets/home_widget_bridge.dart';
 
 enum TrendRange { week, month, year }
 
@@ -258,6 +259,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       await Future<void>.delayed(loadingPreviewDelay);
     }
     if (!next.overview.isDemo) {
+      unawaited(HomeWidgetBridge.update(next.snapshotHistory));
       unawaited(syncCloudSnapshots());
     }
     return next;
@@ -278,7 +280,9 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       if (!result.changedLocally) {
         return;
       }
-      _replaceSnapshotHistory(await repository.loadSnapshotHistory());
+      final history = await repository.loadSnapshotHistory();
+      _replaceSnapshotHistory(history);
+      unawaited(HomeWidgetBridge.update(history));
     });
   }
 
@@ -399,6 +403,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     };
     if (state.hasValue) {
       final overview = state.requireValue.overview;
+      unawaited(HomeWidgetBridge.update(state.requireValue.snapshotHistory));
       unawaited(
         ref
             .read(appAnalyticsProvider)

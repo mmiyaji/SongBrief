@@ -124,7 +124,11 @@ enum SongBriefSnapshotRefresh {
       "filterSignature": rules.signature
     ]
 
-    return write(snapshot: snapshot) ? capturedDateKey : nil
+    guard write(snapshot: snapshot) else {
+      return nil
+    }
+    SongBriefWidgetDataStore.updateAfterBackgroundCapture(snapshot: snapshot)
+    return capturedDateKey
   }
 
   static func localSnapshots() -> [[String: Any]] {

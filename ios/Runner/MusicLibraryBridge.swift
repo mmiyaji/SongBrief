@@ -77,6 +77,11 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       SnapshotCloudSync.sync { payload in
         result(payload)
       }
+    case "updateHomeWidget":
+      let arguments = call.arguments as? [String: Any]
+      let summary = arguments?["summary"] as? [String: Any]
+      SongBriefWidgetDataStore.update(summary: summary)
+      result(nil)
     case "deleteCloudSnapshots":
       let arguments = call.arguments as? [String: Any]
       let cutoffDateKey = arguments?["olderThanDateKey"] as? String
