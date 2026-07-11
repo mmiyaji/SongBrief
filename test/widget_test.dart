@@ -102,6 +102,75 @@ void main() {
     expect(find.byTooltip('Play from beginning'), findsOneWidget);
   });
 
+  testWidgets('updates open track details when playback skips to next', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final tracks = [
+      LibraryTrack(
+        id: 'first-track',
+        title: 'First Track',
+        artist: 'Test Artist',
+        albumTitle: 'Test Album',
+        duration: const Duration(minutes: 3),
+        playCount: 2,
+        skipCount: 0,
+        isCloudItem: false,
+      ),
+      LibraryTrack(
+        id: 'next-track',
+        title: 'Next Track',
+        artist: 'Test Artist',
+        albumTitle: 'Test Album',
+        duration: const Duration(minutes: 4),
+        playCount: 1,
+        skipCount: 0,
+        isCloudItem: false,
+      ),
+    ];
+    final stats = MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
+      overview: LibraryOverview.fromTracks(tracks, isDemo: false),
+      snapshotHistory: SnapshotHistory.empty,
+      snapshotRecordingEnabled: true,
+    );
+
+    await _pumpApp(
+      tester,
+      AppLanguage.english,
+      statsState: stats,
+      playbackControllerBuilder: _NextTrackPlaybackController.new,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Show current track details'));
+    await tester.pumpAndSettle();
+
+    final sheet = find.byType(BottomSheet);
+    expect(
+      find.descendant(of: sheet, matching: find.text('First Track')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.descendant(of: sheet, matching: find.byTooltip('Next')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: sheet, matching: find.text('Next Track')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.text('First Track')),
+      findsNothing,
+    );
+  });
+
   testWidgets('opens trend calculation details from the info button', (
     tester,
   ) async {
@@ -490,6 +559,7 @@ Future<void> _pumpApp(
   AppLanguage language, {
   bool snapshotRecordingEnabled = true,
   MusicStatsState? statsState,
+  PlaybackController Function()? playbackControllerBuilder,
 }) {
   return tester.pumpWidget(
     ProviderScope(
@@ -504,10 +574,24 @@ Future<void> _pumpApp(
           musicStatsControllerProvider.overrideWith(
             () => _FixedMusicStatsController(statsState),
           ),
+        if (playbackControllerBuilder != null)
+          playbackControllerProvider.overrideWith(playbackControllerBuilder),
       ],
       child: const SongBriefApp(),
     ),
   );
+}
+
+class _NextTrackPlaybackController extends PlaybackController {
+  @override
+  PlaybackState build() {
+    return const PlaybackState(activeTrackId: 'first-track', isPlaying: true);
+  }
+
+  @override
+  Future<void> skipToNext() async {
+    state = const PlaybackState(activeTrackId: 'next-track', isPlaying: true);
+  }
 }
 
 class _FixedMusicStatsController extends MusicStatsController {
