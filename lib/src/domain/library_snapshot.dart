@@ -315,7 +315,7 @@ class SnapshotDelta {
     final previousTracks = {
       for (final track in previous.tracks) track.id: track,
     };
-    final trackDeltas = <TrackCounterDelta>[];
+    final trackDeltasByIdentity = <String, TrackCounterDelta>{};
     for (final track in current.tracks) {
       final baseline = previousTracks[track.id];
       if (baseline == null) {
@@ -326,9 +326,14 @@ class SnapshotDelta {
         current: track,
       );
       if (delta.playDelta > 0 || delta.skipDelta > 0) {
-        trackDeltas.add(delta);
+        final identity = _trackCounterIdentity(track);
+        final existing = trackDeltasByIdentity[identity];
+        trackDeltasByIdentity[identity] = existing == null
+            ? delta
+            : existing.merge(delta);
       }
     }
+    final trackDeltas = trackDeltasByIdentity.values.toList();
     trackDeltas.sort((a, b) {
       final byPlays = b.playDelta.compareTo(a.playDelta);
       if (byPlays != 0) {
@@ -400,6 +405,31 @@ class TrackCounterDelta {
       ),
     );
   }
+
+  TrackCounterDelta merge(TrackCounterDelta other) {
+    return TrackCounterDelta(
+      id: id,
+      title: title,
+      artist: artist,
+      albumTitle: albumTitle,
+      playDelta: playDelta + other.playDelta,
+      skipDelta: skipDelta + other.skipDelta,
+      listeningSecondsDelta:
+          listeningSecondsDelta + other.listeningSecondsDelta,
+    );
+  }
+}
+
+String _trackCounterIdentity(TrackCounterSnapshot track) {
+  return [
+    track.title,
+    track.artist,
+    track.albumTitle,
+  ].map(_normalizeTrackCounterIdentityPart).join('\u{1f}');
+}
+
+String _normalizeTrackCounterIdentityPart(String value) {
+  return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 }
 
 String snapshotDateKey(DateTime date) {
