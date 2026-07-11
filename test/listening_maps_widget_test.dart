@@ -18,8 +18,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final tracksCard = find.text('Tracks').first;
-    await tester.ensureVisible(tracksCard);
-    await tester.tap(tracksCard);
+    final tracksAction = find
+        .ancestor(of: tracksCard, matching: find.byType(InkWell))
+        .first;
+    await tester.ensureVisible(tracksAction);
+    await tester.pumpAndSettle();
+    await tester.tap(tracksAction);
     await tester.pumpAndSettle();
 
     expect(find.text('All songs'), findsOneWidget);
@@ -177,6 +181,21 @@ void main() {
 
     expect(find.text('Recap highlights'), findsOneWidget);
     expect(find.text('SongBrief Recap'), findsOneWidget);
+    expect(find.text('Week'), findsOneWidget);
+    expect(find.text('Month'), findsOneWidget);
+    expect(find.text('Summary'), findsOneWidget);
+
+    final summaryScope = find.text('Summary');
+    await tester.scrollUntilVisible(
+      summaryScope,
+      420,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(summaryScope);
+    await tester.pumpAndSettle();
+
+    expect(find.text('This week'), findsOneWidget);
     expect(find.text('This month'), findsOneWidget);
     expect(find.text('This year'), findsOneWidget);
     expect(find.text('Highlights'), findsOneWidget);

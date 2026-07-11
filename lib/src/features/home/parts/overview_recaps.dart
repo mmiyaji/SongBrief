@@ -368,6 +368,8 @@ class _RecapSummaryCardState extends State<_RecapSummaryCard> {
           context,
           'My SongBrief ${_shareScope.name} listening recap',
           'SongBriefの${_recapShareScopeLabel(context, _shareScope)}リキャップ',
+          zh: '我的 SongBrief ${_recapShareScopeLabel(context, _shareScope)}收听回顾',
+          ko: '나의 SongBrief ${_recapShareScopeLabel(context, _shareScope)} 청취 리캡',
         );
         final unavailableMessage = _t(
           context,
@@ -1227,6 +1229,8 @@ String _periodComparisonLabel(BuildContext context, _PeriodRecap recap) {
     context,
     '$prefix$difference vs previous period',
     '前期間比 $prefix$difference',
+    zh: '较上一周期 $prefix$difference',
+    ko: '이전 기간 대비 $prefix$difference',
   );
 }
 

@@ -584,6 +584,8 @@ class _SnapshotSyncStatusLine extends StatelessWidget {
             context,
             '$daysSinceLatest days since the last record',
             '最終記録から$daysSinceLatest日',
+            zh: '距上次记录 $daysSinceLatest 天',
+            ko: '$daysSinceLatest일 전 마지막 기록',
           );
     final warning = daysSinceLatest >= 3;
 

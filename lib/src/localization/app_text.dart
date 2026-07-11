@@ -95,6 +95,74 @@ const _runtimeMessages = <String, _LocalizedCopy>{
 };
 
 const _copyTranslations = <String, _LocalizedCopy>{
+  'Week': _LocalizedCopy(ja: '週間', zh: '周', ko: '주'),
+  'Month': _LocalizedCopy(ja: '月間', zh: '月', ko: '월'),
+  'Summary': _LocalizedCopy(ja: '総合', zh: '摘要', ko: '요약'),
+  'Show song details': _LocalizedCopy(
+    ja: '曲の情報を表示',
+    zh: '显示歌曲详情',
+    ko: '곡 세부 정보 표시',
+  ),
+  'Hide song details': _LocalizedCopy(
+    ja: '曲の情報を隠す',
+    zh: '隐藏歌曲详情',
+    ko: '곡 세부 정보 숨기기',
+  ),
+  'Hidden for sharing': _LocalizedCopy(
+    ja: '共有用に非表示',
+    zh: '分享时隐藏',
+    ko: '공유에서 숨김',
+  ),
+  'weekly': _LocalizedCopy(ja: '週間', zh: '每周', ko: '주간'),
+  'monthly': _LocalizedCopy(ja: '月間', zh: '每月', ko: '월간'),
+  'summary': _LocalizedCopy(ja: '総合', zh: '摘要', ko: '요약'),
+  'iCloud sync off': _LocalizedCopy(
+    ja: 'iCloud同期オフ',
+    zh: 'iCloud 同步已关闭',
+    ko: 'iCloud 동기화 꺼짐',
+  ),
+  'Syncing with iCloud': _LocalizedCopy(
+    ja: 'iCloudと同期中',
+    zh: '正在与 iCloud 同步',
+    ko: 'iCloud와 동기화 중',
+  ),
+  'Recorded today': _LocalizedCopy(ja: '本日記録済み', zh: '今天已记录', ko: '오늘 기록됨'),
+  'Sync now': _LocalizedCopy(ja: '今すぐ同期', zh: '立即同步', ko: '지금 동기화'),
+  'iCloud sync complete': _LocalizedCopy(
+    ja: 'iCloud同期完了',
+    zh: 'iCloud 同步完成',
+    ko: 'iCloud 동기화 완료',
+  ),
+  'iCloud is up to date': _LocalizedCopy(
+    ja: 'iCloudは最新です',
+    zh: 'iCloud 已是最新状态',
+    ko: 'iCloud가 최신 상태입니다',
+  ),
+  'iCloud sync partially complete': _LocalizedCopy(
+    ja: 'iCloud同期が一部完了',
+    zh: 'iCloud 同步部分完成',
+    ko: 'iCloud 동기화가 일부 완료됨',
+  ),
+  'Sign in to iCloud to sync': _LocalizedCopy(
+    ja: '同期するにはiCloudにサインイン',
+    zh: '登录 iCloud 以同步',
+    ko: '동기화하려면 iCloud에 로그인하세요',
+  ),
+  'iCloud is unavailable': _LocalizedCopy(
+    ja: 'iCloudを利用できません',
+    zh: 'iCloud 不可用',
+    ko: 'iCloud를 사용할 수 없습니다',
+  ),
+  'iCloud sync failed': _LocalizedCopy(
+    ja: 'iCloud同期に失敗しました',
+    zh: 'iCloud 同步失败',
+    ko: 'iCloud 동기화 실패',
+  ),
+  'iCloud sync pending': _LocalizedCopy(
+    ja: 'iCloud同期を確認中',
+    zh: 'iCloud 同步待处理',
+    ko: 'iCloud 동기화 대기 중',
+  ),
   'Demo': _LocalizedCopy(ja: 'デモ', zh: '演示', ko: '데모'),
   'Allow': _LocalizedCopy(ja: '許可', zh: '允许', ko: '허용'),
   'Refresh': _LocalizedCopy(ja: '更新', zh: '刷新', ko: '새로 고침'),
