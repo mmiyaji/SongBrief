@@ -1802,6 +1802,8 @@ class _TrackGroupSummary extends StatelessWidget {
       builder: (context, constraints) {
         final columns = constraints.maxWidth >= 560 ? 3 : 2;
         return GridView.builder(
+          padding: EdgeInsets.zero,
+          primary: false,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: values.length,

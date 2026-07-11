@@ -129,6 +129,22 @@ void main() {
         tester.getBottomRight(lastSummaryCard).dy;
     expect(contentGap, lessThanOrEqualTo(30));
 
+    final insightsPanel = find.byKey(const ValueKey('overview-insights'));
+    final lastInsight = find.byKey(const ValueKey('overview-insight-5'));
+    expect(
+      tester.getBottomRight(insightsPanel).dy -
+          tester.getBottomRight(lastInsight).dy,
+      lessThanOrEqualTo(30),
+    );
+
+    final smartListsPanel = find.byKey(const ValueKey('overview-smart-lists'));
+    final lastSmartList = find.byKey(const ValueKey('overview-smart-list-3'));
+    expect(
+      tester.getBottomRight(smartListsPanel).dy -
+          tester.getBottomRight(lastSmartList).dy,
+      lessThanOrEqualTo(30),
+    );
+
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -10000));
     await tester.pumpAndSettle();
 

@@ -168,6 +168,7 @@ class _OverviewInsightPanel extends StatelessWidget {
     ];
 
     return GlassSurface(
+      key: const ValueKey('overview-insights'),
       padding: const EdgeInsets.all(18),
       radius: 24,
       tint: const Color(0x4FFFFFFF),
@@ -194,6 +195,8 @@ class _OverviewInsightPanel extends StatelessWidget {
                   ? 2
                   : 1;
               return GridView.builder(
+                padding: EdgeInsets.zero,
+                primary: false,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: insights.length,
@@ -203,8 +206,10 @@ class _OverviewInsightPanel extends StatelessWidget {
                   crossAxisSpacing: 10,
                   childAspectRatio: columns == 1 ? 3.7 : 2.05,
                 ),
-                itemBuilder: (context, index) =>
-                    _OverviewInsightTile(value: insights[index]),
+                itemBuilder: (context, index) => _OverviewInsightTile(
+                  key: ValueKey('overview-insight-$index'),
+                  value: insights[index],
+                ),
               );
             },
           ),
@@ -359,7 +364,7 @@ class _PanelHeading extends StatelessWidget {
 }
 
 class _OverviewInsightTile extends StatelessWidget {
-  const _OverviewInsightTile({required this.value});
+  const _OverviewInsightTile({required this.value, super.key});
 
   final _OverviewInsightValue value;
 
@@ -464,6 +469,7 @@ class _SmartListsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final lists = _smartListsFor(context, overview);
     return GlassSurface(
+      key: const ValueKey('overview-smart-lists'),
       padding: const EdgeInsets.all(18),
       radius: 24,
       tint: const Color(0x4FFFFFFF),
@@ -490,6 +496,8 @@ class _SmartListsPanel extends StatelessWidget {
                   ? 2
                   : 1;
               return GridView.builder(
+                padding: EdgeInsets.zero,
+                primary: false,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: lists.length,
@@ -500,6 +508,7 @@ class _SmartListsPanel extends StatelessWidget {
                   childAspectRatio: columns == 1 ? 3.0 : 1.55,
                 ),
                 itemBuilder: (context, index) => _SmartListCard(
+                  key: ValueKey('overview-smart-list-$index'),
                   list: lists[index],
                   onTap: lists[index].tracks.isEmpty
                       ? null
@@ -521,7 +530,7 @@ class _SmartListsPanel extends StatelessWidget {
 }
 
 class _SmartListCard extends StatelessWidget {
-  const _SmartListCard({required this.list, required this.onTap});
+  const _SmartListCard({required this.list, required this.onTap, super.key});
 
   final _SmartListDefinition list;
   final VoidCallback? onTap;
