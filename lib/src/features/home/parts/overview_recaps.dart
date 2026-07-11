@@ -8,6 +8,11 @@ class _RecapHighlightsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final week = _periodRecap(
+      history: history,
+      period: _RecapPeriod.week,
+      now: overview.generatedAt,
+    );
     final month = _periodRecap(
       history: history,
       period: _RecapPeriod.month,
@@ -42,6 +47,7 @@ class _RecapHighlightsPanel extends StatelessWidget {
           const SizedBox(height: 14),
           _RecapSummaryCard(
             overview: overview,
+            week: week,
             month: month,
             year: year,
             milestones: milestones,
@@ -135,6 +141,7 @@ class _TasteAndCollectionPanel extends ConsumerWidget {
 class _RecapSummaryCard extends StatefulWidget {
   const _RecapSummaryCard({
     required this.overview,
+    required this.week,
     required this.month,
     required this.year,
     required this.milestones,
@@ -142,12 +149,14 @@ class _RecapSummaryCard extends StatefulWidget {
   });
 
   final LibraryOverview overview;
+  final _PeriodRecap week;
   final _PeriodRecap month;
   final _PeriodRecap year;
   final List<_MilestoneForecast> milestones;
   final _BurnoutSummary burnout;
 
   bool get hasExportData =>
+      week.hasData ||
       month.hasData ||
       year.hasData ||
       milestones.isNotEmpty ||
@@ -172,6 +181,7 @@ class _RecapSummaryCardState extends State<_RecapSummaryCard> {
           key: _captureKey,
           child: _RecapSummaryCardContent(
             overview: widget.overview,
+            week: widget.week,
             month: widget.month,
             year: widget.year,
             milestones: widget.milestones,
@@ -343,6 +353,7 @@ class _RecapSummaryCardState extends State<_RecapSummaryCard> {
 class _RecapSummaryCardContent extends StatelessWidget {
   const _RecapSummaryCardContent({
     required this.overview,
+    required this.week,
     required this.month,
     required this.year,
     required this.milestones,
@@ -350,6 +361,7 @@ class _RecapSummaryCardContent extends StatelessWidget {
   });
 
   final LibraryOverview overview;
+  final _PeriodRecap week;
   final _PeriodRecap month;
   final _PeriodRecap year;
   final List<_MilestoneForecast> milestones;
@@ -359,7 +371,7 @@ class _RecapSummaryCardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final number = _numberFormat(context);
-    final topRecapTrack = _strongestRecapTrack(month, year);
+    final topRecapTrack = _strongestRecapTrack(week, month, year);
     final borderColor = Color.lerp(
       theme.colorScheme.outlineVariant,
       theme.colorScheme.primary,
@@ -432,6 +444,11 @@ class _RecapSummaryCardContent extends StatelessWidget {
               builder: (context, constraints) {
                 final periodCards = [
                   _RecapPeriodSummaryTile(
+                    title: _t(context, 'This week', '今週'),
+                    icon: Icons.date_range_rounded,
+                    recap: week,
+                  ),
+                  _RecapPeriodSummaryTile(
                     title: _t(context, 'This month', '今月'),
                     icon: Icons.calendar_view_month_rounded,
                     recap: month,
@@ -442,12 +459,14 @@ class _RecapSummaryCardContent extends StatelessWidget {
                     recap: year,
                   ),
                 ];
-                if (constraints.maxWidth >= 620) {
+                if (constraints.maxWidth >= 780) {
                   return Row(
                     children: [
                       Expanded(child: periodCards[0]),
                       const SizedBox(width: 10),
                       Expanded(child: periodCards[1]),
+                      const SizedBox(width: 10),
+                      Expanded(child: periodCards[2]),
                     ],
                   );
                 }
@@ -456,6 +475,8 @@ class _RecapSummaryCardContent extends StatelessWidget {
                     periodCards[0],
                     const SizedBox(height: 10),
                     periodCards[1],
+                    const SizedBox(height: 10),
+                    periodCards[2],
                   ],
                 );
               },
@@ -476,7 +497,10 @@ class _RecapSummaryCardContent extends StatelessWidget {
                   icon: Icons.person_add_alt_rounded,
                   label: _t(context, 'New artists', '新しく聴いたアーティスト'),
                   value: number.format(
-                    math.max(month.newArtistCount, year.newArtistCount),
+                    math.max(
+                      week.newArtistCount,
+                      math.max(month.newArtistCount, year.newArtistCount),
+                    ),
                   ),
                 ),
                 if (milestones.isNotEmpty) ...[
@@ -499,7 +523,7 @@ class _RecapSummaryCardContent extends StatelessWidget {
                 ),
               ],
             ),
-            if (!month.hasData && !year.hasData) ...[
+            if (!week.hasData && !month.hasData && !year.hasData) ...[
               const SizedBox(height: 14),
               _AnalyticsEmptyState(
                 label: _t(
@@ -579,6 +603,16 @@ class _RecapPeriodSummaryTile extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (recap.previousPlayDelta != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                _periodComparisonLabel(context, recap),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             _RecapLine(
               icon: Icons.timer_rounded,
@@ -586,6 +620,18 @@ class _RecapPeriodSummaryTile extends StatelessWidget {
               value: recap.hasData
                   ? _dayCountLabel(context, recap.observedDays)
                   : _t(context, 'Waiting', '待機中'),
+            ),
+            const SizedBox(height: 8),
+            _RecapLine(
+              icon: Icons.schedule_rounded,
+              label: _t(context, 'Listening time', '聴取時間'),
+              value: _hoursLabel(recap.listeningSecondsDelta),
+            ),
+            const SizedBox(height: 8),
+            _RecapLine(
+              icon: Icons.skip_next_rounded,
+              label: _t(context, 'Skips', 'スキップ'),
+              value: number.format(recap.skipDelta),
             ),
           ],
         ),
@@ -656,10 +702,15 @@ Color _recapPosterAccentFill(ThemeData theme) {
 }
 
 _TrackDeltaSummary? _strongestRecapTrack(
+  _PeriodRecap week,
   _PeriodRecap month,
   _PeriodRecap year,
 ) {
-  final tracks = [month.topTrack, year.topTrack].nonNulls.toList();
+  final tracks = [
+    week.topTrack,
+    month.topTrack,
+    year.topTrack,
+  ].nonNulls.toList();
   if (tracks.isEmpty) {
     return null;
   }
@@ -1047,22 +1098,47 @@ class _RecapLine extends StatelessWidget {
   }
 }
 
-enum _RecapPeriod { month, year }
+enum _RecapPeriod { week, month, year }
 
 class _PeriodRecap {
   const _PeriodRecap({
     required this.playDelta,
+    required this.skipDelta,
+    required this.listeningSecondsDelta,
     required this.observedDays,
     required this.newArtistCount,
+    this.previousPlayDelta,
     this.topTrack,
   });
 
   final int playDelta;
+  final int skipDelta;
+  final int listeningSecondsDelta;
   final int observedDays;
   final int newArtistCount;
+  final int? previousPlayDelta;
   final _TrackDeltaSummary? topTrack;
 
-  bool get hasData => observedDays > 0 || playDelta > 0 || topTrack != null;
+  bool get hasData =>
+      observedDays > 0 ||
+      playDelta > 0 ||
+      skipDelta > 0 ||
+      listeningSecondsDelta > 0 ||
+      topTrack != null;
+}
+
+String _periodComparisonLabel(BuildContext context, _PeriodRecap recap) {
+  final previous = recap.previousPlayDelta;
+  if (previous == null) {
+    return '';
+  }
+  final difference = recap.playDelta - previous;
+  final prefix = difference > 0 ? '+' : '';
+  return _t(
+    context,
+    '$prefix$difference vs previous period',
+    '前期間比 $prefix$difference',
+  );
 }
 
 class _TrackDeltaSummary {
@@ -1159,19 +1235,39 @@ _PeriodRecap _periodRecap({
 }) {
   final snapshots = history.snapshots;
   if (snapshots.length < 2) {
-    return const _PeriodRecap(playDelta: 0, observedDays: 0, newArtistCount: 0);
+    return const _PeriodRecap(
+      playDelta: 0,
+      skipDelta: 0,
+      listeningSecondsDelta: 0,
+      observedDays: 0,
+      newArtistCount: 0,
+    );
   }
 
   final localNow = now.toLocal();
   final periodStart = switch (period) {
+    _RecapPeriod.week => DateTime(
+      localNow.year,
+      localNow.month,
+      localNow.day,
+    ).subtract(Duration(days: localNow.weekday - DateTime.monday)),
     _RecapPeriod.month => DateTime(localNow.year, localNow.month),
     _RecapPeriod.year => DateTime(localNow.year),
   };
+  final previousPeriodStart = switch (period) {
+    _RecapPeriod.week => periodStart.subtract(const Duration(days: 7)),
+    _RecapPeriod.month => DateTime(periodStart.year, periodStart.month - 1),
+    _RecapPeriod.year => DateTime(periodStart.year - 1),
+  };
   final current = snapshots.last;
   var baseline = snapshots.first;
+  var previousBaseline = snapshots.first;
   for (final snapshot in snapshots) {
     if (snapshot.capturedAt.isBefore(periodStart)) {
       baseline = snapshot;
+    }
+    if (snapshot.capturedAt.isBefore(previousPeriodStart)) {
+      previousBaseline = snapshot;
     }
   }
   if (baseline.dateKey == current.dateKey && snapshots.length >= 2) {
@@ -1179,6 +1275,12 @@ _PeriodRecap _periodRecap({
   }
 
   final delta = SnapshotDelta.compare(previous: baseline, current: current);
+  final previousPlayDelta = previousBaseline.dateKey == baseline.dateKey
+      ? null
+      : SnapshotDelta.compare(
+          previous: previousBaseline,
+          current: baseline,
+        ).totalPlayDelta;
   final topTrack = delta.trackDeltas.isEmpty
       ? null
       : _TrackDeltaSummary(
@@ -1198,8 +1300,11 @@ _PeriodRecap _periodRecap({
 
   return _PeriodRecap(
     playDelta: delta.totalPlayDelta,
+    skipDelta: delta.totalSkipDelta,
+    listeningSecondsDelta: delta.totalListeningSecondsDelta,
     observedDays: delta.observedDays,
     newArtistCount: newArtists.length,
+    previousPlayDelta: previousPlayDelta,
     topTrack: topTrack,
   );
 }
