@@ -123,6 +123,7 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassSurface(
+      key: const ValueKey('overview-listening-maps'),
       padding: const EdgeInsets.all(18),
       radius: 24,
       tint: const Color(0x4FFFFFFF),

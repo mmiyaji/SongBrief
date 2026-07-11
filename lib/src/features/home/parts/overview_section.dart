@@ -64,7 +64,10 @@ class _OverviewSection extends ConsumerWidget {
         const SizedBox(height: 14),
         _OverviewBreakdownPanel(overview: overview),
         const SizedBox(height: 14),
-        AdBannerSlot(placement: _t(context, 'Overview', '概要')),
+        AdBannerSlot(
+          key: const ValueKey('overview-ad-slot'),
+          placement: _t(context, 'Overview', '概要'),
+        ),
       ],
     );
   }
@@ -1065,6 +1068,8 @@ class _SummaryGrid extends StatelessWidget {
       builder: (context, constraints) {
         final columns = constraints.maxWidth > 620 ? 4 : 2;
         return GridView.builder(
+          padding: EdgeInsets.zero,
+          primary: false,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: values.length,
@@ -1074,7 +1079,10 @@ class _SummaryGrid extends StatelessWidget {
             crossAxisSpacing: 12,
             childAspectRatio: columns == 4 ? 1.72 : 1.45,
           ),
-          itemBuilder: (context, index) => _SummaryCard(value: values[index]),
+          itemBuilder: (context, index) => _SummaryCard(
+            key: ValueKey('overview-summary-card-$index'),
+            value: values[index],
+          ),
         );
       },
     );
@@ -1082,7 +1090,7 @@ class _SummaryGrid extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.value});
+  const _SummaryCard({required this.value, super.key});
 
   final _SummaryValue value;
 

@@ -102,6 +102,44 @@ void main() {
     expect(find.byTooltip('Play from beginning'), findsOneWidget);
   });
 
+  testWidgets('keeps mobile overview content clear of playback chrome', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Overview'));
+    await tester.pumpAndSettle();
+
+    final lastSummaryCard = find.byKey(
+      const ValueKey('overview-summary-card-3'),
+    );
+    final listeningMaps = find.byKey(const ValueKey('overview-listening-maps'));
+    final contentGap =
+        tester.getTopLeft(listeningMaps).dy -
+        tester.getBottomRight(lastSummaryCard).dy;
+    expect(contentGap, lessThanOrEqualTo(30));
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -10000));
+    await tester.pumpAndSettle();
+
+    final adSlot = find.byKey(const ValueKey('overview-ad-slot'));
+    final playbackChrome = find.byKey(const ValueKey('mobile-playback-chrome'));
+    expect(
+      tester.getBottomRight(adSlot).dy,
+      lessThanOrEqualTo(tester.getTopLeft(playbackChrome).dy - 12),
+    );
+  });
+
   testWidgets('updates open track details when playback skips to next', (
     tester,
   ) async {

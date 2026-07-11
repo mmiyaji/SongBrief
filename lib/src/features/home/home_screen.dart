@@ -603,6 +603,7 @@ class _MobilePlaybackChrome extends ConsumerWidget {
     final track = activeTrack ?? stats.overview.latestTrack;
     final isLight = theme.colorScheme.brightness == Brightness.light;
     return SafeArea(
+      key: const ValueKey('mobile-playback-chrome'),
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -873,6 +874,10 @@ class _StatsContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final deviceBottomInset = MediaQueryData.fromView(
+      View.of(context),
+    ).viewPadding.bottom;
+    final mobileBottomPadding = 172 + deviceBottomInset;
     return RefreshIndicator.adaptive(
       onRefresh: () => ref
           .read(musicStatsControllerProvider.notifier)
@@ -887,7 +892,7 @@ class _StatsContent extends ConsumerWidget {
                 useRail ? 24 : 20,
                 12,
                 useRail ? 28 : 20,
-                useRail ? 28 : 172,
+                useRail ? 28 : mobileBottomPadding,
               ),
               child: Center(
                 child: ConstrainedBox(
