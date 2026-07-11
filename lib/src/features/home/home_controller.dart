@@ -69,6 +69,44 @@ final trendRangeProvider = NotifierProvider<TrendRangeController, TrendRange>(
   TrendRangeController.new,
 );
 
+final snapshotSyncStateProvider =
+    NotifierProvider<SnapshotSyncStateController, SnapshotSyncState>(
+      SnapshotSyncStateController.new,
+    );
+
+class SnapshotSyncState {
+  const SnapshotSyncState({
+    this.isSyncing = false,
+    this.lastAttemptAt,
+    this.result,
+  });
+
+  final bool isSyncing;
+  final DateTime? lastAttemptAt;
+  final SnapshotSyncResult? result;
+}
+
+class SnapshotSyncStateController extends Notifier<SnapshotSyncState> {
+  @override
+  SnapshotSyncState build() => const SnapshotSyncState();
+
+  void begin() {
+    state = SnapshotSyncState(
+      isSyncing: true,
+      lastAttemptAt: state.lastAttemptAt,
+      result: state.result,
+    );
+  }
+
+  void complete(SnapshotSyncResult result) {
+    state = SnapshotSyncState(lastAttemptAt: DateTime.now(), result: result);
+  }
+
+  void unavailable() {
+    complete(const SnapshotSyncResult(status: SnapshotSyncStatus.disabled));
+  }
+}
+
 class RankingScopeController extends Notifier<RankingScope> {
   @override
   RankingScope build() {
@@ -229,9 +267,15 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   /// the visible history when other devices contributed records.
   Future<void> syncCloudSnapshots() {
     return _runSnapshotHistoryOperation(() async {
+      ref.read(snapshotSyncStateProvider.notifier).begin();
       final repository = ref.read(musicStatsRepositoryProvider);
       final result = await repository.syncCloudSnapshots();
-      if (result == null || !result.changedLocally) {
+      if (result == null) {
+        ref.read(snapshotSyncStateProvider.notifier).unavailable();
+        return;
+      }
+      ref.read(snapshotSyncStateProvider.notifier).complete(result);
+      if (!result.changedLocally) {
         return;
       }
       _replaceSnapshotHistory(await repository.loadSnapshotHistory());

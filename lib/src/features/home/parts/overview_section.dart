@@ -1,13 +1,15 @@
 part of '../home_screen.dart';
 
-class _OverviewSection extends StatelessWidget {
+class _OverviewSection extends ConsumerWidget {
   const _OverviewSection({required this.stats});
 
   final MusicStatsState stats;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final overview = stats.overview;
+    final syncState = ref.watch(snapshotSyncStateProvider);
+    final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -26,6 +28,13 @@ class _OverviewSection extends StatelessWidget {
             history: stats.snapshotHistory,
             overview: overview,
             isDemo: overview.isDemo,
+            syncState: syncState,
+            cloudSyncEnabled: cloudSyncEnabled,
+            onSync: overview.isDemo || syncState.isSyncing
+                ? null
+                : () => ref
+                      .read(musicStatsControllerProvider.notifier)
+                      .syncCloudSnapshots(),
           ),
         ],
         const SizedBox(height: 14),
@@ -331,11 +340,17 @@ class _SnapshotStatusPanel extends StatelessWidget {
     required this.history,
     required this.overview,
     required this.isDemo,
+    required this.syncState,
+    required this.cloudSyncEnabled,
+    required this.onSync,
   });
 
   final SnapshotHistory history;
   final LibraryOverview overview;
   final bool isDemo;
+  final SnapshotSyncState syncState;
+  final bool cloudSyncEnabled;
+  final VoidCallback? onSync;
 
   @override
   Widget build(BuildContext context) {
@@ -393,6 +408,7 @@ class _SnapshotStatusPanel extends StatelessWidget {
     }
 
     final latestDate = _dateTimeFormat(context).format(latest.capturedAt);
+    final daysSinceLatest = history.daysSinceLatest(DateTime.now());
     final observedDays = delta?.observedDays ?? 0;
     final topDeltas =
         delta?.trackDeltas.take(3).toList(growable: false) ??
@@ -444,6 +460,13 @@ class _SnapshotStatusPanel extends StatelessWidget {
                 label: _dayCountLabel(context, history.snapshotCount),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          _SnapshotSyncStatusLine(
+            state: syncState,
+            cloudSyncEnabled: cloudSyncEnabled,
+            daysSinceLatest: daysSinceLatest,
+            onSync: onSync,
           ),
           const SizedBox(height: 14),
           LayoutBuilder(
@@ -531,6 +554,151 @@ class _SnapshotStatusPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SnapshotSyncStatusLine extends StatelessWidget {
+  const _SnapshotSyncStatusLine({
+    required this.state,
+    required this.cloudSyncEnabled,
+    required this.daysSinceLatest,
+    required this.onSync,
+  });
+
+  final SnapshotSyncState state;
+  final bool cloudSyncEnabled;
+  final int daysSinceLatest;
+  final VoidCallback? onSync;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final result = state.result;
+    final syncLabel = !cloudSyncEnabled
+        ? _t(context, 'iCloud sync off', 'iCloud同期オフ')
+        : state.isSyncing
+        ? _t(context, 'Syncing with iCloud', 'iCloudと同期中')
+        : _snapshotSyncResultLabel(context, result?.status);
+    final recordLabel = daysSinceLatest <= 0
+        ? _t(context, 'Recorded today', '本日記録済み')
+        : _t(
+            context,
+            '$daysSinceLatest days since the last record',
+            '最終記録から$daysSinceLatest日',
+          );
+    final warning = daysSinceLatest >= 3;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: warning
+              ? theme.colorScheme.error.withValues(alpha: 0.35)
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(
+              warning
+                  ? Icons.history_toggle_off_rounded
+                  : Icons.cloud_done_outlined,
+              size: 20,
+              color: warning
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    recordLabel,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _syncStatusDetail(context, syncLabel, state.lastAttemptAt),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (cloudSyncEnabled)
+              IconButton(
+                tooltip: _t(context, 'Sync now', '今すぐ同期'),
+                onPressed: onSync,
+                icon: state.isSyncing
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sync_rounded),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _snapshotSyncResultLabel(
+  BuildContext context,
+  SnapshotSyncStatus? status,
+) {
+  return switch (status) {
+    SnapshotSyncStatus.synced => _t(
+      context,
+      'iCloud sync complete',
+      'iCloud同期完了',
+    ),
+    SnapshotSyncStatus.unchanged => _t(
+      context,
+      'iCloud is up to date',
+      'iCloudは最新です',
+    ),
+    SnapshotSyncStatus.partial => _t(
+      context,
+      'iCloud sync partially complete',
+      'iCloud同期が一部未完了です',
+    ),
+    SnapshotSyncStatus.noAccount => _t(
+      context,
+      'Sign in to iCloud to sync',
+      '同期するにはiCloudへサインインしてください',
+    ),
+    SnapshotSyncStatus.unavailable => _t(
+      context,
+      'iCloud is unavailable',
+      'iCloudを利用できません',
+    ),
+    SnapshotSyncStatus.error => _t(
+      context,
+      'iCloud sync failed',
+      'iCloud同期に失敗しました',
+    ),
+    SnapshotSyncStatus.disabled => _t(context, 'iCloud sync off', 'iCloud同期オフ'),
+    null => _t(context, 'iCloud sync pending', 'iCloud同期を確認中'),
+  };
+}
+
+String _syncStatusDetail(
+  BuildContext context,
+  String label,
+  DateTime? attemptedAt,
+) {
+  if (attemptedAt == null) {
+    return label;
+  }
+  return '$label · ${_dateTimeFormat(context).format(attemptedAt)}';
 }
 
 class _SnapshotMetric extends StatelessWidget {
