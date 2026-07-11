@@ -156,6 +156,44 @@ void main() {
     );
   });
 
+  testWidgets('fits overview and navigation on a compact phone', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.japanese);
+    await tester.pumpAndSettle();
+
+    final navigationBar = tester.widget<NavigationBar>(
+      find.byType(NavigationBar),
+    );
+    expect(
+      navigationBar.destinations.cast<NavigationDestination>().map(
+        (destination) => destination.label,
+      ),
+      ['再生', '概要', '順位', '曲', '設定'],
+    );
+
+    await tester.tap(find.text('概要'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSize(find.byKey(const ValueKey('overview-insight-5'))).height,
+      92,
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('順位'));
+    await tester.pumpAndSettle();
+    final scopeSelector = find.byType(SegmentedButton<RankingScope>);
+    expect(scopeSelector, findsOneWidget);
+    expect(tester.getTopLeft(scopeSelector).dx, greaterThanOrEqualTo(0));
+    expect(tester.getBottomRight(scopeSelector).dx, lessThanOrEqualTo(320));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('updates open track details when playback skips to next', (
     tester,
   ) async {

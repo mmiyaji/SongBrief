@@ -2705,16 +2705,31 @@ String _rankingSubtitle(BuildContext context, RankingScope scope) {
   };
 }
 
-List<NavigationDestination> _navigationDestinations(BuildContext context) {
+List<NavigationDestination> _navigationDestinations(
+  BuildContext context, {
+  required bool compact,
+}) {
   return HomeSection.values
       .map(
         (section) => NavigationDestination(
           icon: Icon(_sectionIcon(section)),
           selectedIcon: Icon(_sectionSelectedIcon(section)),
-          label: _sectionLabel(context, section),
+          label: compact
+              ? _sectionCompactLabel(context, section)
+              : _sectionLabel(context, section),
         ),
       )
       .toList();
+}
+
+String _sectionCompactLabel(BuildContext context, HomeSection section) {
+  return switch (section) {
+    HomeSection.playing => _t(context, 'Play', '再生', zh: '播放', ko: '재생'),
+    HomeSection.overview => _t(context, 'Stats', '概要', zh: '概览', ko: '개요'),
+    HomeSection.rankings => _t(context, 'Rank', '順位', zh: '排行', ko: '순위'),
+    HomeSection.library => _t(context, 'Music', '曲', zh: '音乐', ko: '음악'),
+    HomeSection.settings => _t(context, 'Setup', '設定', zh: '设置', ko: '설정'),
+  };
 }
 
 String _sectionLabel(BuildContext context, HomeSection section) {

@@ -257,26 +257,47 @@ class _OverviewSignals extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        _SignalTile(
-          icon: Icons.schedule,
-          label: _t(context, 'Hours', '時間'),
-          value: hours,
-        ),
-        _SignalTile(
-          icon: Icons.fast_forward,
-          label: _t(context, 'Skips', 'スキップ'),
-          value: skips,
-        ),
-        _SignalTile(
-          icon: Icons.speed,
-          label: _t(context, 'Skip rate', 'スキップ率'),
-          value: skipRate,
-        ),
-      ],
+    final tiles = [
+      _SignalTile(
+        icon: Icons.schedule,
+        label: _t(context, 'Hours', '時間'),
+        value: hours,
+      ),
+      _SignalTile(
+        icon: Icons.fast_forward,
+        label: _t(context, 'Skips', 'スキップ'),
+        value: skips,
+      ),
+      _SignalTile(
+        icon: Icons.speed,
+        label: _t(context, 'Skip rate', 'スキップ率'),
+        value: skipRate,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 220) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var index = 0; index < tiles.length; index++) ...[
+                tiles[index],
+                if (index < tiles.length - 1) const SizedBox(height: 10),
+              ],
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            for (var index = 0; index < tiles.length; index++) ...[
+              Expanded(child: tiles[index]),
+              if (index < tiles.length - 1) const SizedBox(width: 10),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -295,43 +316,47 @@ class _SignalTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 118),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.78,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.78,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.22),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
           ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.primary.withValues(alpha: 0.22),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.16),
-              blurRadius: 14,
-              offset: const Offset(0, 8),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 18, color: theme.colorScheme.primary),
-              const SizedBox(height: 10),
-              Text(value, style: theme.textTheme.titleLarge),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

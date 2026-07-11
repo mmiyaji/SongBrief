@@ -571,12 +571,13 @@ class _BottomTabs extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final useCompactLabels = MediaQuery.sizeOf(context).width < 360;
     return NavigationBar(
       selectedIndex: selectedSection.index,
       height: 72,
       backgroundColor: Colors.transparent,
       indicatorColor: theme.colorScheme.primary.withValues(alpha: 0.22),
-      destinations: _navigationDestinations(context),
+      destinations: _navigationDestinations(context, compact: useCompactLabels),
       onDestinationSelected: (index) {
         ref
             .read(homeSectionProvider.notifier)

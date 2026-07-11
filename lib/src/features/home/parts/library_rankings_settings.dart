@@ -85,68 +85,60 @@ class _RankingPanel extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                child: SegmentedButton<RankingScope>(
-                  showSelectedIcon: false,
-                  style: ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                    padding: const WidgetStatePropertyAll(
-                      EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-                    ),
-                    side: WidgetStateProperty.resolveWith((states) {
-                      final selected = states.contains(WidgetState.selected);
-                      return BorderSide(
-                        color: selected
-                            ? theme.colorScheme.primary.withValues(alpha: 0.55)
-                            : theme.colorScheme.outlineVariant.withValues(
-                                alpha: 0.48,
-                              ),
-                      );
-                    }),
-                    backgroundColor: WidgetStateProperty.resolveWith((states) {
-                      if (states.contains(WidgetState.selected)) {
-                        return theme.colorScheme.primary.withValues(
-                          alpha: 0.18,
-                        );
-                      }
-                      return theme.colorScheme.surfaceContainerHighest
-                          .withValues(alpha: 0.72);
-                    }),
-                    foregroundColor: WidgetStateProperty.resolveWith((states) {
-                      if (states.contains(WidgetState.selected)) {
-                        return theme.colorScheme.primary;
-                      }
-                      return theme.colorScheme.onSurfaceVariant;
-                    }),
-                  ),
-                  segments: RankingScope.values
-                      .map(
-                        (value) => ButtonSegment<RankingScope>(
-                          value: value,
-                          label: Text(
-                            useCompactScopeLabels
-                                ? _rankingScopeCompactLabel(context, value)
-                                : _rankingScopeLabel(context, value),
-                            maxLines: 1,
-                            softWrap: false,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  selected: {scope},
-                  onSelectionChanged: (selection) {
-                    ref.read(rankingFocusProvider.notifier).clear();
-                    ref
-                        .read(rankingScopeProvider.notifier)
-                        .setScope(selection.first);
-                  },
-                ),
+          SegmentedButton<RankingScope>(
+            expandedInsets: EdgeInsets.zero,
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: const WidgetStatePropertyAll(Size.zero),
+              padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 4, vertical: 9),
               ),
+              side: WidgetStateProperty.resolveWith((states) {
+                final selected = states.contains(WidgetState.selected);
+                return BorderSide(
+                  color: selected
+                      ? theme.colorScheme.primary.withValues(alpha: 0.55)
+                      : theme.colorScheme.outlineVariant.withValues(
+                          alpha: 0.48,
+                        ),
+                );
+              }),
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return theme.colorScheme.primary.withValues(alpha: 0.18);
+                }
+                return theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.72,
+                );
+              }),
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return theme.colorScheme.primary;
+                }
+                return theme.colorScheme.onSurfaceVariant;
+              }),
             ),
+            segments: RankingScope.values
+                .map(
+                  (value) => ButtonSegment<RankingScope>(
+                    value: value,
+                    label: Text(
+                      useCompactScopeLabels
+                          ? _rankingScopeCompactLabel(context, value)
+                          : _rankingScopeLabel(context, value),
+                      maxLines: 1,
+                      softWrap: false,
+                    ),
+                  ),
+                )
+                .toList(),
+            selected: {scope},
+            onSelectionChanged: (selection) {
+              ref.read(rankingFocusProvider.notifier).clear();
+              ref.read(rankingScopeProvider.notifier).setScope(selection.first);
+            },
           ),
           const SizedBox(height: 14),
           _RankingList(

@@ -204,7 +204,8 @@ class _OverviewInsightPanel extends StatelessWidget {
                   crossAxisCount: columns,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
-                  childAspectRatio: columns == 1 ? 3.7 : 2.05,
+                  mainAxisExtent: columns == 1 ? 92 : null,
+                  childAspectRatio: 2.05,
                 ),
                 itemBuilder: (context, index) => _OverviewInsightTile(
                   key: ValueKey('overview-insight-$index'),
@@ -505,7 +506,8 @@ class _SmartListsPanel extends StatelessWidget {
                   crossAxisCount: columns,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
-                  childAspectRatio: columns == 1 ? 3.0 : 1.55,
+                  mainAxisExtent: columns == 1 ? 124 : null,
+                  childAspectRatio: 1.55,
                 ),
                 itemBuilder: (context, index) => _SmartListCard(
                   key: ValueKey('overview-smart-list-$index'),
