@@ -8,12 +8,14 @@ class MusicStatsState {
     required this.overview,
     required this.snapshotHistory,
     this.snapshotRecordingEnabled = true,
+    this.lastDataRefreshAt,
   });
 
   final MusicLibraryAuthorizationStatus authorizationStatus;
   final LibraryOverview overview;
   final SnapshotHistory snapshotHistory;
   final bool snapshotRecordingEnabled;
+  final DateTime? lastDataRefreshAt;
 
   bool get isDemo => overview.isDemo;
 
@@ -23,6 +25,7 @@ class MusicStatsState {
       overview: overview,
       snapshotHistory: snapshotHistory,
       snapshotRecordingEnabled: snapshotRecordingEnabled,
+      lastDataRefreshAt: lastDataRefreshAt,
     );
   }
 }

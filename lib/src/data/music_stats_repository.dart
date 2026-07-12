@@ -75,6 +75,7 @@ class MusicStatsRepository {
         overview: LibraryOverview.empty(isDemo: false),
         snapshotHistory: await _snapshotRepository.loadHistory(),
         snapshotRecordingEnabled: snapshotRecordingEnabled,
+        lastDataRefreshAt: DateTime.now(),
       );
     }
 
@@ -98,6 +99,7 @@ class MusicStatsRepository {
       overview: overview,
       snapshotHistory: snapshotHistory,
       snapshotRecordingEnabled: snapshotRecordingEnabled,
+      lastDataRefreshAt: DateTime.now(),
     );
   }
 
@@ -116,6 +118,7 @@ class MusicStatsRepository {
           ? _sampleSnapshotHistory(overview)
           : SnapshotHistory.empty,
       snapshotRecordingEnabled: snapshotRecordingEnabled,
+      lastDataRefreshAt: DateTime.now(),
     );
   }
 

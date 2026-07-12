@@ -43,6 +43,7 @@ part 'parts/library_rankings_settings.dart';
 part 'parts/shared_helpers.dart';
 
 const _privacyPolicyUrl = 'https://songbrief.ruhenheim.org/privacy/';
+const _pullRefreshIndicatorTimeout = Duration(seconds: 12);
 const _termsOfUseUrl = 'https://songbrief.ruhenheim.org/terms/';
 const _officialWebsiteUrl = 'https://songbrief.ruhenheim.org/';
 const _authorUrl = 'https://ruhenheim.org';
@@ -234,48 +235,60 @@ String _musicAccessStatusTooltipLabel(
   BuildContext context,
   bool isDemo,
   MusicLibraryAuthorizationStatus status,
+  DateTime? lastDataRefreshAt,
 ) {
-  if (isDemo) {
-    return _t(context, 'Demo mode', 'デモモード', zh: '演示模式', ko: '데모 모드');
-  }
+  final statusLabel = isDemo
+      ? _t(context, 'Demo mode', 'デモモード', zh: '演示模式', ko: '데모 모드')
+      : switch (status) {
+          MusicLibraryAuthorizationStatus.notDetermined => _t(
+            context,
+            'Apple Music access not requested',
+            'Apple Musicアクセス未確認',
+            zh: '尚未请求 Apple Music 访问权限',
+            ko: 'Apple Music 접근 권한 미요청',
+          ),
+          MusicLibraryAuthorizationStatus.authorized => _t(
+            context,
+            'Apple Music authorized',
+            'Apple Music認証済み',
+            zh: 'Apple Music 已授权',
+            ko: 'Apple Music 인증됨',
+          ),
+          MusicLibraryAuthorizationStatus.denied => _t(
+            context,
+            'Apple Music access denied',
+            'Apple Musicアクセス拒否',
+            zh: 'Apple Music 访问被拒绝',
+            ko: 'Apple Music 접근 거부됨',
+          ),
+          MusicLibraryAuthorizationStatus.restricted => _t(
+            context,
+            'Apple Music access restricted',
+            'Apple Musicアクセス制限中',
+            zh: 'Apple Music 访问受限',
+            ko: 'Apple Music 접근 제한됨',
+          ),
+          MusicLibraryAuthorizationStatus.unsupported => _t(
+            context,
+            'Apple Music unavailable',
+            'Apple Music利用不可',
+            zh: 'Apple Music 不可用',
+            ko: 'Apple Music 사용 불가',
+          ),
+        };
 
-  return switch (status) {
-    MusicLibraryAuthorizationStatus.notDetermined => _t(
-      context,
-      'Apple Music access not requested',
-      'Apple Musicアクセス未確認',
-      zh: '尚未请求 Apple Music 访问权限',
-      ko: 'Apple Music 접근 권한 미요청',
-    ),
-    MusicLibraryAuthorizationStatus.authorized => _t(
-      context,
-      'Apple Music authorized',
-      'Apple Music認証済み',
-      zh: 'Apple Music 已授权',
-      ko: 'Apple Music 인증됨',
-    ),
-    MusicLibraryAuthorizationStatus.denied => _t(
-      context,
-      'Apple Music access denied',
-      'Apple Musicアクセス拒否',
-      zh: 'Apple Music 访问被拒绝',
-      ko: 'Apple Music 접근 거부됨',
-    ),
-    MusicLibraryAuthorizationStatus.restricted => _t(
-      context,
-      'Apple Music access restricted',
-      'Apple Musicアクセス制限中',
-      zh: 'Apple Music 访问受限',
-      ko: 'Apple Music 접근 제한됨',
-    ),
-    MusicLibraryAuthorizationStatus.unsupported => _t(
-      context,
-      'Apple Music unavailable',
-      'Apple Music利用不可',
-      zh: 'Apple Music 不可用',
-      ko: 'Apple Music 사용 불가',
-    ),
-  };
+  if (lastDataRefreshAt == null) {
+    return statusLabel;
+  }
+  final refreshedAt = _dateTimeFormat(context).format(lastDataRefreshAt);
+  return '$statusLabel\n${_t(context, 'Last data update $refreshedAt', '最終データ取得 $refreshedAt', zh: '最后获取数据 $refreshedAt', ko: '마지막 데이터 가져오기 $refreshedAt')}';
+}
+
+Future<void> _refreshStatsFromPull(WidgetRef ref) {
+  final refresh = ref
+      .read(musicStatsControllerProvider.notifier)
+      .refreshStatsSilently();
+  return refresh.timeout(_pullRefreshIndicatorTimeout, onTimeout: () {});
 }
 
 String _themeStyleLabel(BuildContext context, SongBriefThemeStyle style) {
@@ -880,9 +893,7 @@ class _StatsContent extends ConsumerWidget {
     ).viewPadding.bottom;
     final mobileBottomPadding = 172 + deviceBottomInset;
     return RefreshIndicator.adaptive(
-      onRefresh: () => ref
-          .read(musicStatsControllerProvider.notifier)
-          .refreshStatsSilently(),
+      onRefresh: () => _refreshStatsFromPull(ref),
       child: CustomScrollView(
         key: PageStorageKey<HomeSection>(selectedSection),
         physics: const AlwaysScrollableScrollPhysics(),
@@ -978,6 +989,7 @@ class _Header extends StatelessWidget {
         _MusicAccessStatusPill(
           isDemo: overview.isDemo,
           status: stats.authorizationStatus,
+          lastDataRefreshAt: stats.lastDataRefreshAt,
         ),
       ],
     );
@@ -985,10 +997,15 @@ class _Header extends StatelessWidget {
 }
 
 class _MusicAccessStatusPill extends StatefulWidget {
-  const _MusicAccessStatusPill({required this.isDemo, required this.status});
+  const _MusicAccessStatusPill({
+    required this.isDemo,
+    required this.status,
+    required this.lastDataRefreshAt,
+  });
 
   final bool isDemo;
   final MusicLibraryAuthorizationStatus status;
+  final DateTime? lastDataRefreshAt;
 
   @override
   State<_MusicAccessStatusPill> createState() => _MusicAccessStatusPillState();
@@ -1004,6 +1021,7 @@ class _MusicAccessStatusPillState extends State<_MusicAccessStatusPill> {
       context,
       widget.isDemo,
       widget.status,
+      widget.lastDataRefreshAt,
     );
     final icon = widget.isDemo
         ? Icons.science_outlined
@@ -1019,8 +1037,11 @@ class _MusicAccessStatusPillState extends State<_MusicAccessStatusPill> {
         button: true,
         label: label,
         child: Material(
+          key: const ValueKey('music-access-status-button'),
           color: Colors.transparent,
-          child: InkResponse(
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
             borderRadius: BorderRadius.circular(18),
             onTap: () {
               _tooltipKey.currentState?.ensureTooltipVisible();

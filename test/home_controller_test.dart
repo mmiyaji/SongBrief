@@ -45,6 +45,32 @@ void main() {
     expect(afterRefresh.requireValue.overview.latestTrack?.title, 'Updated');
   });
 
+  test('stats refresh does not wait for playback synchronization', () async {
+    final repository = _HangingPlaybackRepository();
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(musicStatsControllerProvider.future);
+    final refresh = container
+        .read(musicStatsControllerProvider.notifier)
+        .refreshStatsSilently();
+    await Future<void>.delayed(Duration.zero);
+    repository.completeRefresh(_state('Updated without playback'));
+
+    await refresh.timeout(const Duration(seconds: 1));
+    expect(
+      container
+          .read(musicStatsControllerProvider)
+          .requireValue
+          .overview
+          .latestTrack
+          ?.title,
+      'Updated without playback',
+    );
+  });
+
   test('overlapping stats refreshes share one repository load', () async {
     final repository = _ControlledMusicStatsRepository();
     final container = ProviderContainer(
@@ -217,6 +243,13 @@ class _ControlledMusicStatsRepository extends MusicStatsRepository {
   Future<MusicPlaybackSnapshot?> currentPlayback() {
     return Future.value();
   }
+}
+
+class _HangingPlaybackRepository extends _ControlledMusicStatsRepository {
+  final _playback = Completer<MusicPlaybackSnapshot?>();
+
+  @override
+  Future<MusicPlaybackSnapshot?> currentPlayback() => _playback.future;
 }
 
 class _SnapshotRaceRepository extends MusicStatsRepository {

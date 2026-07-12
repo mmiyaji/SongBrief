@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,7 +26,7 @@ void main() {
     expect(find.textContaining('City lights are waking slow'), findsOneWidget);
     expect(find.text('Show all lyrics'), findsOneWidget);
     expect(find.text('Recently played songs'), findsOneWidget);
-    expect(find.byTooltip('Demo mode'), findsOneWidget);
+    expect(_tooltipStartingWith('Demo mode'), findsOneWidget);
   });
 
   testWidgets('expands and collapses long lyrics', (tester) async {
@@ -59,7 +61,7 @@ void main() {
     expect(find.text('再生回数'), findsWidgets);
     expect(find.text('今週の傾向'), findsOneWidget);
     expect(find.text('最近再生した曲'), findsOneWidget);
-    expect(find.byTooltip('デモモード'), findsOneWidget);
+    expect(_tooltipStartingWith('デモモード'), findsOneWidget);
   });
 
   testWidgets('shows playback feedback and allows pausing from the player', (
@@ -154,6 +156,56 @@ void main() {
       tester.getBottomRight(adSlot).dy,
       lessThanOrEqualTo(tester.getTopLeft(playbackChrome).dy - 12),
     );
+  });
+
+  testWidgets('bounds pull refresh feedback when data loading is delayed', (
+    tester,
+  ) async {
+    final controller = _NeverCompletingRefreshController(_settingsDemoStats());
+    await _pumpApp(
+      tester,
+      AppLanguage.english,
+      musicStatsControllerBuilder: () => controller,
+    );
+    await tester.pumpAndSettle();
+
+    final indicator = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    var completed = false;
+    final refresh = indicator.onRefresh().whenComplete(() => completed = true);
+
+    await tester.pump(const Duration(seconds: 11));
+    expect(completed, isFalse);
+    await tester.pump(const Duration(seconds: 1));
+    await refresh;
+    expect(completed, isTrue);
+
+    controller.completeRefresh();
+  });
+
+  testWidgets('shows last data refresh and clips access button feedback', (
+    tester,
+  ) async {
+    final base = _settingsDemoStats();
+    final stats = MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+      overview: LibraryOverview.fromTracks(base.overview.tracks, isDemo: false),
+      snapshotHistory: base.snapshotHistory,
+      lastDataRefreshAt: DateTime(2026, 7, 12, 10, 51),
+    );
+    await _pumpApp(tester, AppLanguage.english, statsState: stats);
+    await tester.pumpAndSettle();
+
+    final button = find.byKey(const ValueKey('music-access-status-button'));
+    final material = tester.widget<Material>(button);
+    expect(material.borderRadius, BorderRadius.circular(18));
+    expect(material.clipBehavior, Clip.antiAlias);
+
+    await tester.tap(button);
+    await tester.pump();
+    expect(find.textContaining('Apple Music authorized'), findsOneWidget);
+    expect(find.textContaining('Last data update'), findsOneWidget);
   });
 
   testWidgets('fits overview and navigation on a compact phone', (
@@ -651,6 +703,7 @@ Future<void> _pumpApp(
   AppLanguage language, {
   bool snapshotRecordingEnabled = true,
   MusicStatsState? statsState,
+  MusicStatsController Function()? musicStatsControllerBuilder,
   PlaybackController Function()? playbackControllerBuilder,
 }) {
   return tester.pumpWidget(
@@ -662,7 +715,9 @@ Future<void> _pumpApp(
         snapshotRecordingProvider.overrideWith(
           () => _FixedSnapshotRecordingController(snapshotRecordingEnabled),
         ),
-        if (statsState != null)
+        if (musicStatsControllerBuilder != null)
+          musicStatsControllerProvider.overrideWith(musicStatsControllerBuilder)
+        else if (statsState != null)
           musicStatsControllerProvider.overrideWith(
             () => _FixedMusicStatsController(statsState),
           ),
@@ -671,6 +726,12 @@ Future<void> _pumpApp(
       ],
       child: const SongBriefApp(),
     ),
+  );
+}
+
+Finder _tooltipStartingWith(String prefix) {
+  return find.byWidgetPredicate(
+    (widget) => widget is Tooltip && widget.message?.startsWith(prefix) == true,
   );
 }
 
@@ -694,6 +755,25 @@ class _FixedMusicStatsController extends MusicStatsController {
   @override
   Future<MusicStatsState> build() async {
     return stats;
+  }
+}
+
+class _NeverCompletingRefreshController extends MusicStatsController {
+  _NeverCompletingRefreshController(this.stats);
+
+  final MusicStatsState stats;
+  final Completer<void> _refresh = Completer<void>();
+
+  @override
+  Future<MusicStatsState> build() async => stats;
+
+  @override
+  Future<void> refreshStatsSilently() => _refresh.future;
+
+  void completeRefresh() {
+    if (!_refresh.isCompleted) {
+      _refresh.complete();
+    }
   }
 }
 

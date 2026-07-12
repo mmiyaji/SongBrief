@@ -418,7 +418,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
               },
             ),
       );
-      await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
+      unawaited(ref.read(playbackControllerProvider.notifier).syncWithPlayer());
       if (!overview.isDemo) {
         unawaited(syncCloudSnapshots());
       }
