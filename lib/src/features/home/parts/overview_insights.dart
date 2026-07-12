@@ -406,29 +406,27 @@ class _OverviewInsightTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  _EllipsisTextWithTooltip(
                     value.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    triggerMode: TooltipTriggerMode.longPress,
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    value.value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  _AdaptiveValueText(
+                    value: value.value,
+                    tooltipMessage: '${value.label}: ${value.value}',
+                    triggerMode: TooltipTriggerMode.longPress,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  _EllipsisTextWithTooltip(
                     value.detail,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    triggerMode: TooltipTriggerMode.longPress,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,

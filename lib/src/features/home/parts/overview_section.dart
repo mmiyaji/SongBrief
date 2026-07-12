@@ -103,6 +103,9 @@ class _OverviewPanel extends StatelessWidget {
           );
 
           if (constraints.maxWidth >= 640) {
+            final signalWidth = (constraints.maxWidth * 0.4)
+                .clamp(320.0, 360.0)
+                .toDouble();
             return Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -110,7 +113,7 @@ class _OverviewPanel extends StatelessWidget {
                   child: _OverviewMain(overview: overview, topTrack: topTrack),
                 ),
                 const SizedBox(width: 20),
-                SizedBox(width: 260, child: signalTiles),
+                SizedBox(width: signalWidth, child: signalTiles),
               ],
             );
           }
@@ -228,10 +231,8 @@ class _TopTrackLine extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  _EllipsisTextWithTooltip(
                     entry.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium,
                   ),
                 ],
@@ -317,6 +318,7 @@ class _SignalTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return DecoratedBox(
+      key: ValueKey('overview-signal-$label'),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.78,
@@ -340,17 +342,14 @@ class _SignalTile extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: theme.colorScheme.primary),
             const SizedBox(height: 10),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            _AdaptiveValueText(
+              value: value,
+              tooltipMessage: '$label: $value',
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 2),
-            Text(
+            _EllipsisTextWithTooltip(
               label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
@@ -770,7 +769,13 @@ class _SnapshotMetric extends StatelessWidget {
                 ),
               ),
             ),
-            Text(value, style: theme.textTheme.titleSmall),
+            Flexible(
+              child: _AdaptiveValueText(
+                value: value,
+                tooltipMessage: '$label: $value',
+                style: theme.textTheme.titleSmall,
+              ),
+            ),
           ],
         ),
       ),
@@ -1146,15 +1151,15 @@ class _SummaryCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(value.value, style: theme.textTheme.titleMedium),
+                _AdaptiveValueText(
+                  value: value.value,
+                  tooltipMessage: '${value.label}: ${value.value}',
+                  triggerMode: TooltipTriggerMode.longPress,
+                  style: theme.textTheme.titleMedium,
                 ),
-                Text(
+                _EllipsisTextWithTooltip(
                   value.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  triggerMode: TooltipTriggerMode.longPress,
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w700,

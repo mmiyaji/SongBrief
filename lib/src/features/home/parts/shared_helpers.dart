@@ -2639,6 +2639,96 @@ class _TrackTrendValue {
   final int playDelta;
 }
 
+class _AdaptiveValueText extends StatelessWidget {
+  const _AdaptiveValueText({
+    required this.value,
+    required this.style,
+    this.tooltipMessage,
+    this.triggerMode = TooltipTriggerMode.tap,
+  });
+
+  final String value;
+  final TextStyle? style;
+  final String? tooltipMessage;
+  final TooltipTriggerMode triggerMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveStyle = style ?? DefaultTextStyle.of(context).style;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: value, style: effectiveStyle),
+          maxLines: 1,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        final needsScaling =
+            constraints.maxWidth.isFinite &&
+            painter.width > constraints.maxWidth;
+        final text = Text(
+          value,
+          maxLines: 1,
+          softWrap: false,
+          style: effectiveStyle,
+        );
+        if (!needsScaling) {
+          return text;
+        }
+        return Tooltip(
+          message: tooltipMessage ?? value,
+          triggerMode: triggerMode,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: text,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _EllipsisTextWithTooltip extends StatelessWidget {
+  const _EllipsisTextWithTooltip(
+    this.text, {
+    required this.style,
+    this.triggerMode = TooltipTriggerMode.tap,
+  });
+
+  final String text;
+  final TextStyle? style;
+  final TooltipTriggerMode triggerMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveStyle = style ?? DefaultTextStyle.of(context).style;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: effectiveStyle),
+          maxLines: 1,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        final isTruncated =
+            constraints.maxWidth.isFinite &&
+            painter.width > constraints.maxWidth;
+        final child = Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: effectiveStyle,
+        );
+        if (!isTruncated) {
+          return child;
+        }
+        return Tooltip(message: text, triggerMode: triggerMode, child: child);
+      },
+    );
+  }
+}
+
 String _compactNumber(int value) {
   if (value >= 1000) {
     final compact = value / 1000;

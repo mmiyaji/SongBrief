@@ -281,6 +281,56 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('adapts large overview values and exposes their full text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const track = LibraryTrack(
+      id: 'large-values-track',
+      title: 'A deliberately long track title for overflow verification',
+      artist: 'Large Library Artist',
+      albumTitle: 'Large Library Album',
+      duration: Duration(hours: 24),
+      playCount: 200000,
+      skipCount: 123456,
+      isCloudItem: false,
+    );
+    final stats = MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+      overview: LibraryOverview.fromTracks(const [track], isDemo: false),
+      snapshotHistory: SnapshotHistory.empty,
+    );
+
+    await _pumpApp(tester, AppLanguage.english, statsState: stats);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Overview'));
+    await tester.pumpAndSettle();
+
+    final hoursTile = find.byKey(const ValueKey('overview-signal-Hours'));
+    expect(hoursTile, findsOneWidget);
+    expect(
+      find.descendant(of: hoursTile, matching: find.byType(FittedBox)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: hoursTile,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Tooltip &&
+              widget.message?.startsWith('Hours: ') == true &&
+              !widget.message!.contains('…'),
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('updates open track details when playback skips to next', (
     tester,
   ) async {
