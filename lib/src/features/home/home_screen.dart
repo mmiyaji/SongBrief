@@ -1031,32 +1031,54 @@ class _StatsContent extends ConsumerWidget {
         key: PageStorageKey<HomeSection>(selectedSection),
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                useRail ? 24 : 20,
-                12,
-                useRail ? 28 : 20,
-                useRail ? 28 : mobileBottomPadding,
-              ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              useRail ? 24 : 20,
+              12,
+              useRail ? 28 : 20,
+              0,
+            ),
+            sliver: SliverToBoxAdapter(
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 900),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _Header(stats: stats, selectedSection: selectedSection),
-                      const SizedBox(height: 16),
-                      _SectionBody(
-                        stats: stats,
-                        selectedSection: selectedSection,
-                      ),
-                    ],
+                  child: _Header(
+                    stats: stats,
+                    selectedSection: selectedSection,
                   ),
                 ),
               ),
             ),
           ),
+          if (selectedSection == HomeSection.overview)
+            _OverviewSliverSection(
+              stats: stats,
+              horizontalPadding: EdgeInsets.only(
+                left: useRail ? 24 : 20,
+                right: useRail ? 28 : 20,
+              ),
+              bottomPadding: useRail ? 28 : mobileBottomPadding,
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                useRail ? 24 : 20,
+                16,
+                useRail ? 28 : 20,
+                useRail ? 28 : mobileBottomPadding,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 900),
+                    child: _SectionBody(
+                      stats: stats,
+                      selectedSection: selectedSection,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

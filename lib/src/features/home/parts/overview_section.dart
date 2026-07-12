@@ -7,70 +7,128 @@ class _OverviewSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final overview = stats.overview;
     final syncState = ref.watch(snapshotSyncStateProvider);
     final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo) ...[
-          _AuthorizationPanel(status: stats.authorizationStatus),
-          const SizedBox(height: 16),
-        ],
-        if (overview.isDemo) ...[
-          const _DemoBanner(),
-          const SizedBox(height: 16),
-        ],
-        _OverviewPanel(overview: overview),
-        if (stats.snapshotRecordingEnabled) ...[
-          const SizedBox(height: 14),
-          _SnapshotStatusPanel(
-            history: stats.snapshotHistory,
-            overview: overview,
-            isDemo: overview.isDemo,
-            syncState: syncState,
-            cloudSyncEnabled: cloudSyncEnabled,
-            onSync: overview.isDemo || syncState.isSyncing
-                ? null
-                : () => ref
-                      .read(musicStatsControllerProvider.notifier)
-                      .syncCloudSnapshots(),
-          ),
-        ],
-        const SizedBox(height: 14),
-        _SummaryGrid(overview: overview),
-        const SizedBox(height: 14),
-        _OverviewAnalyticsPanel(
-          overview: overview,
-          history: stats.snapshotHistory,
-          snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
-        ),
-        if (stats.snapshotRecordingEnabled) ...[
-          const SizedBox(height: 14),
-          _RecapHighlightsPanel(
-            overview: overview,
-            history: stats.snapshotHistory,
-          ),
-        ],
-        const SizedBox(height: 14),
-        _TasteAndCollectionPanel(
-          overview: overview,
-          history: stats.snapshotHistory,
-        ),
-        const SizedBox(height: 14),
-        _OverviewInsightPanel(overview: overview),
-        const SizedBox(height: 14),
-        _SmartListsPanel(overview: overview),
-        const SizedBox(height: 14),
-        _OverviewBreakdownPanel(overview: overview),
-        const SizedBox(height: 14),
-        AdBannerSlot(
-          key: const ValueKey('overview-ad-slot'),
-          placement: _t(context, 'Overview', '概要'),
-        ),
-      ],
+      children: _overviewPanelItems(
+        context,
+        stats: stats,
+        syncState: syncState,
+        cloudSyncEnabled: cloudSyncEnabled,
+      ),
     );
   }
+}
+
+class _OverviewSliverSection extends ConsumerWidget {
+  const _OverviewSliverSection({
+    required this.stats,
+    required this.horizontalPadding,
+    required this.bottomPadding,
+  });
+
+  final MusicStatsState stats;
+  final EdgeInsets horizontalPadding;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final syncState = ref.watch(snapshotSyncStateProvider);
+    final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
+    final items = _overviewPanelItems(
+      context,
+      stats: stats,
+      syncState: syncState,
+      cloudSyncEnabled: cloudSyncEnabled,
+    );
+
+    return SliverPadding(
+      padding: horizontalPadding.copyWith(top: 16, bottom: bottomPadding),
+      sliver: SliverList.builder(
+        itemCount: items.length,
+        itemBuilder: (context, index) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: items[index],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+List<Widget> _overviewPanelItems(
+  BuildContext context, {
+  required MusicStatsState stats,
+  required SnapshotSyncState syncState,
+  required bool cloudSyncEnabled,
+}) {
+  final overview = stats.overview;
+  final items = <Widget>[];
+
+  void add(Widget child, {double spaceAfter = 14}) {
+    items.add(
+      Padding(
+        padding: EdgeInsets.only(bottom: spaceAfter),
+        child: child,
+      ),
+    );
+  }
+
+  if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo) {
+    add(_AuthorizationPanel(status: stats.authorizationStatus), spaceAfter: 16);
+  }
+  if (overview.isDemo) {
+    add(const _DemoBanner(), spaceAfter: 16);
+  }
+  add(_OverviewPanel(overview: overview));
+  if (stats.snapshotRecordingEnabled) {
+    add(
+      _SnapshotStatusPanel(
+        history: stats.snapshotHistory,
+        overview: overview,
+        isDemo: overview.isDemo,
+        syncState: syncState,
+        cloudSyncEnabled: cloudSyncEnabled,
+        onSync: overview.isDemo || syncState.isSyncing
+            ? null
+            : () => ProviderScope.containerOf(context)
+                  .read(musicStatsControllerProvider.notifier)
+                  .syncCloudSnapshots(),
+      ),
+    );
+  }
+  add(_SummaryGrid(overview: overview));
+  add(
+    _OverviewAnalyticsPanel(
+      overview: overview,
+      history: stats.snapshotHistory,
+      snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
+    ),
+  );
+  if (stats.snapshotRecordingEnabled) {
+    add(
+      _RecapHighlightsPanel(overview: overview, history: stats.snapshotHistory),
+    );
+  }
+  add(
+    _TasteAndCollectionPanel(
+      overview: overview,
+      history: stats.snapshotHistory,
+    ),
+  );
+  add(_OverviewInsightPanel(overview: overview));
+  add(_SmartListsPanel(overview: overview));
+  add(_OverviewBreakdownPanel(overview: overview));
+  add(
+    AdBannerSlot(
+      key: const ValueKey('overview-ad-slot'),
+      placement: _t(context, 'Overview', '概要'),
+    ),
+    spaceAfter: 0,
+  );
+  return items;
 }
 
 class _OverviewPanel extends StatelessWidget {

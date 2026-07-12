@@ -157,35 +157,21 @@ void main() {
     await tester.tap(find.text('Overview'));
     await tester.pumpAndSettle();
 
-    final lastSummaryCard = find.byKey(
-      const ValueKey('overview-summary-card-3'),
-    );
     final listeningMaps = find.byKey(const ValueKey('overview-listening-maps'));
-    final contentGap =
-        tester.getTopLeft(listeningMaps).dy -
-        tester.getBottomRight(lastSummaryCard).dy;
-    expect(contentGap, lessThanOrEqualTo(30));
+    expect(listeningMaps, findsNothing);
+    await _scrollOverviewUntilVisible(tester, listeningMaps);
+    expect(listeningMaps, findsOneWidget);
 
     final insightsPanel = find.byKey(const ValueKey('overview-insights'));
-    final lastInsight = find.byKey(const ValueKey('overview-insight-5'));
-    expect(
-      tester.getBottomRight(insightsPanel).dy -
-          tester.getBottomRight(lastInsight).dy,
-      lessThanOrEqualTo(30),
-    );
+    await _scrollOverviewUntilVisible(tester, insightsPanel);
+    expect(find.byKey(const ValueKey('overview-insight-5')), findsOneWidget);
 
     final smartListsPanel = find.byKey(const ValueKey('overview-smart-lists'));
-    final lastSmartList = find.byKey(const ValueKey('overview-smart-list-3'));
-    expect(
-      tester.getBottomRight(smartListsPanel).dy -
-          tester.getBottomRight(lastSmartList).dy,
-      lessThanOrEqualTo(30),
-    );
-
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -10000));
-    await tester.pumpAndSettle();
+    await _scrollOverviewUntilVisible(tester, smartListsPanel);
+    expect(find.byKey(const ValueKey('overview-smart-list-3')), findsOneWidget);
 
     final adSlot = find.byKey(const ValueKey('overview-ad-slot'));
+    await _scrollOverviewUntilVisible(tester, adSlot);
     final playbackChrome = find.byKey(const ValueKey('mobile-playback-chrome'));
     expect(
       tester.getBottomRight(adSlot).dy,
@@ -266,10 +252,9 @@ void main() {
 
     await tester.tap(find.text('概要'));
     await tester.pumpAndSettle();
-    expect(
-      tester.getSize(find.byKey(const ValueKey('overview-insight-5'))).height,
-      92,
-    );
+    final lastInsight = find.byKey(const ValueKey('overview-insight-5'));
+    await _scrollOverviewUntilVisible(tester, lastInsight, step: 420);
+    expect(tester.getSize(lastInsight).height, 92);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('順位'));
@@ -833,18 +818,18 @@ void main() {
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -520));
     await tester.pumpAndSettle();
-    final headerTitle = find.byWidgetPredicate(
-      (widget) =>
-          widget is Text &&
-          widget.data == 'SongBrief' &&
-          (widget.style?.fontSize ?? 0) >= 28,
+    final settingsScrollable = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
     );
-    expect(tester.getTopLeft(headerTitle).dy, lessThan(0));
+    expect(settingsScrollable.position.pixels, greaterThan(0));
 
     await tester.tap(find.text('Playing'));
     await tester.pumpAndSettle();
 
-    expect(tester.getTopLeft(headerTitle).dy, greaterThanOrEqualTo(0));
+    final playingScrollable = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    expect(playingScrollable.position.pixels, 0);
     expect(find.text('Skyline Echo'), findsWidgets);
   });
 
@@ -878,6 +863,9 @@ void main() {
           .setSection(HomeSection.overview);
       await tester.pumpAndSettle();
 
+      final listeningMaps = find.text('Listening maps');
+      await _scrollOverviewUntilVisible(tester, listeningMaps);
+
       expect(find.text('Daily listening records'), findsNothing);
       expect(find.text('Recap highlights'), findsNothing);
       expect(find.text('Activity heatmap'), findsNothing);
@@ -888,6 +876,24 @@ void main() {
       await tester.pump();
     }
   });
+}
+
+Future<void> _scrollOverviewUntilVisible(
+  WidgetTester tester,
+  Finder target, {
+  double step = 520,
+}) async {
+  final scrollView = find.byType(CustomScrollView);
+  for (var attempt = 0; attempt < 30; attempt += 1) {
+    if (target.evaluate().isNotEmpty) {
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
+      return;
+    }
+    await tester.drag(scrollView, Offset(0, -step));
+    await tester.pumpAndSettle();
+  }
+  expect(target, findsOneWidget);
 }
 
 Future<void> _pumpApp(

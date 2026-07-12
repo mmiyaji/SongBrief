@@ -52,6 +52,7 @@ void main() {
     await _pumpOverview(tester);
     await tester.pumpAndSettle();
 
+    await _scrollOverviewUntilVisible(tester, find.text('Listening maps'));
     expect(find.text('Listening maps'), findsOneWidget);
     expect(find.text('Tap a year point'), findsOneWidget);
 
@@ -179,6 +180,7 @@ void main() {
     await _pumpOverview(tester);
     await tester.pumpAndSettle();
 
+    await _scrollOverviewUntilVisible(tester, find.text('Recap highlights'));
     expect(find.text('Recap highlights'), findsOneWidget);
     expect(find.text('SongBrief Recap'), findsOneWidget);
     expect(find.text('Week'), findsOneWidget);
@@ -275,14 +277,25 @@ void main() {
 
 Future<void> _openExpandedListeningMaps(WidgetTester tester) async {
   final expandButton = find.byTooltip('Expand listening maps');
-  await tester.scrollUntilVisible(
-    expandButton,
-    420,
-    scrollable: find.byType(Scrollable).first,
-  );
-  await tester.pumpAndSettle();
+  await _scrollOverviewUntilVisible(tester, expandButton);
   await tester.tap(expandButton);
   await tester.pumpAndSettle();
+}
+
+Future<void> _scrollOverviewUntilVisible(
+  WidgetTester tester,
+  Finder target,
+) async {
+  for (var attempt = 0; attempt < 30; attempt += 1) {
+    if (target.evaluate().isNotEmpty) {
+      await tester.ensureVisible(target.first);
+      await tester.pumpAndSettle();
+      return;
+    }
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -420));
+    await tester.pumpAndSettle();
+  }
+  expect(target, findsWidgets);
 }
 
 Future<void> _pumpOverview(

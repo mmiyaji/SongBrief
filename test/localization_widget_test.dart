@@ -16,6 +16,9 @@ void main() {
       await tester.pumpAndSettle();
 
       for (final text in _expectedEnglish[section]!) {
+        if (section == HomeSection.overview) {
+          await _scrollOverviewUntilVisible(tester, find.text(text));
+        }
         expect(find.text(text), findsWidgets, reason: text);
       }
     });
@@ -29,6 +32,9 @@ void main() {
       await tester.pumpAndSettle();
 
       for (final text in _expectedJapanese[section]!) {
+        if (section == HomeSection.overview) {
+          await _scrollOverviewUntilVisible(tester, find.text(text));
+        }
         expect(find.text(text), findsWidgets, reason: text);
       }
     });
@@ -101,6 +107,22 @@ void main() {
     expect(find.text('가사'), findsOneWidget);
     expect(find.text('재생 횟수'), findsWidgets);
   });
+}
+
+Future<void> _scrollOverviewUntilVisible(
+  WidgetTester tester,
+  Finder target,
+) async {
+  for (var attempt = 0; attempt < 30; attempt += 1) {
+    if (target.evaluate().isNotEmpty) {
+      await tester.ensureVisible(target.first);
+      await tester.pumpAndSettle();
+      return;
+    }
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -420));
+    await tester.pumpAndSettle();
+  }
+  expect(target, findsWidgets);
 }
 
 const _expectedEnglish = <HomeSection, List<String>>{
