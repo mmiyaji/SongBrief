@@ -1,0 +1,747 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../domain/library_snapshot.dart';
+import 'library_snapshot_store_base.dart';
+import 'library_snapshot_store_channel.dart';
+
+typedef SnapshotDirectoryProvider = Future<Directory> Function();
+
+SnapshotStore createSnapshotStore() {
+  return Platform.isIOS
+      ? const MethodChannelSnapshotStore()
+      : const FileSnapshotStore();
+}
+
+class FileSnapshotStore implements SnapshotStore {
+  const FileSnapshotStore({SnapshotDirectoryProvider? directoryProvider})
+    : _directoryProvider = directoryProvider;
+
+  static final _snapshotFileNamePattern = RegExp(r'^\d{4}-\d{2}-\d{2}\.json$');
+  static final _dateKeyPattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+  static const _snapshotIndexFileName = '_snapshot_index_v1.json';
+  static const _snapshotIndexVersion = 1;
+  static final Map<String, Future<void>> _directoryOperationTails = {};
+  static int _temporaryFileSequence = 0;
+
+  final SnapshotDirectoryProvider? _directoryProvider;
+
+  @override
+  Future<SnapshotHistory> loadHistory() async {
+    final directory = await _directory(create: false);
+    return _runDirectoryOperation(directory, () async {
+      if (!await directory.exists()) {
+        return SnapshotHistory.empty;
+      }
+
+      final snapshotFiles = await _snapshotFileRefs(directory);
+      if (snapshotFiles.isEmpty) {
+        await _deleteSnapshotIndex(directory);
+        return SnapshotHistory.empty;
+      }
+
+      final summaries = await _loadSnapshotSummaries(directory, snapshotFiles);
+      if (summaries.isEmpty) {
+        return SnapshotHistory.empty;
+      }
+
+      final detailedSnapshots = await _loadDetailedSnapshots(snapshotFiles);
+      final snapshotsByDateKey = {
+        for (final snapshot in summaries) snapshot.dateKey: snapshot,
+        for (final snapshot in detailedSnapshots) snapshot.dateKey: snapshot,
+      };
+      final snapshots = snapshotsByDateKey.values.toList(growable: false)
+        ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
+      return SnapshotHistory(snapshots: List.unmodifiable(snapshots));
+    });
+  }
+
+  @override
+  Future<void> writeSnapshot(DailyLibrarySnapshot snapshot) async {
+    if (!_dateKeyPattern.hasMatch(snapshot.dateKey)) {
+      return;
+    }
+    final directory = await _directory(create: false);
+    await _runDirectoryOperation(directory, () async {
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      final target = File(_snapshotPath(directory, snapshot.dateKey));
+      final persistedSnapshot = await _mergeWithStoredSnapshot(
+        target,
+        snapshot,
+      );
+      final encoded = await compute(
+        _encodeSnapshotFile,
+        persistedSnapshot.toJson(),
+      );
+      await _writeFileSafely(target, encoded);
+      await _updateSnapshotIndexAfterWrite(directory, persistedSnapshot);
+    });
+  }
+
+  @override
+  Future<void> deleteSnapshotsOlderThan(DateTime cutoff) async {
+    final directory = await _directory(create: false);
+    await _runDirectoryOperation(directory, () async {
+      if (!await directory.exists()) {
+        return;
+      }
+      final cutoffKey = snapshotDateKey(cutoff);
+      await for (final entity in directory.list(followLinks: false)) {
+        if (entity is! File || !_isSnapshotFile(entity)) {
+          continue;
+        }
+        final dateKey = _dateKeyFromFile(entity);
+        if (dateKey != null && dateKey.compareTo(cutoffKey) < 0) {
+          await entity.delete();
+        }
+      }
+      await _reconcileSnapshotIndex(directory);
+    });
+  }
+
+  @override
+  Future<void> clearHistory() async {
+    final directory = await _directory(create: false);
+    await _runDirectoryOperation(directory, () async {
+      if (!await directory.exists()) {
+        return;
+      }
+      await for (final entity in directory.list(followLinks: false)) {
+        if (entity is File && _isSnapshotFile(entity)) {
+          await entity.delete();
+        }
+      }
+      await _deleteSnapshotIndex(directory);
+    });
+  }
+
+  Future<Directory> _directory({required bool create}) async {
+    final directory = _directoryProvider == null
+        ? await _defaultSnapshotsDirectory()
+        : await _directoryProvider();
+    if (create && !await directory.exists()) {
+      await directory.create(recursive: true);
+    }
+    return directory;
+  }
+
+  static Future<Directory> _defaultSnapshotsDirectory() async {
+    Directory support;
+    try {
+      support = await getApplicationSupportDirectory();
+    } on Object {
+      support = Directory(
+        [
+          Directory.systemTemp.path,
+          'songbrief_snapshot_store_$pid',
+        ].join(Platform.pathSeparator),
+      );
+    }
+    return Directory(
+      [support.path, 'SongBrief', 'Snapshots'].join(Platform.pathSeparator),
+    );
+  }
+
+  static bool _isSnapshotFile(File file) {
+    return _snapshotFileNamePattern.hasMatch(_fileName(file.path));
+  }
+
+  static String? _dateKeyFromFile(File file) {
+    final name = _fileName(file.path);
+    if (!_snapshotFileNamePattern.hasMatch(name)) {
+      return null;
+    }
+    return name.substring(0, name.length - '.json'.length);
+  }
+
+  static String _snapshotPath(Directory directory, String dateKey) {
+    return [directory.path, '$dateKey.json'].join(Platform.pathSeparator);
+  }
+
+  static String _snapshotIndexPath(Directory directory) {
+    return [
+      directory.path,
+      _snapshotIndexFileName,
+    ].join(Platform.pathSeparator);
+  }
+
+  static String _fileName(String path) {
+    final separatorIndex = path.lastIndexOf(Platform.pathSeparator);
+    return separatorIndex < 0 ? path : path.substring(separatorIndex + 1);
+  }
+
+  Future<List<_SnapshotFileRef>> _snapshotFileRefs(Directory directory) async {
+    final refs = <_SnapshotFileRef>[];
+    await for (final entity in directory.list(followLinks: false)) {
+      if (entity is! File || !_isSnapshotFile(entity)) {
+        continue;
+      }
+      final dateKey = _dateKeyFromFile(entity);
+      if (dateKey == null) {
+        continue;
+      }
+      try {
+        final stat = await entity.stat();
+        refs.add(
+          _SnapshotFileRef(
+            file: entity,
+            dateKey: dateKey,
+            modifiedMillis: stat.modified.millisecondsSinceEpoch,
+          ),
+        );
+      } on FileSystemException {
+        continue;
+      }
+    }
+    refs.sort((a, b) => a.dateKey.compareTo(b.dateKey));
+    return refs;
+  }
+
+  Future<List<DailyLibrarySnapshot>> _loadSnapshotSummaries(
+    Directory directory,
+    List<_SnapshotFileRef> refs,
+  ) async {
+    final index = await _readSnapshotIndex(directory);
+    if (index != null && _snapshotRefsMatch(index.files, refs)) {
+      return index.snapshots;
+    }
+    return _rebuildSnapshotIndex(directory, refs);
+  }
+
+  Future<List<DailyLibrarySnapshot>> _loadDetailedSnapshots(
+    List<_SnapshotFileRef> refs,
+  ) async {
+    final detailedRefs = refs.length > detailedSnapshotHistoryEntries
+        ? refs.sublist(refs.length - detailedSnapshotHistoryEntries)
+        : refs;
+    return _readSnapshotRefs(detailedRefs, includeTracks: true);
+  }
+
+  Future<List<DailyLibrarySnapshot>> _rebuildSnapshotIndex(
+    Directory directory,
+    List<_SnapshotFileRef> refs,
+  ) async {
+    final summaries = await _readSnapshotRefs(refs, includeTracks: false);
+    final validDateKeys = summaries.map((snapshot) => snapshot.dateKey).toSet();
+    final invalidRefs = refs.where(
+      (ref) => !validDateKeys.contains(ref.dateKey),
+    );
+    await _deleteSnapshotFiles(invalidRefs);
+    final currentRefs = invalidRefs.isEmpty
+        ? refs
+        : await _snapshotFileRefs(directory);
+    final currentDateKeys = currentRefs.map((ref) => ref.dateKey).toSet();
+    final currentSummaries = summaries
+        .where((snapshot) => currentDateKeys.contains(snapshot.dateKey))
+        .toList(growable: false);
+    await _writeSnapshotIndex(directory, currentSummaries, currentRefs);
+    return currentSummaries;
+  }
+
+  Future<List<DailyLibrarySnapshot>> _readSnapshotRefs(
+    List<_SnapshotFileRef> refs, {
+    required bool includeTracks,
+  }) async {
+    final rawSnapshots = <Map<String, Object?>>[];
+    for (final ref in refs) {
+      try {
+        rawSnapshots.add({
+          'raw': await ref.file.readAsString(),
+          'includeTracks': includeTracks,
+        });
+      } on FileSystemException {
+        continue;
+      }
+    }
+    if (rawSnapshots.isEmpty) {
+      return const [];
+    }
+    final snapshots = await compute(_decodeSnapshotFiles, rawSnapshots);
+    snapshots.sort((a, b) => a.dateKey.compareTo(b.dateKey));
+    return snapshots;
+  }
+
+  Future<DailyLibrarySnapshot> _mergeWithStoredSnapshot(
+    File target,
+    DailyLibrarySnapshot incoming,
+  ) async {
+    if (!await target.exists()) {
+      return incoming;
+    }
+    try {
+      final decoded = await compute(_decodeSnapshotFiles, [
+        {'raw': await target.readAsString(), 'includeTracks': true},
+      ]);
+      if (decoded.isEmpty) {
+        return incoming;
+      }
+      return _mergeSnapshotsForWrite(decoded.single, incoming);
+    } on FileSystemException {
+      return incoming;
+    }
+  }
+
+  Future<void> _updateSnapshotIndexAfterWrite(
+    Directory directory,
+    DailyLibrarySnapshot snapshot,
+  ) async {
+    final refs = await _snapshotFileRefs(directory);
+    final index = await _readSnapshotIndex(directory);
+    if (index != null &&
+        _snapshotRefsCanAcceptWrite(index.files, refs, snapshot.dateKey)) {
+      final summaries = SnapshotHistory(
+        snapshots: index.snapshots,
+      ).withSnapshot(_summaryOnly(snapshot)).snapshots;
+      await _writeSnapshotIndex(directory, summaries, refs);
+      return;
+    }
+    await _rebuildSnapshotIndex(directory, refs);
+  }
+
+  Future<void> _reconcileSnapshotIndex(Directory directory) async {
+    final refs = await _snapshotFileRefs(directory);
+    if (refs.isEmpty) {
+      await _deleteSnapshotIndex(directory);
+      return;
+    }
+    await _rebuildSnapshotIndex(directory, refs);
+  }
+
+  Future<_SnapshotIndex?> _readSnapshotIndex(Directory directory) async {
+    final indexFile = File(_snapshotIndexPath(directory));
+    if (!await indexFile.exists()) {
+      return null;
+    }
+    try {
+      return await compute(
+        _decodeSnapshotIndex,
+        await indexFile.readAsString(),
+      );
+    } on FileSystemException {
+      return null;
+    }
+  }
+
+  Future<void> _writeSnapshotIndex(
+    Directory directory,
+    List<DailyLibrarySnapshot> summaries,
+    List<_SnapshotFileRef> refs,
+  ) async {
+    final indexFile = File(_snapshotIndexPath(directory));
+    final payload = <String, Object?>{
+      'version': _snapshotIndexVersion,
+      'updatedAtMillis': DateTime.now().millisecondsSinceEpoch,
+      'files': refs
+          .map(
+            (ref) => {
+              'dateKey': ref.dateKey,
+              'modifiedMillis': ref.modifiedMillis,
+            },
+          )
+          .toList(growable: false),
+      'snapshots': summaries.map(_snapshotSummaryJson).toList(growable: false),
+    };
+    final encoded = await compute(_encodeSnapshotFile, payload);
+    await _writeFileSafely(indexFile, encoded);
+  }
+
+  Future<T> _runDirectoryOperation<T>(
+    Directory directory,
+    Future<T> Function() operation,
+  ) async {
+    final absolutePath = directory.absolute.path;
+    final key = Platform.isWindows ? absolutePath.toLowerCase() : absolutePath;
+    final previous = _directoryOperationTails[key] ?? Future<void>.value();
+    final completion = Completer<void>();
+    _directoryOperationTails[key] = completion.future;
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      completion.complete();
+      if (identical(_directoryOperationTails[key], completion.future)) {
+        _directoryOperationTails.remove(key);
+      }
+    }
+  }
+
+  Future<void> _writeFileSafely(File target, String contents) async {
+    final temporary = await _createUniqueSiblingFile(target, 'tmp');
+    try {
+      await temporary.writeAsString(contents, flush: true);
+      await _replaceFile(temporary, target);
+    } finally {
+      await _deleteFileIfPresent(temporary);
+    }
+  }
+
+  Future<File> _createUniqueSiblingFile(File target, String role) async {
+    for (var attempt = 0; attempt < 100; attempt += 1) {
+      final sequence = _temporaryFileSequence++;
+      final candidate = File(
+        '${target.path}.$pid.'
+        '${DateTime.now().microsecondsSinceEpoch}.$sequence.$role',
+      );
+      try {
+        return await candidate.create(exclusive: true);
+      } on FileSystemException {
+        continue;
+      }
+    }
+    throw FileSystemException(
+      'Unable to create a unique temporary file',
+      target.path,
+    );
+  }
+
+  Future<void> _replaceFile(File replacement, File target) async {
+    try {
+      await replacement.rename(target.path);
+      return;
+    } on FileSystemException {
+      if (!await target.exists()) {
+        rethrow;
+      }
+    }
+
+    final backup = _uniqueSiblingPath(target, 'backup');
+    await target.rename(backup.path);
+    try {
+      await replacement.rename(target.path);
+    } catch (error, stackTrace) {
+      try {
+        if (!await target.exists() && await backup.exists()) {
+          await backup.rename(target.path);
+        }
+      } on FileSystemException {
+        // Keep the backup in place when restoration also fails.
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+    await _deleteFileIfPresent(backup);
+  }
+
+  File _uniqueSiblingPath(File target, String role) {
+    final sequence = _temporaryFileSequence++;
+    return File(
+      '${target.path}.$pid.'
+      '${DateTime.now().microsecondsSinceEpoch}.$sequence.$role',
+    );
+  }
+
+  Future<void> _deleteFileIfPresent(File file) async {
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } on FileSystemException {
+      return;
+    }
+  }
+
+  Future<void> _deleteSnapshotIndex(Directory directory) async {
+    final indexFile = File(_snapshotIndexPath(directory));
+    try {
+      if (await indexFile.exists()) {
+        await indexFile.delete();
+      }
+    } on FileSystemException {
+      return;
+    }
+  }
+
+  Future<void> _deleteSnapshotFiles(Iterable<_SnapshotFileRef> refs) async {
+    for (final ref in refs) {
+      try {
+        if (await ref.file.exists()) {
+          await ref.file.delete();
+        }
+      } on FileSystemException {
+        continue;
+      }
+    }
+  }
+
+  bool _snapshotRefsMatch(
+    List<_SnapshotFileState> states,
+    List<_SnapshotFileRef> refs,
+  ) {
+    if (states.length != refs.length) {
+      return false;
+    }
+    for (var index = 0; index < refs.length; index += 1) {
+      if (states[index].dateKey != refs[index].dateKey ||
+          states[index].modifiedMillis != refs[index].modifiedMillis) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _snapshotRefsCanAcceptWrite(
+    List<_SnapshotFileState> states,
+    List<_SnapshotFileRef> refs,
+    String writtenDateKey,
+  ) {
+    final statesByDateKey = {for (final state in states) state.dateKey: state};
+    for (final ref in refs) {
+      if (ref.dateKey == writtenDateKey) {
+        continue;
+      }
+      final state = statesByDateKey.remove(ref.dateKey);
+      if (state == null || state.modifiedMillis != ref.modifiedMillis) {
+        return false;
+      }
+    }
+    return statesByDateKey.isEmpty;
+  }
+}
+
+class _SnapshotFileRef {
+  const _SnapshotFileRef({
+    required this.file,
+    required this.dateKey,
+    required this.modifiedMillis,
+  });
+
+  final File file;
+  final String dateKey;
+  final int modifiedMillis;
+}
+
+class _SnapshotFileState {
+  const _SnapshotFileState({
+    required this.dateKey,
+    required this.modifiedMillis,
+  });
+
+  final String dateKey;
+  final int modifiedMillis;
+}
+
+class _SnapshotIndex {
+  const _SnapshotIndex({required this.snapshots, required this.files});
+
+  final List<DailyLibrarySnapshot> snapshots;
+  final List<_SnapshotFileState> files;
+}
+
+String _encodeSnapshotFile(Map<String, Object?> json) {
+  return jsonEncode(json);
+}
+
+_SnapshotIndex? _decodeSnapshotIndex(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      return null;
+    }
+    final rawFiles = decoded['files'];
+    final rawSnapshots = decoded['snapshots'];
+    if (rawFiles is! List || rawSnapshots is! List) {
+      return null;
+    }
+    final files =
+        rawFiles
+            .whereType<Map>()
+            .map((file) {
+              final json = file.cast<String, Object?>();
+              final dateKey = json['dateKey'];
+              final modifiedMillis = json['modifiedMillis'];
+              if (dateKey is! String || modifiedMillis is! int) {
+                return null;
+              }
+              return _SnapshotFileState(
+                dateKey: dateKey,
+                modifiedMillis: modifiedMillis,
+              );
+            })
+            .whereType<_SnapshotFileState>()
+            .toList(growable: false)
+          ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
+    final snapshots =
+        rawSnapshots
+            .whereType<Map>()
+            .map(
+              (snapshot) => DailyLibrarySnapshot.fromJson(
+                snapshot.cast<String, Object?>(),
+                includeTracks: false,
+              ),
+            )
+            .toList(growable: false)
+          ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
+    return _SnapshotIndex(
+      snapshots: List.unmodifiable(snapshots),
+      files: List.unmodifiable(files),
+    );
+  } on FormatException {
+    return null;
+  }
+}
+
+List<DailyLibrarySnapshot> _decodeSnapshotFiles(
+  List<Map<String, Object?>> rawSnapshots,
+) {
+  final snapshots = <DailyLibrarySnapshot>[];
+  for (final entry in rawSnapshots) {
+    final raw = entry['raw'];
+    if (raw is! String) {
+      continue;
+    }
+    final includeTracksValue = entry['includeTracks'];
+    final includeTracks = includeTracksValue is bool
+        ? includeTracksValue
+        : true;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        snapshots.add(
+          DailyLibrarySnapshot.fromJson(
+            decoded.cast<String, Object?>(),
+            includeTracks: includeTracks,
+          ),
+        );
+      }
+    } on FormatException {
+      continue;
+    }
+  }
+  return snapshots;
+}
+
+DailyLibrarySnapshot _summaryOnly(DailyLibrarySnapshot snapshot) {
+  return DailyLibrarySnapshot(
+    dateKey: snapshot.dateKey,
+    capturedAt: snapshot.capturedAt,
+    source: snapshot.source,
+    trackCount: snapshot.trackCount,
+    totalPlayCount: snapshot.totalPlayCount,
+    totalSkipCount: snapshot.totalSkipCount,
+    totalListeningSeconds: snapshot.totalListeningSeconds,
+    tracks: const [],
+    filterSignature: snapshot.filterSignature,
+  );
+}
+
+DailyLibrarySnapshot _mergeSnapshotsForWrite(
+  DailyLibrarySnapshot existing,
+  DailyLibrarySnapshot incoming,
+) {
+  if (existing.dateKey != incoming.dateKey) {
+    return incoming;
+  }
+  final existingSignature = _normalizedSignature(existing.filterSignature);
+  final incomingSignature = _normalizedSignature(incoming.filterSignature);
+  final incomingIsNewerOrSame = !incoming.capturedAt.isBefore(
+    existing.capturedAt,
+  );
+  if (existingSignature != incomingSignature) {
+    return incomingIsNewerOrSame ? incoming : existing;
+  }
+
+  final newer = incomingIsNewerOrSame ? incoming : existing;
+  final older = identical(newer, incoming) ? existing : incoming;
+  return DailyLibrarySnapshot(
+    dateKey: newer.dateKey,
+    capturedAt: newer.capturedAt,
+    source: newer.source,
+    trackCount: math.max(existing.trackCount, incoming.trackCount),
+    totalPlayCount: math.max(existing.totalPlayCount, incoming.totalPlayCount),
+    totalSkipCount: math.max(existing.totalSkipCount, incoming.totalSkipCount),
+    totalListeningSeconds: math.max(
+      existing.totalListeningSeconds,
+      incoming.totalListeningSeconds,
+    ),
+    tracks: List.unmodifiable(_mergeTrackCounters(older.tracks, newer.tracks)),
+    filterSignature: newer.filterSignature ?? older.filterSignature,
+  );
+}
+
+List<TrackCounterSnapshot> _mergeTrackCounters(
+  List<TrackCounterSnapshot> older,
+  List<TrackCounterSnapshot> newer,
+) {
+  final byId = <String, TrackCounterSnapshot>{
+    for (final track in older) track.id: track,
+  };
+  for (final track in newer) {
+    final previous = byId[track.id];
+    if (previous == null) {
+      byId[track.id] = track;
+      continue;
+    }
+    byId[track.id] = TrackCounterSnapshot(
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      albumTitle: track.albumTitle,
+      albumArtist: track.albumArtist ?? previous.albumArtist,
+      genre: track.genre ?? previous.genre,
+      playCount: math.max(previous.playCount, track.playCount),
+      skipCount: math.max(previous.skipCount, track.skipCount),
+      listeningSeconds: math.max(
+        previous.listeningSeconds,
+        track.listeningSeconds,
+      ),
+      lastPlayedAt: _latestDate(previous.lastPlayedAt, track.lastPlayedAt),
+    );
+  }
+  final ranked = byId.values.toList(growable: false)
+    ..sort((a, b) {
+      final playComparison = b.playCount.compareTo(a.playCount);
+      if (playComparison != 0) {
+        return playComparison;
+      }
+      final skipComparison = b.skipCount.compareTo(a.skipCount);
+      if (skipComparison != 0) {
+        return skipComparison;
+      }
+      final lastPlayedComparison = (b.lastPlayedAt?.millisecondsSinceEpoch ?? 0)
+          .compareTo(a.lastPlayedAt?.millisecondsSinceEpoch ?? 0);
+      if (lastPlayedComparison != 0) {
+        return lastPlayedComparison;
+      }
+      return a.id.compareTo(b.id);
+    });
+  final compacted = ranked.length > maxSnapshotTrackCounters
+      ? ranked.sublist(0, maxSnapshotTrackCounters)
+      : ranked;
+  compacted.sort((a, b) => a.id.compareTo(b.id));
+  return compacted;
+}
+
+DateTime? _latestDate(DateTime? a, DateTime? b) {
+  if (a == null) {
+    return b;
+  }
+  if (b == null) {
+    return a;
+  }
+  return a.isAfter(b) ? a : b;
+}
+
+String? _normalizedSignature(String? value) {
+  final normalized = value?.trim();
+  return normalized == null || normalized.isEmpty ? null : normalized;
+}
+
+Map<String, Object?> _snapshotSummaryJson(DailyLibrarySnapshot snapshot) {
+  return {
+    'dateKey': snapshot.dateKey,
+    'capturedAtMillis': snapshot.capturedAt.millisecondsSinceEpoch,
+    'source': snapshot.source,
+    'trackCount': snapshot.trackCount,
+    'totalPlayCount': snapshot.totalPlayCount,
+    'totalSkipCount': snapshot.totalSkipCount,
+    'totalListeningSeconds': snapshot.totalListeningSeconds,
+    if (snapshot.filterSignature != null)
+      'filterSignature': snapshot.filterSignature,
+  };
+}

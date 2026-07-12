@@ -1,0 +1,64 @@
+{
+  "source": "Actual screenshots captured from the local SongBrief web demo.",
+  "specs": {
+    "iphone_6_9": {
+      "pixels": [
+        1320,
+        2868
+      ],
+      "apple_display": "6.9-inch iPhone portrait"
+    },
+    "iphone_6_5_compat": {
+      "pixels": [
+        1284,
+        2778
+      ],
+      "apple_display": "6.5/6.7-inch iPhone portrait compatibility"
+    },
+    "ipad_13_landscape": {
+      "pixels": [
+        2752,
+        2064
+      ],
+      "apple_display": "13-inch iPad landscape"
+    }
+  },
+  "files": [
+    "store_assets/app_store_screenshots/en/iphone_6_9/01_playing.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/02_overview.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/03_rankings.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/04_library.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/05_settings.png",
+    "store_assets/app_store_screenshots/en/iphone_6_9/06_history.png",
+    "store_assets/app_store_screenshots/en/iphone_6_5_compat/01_playing.png",
+    "store_assets/app_store_screenshots/en/iphone_6_5_compat/02_overview.png",
+    "store_assets/app_store_screenshots/en/iphone_6_5_compat/03_rankings.png",
+    "store_assets/app_store_screenshots/en/iphone_6_5_compat/04_library.png",
+    "store_assets/app_store_screenshots/en/iphone_6_5_compat/05_settings.png",
+    "store_assets/app_store_screenshots/en/iphone_6_5_compat/06_history.png",
+    "store_assets/app_store_screenshots/en/ipad_13_landscape/01_playing.png",
+    "store_assets/app_store_screenshots/en/ipad_13_landscape/02_overview.png",
+    "store_assets/app_store_screenshots/en/ipad_13_landscape/03_rankings.png",
+    "store_assets/app_store_screenshots/en/ipad_13_landscape/04_library.png",
+    "store_assets/app_store_screenshots/en/ipad_13_landscape/05_settings.png",
+    "store_assets/app_store_screenshots/en/ipad_13_landscape/06_history.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/01_playing.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/02_overview.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/03_rankings.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/04_library.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/05_settings.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_9/06_history.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_5_compat/01_playing.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_5_compat/02_overview.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_5_compat/03_rankings.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_5_compat/04_library.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_5_compat/05_settings.png",
+    "store_assets/app_store_screenshots/ja/iphone_6_5_compat/06_history.png",
+    "store_assets/app_store_screenshots/ja/ipad_13_landscape/01_playing.png",
+    "store_assets/app_store_screenshots/ja/ipad_13_landscape/02_overview.png",
+    "store_assets/app_store_screenshots/ja/ipad_13_landscape/03_rankings.png",
+    "store_assets/app_store_screenshots/ja/ipad_13_landscape/04_library.png",
+    "store_assets/app_store_screenshots/ja/ipad_13_landscape/05_settings.png",
+    "store_assets/app_store_screenshots/ja/ipad_13_landscape/06_history.png"
+  ]
+}

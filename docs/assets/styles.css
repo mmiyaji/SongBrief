@@ -221,6 +221,22 @@ li + li {
   margin-top: 22px;
 }
 
+.app-store-badge-link {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.app-store-badge-link:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.app-store-badge {
+  display: block;
+  height: 48px;
+  width: auto;
+}
+
 .button-link {
   align-items: center;
   background: var(--text);
@@ -928,6 +944,17 @@ figcaption {
   color: var(--muted);
   font-size: 0.92rem;
   padding: 26px 0 34px;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+.apple-credit {
+  font-size: 0.74rem;
+  line-height: 1.55;
+  margin-top: 8px !important;
+  max-width: 760px;
 }
 
 @media (max-width: 760px) {

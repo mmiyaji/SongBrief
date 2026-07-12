@@ -1,5 +1,5 @@
 name: songbrief
-description: "A new Flutter project."
+description: "A quiet, privacy-conscious Apple Music library statistics app."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.2+3
 
 environment:
   sdk: ^3.11.4
@@ -41,6 +41,18 @@ dependencies:
   intl: 0.20.2
   liquid_glass_renderer: ^0.2.0-dev.4
   url_launcher: ^6.3.2
+  shared_preferences: ^2.5.5
+  local_auth: ^3.0.1
+  google_mobile_ads: ^9.0.0
+  in_app_purchase: ^3.3.0
+  file_saver: ^0.4.0
+  screen_protector: ^1.5.2
+  share_plus: ^13.2.0
+  path_provider: ^2.1.6
+  firebase_core: ^4.11.0
+  firebase_analytics: ^12.4.3
+  firebase_crashlytics: ^5.2.4
+  package_info_plus: ^10.2.0
 
 dev_dependencies:
   flutter_test:
@@ -59,9 +71,11 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/branding/songbrief_icon.png
+  image_path_ios: assets/branding/songbrief_icon_ios.png
   adaptive_icon_background: "#040708"
   adaptive_icon_foreground: assets/branding/songbrief_icon_foreground.png
   remove_alpha_ios: true
+  background_color_ios: "#071517"
   web:
     generate: true
     image_path: assets/branding/songbrief_icon.png
@@ -90,6 +104,7 @@ flutter_native_splash:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

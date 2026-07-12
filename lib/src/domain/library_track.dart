@@ -11,7 +11,11 @@ class LibraryTrack {
     this.albumArtist,
     this.genre,
     this.artworkAsset,
+    this.appleMusicStoreId,
+    this.releaseDate,
     this.lastPlayedAt,
+    this.lyrics,
+    this.playlistNames = const <String>[],
   });
 
   final String id;
@@ -21,11 +25,15 @@ class LibraryTrack {
   final String? albumArtist;
   final String? genre;
   final String? artworkAsset;
+  final String? appleMusicStoreId;
+  final DateTime? releaseDate;
   final Duration duration;
   final int playCount;
   final int skipCount;
   final DateTime? lastPlayedAt;
   final bool isCloudItem;
+  final String? lyrics;
+  final List<String> playlistNames;
 
   int get listeningSeconds => duration.inSeconds * playCount;
 
@@ -42,11 +50,15 @@ class LibraryTrack {
       albumArtist: albumArtist,
       genre: genre,
       artworkAsset: artworkAsset,
+      appleMusicStoreId: appleMusicStoreId,
+      releaseDate: releaseDate,
       duration: duration,
       playCount: playCount ?? this.playCount,
       skipCount: skipCount ?? this.skipCount,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
       isCloudItem: isCloudItem,
+      lyrics: lyrics,
+      playlistNames: playlistNames,
     );
   }
 
@@ -58,11 +70,15 @@ class LibraryTrack {
       albumTitle: _readString(map, 'albumTitle', fallback: 'Unknown Album'),
       albumArtist: _readNullableString(map, 'albumArtist'),
       genre: _readNullableString(map, 'genre'),
+      appleMusicStoreId: _readNullableString(map, 'appleMusicStoreId'),
+      releaseDate: _readDateTime(map, 'releaseDateMillis'),
       duration: Duration(seconds: _readInt(map, 'durationSeconds')),
       playCount: _readInt(map, 'playCount'),
       skipCount: _readInt(map, 'skipCount'),
       lastPlayedAt: _readDateTime(map, 'lastPlayedAtMillis'),
       isCloudItem: _readBool(map, 'isCloudItem'),
+      lyrics: _readLyrics(map, 'lyrics'),
+      playlistNames: _readStringList(map, 'playlistNames'),
     );
   }
 
@@ -84,6 +100,16 @@ class LibraryTrack {
       return value.trim();
     }
     return null;
+  }
+
+  static String? _readLyrics(Map<Object?, Object?> map, String key) {
+    final value = _readNullableString(map, key);
+    if (value == null) {
+      return null;
+    }
+    final normalized = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final trimmed = normalized.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   static int _readInt(Map<Object?, Object?> map, String key) {
@@ -111,5 +137,31 @@ class LibraryTrack {
       return DateTime.fromMillisecondsSinceEpoch(value.round());
     }
     return null;
+  }
+
+  static List<String> _readStringList(Map<Object?, Object?> map, String key) {
+    final value = map[key];
+    if (value is! Iterable) {
+      return const <String>[];
+    }
+
+    final names = <String>{};
+    for (final item in value) {
+      if (item is! String) {
+        continue;
+      }
+      final trimmed = item.trim();
+      if (trimmed.isNotEmpty) {
+        names.add(trimmed);
+      }
+    }
+
+    if (names.isEmpty) {
+      return const <String>[];
+    }
+
+    final sorted = names.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return List.unmodifiable(sorted);
   }
 }

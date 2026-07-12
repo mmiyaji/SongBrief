@@ -1,0 +1,532 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:songbrief/src/data/library_snapshot_repository.dart';
+import 'package:songbrief/src/data/library_snapshot_store_io.dart';
+import 'package:songbrief/src/domain/library_overview.dart';
+import 'package:songbrief/src/domain/library_snapshot.dart';
+import 'package:songbrief/src/domain/library_track.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Directory snapshotDirectory;
+  late LibrarySnapshotRepository repository;
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    snapshotDirectory = await Directory.systemTemp.createTemp(
+      'songbrief_snapshots_',
+    );
+    repository = LibrarySnapshotRepository(
+      store: FileSnapshotStore(
+        directoryProvider: () async => snapshotDirectory,
+      ),
+    );
+  });
+
+  tearDown(() async {
+    if (await snapshotDirectory.exists()) {
+      await snapshotDirectory.delete(recursive: true);
+    }
+  });
+
+  test(
+    'stores large histories as per-day files without a preferences cap',
+    () async {
+      final store = FileSnapshotStore(
+        directoryProvider: () async => snapshotDirectory,
+      );
+      final snapshots = List.generate(24, (index) => _largeSnapshot(index));
+      for (final snapshot in snapshots) {
+        await store.writeSnapshot(snapshot);
+      }
+
+      final loaded = await repository.loadHistory();
+      final preferences = await SharedPreferences.getInstance();
+      final totalBytes = await _directoryBytes(snapshotDirectory);
+
+      expect(loaded.snapshotCount, 24);
+      expect(loaded.latest?.dateKey, '2026-01-24');
+      expect(await _snapshotFileCount(snapshotDirectory), 24);
+      expect(await _snapshotIndexExists(snapshotDirectory), isTrue);
+      expect(totalBytes, greaterThan(1500000));
+      expect(
+        preferences.getString(librarySnapshotFallbackPreferencesKey),
+        isNull,
+      );
+    },
+  );
+
+  test('cleans malformed legacy snapshot keys once during migration', () async {
+    SharedPreferences.setMockInitialValues({
+      legacyLibrarySnapshotPreferencesKeys.first: 'legacy-history',
+    });
+
+    await repository.loadHistory();
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getString(legacyLibrarySnapshotPreferencesKeys.first),
+      isNull,
+    );
+
+    await preferences.setString(
+      legacyLibrarySnapshotPreferencesKeys.first,
+      'newly-written-legacy-value',
+    );
+    await repository.loadHistory();
+
+    expect(
+      preferences.getString(legacyLibrarySnapshotPreferencesKeys.first),
+      'newly-written-legacy-value',
+    );
+  });
+
+  test('migrates legacy preferences snapshots into per-day files', () async {
+    final legacyHistory = SnapshotHistory.empty
+        .withSnapshot(_snapshotOn(DateTime(2026, 1, 3)))
+        .withSnapshot(_snapshotOn(DateTime(2026, 1, 4)));
+    SharedPreferences.setMockInitialValues({
+      legacyLibrarySnapshotPreferencesKeys.last: jsonEncode(
+        legacyHistory.toJson(),
+      ),
+    });
+
+    final loaded = await repository.loadHistory();
+    final preferences = await SharedPreferences.getInstance();
+
+    expect(loaded.snapshotCount, 2);
+    expect(loaded.snapshots.first.dateKey, '2026-01-03');
+    expect(loaded.latest?.dateKey, '2026-01-04');
+    expect(await _snapshotFileCount(snapshotDirectory), 2);
+    expect(
+      preferences.getString(legacyLibrarySnapshotPreferencesKeys.last),
+      isNull,
+    );
+  });
+
+  test(
+    'migrates remaining legacy snapshots even when migration was flagged',
+    () async {
+      final legacyHistory = SnapshotHistory.empty.withSnapshot(
+        _snapshotOn(DateTime(2026, 1, 5)),
+      );
+      SharedPreferences.setMockInitialValues({
+        'songbrief_daily_snapshots_file_store_migrated_v1': true,
+        legacyLibrarySnapshotPreferencesKeys.last: jsonEncode(
+          legacyHistory.toJson(),
+        ),
+      });
+
+      final loaded = await repository.loadHistory();
+
+      expect(loaded.snapshotCount, 1);
+      expect(loaded.latest?.dateKey, '2026-01-05');
+      expect(await _snapshotFileCount(snapshotDirectory), 1);
+    },
+  );
+
+  test('ignores malformed stored snapshot files', () async {
+    await File(
+      '${snapshotDirectory.path}${Platform.pathSeparator}2026-01-01.json',
+    ).writeAsString('{not-json');
+
+    final history = await repository.loadHistory();
+
+    expect(history.snapshotCount, 0);
+  });
+
+  test(
+    'keeps more than one thousand daily snapshot files',
+    () async {
+      const historyLength = 1100;
+      final start = DateTime(2026, 1, 1);
+      for (var index = 0; index < historyLength; index += 1) {
+        await _writeSnapshotFile(
+          snapshotDirectory,
+          _snapshotOn(start.add(Duration(days: index))),
+        );
+      }
+
+      final history = await repository.loadHistory();
+
+      expect(history.snapshotCount, historyLength);
+      expect(history.snapshots.first.dateKey, '2026-01-01');
+      expect(await _snapshotFileCount(snapshotDirectory), historyLength);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+
+  test('loads older snapshots from summaries without track details', () async {
+    final start = DateTime(2026, 1, 1);
+    for (
+      var index = 0;
+      index < detailedSnapshotHistoryEntries + 2;
+      index += 1
+    ) {
+      await _writeSnapshotFile(
+        snapshotDirectory,
+        _snapshotWithTrack(start.add(Duration(days: index))),
+      );
+    }
+
+    final history = await repository.loadHistory();
+
+    expect(history.snapshotCount, detailedSnapshotHistoryEntries + 2);
+    expect(history.snapshots.first.tracks, isEmpty);
+    expect(history.snapshots[1].tracks, isEmpty);
+    expect(history.snapshots[2].tracks, isNotEmpty);
+    expect(history.latest?.tracks, isNotEmpty);
+    expect(await _snapshotFileCount(snapshotDirectory), 402);
+    expect(await _snapshotIndexExists(snapshotDirectory), isTrue);
+  });
+
+  test('records an overview snapshot and replaces the same day', () async {
+    final first = await repository.recordSnapshot(
+      _overview(playCount: 4),
+      capturedAt: DateTime(2026, 7, 7, 8),
+    );
+    final second = await repository.recordSnapshot(
+      _overview(playCount: 9),
+      capturedAt: DateTime(2026, 7, 7, 20),
+      source: 'manual',
+    );
+    final reloaded = await repository.loadHistory();
+
+    expect(first.snapshotCount, 1);
+    expect(second.snapshotCount, 1);
+    expect(second.latest?.source, 'manual');
+    expect(second.latest?.totalPlayCount, 9);
+    expect(reloaded.latest?.totalPlayCount, 9);
+    expect(await _snapshotFileCount(snapshotDirectory), 1);
+  });
+
+  test('recordSnapshot returns the monotonic same-day value', () async {
+    await repository.recordSnapshot(
+      _overview(playCount: 9),
+      capturedAt: DateTime(2026, 7, 7, 20),
+      filterSignature: 'profile-a',
+    );
+
+    final result = await repository.recordSnapshot(
+      _overview(playCount: 4),
+      capturedAt: DateTime(2026, 7, 7, 8),
+      filterSignature: 'profile-a',
+    );
+
+    expect(result.latest?.capturedAt, DateTime(2026, 7, 7, 20));
+    expect(result.latest?.totalPlayCount, 9);
+  });
+
+  test('serializes concurrent writes that replace the same day', () async {
+    final stores = List.generate(
+      2,
+      (_) =>
+          FileSnapshotStore(directoryProvider: () async => snapshotDirectory),
+    );
+    final snapshots = List.generate(8, (index) => _sameDaySnapshot(index));
+
+    await Future.wait([
+      for (var index = 0; index < snapshots.length; index += 1)
+        stores[index % stores.length].writeSnapshot(snapshots[index]),
+    ]);
+
+    final loaded = await stores.first.loadHistory();
+    final leftovers = await snapshotDirectory
+        .list()
+        .where(
+          (entity) =>
+              entity is File &&
+              (entity.path.endsWith('.tmp') || entity.path.endsWith('.backup')),
+        )
+        .toList();
+
+    expect(loaded.snapshotCount, 1);
+    expect(loaded.latest?.dateKey, '2026-07-07');
+    expect(
+      snapshots.map((snapshot) => snapshot.totalPlayCount),
+      contains(loaded.latest?.totalPlayCount),
+    );
+    expect(await _snapshotFileCount(snapshotDirectory), 1);
+    expect(await _snapshotIndexExists(snapshotDirectory), isTrue);
+    expect(leftovers, isEmpty);
+  });
+
+  test(
+    'same-day writes cannot move capture time or counters backwards',
+    () async {
+      final store = FileSnapshotStore(
+        directoryProvider: () async => snapshotDirectory,
+      );
+      final newer = _snapshotWithValues(
+        capturedAt: DateTime(2026, 7, 7, 20),
+        playCount: 9,
+        filterSignature: 'profile-a',
+      );
+      final delayedOlder = _snapshotWithValues(
+        capturedAt: DateTime(2026, 7, 7, 8),
+        playCount: 12,
+        filterSignature: 'profile-a',
+      );
+
+      await store.writeSnapshot(newer);
+      await store.writeSnapshot(delayedOlder);
+
+      final loaded = await store.loadHistory();
+      expect(loaded.latest?.capturedAt, newer.capturedAt);
+      expect(loaded.latest?.totalPlayCount, 12);
+      expect(loaded.latest?.tracks.single.playCount, 12);
+    },
+  );
+
+  test('same-day writes do not max-merge different filter profiles', () async {
+    final store = FileSnapshotStore(
+      directoryProvider: () async => snapshotDirectory,
+    );
+    await store.writeSnapshot(
+      _snapshotWithValues(
+        capturedAt: DateTime(2026, 7, 7, 8),
+        playCount: 12,
+        filterSignature: 'unfiltered',
+      ),
+    );
+    await store.writeSnapshot(
+      _snapshotWithValues(
+        capturedAt: DateTime(2026, 7, 7, 20),
+        playCount: 3,
+        filterSignature: 'filtered',
+      ),
+    );
+
+    final loaded = await store.loadHistory();
+    expect(loaded.latest?.capturedAt, DateTime(2026, 7, 7, 20));
+    expect(loaded.latest?.totalPlayCount, 3);
+    expect(loaded.latest?.filterSignature, 'filtered');
+  });
+
+  test('does not record empty overviews', () async {
+    await _writeSnapshotFile(
+      snapshotDirectory,
+      _snapshotOn(DateTime(2026, 1, 1)),
+    );
+
+    final result = await repository.recordSnapshot(
+      LibraryOverview.empty(isDemo: false),
+    );
+
+    expect(result.snapshotCount, 1);
+    expect(result.latest?.dateKey, '2026-01-01');
+    expect(await _snapshotFileCount(snapshotDirectory), 1);
+  });
+
+  test(
+    'deletes snapshots older than a cutoff and persists the result',
+    () async {
+      await _writeSnapshotFile(
+        snapshotDirectory,
+        _snapshotOn(DateTime(2026, 1, 1)),
+      );
+      await _writeSnapshotFile(
+        snapshotDirectory,
+        _snapshotOn(DateTime(2026, 1, 20)),
+      );
+      await _writeSnapshotFile(
+        snapshotDirectory,
+        _snapshotOn(DateTime(2026, 2, 1)),
+      );
+
+      final trimmed = await repository.deleteSnapshotsOlderThan(
+        DateTime(2026, 1, 15),
+      );
+      final reloaded = await repository.loadHistory();
+
+      expect(trimmed.snapshotCount, 2);
+      expect(trimmed.snapshots.first.dateKey, '2026-01-20');
+      expect(reloaded.snapshotCount, 2);
+      expect(reloaded.snapshots.first.dateKey, '2026-01-20');
+      expect(await _snapshotFileCount(snapshotDirectory), 2);
+    },
+  );
+
+  test('clears stored snapshot history', () async {
+    await _writeSnapshotFile(
+      snapshotDirectory,
+      _snapshotOn(DateTime(2026, 1, 1)),
+    );
+
+    final cleared = await repository.clearHistory();
+
+    expect(cleared.snapshotCount, 0);
+    expect(await _snapshotFileCount(snapshotDirectory), 0);
+    expect((await repository.loadHistory()).snapshotCount, 0);
+  });
+}
+
+Future<void> _writeSnapshotFile(
+  Directory directory,
+  DailyLibrarySnapshot snapshot,
+) async {
+  await directory.create(recursive: true);
+  await File(
+    '${directory.path}${Platform.pathSeparator}${snapshot.dateKey}.json',
+  ).writeAsString(jsonEncode(snapshot.toJson()));
+}
+
+Future<int> _snapshotFileCount(Directory directory) async {
+  if (!await directory.exists()) {
+    return 0;
+  }
+  return directory
+      .list()
+      .where(
+        (entity) =>
+            entity is File &&
+            RegExp(r'\d{4}-\d{2}-\d{2}\.json$').hasMatch(entity.path),
+      )
+      .length;
+}
+
+Future<bool> _snapshotIndexExists(Directory directory) {
+  return File(
+    '${directory.path}${Platform.pathSeparator}_snapshot_index_v1.json',
+  ).exists();
+}
+
+Future<int> _directoryBytes(Directory directory) async {
+  var bytes = 0;
+  await for (final entity in directory.list()) {
+    if (entity is File) {
+      bytes += await entity.length();
+    }
+  }
+  return bytes;
+}
+
+DailyLibrarySnapshot _snapshotOn(DateTime capturedAt) {
+  return DailyLibrarySnapshot(
+    dateKey: snapshotDateKey(capturedAt),
+    capturedAt: capturedAt,
+    source: 'foreground',
+    trackCount: 10,
+    totalPlayCount: capturedAt.day,
+    totalSkipCount: 0,
+    totalListeningSeconds: capturedAt.day * 180,
+    tracks: const [],
+  );
+}
+
+DailyLibrarySnapshot _snapshotWithTrack(DateTime capturedAt) {
+  return DailyLibrarySnapshot(
+    dateKey: snapshotDateKey(capturedAt),
+    capturedAt: capturedAt,
+    source: 'foreground',
+    trackCount: 1,
+    totalPlayCount: capturedAt.difference(DateTime(2026, 1, 1)).inDays + 1,
+    totalSkipCount: 0,
+    totalListeningSeconds: 240,
+    tracks: [
+      TrackCounterSnapshot(
+        id: 'track-${snapshotDateKey(capturedAt)}',
+        title: 'Tracked Song',
+        artist: 'Tracked Artist',
+        albumTitle: 'Tracked Album',
+        playCount: 1,
+        skipCount: 0,
+        listeningSeconds: 240,
+        lastPlayedAt: capturedAt,
+      ),
+    ],
+  );
+}
+
+DailyLibrarySnapshot _sameDaySnapshot(int index) {
+  final capturedAt = DateTime(2026, 7, 7, 8 + index);
+  return DailyLibrarySnapshot(
+    dateKey: snapshotDateKey(capturedAt),
+    capturedAt: capturedAt,
+    source: 'foreground',
+    trackCount: 1,
+    totalPlayCount: index + 1,
+    totalSkipCount: 0,
+    totalListeningSeconds: (index + 1) * 180,
+    tracks: const [],
+  );
+}
+
+DailyLibrarySnapshot _snapshotWithValues({
+  required DateTime capturedAt,
+  required int playCount,
+  required String filterSignature,
+}) {
+  return DailyLibrarySnapshot(
+    dateKey: snapshotDateKey(capturedAt),
+    capturedAt: capturedAt,
+    source: 'foreground',
+    trackCount: 1,
+    totalPlayCount: playCount,
+    totalSkipCount: 0,
+    totalListeningSeconds: playCount * 180,
+    tracks: [
+      TrackCounterSnapshot(
+        id: 'track-1',
+        title: 'Tracked Song',
+        artist: 'Tracked Artist',
+        albumTitle: 'Tracked Album',
+        playCount: playCount,
+        skipCount: 0,
+        listeningSeconds: playCount * 180,
+        lastPlayedAt: capturedAt,
+      ),
+    ],
+    filterSignature: filterSignature,
+  );
+}
+
+LibraryOverview _overview({required int playCount}) {
+  return LibraryOverview.fromTracks([
+    LibraryTrack(
+      id: 'track-1',
+      title: 'Snapshot Song',
+      artist: 'Snapshot Artist',
+      albumTitle: 'Snapshot Album',
+      duration: const Duration(minutes: 4),
+      playCount: playCount,
+      skipCount: 1,
+      isCloudItem: false,
+    ),
+  ], isDemo: false);
+}
+
+DailyLibrarySnapshot _largeSnapshot(int index) {
+  final capturedAt = DateTime(2026, 1, index + 1, 8);
+  return DailyLibrarySnapshot(
+    dateKey: snapshotDateKey(capturedAt),
+    capturedAt: capturedAt,
+    source: 'foreground',
+    trackCount: maxSnapshotTrackCounters + 200,
+    totalPlayCount: 100000 + index,
+    totalSkipCount: 5000 + index,
+    totalListeningSeconds: 300000 + index,
+    tracks: List.unmodifiable(
+      List.generate(
+        maxSnapshotTrackCounters,
+        (trackIndex) => TrackCounterSnapshot(
+          id: 'track-${trackIndex.toString().padLeft(4, '0')}',
+          title:
+              'Large Snapshot Song $index-$trackIndex ${'title-padding-' * 8}',
+          artist: 'Snapshot Artist ${trackIndex % 40} ${'artist-padding-' * 5}',
+          albumTitle:
+              'Snapshot Album ${trackIndex % 60} ${'album-padding-' * 5}',
+          albumArtist: 'Album Artist ${trackIndex % 25}',
+          genre: 'Genre ${trackIndex % 12}',
+          playCount: 1000 + index + trackIndex,
+          skipCount: trackIndex % 20,
+          listeningSeconds: (180 + trackIndex % 120) * (1000 + index),
+          lastPlayedAt: capturedAt.add(Duration(minutes: trackIndex)),
+        ),
+      ),
+    ),
+  );
+}

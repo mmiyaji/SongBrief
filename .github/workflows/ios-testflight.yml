@@ -24,7 +24,12 @@ env:
   FLUTTER_VERSION: "3.41.6"
   APPLE_TEAM_ID: "B8LGAS7YHH"
   BUNDLE_ID: "app.songbrief.songbrief"
+  WIDGET_BUNDLE_ID: "app.songbrief.songbrief.widget"
   KEYCHAIN_NAME: "songbrief-build.keychain-db"
+  SONGBRIEF_AD_MODE: "admobLive"
+  SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID: "ca-app-pub-5321136982470738/2315074663"
+  SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED: "true"
+  SONGBRIEF_PREMIUM_PRODUCT_ID: "songbrief_premium_lifetime"
 
 jobs:
   build-and-upload:
@@ -66,11 +71,27 @@ jobs:
           echo "Using version name: $VERSION_NAME"
           echo "Using build number: $BUILD_NUMBER"
 
+      - name: Validate production ad configuration
+        run: |
+          set -euo pipefail
+          if [ "$SONGBRIEF_AD_MODE" = "admobLive" ]; then
+            : "${SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID:?Missing production iOS AdMob banner ad unit ID}"
+            if ! printf '%s' "$SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID" | grep -Eq '^ca-app-pub-[0-9]+/[0-9]+$'; then
+              echo "SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID must be a production banner ad unit ID."
+              exit 1
+            fi
+            if printf '%s' "$SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID" | grep -q 'ca-app-pub-3940256099942544/'; then
+              echo "Google sample ad unit IDs are not allowed for admobLive builds."
+              exit 1
+            fi
+          fi
+
       - name: Install Apple signing assets
         env:
           IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
           IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           IOS_PROVISIONING_PROFILE_APP_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_APP_BASE64 }}
+          IOS_PROVISIONING_PROFILE_WIDGET_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_WIDGET_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.IOS_BUILD_KEYCHAIN_PASSWORD }}
         run: |
           set -euo pipefail
@@ -78,6 +99,7 @@ jobs:
           : "${IOS_DISTRIBUTION_CERTIFICATE_BASE64:?Missing IOS_DISTRIBUTION_CERTIFICATE_BASE64 secret}"
           : "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD:?Missing IOS_DISTRIBUTION_CERTIFICATE_PASSWORD secret}"
           : "${IOS_PROVISIONING_PROFILE_APP_BASE64:?Missing IOS_PROVISIONING_PROFILE_APP_BASE64 secret}"
+          : "${IOS_PROVISIONING_PROFILE_WIDGET_BASE64:?Missing IOS_PROVISIONING_PROFILE_WIDGET_BASE64 secret}"
 
           KEYCHAIN_PASSWORD="${KEYCHAIN_PASSWORD:-$(uuidgen)}"
           CERTIFICATE_PATH="$RUNNER_TEMP/distribution.p12"
@@ -106,9 +128,20 @@ jobs:
           IOS_APP_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$PROFILE_PLIST")
           cp "$PROFILE_PATH" "$PROFILE_DIR/$IOS_APP_PROFILE_UUID.mobileprovision"
           echo "Installed provisioning profile: $IOS_APP_PROFILE_NAME ($IOS_APP_PROFILE_UUID)"
+
+          WIDGET_PROFILE_PATH="$RUNNER_TEMP/songbrief-widget-app-store.mobileprovision"
+          WIDGET_PROFILE_PLIST="$RUNNER_TEMP/songbrief-widget-app-store.plist"
+          echo "$IOS_PROVISIONING_PROFILE_WIDGET_BASE64" | base64 --decode > "$WIDGET_PROFILE_PATH"
+          security cms -D -i "$WIDGET_PROFILE_PATH" > "$WIDGET_PROFILE_PLIST"
+          IOS_WIDGET_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$WIDGET_PROFILE_PLIST")
+          IOS_WIDGET_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$WIDGET_PROFILE_PLIST")
+          cp "$WIDGET_PROFILE_PATH" "$PROFILE_DIR/$IOS_WIDGET_PROFILE_UUID.mobileprovision"
+          echo "Installed widget provisioning profile: $IOS_WIDGET_PROFILE_NAME ($IOS_WIDGET_PROFILE_UUID)"
           {
             echo "IOS_APP_PROFILE_UUID=$IOS_APP_PROFILE_UUID"
             echo "IOS_APP_PROFILE_NAME=$IOS_APP_PROFILE_NAME"
+            echo "IOS_WIDGET_PROFILE_UUID=$IOS_WIDGET_PROFILE_UUID"
+            echo "IOS_WIDGET_PROFILE_NAME=$IOS_WIDGET_PROFILE_NAME"
           } >> "$GITHUB_ENV"
 
       - name: Install Flutter dependencies
@@ -124,12 +157,69 @@ jobs:
         run: |
           set -euo pipefail
           flutter analyze
-          flutter test
+          flutter test --coverage
+          dart run tool/coverage_report.dart coverage/lcov.info "$RUNNER_TEMP/coverage_report.md"
 
       - name: Install CocoaPods dependencies
         run: |
           set -euo pipefail
           find ios -name "Podfile" -execdir pod install \;
+
+      - name: Validate Crashlytics symbol uploader
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import plistlib
+          from pathlib import Path
+
+          service_file_path = Path("ios/Runner/GoogleService-Info.plist")
+          config = plistlib.loads(service_file_path.read_bytes())
+          expected = {
+              "GOOGLE_APP_ID": "1:635263972708:ios:e884ba44856bad539b7671",
+              "PROJECT_ID": "songbrief-7c9c0",
+              "GCM_SENDER_ID": "635263972708",
+              "BUNDLE_ID": "app.songbrief.songbrief",
+          }
+          for key, value in expected.items():
+              if config.get(key) != value:
+                  raise SystemExit(f"Unexpected {key} in {service_file_path}")
+          PY
+          UPLOAD_SYMBOLS="ios/Pods/FirebaseCrashlytics/upload-symbols"
+          if [ ! -x "$UPLOAD_SYMBOLS" ]; then
+            echo "Crashlytics upload-symbols was not installed at $UPLOAD_SYMBOLS."
+            exit 1
+          fi
+
+      - name: Run iOS unit tests
+        run: |
+          set -euo pipefail
+          SIMULATOR_ID="$(
+            xcrun simctl list devices available --json |
+              /usr/bin/python3 -c '
+          import json
+          import sys
+
+          runtimes = json.load(sys.stdin).get("devices", {}).values()
+          for devices in runtimes:
+              for device in devices:
+                  if device.get("isAvailable", True) and device.get("name", "").startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit
+          '
+          )"
+          if [ -z "$SIMULATOR_ID" ]; then
+            xcrun simctl list devices available
+            echo "No available iPhone simulator was found."
+            exit 1
+          fi
+          xcodebuild test \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -only-testing:RunnerTests \
+            -parallel-testing-enabled NO
 
       - name: Create App Store export options
         run: |
@@ -149,6 +239,8 @@ jobs:
             <dict>
               <key>${BUNDLE_ID}</key>
               <string>${IOS_APP_PROFILE_NAME}</string>
+              <key>${WIDGET_BUNDLE_ID}</key>
+              <string>${IOS_WIDGET_PROFILE_NAME}</string>
             </dict>
             <key>signingCertificate</key>
             <string>Apple Distribution</string>
@@ -175,9 +267,18 @@ jobs:
           project_path = Path("ios/Runner.xcodeproj/project.pbxproj")
           text = project_path.read_text()
           bundle_id = os.environ["BUNDLE_ID"]
-          profile_name = os.environ["IOS_APP_PROFILE_NAME"]
-          profile_uuid = os.environ["IOS_APP_PROFILE_UUID"]
+          widget_bundle_id = os.environ["WIDGET_BUNDLE_ID"]
           team_id = os.environ["APPLE_TEAM_ID"]
+          signing_profiles = {
+              bundle_id: (
+                  os.environ["IOS_APP_PROFILE_NAME"],
+                  os.environ["IOS_APP_PROFILE_UUID"],
+              ),
+              widget_bundle_id: (
+                  os.environ["IOS_WIDGET_PROFILE_NAME"],
+                  os.environ["IOS_WIDGET_PROFILE_UUID"],
+              ),
+          }
 
           def upsert_setting(block: str, key: str, value: str) -> str:
               quoted_key = f'"{key}"' if "[" in key or "]" in key else key
@@ -216,7 +317,16 @@ jobs:
               block = text[start:end]
               output.append(text[cursor:start])
 
-              if f"PRODUCT_BUNDLE_IDENTIFIER = {bundle_id};" in block:
+              matched_bundle_id = next(
+                  (
+                      candidate
+                      for candidate in signing_profiles
+                      if f"PRODUCT_BUNDLE_IDENTIFIER = {candidate};" in block
+                  ),
+                  None,
+              )
+              if matched_bundle_id is not None:
+                  profile_name, profile_uuid = signing_profiles[matched_bundle_id]
                   block = upsert_setting(block, "CODE_SIGN_IDENTITY", '"Apple Distribution"')
                   block = upsert_setting(block, "CODE_SIGN_IDENTITY[sdk=iphoneos*]", '"Apple Distribution"')
                   block = upsert_setting(block, "CODE_SIGN_STYLE", "Manual")
@@ -224,13 +334,15 @@ jobs:
                   block = upsert_setting(block, "PROVISIONING_PROFILE", profile_uuid)
                   block = upsert_setting(block, "PROVISIONING_PROFILE_SPECIFIER", f'"{profile_name}"')
                   configured += 1
-                  print(f"Configured manual signing for {bundle_id}: {profile_name} ({profile_uuid})")
+                  print(f"Configured manual signing for {matched_bundle_id}: {profile_name} ({profile_uuid})")
 
               output.append(block)
               cursor = end
 
-          if configured == 0:
-              raise RuntimeError(f"No build settings block found for {bundle_id}")
+          if configured < 6:
+              raise RuntimeError(
+                  f"Expected app and widget signing settings in 6 blocks, configured {configured}"
+              )
 
           project_path.write_text("".join(output))
           PY
@@ -241,6 +353,10 @@ jobs:
           flutter build ipa --release \
             --build-name="$VERSION_NAME" \
             --build-number="$BUILD_NUMBER" \
+            --dart-define=SONGBRIEF_AD_MODE="$SONGBRIEF_AD_MODE" \
+            --dart-define=SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID="$SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID" \
+            --dart-define=SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED="$SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED" \
+            --dart-define=SONGBRIEF_PREMIUM_PRODUCT_ID="$SONGBRIEF_PREMIUM_PRODUCT_ID" \
             --export-options-plist="$RUNNER_TEMP/ExportOptions.plist"
 
       - name: Verify IPA
@@ -254,12 +370,34 @@ jobs:
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
           echo "Produced IPA: $IPA_PATH"
 
+          DSYM_PATH="build/ios/archive/Runner.xcarchive/dSYMs/Runner.app.dSYM"
+          if [ ! -d "$DSYM_PATH" ]; then
+            echo "Runner dSYM was not produced at $DSYM_PATH."
+            find build/ios -name '*.dSYM' -print || true
+            exit 1
+          fi
+          echo "DSYM_PATH=$DSYM_PATH" >> "$GITHUB_ENV"
+          echo "Produced dSYM: $DSYM_PATH"
+          dwarfdump --uuid "$DSYM_PATH"
+
+      - name: Upload dSYMs to Firebase Crashlytics
+        run: |
+          set -euo pipefail
+          UPLOAD_SYMBOLS="ios/Pods/FirebaseCrashlytics/upload-symbols"
+          DSYM_DIRECTORY="build/ios/archive/Runner.xcarchive/dSYMs"
+          "$UPLOAD_SYMBOLS" \
+            -gsp "ios/Runner/GoogleService-Info.plist" \
+            -p ios \
+            "$DSYM_DIRECTORY"
+
       - name: Upload IPA artifact
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
           name: songbrief-ios-${{ github.run_number }}
-          path: build/ios/ipa/*.ipa
+          path: |
+            build/ios/ipa/*.ipa
+            build/ios/archive/Runner.xcarchive/dSYMs/*.dSYM
           if-no-files-found: error
 
       - name: Upload to App Store Connect

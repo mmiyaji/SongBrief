@@ -1,8 +1,18 @@
 import Flutter
 import MediaPlayer
+import UIKit
 
-final class MusicLibraryBridge {
-  private init() {}
+final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
+  private let player = MPMusicPlayerController.systemMusicPlayer
+  private let snapshotStoreQueue = DispatchQueue(
+    label: "app.songbrief.snapshot-store-channel",
+    qos: .utility
+  )
+  private var eventSink: FlutterEventSink?
+
+  private override init() {
+    super.init()
+  }
 
   static func register(with messenger: FlutterBinaryMessenger) {
     let bridge = MusicLibraryBridge()
@@ -14,6 +24,12 @@ final class MusicLibraryBridge {
     channel.setMethodCallHandler { call, result in
       bridge.handle(call, result: result)
     }
+
+    let eventChannel = FlutterEventChannel(
+      name: "app.songbrief/music_playback",
+      binaryMessenger: messenger
+    )
+    eventChannel.setStreamHandler(bridge)
   }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -26,8 +42,18 @@ final class MusicLibraryBridge {
           result(Self.authorizationStatusString(status))
         }
       }
+    case "openAppSettings":
+      guard let url = URL(string: UIApplication.openSettingsURLString) else {
+        result(false)
+        return
+      }
+      UIApplication.shared.open(url, options: [:]) { opened in
+        result(opened)
+      }
     case "fetchTracks":
       fetchTracks(result: result)
+    case "currentPlayback":
+      result(playbackMap())
     case "fetchArtwork":
       fetchArtwork(call, result: result)
     case "playTrack":
@@ -44,9 +70,119 @@ final class MusicLibraryBridge {
     case "skipToPrevious":
       MPMusicPlayerController.systemMusicPlayer.skipToPreviousItem()
       result(nil)
+    case "scheduleSnapshotRefresh":
+      SongBriefSnapshotRefresh.schedule()
+      result(nil)
+    case "syncSnapshotHistory":
+      SnapshotCloudSync.sync { payload in
+        result(payload)
+      }
+    case "updateHomeWidget":
+      let arguments = call.arguments as? [String: Any]
+      let summary = arguments?["summary"] as? [String: Any]
+      SongBriefWidgetDataStore.update(summary: summary)
+      result(nil)
+    case "deleteCloudSnapshots":
+      let arguments = call.arguments as? [String: Any]
+      let cutoffDateKey = arguments?["olderThanDateKey"] as? String
+      SnapshotCloudSync.deleteCloudSnapshots(olderThan: cutoffDateKey) { payload in
+        result(payload)
+      }
+    case "loadLocalSnapshotHistory":
+      let arguments = call.arguments as? [String: Any]
+      let requestedLimit = (arguments?["detailedLimit"] as? NSNumber)?.intValue ?? 400
+      let detailedLimit = max(0, min(requestedLimit, 500))
+      runSnapshotStoreOperation(result: result) {
+        SnapshotFileStore.readSnapshotsForFlutter(detailedLimit: detailedLimit)
+      }
+    case "writeLocalSnapshot":
+      guard let arguments = call.arguments as? [String: Any],
+            let snapshot = arguments["snapshot"] as? [String: Any] else {
+        result(false)
+        return
+      }
+      runSnapshotStoreOperation(result: result) {
+        SnapshotFileStore.write(snapshot: snapshot)
+      }
+    case "deleteLocalSnapshots":
+      let arguments = call.arguments as? [String: Any]
+      let cutoffDateKey = arguments?["olderThanDateKey"] as? String
+      runSnapshotStoreOperation(result: result) {
+        SnapshotFileStore.deleteSnapshots(olderThan: cutoffDateKey)
+      }
+    case "clearLocalSnapshotHistory":
+      runSnapshotStoreOperation(result: result) {
+        SnapshotFileStore.deleteSnapshots(olderThan: nil)
+      }
     default:
       result(FlutterMethodNotImplemented)
     }
+  }
+
+  private func runSnapshotStoreOperation(
+    result: @escaping FlutterResult,
+    operation: @escaping () -> Any?
+  ) {
+    snapshotStoreQueue.async {
+      let payload = operation()
+      DispatchQueue.main.async {
+        result(payload)
+      }
+    }
+  }
+
+  func onListen(
+    withArguments arguments: Any?,
+    eventSink events: @escaping FlutterEventSink
+  ) -> FlutterError? {
+    eventSink = events
+    player.beginGeneratingPlaybackNotifications()
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(playbackDidChange),
+      name: .MPMusicPlayerControllerNowPlayingItemDidChange,
+      object: player
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(playbackDidChange),
+      name: .MPMusicPlayerControllerPlaybackStateDidChange,
+      object: player
+    )
+    events(playbackMap())
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    NotificationCenter.default.removeObserver(
+      self,
+      name: .MPMusicPlayerControllerNowPlayingItemDidChange,
+      object: player
+    )
+    NotificationCenter.default.removeObserver(
+      self,
+      name: .MPMusicPlayerControllerPlaybackStateDidChange,
+      object: player
+    )
+    player.endGeneratingPlaybackNotifications()
+    eventSink = nil
+    return nil
+  }
+
+  @objc private func playbackDidChange() {
+    eventSink?(playbackMap())
+  }
+
+  private func playbackMap() -> [String: Any] {
+    var playback: [String: Any] = [
+      "isPlaying": player.playbackState == .playing
+    ]
+
+    if let item = player.nowPlayingItem, item.persistentID != 0 {
+      playback["trackId"] = String(item.persistentID)
+    }
+
+    return playback
   }
 
   private func fetchTracks(result: @escaping FlutterResult) {
@@ -62,7 +198,13 @@ final class MusicLibraryBridge {
     DispatchQueue.global(qos: .userInitiated).async {
       let query = MPMediaQuery.songs()
       let items = query.items ?? []
-      let tracks = items.map { Self.trackMap(from: $0) }
+      let playlistNamesByItemID = Self.playlistNamesByItemID()
+      let tracks = items.map { item in
+        Self.trackMap(
+          from: item,
+          playlistNames: playlistNamesByItemID[item.persistentID] ?? []
+        )
+      }
 
       DispatchQueue.main.async {
         result(tracks)
@@ -135,13 +277,21 @@ final class MusicLibraryBridge {
     }
 
     let player = MPMusicPlayerController.systemMusicPlayer
-    player.setQueue(with: MPMediaItemCollection(items: [item]))
+    var queueItems = SongBriefSnapshotRefresh.filteredLibraryItems()
+    if !queueItems.contains(where: { $0.persistentID == item.persistentID }) {
+      queueItems.append(item)
+    }
+    player.setQueue(with: MPMediaItemCollection(items: queueItems))
     player.nowPlayingItem = item
+    player.currentPlaybackTime = 0
     player.play()
     result(nil)
   }
 
-  private static func trackMap(from item: MPMediaItem) -> [String: Any] {
+  private static func trackMap(
+    from item: MPMediaItem,
+    playlistNames: [String] = []
+  ) -> [String: Any] {
     var track: [String: Any] = [
       "id": String(item.persistentID),
       "title": nonEmpty(item.title) ?? "Untitled",
@@ -159,11 +309,52 @@ final class MusicLibraryBridge {
     if let genre = nonEmpty(item.genre) {
       track["genre"] = genre
     }
+    if item.playbackStoreID != "0",
+       let appleMusicStoreID = nonEmpty(item.playbackStoreID) {
+      track["appleMusicStoreId"] = appleMusicStoreID
+    }
+    if let releaseDate = item.value(forProperty: MPMediaItemPropertyReleaseDate) as? Date {
+      track["releaseDateMillis"] = Int(releaseDate.timeIntervalSince1970 * 1000)
+    }
+    if let lyrics = nonEmpty(
+      item.value(forProperty: MPMediaItemPropertyLyrics) as? String
+    ) {
+      track["lyrics"] = lyrics
+    }
+    if !playlistNames.isEmpty {
+      track["playlistNames"] = playlistNames
+    }
     if let lastPlayedDate = item.lastPlayedDate {
       track["lastPlayedAtMillis"] = Int(lastPlayedDate.timeIntervalSince1970 * 1000)
     }
 
     return track
+  }
+
+  static func playlistNamesByItemID() -> [UInt64: [String]] {
+    var namesByID: [UInt64: Set<String>] = [:]
+    let playlists = MPMediaQuery.playlists().collections ?? []
+
+    for collection in playlists {
+      guard
+        let playlist = collection as? MPMediaPlaylist,
+        let playlistName = nonEmpty(playlist.name)
+      else {
+        continue
+      }
+
+      for item in playlist.items {
+        var names = namesByID[item.persistentID] ?? []
+        names.insert(playlistName)
+        namesByID[item.persistentID] = names
+      }
+    }
+
+    return namesByID.mapValues { names in
+      names.sorted {
+        $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+      }
+    }
   }
 
   private static func mediaItem(withPersistentID id: UInt64) -> MPMediaItem? {
@@ -178,10 +369,19 @@ final class MusicLibraryBridge {
 
   private static func persistentID(from value: Any?) -> UInt64? {
     if let value = value as? String {
-      return UInt64(value)
+      return UInt64(value.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+    if let value = value as? UInt64 {
+      return value
+    }
+    if let value = value as? Int64 {
+      return UInt64(exactly: value)
     }
     if let value = value as? Int {
-      return UInt64(value)
+      return UInt64(exactly: value)
+    }
+    if let value = value as? NSNumber {
+      return UInt64(exactly: value.int64Value)
     }
     return nil
   }

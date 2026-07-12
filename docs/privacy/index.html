@@ -106,6 +106,7 @@
 
         <h3>4. 保存と送信</h3>
         <p>音楽ライブラリの統計、日次の記録、非表示条件、キャッシュなどは、主に端末内のストレージに保存されます。ユーザーはアプリ内の設定から、キャッシュや履歴を削除できます。日次の記録を保存しない設定にした場合、履歴に基づく傾向表示やリキャップなどの機能は利用できない場合があります。</p>
+        <p>iCloud同期を有効にしている場合、日次の記録はユーザー自身のiCloudアカウントのプライベートデータベース（CloudKit）に保存され、同じApple IDでサインインした端末間で統合されます。このデータはAppleが提供するユーザー専用領域に保存され、SongBrief開発者はアクセスできません。iCloud同期はアプリ内の設定からいつでも無効にでき、アプリ内で履歴を削除するとiCloud上の対応する記録も削除されます。</p>
         <p>広告、解析、クラッシュレポートが有効な場合、Firebase、AdMob、Crashlyticsの動作に必要なデータはGoogleへ送信されます。ただし、SongBriefは音楽ライブラリの詳細情報を広告、解析、クラッシュレポートのデータとして送信しません。</p>
         <p>この法務ページはCloudflare Pagesで配信します。移行期間中はGitHub Pagesでも参照できる場合があります。Webページにアクセスした場合、CloudflareまたはGitHubが、セキュリティ、配信、ログ管理のために標準的なアクセス情報を処理する場合があります。</p>
 
@@ -191,6 +192,15 @@
           are primarily stored on your device. You can delete caches and history
           from the app settings. If daily record saving is disabled, history-
           based features such as trends and recaps may not be available.
+        </p>
+        <p>
+          When iCloud sync is enabled, daily records are stored in your own
+          iCloud account's private database (CloudKit) and merged across
+          devices signed in to the same Apple ID. This data lives in a
+          user-only area provided by Apple and is not accessible to the
+          SongBrief developer. You can disable iCloud sync at any time from
+          the app settings, and deleting history inside the app also deletes
+          the corresponding records in iCloud.
         </p>
         <p>
           When ads, analytics, or crash reports are enabled, data required by

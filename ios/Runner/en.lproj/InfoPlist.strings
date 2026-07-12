@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "SongBrief";
+"NSAppleMusicUsageDescription" = "SongBrief reads your Music library play counts, skip counts, and last played dates to build local listening statistics.";
+"NSFaceIDUsageDescription" = "SongBrief uses Face ID to unlock the app when App Lock is enabled.";
