@@ -13,9 +13,9 @@ without an iPhone attached.
 
 - Latest App Store version: `1.0.0` (currently removed from sale in App Store Connect)
 - Next release candidate: `1.0.2` (source build `3`)
-- Previous accepted TestFlight upload: `1.0.1` (`CFBundleVersion` `2607102045`),
-  built by [iOS TestFlight #40](https://github.com/mmiyaji/SongBrief/actions/runs/29122438513)
-  on 2026-07-11
+- Latest accepted TestFlight upload: `1.0.2` (`CFBundleVersion` `2607120810`),
+  built by [iOS TestFlight #48](https://github.com/mmiyaji/SongBrief/actions/runs/29185374799)
+  on 2026-07-12
 - Public site: https://songbrief.ruhenheim.org/
 - Privacy Policy: https://songbrief.ruhenheim.org/privacy/
 - Terms of Use: https://songbrief.ruhenheim.org/terms/
@@ -30,7 +30,7 @@ Release readiness for `1.0.2`:
   dSYM upload, and App Store Connect upload in the TestFlight workflow.
 - [x] Register the widget App ID and App Group and install the app and widget
   App Store provisioning profiles in GitHub Actions.
-- [ ] Run the TestFlight workflow for `1.0.2` and verify the app, widget,
+- [x] Run the TestFlight workflow for `1.0.2` and verify the app, widget,
   Crashlytics dSYM upload, and App Store Connect processing.
 - [ ] Restore App Store availability under Pricing and Availability.
 - [ ] Complete App Store Connect metadata and submit `1.0.2` for review.
