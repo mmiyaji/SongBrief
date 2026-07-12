@@ -569,7 +569,7 @@ class _AdaptiveShell extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SideTabs(selectedSection: selectedSection),
+        _SideTabs(stats: stats, selectedSection: selectedSection),
         Expanded(child: content),
       ],
     );
@@ -830,14 +830,23 @@ class _MiniArtwork extends StatelessWidget {
 }
 
 class _SideTabs extends ConsumerWidget {
-  const _SideTabs({required this.selectedSection});
+  const _SideTabs({required this.stats, required this.selectedSection});
 
+  final MusicStatsState stats;
   final HomeSection selectedSection;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final width = MediaQuery.sizeOf(context).width;
+    final extended = width >= 980;
+    final playback = ref.watch(playbackControllerProvider);
+    final track =
+        stats.overview.trackById(playback.activeTrackId) ??
+        stats.overview.latestTrack;
+    final artwork = track == null
+        ? null
+        : ref.watch(trackArtworkProvider(track.id));
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 0, 12),
       child: GlassSurface(
@@ -846,29 +855,153 @@ class _SideTabs extends ConsumerWidget {
         tint: const Color(0x26FFFFFF),
         borderOpacity: 0.14,
         shadowOpacity: 0.16,
-        child: NavigationRail(
-          selectedIndex: selectedSection.index,
-          backgroundColor: Colors.transparent,
-          extended: width >= 980,
-          minExtendedWidth: 188,
-          leading: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Icon(Icons.graphic_eq, color: theme.colorScheme.primary),
-          ),
-          destinations: HomeSection.values
-              .map(
-                (section) => NavigationRailDestination(
-                  icon: Icon(_sectionIcon(section)),
-                  selectedIcon: Icon(_sectionSelectedIcon(section)),
-                  label: Text(_sectionLabel(context, section)),
+        child: Column(
+          children: [
+            Expanded(
+              child: NavigationRail(
+                selectedIndex: selectedSection.index,
+                backgroundColor: Colors.transparent,
+                extended: extended,
+                minExtendedWidth: 188,
+                leading: Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Icon(
+                    Icons.graphic_eq,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
-              )
-              .toList(),
-          onDestinationSelected: (index) {
-            ref
-                .read(homeSectionProvider.notifier)
-                .setSection(HomeSection.values[index]);
-          },
+                destinations: HomeSection.values
+                    .map(
+                      (section) => NavigationRailDestination(
+                        icon: Icon(_sectionIcon(section)),
+                        selectedIcon: Icon(_sectionSelectedIcon(section)),
+                        label: Text(_sectionLabel(context, section)),
+                      ),
+                    )
+                    .toList(),
+                onDestinationSelected: (index) {
+                  ref
+                      .read(homeSectionProvider.notifier)
+                      .setSection(HomeSection.values[index]);
+                },
+              ),
+            ),
+            if (track != null && artwork != null) ...[
+              const SizedBox(height: 8),
+              _RailNowPlayingShortcut(
+                track: track,
+                artwork: artwork,
+                extended: extended,
+                isPlaying: playback.isTrackPlaying(track.id),
+                onTap: () => ref
+                    .read(homeSectionProvider.notifier)
+                    .setSection(HomeSection.playing),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RailNowPlayingShortcut extends StatelessWidget {
+  const _RailNowPlayingShortcut({
+    required this.track,
+    required this.artwork,
+    required this.extended,
+    required this.isPlaying,
+    required this.onTap,
+  });
+
+  final LibraryTrack track;
+  final AsyncValue<Uint8List?> artwork;
+  final bool extended;
+  final bool isPlaying;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final radius = BorderRadius.circular(16);
+    final content = extended
+        ? Row(
+            children: [
+              _MiniArtwork(track: track, artwork: artwork),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      track.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      track.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                isPlaying ? Icons.graphic_eq_rounded : Icons.play_arrow_rounded,
+                color: theme.colorScheme.primary,
+                size: 18,
+              ),
+            ],
+          )
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MiniArtwork(track: track, artwork: artwork),
+              const SizedBox(height: 5),
+              Icon(
+                isPlaying ? Icons.graphic_eq_rounded : Icons.play_arrow_rounded,
+                color: theme.colorScheme.primary,
+                size: 17,
+              ),
+            ],
+          );
+    final tooltip = _t(
+      context,
+      'Open now playing: ${track.title}',
+      '再生中を開く: ${track.title}',
+      zh: '打开正在播放：${track.title}',
+      ko: '현재 재생 열기: ${track.title}',
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Tooltip(
+        message: tooltip,
+        child: Semantics(
+          button: true,
+          label: tooltip,
+          child: Material(
+            key: const ValueKey('rail-now-playing-shortcut'),
+            color: theme.colorScheme.primary.withValues(alpha: 0.08),
+            borderRadius: radius,
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              borderRadius: radius,
+              onTap: onTap,
+              child: Padding(
+                padding: EdgeInsets.all(extended ? 8 : 7),
+                child: SizedBox(width: extended ? 156 : 44, child: content),
+              ),
+            ),
+          ),
         ),
       ),
     );

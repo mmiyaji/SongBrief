@@ -27,6 +27,10 @@ class _NowPlayingSection extends ConsumerWidget {
 
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final recentTracks = overview.recentTrackDetails;
+    final playRankIndex = overview.topTracks.indexWhere(
+      (entry) => entry.representativeTrackId == track.id,
+    );
+    final playRank = playRankIndex < 0 ? null : playRankIndex + 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -35,7 +39,7 @@ class _NowPlayingSection extends ConsumerWidget {
           _AuthorizationPanel(status: stats.authorizationStatus),
           const SizedBox(height: 14),
         ],
-        _HeroTrackPanel(track: track, artwork: artwork),
+        _HeroTrackPanel(track: track, artwork: artwork, playRank: playRank),
         if (stats.snapshotRecordingEnabled) ...[
           const SizedBox(height: 14),
           _TrendPanel(
@@ -97,10 +101,15 @@ class _NowPlayingLyricsPanel extends StatelessWidget {
 }
 
 class _HeroTrackPanel extends ConsumerWidget {
-  const _HeroTrackPanel({required this.track, required this.artwork});
+  const _HeroTrackPanel({
+    required this.track,
+    required this.artwork,
+    required this.playRank,
+  });
 
   final LibraryTrack track;
   final AsyncValue<Uint8List?> artwork;
+  final int? playRank;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -131,6 +140,7 @@ class _HeroTrackPanel extends ConsumerWidget {
                     busy: busy,
                     isActive: isActive,
                     isPlaying: isPlaying,
+                    playRank: playRank,
                     onTogglePlayback: () {
                       ref
                           .read(playbackControllerProvider.notifier)
@@ -151,19 +161,14 @@ class _HeroTrackPanel extends ConsumerWidget {
                     children: [
                       _TrackArtworkImage(track: track, artwork: artwork),
                       const _HeroImageShade(),
-                      Positioned(
-                        left: 18,
-                        top: 18,
-                        child: _HeroBadge(
-                          label: _t(
-                            context,
-                            '#1 Song',
-                            '#1 曲',
-                            zh: '#1 歌曲',
-                            ko: '#1 곡',
+                      if (playRank != null)
+                        Positioned(
+                          left: 18,
+                          top: 18,
+                          child: _HeroBadge(
+                            label: _playRankBadgeLabel(context, playRank!),
                           ),
                         ),
-                      ),
                       Positioned(
                         right: 18,
                         top: 18,
@@ -267,6 +272,7 @@ class _HeroTrackWideHeader extends StatelessWidget {
     required this.busy,
     required this.isActive,
     required this.isPlaying,
+    required this.playRank,
     required this.onTogglePlayback,
     required this.onRestartPlayback,
   });
@@ -277,6 +283,7 @@ class _HeroTrackWideHeader extends StatelessWidget {
   final bool busy;
   final bool isActive;
   final bool isPlaying;
+  final int? playRank;
   final VoidCallback onTogglePlayback;
   final VoidCallback onRestartPlayback;
 
@@ -304,19 +311,14 @@ class _HeroTrackWideHeader extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       _TrackArtworkImage(track: track, artwork: artwork),
-                      Positioned(
-                        left: 12,
-                        top: 12,
-                        child: _HeroBadge(
-                          label: _t(
-                            context,
-                            '#1 Song',
-                            '#1 曲',
-                            zh: '#1 歌曲',
-                            ko: '#1 곡',
+                      if (playRank != null)
+                        Positioned(
+                          left: 12,
+                          top: 12,
+                          child: _HeroBadge(
+                            label: _playRankBadgeLabel(context, playRank!),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -562,6 +564,17 @@ class _HeroBadge extends StatelessWidget {
   }
 }
 
+String _playRankBadgeLabel(BuildContext context, int rank) {
+  final formattedRank = _numberFormat(context).format(rank);
+  return _t(
+    context,
+    '#$formattedRank by plays',
+    '再生 $formattedRank位',
+    zh: '播放第$formattedRank名',
+    ko: '재생 $formattedRank위',
+  );
+}
+
 class _SmallMetricPill extends StatelessWidget {
   const _SmallMetricPill({required this.label});
 
@@ -794,7 +807,7 @@ class _HeroStat extends StatelessWidget {
   }
 }
 
-class _TrendPanel extends ConsumerWidget {
+class _TrendPanel extends StatefulWidget {
   const _TrendPanel({
     required this.track,
     required this.overview,
@@ -806,22 +819,44 @@ class _TrendPanel extends ConsumerWidget {
   final SnapshotHistory history;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  State<_TrendPanel> createState() => _TrendPanelState();
+}
+
+class _TrendPanelState extends State<_TrendPanel> {
+  TrendRange? _selectedRange;
+
+  @override
+  void didUpdateWidget(covariant _TrendPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.track.id != widget.track.id) {
+      _selectedRange = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final range = ref.watch(trendRangeProvider);
     final provisionalCurrentSnapshot = DailyLibrarySnapshot.fromOverview(
-      overview,
+      widget.overview,
       capturedAt: DateTime.now(),
       source: 'current',
     );
     final snapshots = _snapshotsWithProvisionalCurrent(
-      history,
+      widget.history,
       provisionalCurrentSnapshot,
     );
+    final range =
+        _selectedRange ??
+        _initialTrackTrendRange(
+          context: context,
+          trackId: widget.track.id,
+          history: widget.history,
+          provisionalCurrentSnapshot: provisionalCurrentSnapshot,
+        );
     final values = _trackTrendValues(
       context: context,
-      trackId: track.id,
-      history: history,
+      trackId: widget.track.id,
+      history: widget.history,
       provisionalCurrentSnapshot: provisionalCurrentSnapshot,
       range: range,
     );
@@ -844,7 +879,7 @@ class _TrendPanel extends ConsumerWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  _t(context, 'This week trend', '今週の傾向'),
+                  _t(context, 'Listening trend', '再生傾向'),
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -924,12 +959,16 @@ class _TrendPanel extends ConsumerWidget {
                   .toList(),
               selected: {range},
               onSelectionChanged: (selection) {
-                ref.read(trendRangeProvider.notifier).setRange(selection.first);
+                setState(() => _selectedRange = selection.first);
               },
             ),
           ),
           const SizedBox(height: 18),
-          _TrendBars(values: values, hasSnapshotData: hasSnapshotData),
+          _TrendBars(
+            values: values,
+            hasSnapshotData: hasSnapshotData,
+            range: range,
+          ),
         ],
       ),
     );
@@ -937,10 +976,15 @@ class _TrendPanel extends ConsumerWidget {
 }
 
 class _TrendBars extends StatelessWidget {
-  const _TrendBars({required this.values, required this.hasSnapshotData});
+  const _TrendBars({
+    required this.values,
+    required this.hasSnapshotData,
+    required this.range,
+  });
 
   final List<_TrackTrendValue> values;
   final bool hasSnapshotData;
+  final TrendRange range;
 
   @override
   Widget build(BuildContext context) {
@@ -966,6 +1010,17 @@ class _TrendBars extends StatelessWidget {
       0,
       (previous, value) => math.max(previous, value.playDelta),
     );
+
+    if (max == 0) {
+      return SizedBox(
+        height: 178,
+        child: Center(
+          child: _TrackContextEmptyText(
+            text: _trendNoPlaysLabel(context, range),
+          ),
+        ),
+      );
+    }
 
     return SizedBox(
       height: 178,

@@ -223,7 +223,7 @@ const _copyTranslations = <String, _LocalizedCopy>{
     ko: '가사 모두 보기',
   ),
   'Show less': _LocalizedCopy(ja: '折りたたむ', zh: '收起', ko: '접기'),
-  'This week trend': _LocalizedCopy(ja: '今週の傾向', zh: '本周趋势', ko: '이번 주 추세'),
+  'Listening trend': _LocalizedCopy(ja: '再生傾向', zh: '播放趋势', ko: '재생 추세'),
   'About this trend': _LocalizedCopy(
     ja: 'この傾向について',
     zh: '关于此趋势',

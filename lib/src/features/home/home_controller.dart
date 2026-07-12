@@ -66,10 +66,6 @@ final rankingVisibleCountProvider =
       RankingVisibleCountController.new,
     );
 
-final trendRangeProvider = NotifierProvider<TrendRangeController, TrendRange>(
-  TrendRangeController.new,
-);
-
 final snapshotSyncStateProvider =
     NotifierProvider<SnapshotSyncStateController, SnapshotSyncState>(
       SnapshotSyncStateController.new,
@@ -167,17 +163,6 @@ class RankingVisibleCountController extends Notifier<Map<RankingScope, int>> {
       return maximum;
     }
     return value;
-  }
-}
-
-class TrendRangeController extends Notifier<TrendRange> {
-  @override
-  TrendRange build() {
-    return TrendRange.week;
-  }
-
-  void setRange(TrendRange range) {
-    state = range;
   }
 }
 

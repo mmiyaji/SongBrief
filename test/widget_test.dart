@@ -21,12 +21,13 @@ void main() {
     expect(find.text('SongBrief'), findsOneWidget);
     expect(find.text('Skyline Echo'), findsWidgets);
     expect(find.text('Plays'), findsWidgets);
-    expect(find.text('This week trend'), findsOneWidget);
+    expect(find.text('Listening trend'), findsOneWidget);
     expect(find.text('Lyrics'), findsOneWidget);
     expect(find.textContaining('City lights are waking slow'), findsOneWidget);
     expect(find.text('Show all lyrics'), findsOneWidget);
     expect(find.text('Recently played songs'), findsOneWidget);
     expect(_tooltipStartingWith('Demo mode'), findsOneWidget);
+    expect(find.text('#1 by plays'), findsOneWidget);
   });
 
   testWidgets('expands and collapses long lyrics', (tester) async {
@@ -59,7 +60,7 @@ void main() {
     expect(find.text('SongBrief'), findsOneWidget);
     expect(find.text('Skyline Echo'), findsWidgets);
     expect(find.text('再生回数'), findsWidgets);
-    expect(find.text('今週の傾向'), findsOneWidget);
+    expect(find.text('再生傾向'), findsOneWidget);
     expect(find.text('最近再生した曲'), findsOneWidget);
     expect(_tooltipStartingWith('デモモード'), findsOneWidget);
   });
@@ -370,7 +371,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Provisional Song'), findsWidgets);
-    expect(find.text('This week trend'), findsOneWidget);
+    expect(find.text('Listening trend'), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
   });
 
@@ -409,8 +410,115 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Recent Fallback Song'), findsWidgets);
-    expect(find.text('This week trend'), findsOneWidget);
+    expect(find.text('Listening trend'), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
+  });
+
+  testWidgets('selects the first trend range with recent playback', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final stats = _trendStats(
+      lastPlayedAt: now.subtract(const Duration(days: 14)),
+    );
+
+    await _pumpApp(tester, AppLanguage.english, statsState: stats);
+    await tester.pumpAndSettle();
+
+    final selector = tester.widget<SegmentedButton<TrendRange>>(
+      find.byType(SegmentedButton<TrendRange>),
+    );
+    expect(selector.selected, {TrendRange.month});
+  });
+
+  testWidgets('shows a useful empty trend beyond the last year', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final stats = _trendStats(
+      lastPlayedAt: now.subtract(const Duration(days: 400)),
+    );
+
+    await _pumpApp(tester, AppLanguage.english, statsState: stats);
+    await tester.pumpAndSettle();
+
+    final selector = tester.widget<SegmentedButton<TrendRange>>(
+      find.byType(SegmentedButton<TrendRange>),
+    );
+    expect(selector.selected, {TrendRange.year});
+    expect(
+      find.text('This song has not been played in the last year.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shows the actual play-count rank on the hero artwork', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final stats = MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+      overview: LibraryOverview.fromTracks([
+        LibraryTrack(
+          id: 'rank-one',
+          title: 'Older Favorite',
+          artist: 'Test Artist',
+          albumTitle: 'Test Album',
+          duration: const Duration(minutes: 3),
+          playCount: 100,
+          skipCount: 0,
+          lastPlayedAt: now.subtract(const Duration(days: 3)),
+          isCloudItem: false,
+        ),
+        LibraryTrack(
+          id: 'rank-two',
+          title: 'Current Song',
+          artist: 'Test Artist',
+          albumTitle: 'Test Album',
+          duration: const Duration(minutes: 3),
+          playCount: 5,
+          skipCount: 0,
+          lastPlayedAt: now,
+          isCloudItem: false,
+        ),
+      ], isDemo: false),
+      snapshotHistory: SnapshotHistory.empty,
+    );
+
+    await _pumpApp(tester, AppLanguage.english, statsState: stats);
+    await tester.pumpAndSettle();
+
+    expect(find.text('#2 by plays'), findsOneWidget);
+    expect(find.text('#1 Song'), findsNothing);
+  });
+
+  testWidgets('opens playing from the tablet rail track shortcut', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    final shortcut = find.byKey(const ValueKey('rail-now-playing-shortcut'));
+    expect(shortcut, findsOneWidget);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+      HomeSection.settings.index,
+    );
+
+    await tester.tap(shortcut);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+      HomeSection.playing.index,
+    );
   });
 
   testWidgets('switches to the light appearance from settings', (tester) async {
@@ -679,7 +787,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('This week trend'), findsNothing);
+      expect(find.text('Listening trend'), findsNothing);
 
       container
           .read(homeSectionProvider.notifier)
@@ -816,5 +924,31 @@ MusicStatsState _settingsDemoStats() {
     ], isDemo: true),
     snapshotHistory: SnapshotHistory.empty,
     snapshotRecordingEnabled: true,
+  );
+}
+
+MusicStatsState _trendStats({required DateTime lastPlayedAt}) {
+  final now = DateTime.now();
+  final track = LibraryTrack(
+    id: 'trend-range-track',
+    title: 'Trend Range Song',
+    artist: 'Test Artist',
+    albumTitle: 'Test Album',
+    duration: const Duration(minutes: 3),
+    playCount: 10,
+    skipCount: 0,
+    lastPlayedAt: lastPlayedAt,
+    isCloudItem: false,
+  );
+  final previousCapturedAt = now.subtract(const Duration(days: 1));
+  return MusicStatsState(
+    authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+    overview: LibraryOverview.fromTracks([track], isDemo: false),
+    snapshotHistory: SnapshotHistory.empty.withSnapshot(
+      DailyLibrarySnapshot.fromOverview(
+        LibraryOverview.fromTracks([track], isDemo: false),
+        capturedAt: previousCapturedAt,
+      ),
+    ),
   );
 }

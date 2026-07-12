@@ -2448,6 +2448,27 @@ List<_TrackTrendValue> _trackTrendValues({
   ];
 }
 
+TrendRange _initialTrackTrendRange({
+  required BuildContext context,
+  required String trackId,
+  required SnapshotHistory history,
+  required DailyLibrarySnapshot provisionalCurrentSnapshot,
+}) {
+  for (final range in TrendRange.values) {
+    final values = _trackTrendValues(
+      context: context,
+      trackId: trackId,
+      history: history,
+      provisionalCurrentSnapshot: provisionalCurrentSnapshot,
+      range: range,
+    );
+    if (values.any((value) => value.playDelta > 0)) {
+      return range;
+    }
+  }
+  return TrendRange.year;
+}
+
 List<DailyLibrarySnapshot> _snapshotsWithProvisionalCurrent(
   SnapshotHistory history,
   DailyLibrarySnapshot? provisionalCurrentSnapshot,
@@ -2635,6 +2656,32 @@ String _trendRangeLabel(BuildContext context, TrendRange range) {
     TrendRange.week => _t(context, '7 days', '7日間', zh: '7天', ko: '7일'),
     TrendRange.month => _t(context, '4 weeks', '4週間', zh: '4周', ko: '4주'),
     TrendRange.year => _t(context, '1 year', '1年間', zh: '1年', ko: '1년'),
+  };
+}
+
+String _trendNoPlaysLabel(BuildContext context, TrendRange range) {
+  return switch (range) {
+    TrendRange.week => _t(
+      context,
+      'No plays for this song in the last 7 days.',
+      'この曲は直近7日間再生されていません。',
+      zh: '这首歌在最近 7 天内没有播放记录。',
+      ko: '이 곡은 최근 7일 동안 재생되지 않았습니다.',
+    ),
+    TrendRange.month => _t(
+      context,
+      'No plays for this song in the last 4 weeks.',
+      'この曲は直近4週間再生されていません。',
+      zh: '这首歌在最近 4 周内没有播放记录。',
+      ko: '이 곡은 최근 4주 동안 재생되지 않았습니다.',
+    ),
+    TrendRange.year => _t(
+      context,
+      'This song has not been played in the last year.',
+      'この曲は直近1年間再生されていません。',
+      zh: '这首歌在最近 1 年内没有播放记录。',
+      ko: '이 곡은 최근 1년 동안 재생되지 않았습니다.',
+    ),
   };
 }
 
