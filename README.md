@@ -12,7 +12,7 @@ without an iPhone attached.
 ## Release Status
 
 - Latest App Store version: `1.0.0` (currently removed from sale in App Store Connect)
-- Next release candidate: `1.0.1` (source build `2`)
+- Next release candidate: `1.0.2` (source build `3`)
 - Previous accepted TestFlight upload: `1.0.1` (`CFBundleVersion` `2607102045`),
   built by [iOS TestFlight #40](https://github.com/mmiyaji/SongBrief/actions/runs/29122438513)
   on 2026-07-11
@@ -20,19 +20,20 @@ without an iPhone attached.
 - Privacy Policy: https://songbrief.ruhenheim.org/privacy/
 - Terms of Use: https://songbrief.ruhenheim.org/terms/
 - Initial release notes: [docs/release-notes/v1.0.0.md](docs/release-notes/v1.0.0.md)
-- Next release notes: [docs/release-notes/v1.0.1.md](docs/release-notes/v1.0.1.md)
+- Next release notes: [docs/release-notes/v1.0.2.md](docs/release-notes/v1.0.2.md)
 
-Release readiness for `1.0.1`:
+Release readiness for `1.0.2`:
 
 - [x] Deploy the `DailySnapshot.filterSignature` String field to the Production
   CloudKit schema.
 - [x] Pass Dart coverage, native iOS unit tests, IPA verification, Crashlytics
   dSYM upload, and App Store Connect upload in the TestFlight workflow.
-- [ ] Register the widget App ID and App Group, install its App Store
-  provisioning profile in GitHub Actions, and create a new TestFlight build
-  containing the widget and recap updates.
+- [x] Register the widget App ID and App Group and install the app and widget
+  App Store provisioning profiles in GitHub Actions.
+- [ ] Run the TestFlight workflow for `1.0.2` and verify the app, widget,
+  Crashlytics dSYM upload, and App Store Connect processing.
 - [ ] Restore App Store availability under Pricing and Availability.
-- [ ] Complete App Store Connect metadata and submit `1.0.1` for review.
+- [ ] Complete App Store Connect metadata and submit `1.0.2` for review.
 
 ## Product Scope
 
