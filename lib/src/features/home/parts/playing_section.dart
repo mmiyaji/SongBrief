@@ -151,6 +151,12 @@ class _HeroTrackPanel extends ConsumerWidget {
                           .read(playbackControllerProvider.notifier)
                           .restartTrack(track.id);
                     },
+                    onPrevious: () => ref
+                        .read(playbackControllerProvider.notifier)
+                        .skipToPrevious(),
+                    onNext: () => ref
+                        .read(playbackControllerProvider.notifier)
+                        .skipToNext(),
                   );
                 }
 
@@ -172,19 +178,18 @@ class _HeroTrackPanel extends ConsumerWidget {
                       Positioned(
                         right: 18,
                         top: 18,
-                        child: _ArtworkPlaybackButton(
+                        child: _ArtworkTransportControls(
                           isPlaying: isPlaying,
                           busy: busy,
-                          onPressed: busy
-                              ? null
-                              : () {
-                                  ref
-                                      .read(playbackControllerProvider.notifier)
-                                      .toggleTrack(track.id);
-                                },
-                          tooltip: isPlaying
-                              ? _t(context, 'Pause', '一時停止')
-                              : _t(context, 'Play this track', 'この曲を再生'),
+                          onPrevious: () => ref
+                              .read(playbackControllerProvider.notifier)
+                              .skipToPrevious(),
+                          onToggle: () => ref
+                              .read(playbackControllerProvider.notifier)
+                              .toggleTrack(track.id),
+                          onNext: () => ref
+                              .read(playbackControllerProvider.notifier)
+                              .skipToNext(),
                         ),
                       ),
                       Positioned(
@@ -275,6 +280,8 @@ class _HeroTrackWideHeader extends StatelessWidget {
     required this.playRank,
     required this.onTogglePlayback,
     required this.onRestartPlayback,
+    required this.onPrevious,
+    required this.onNext,
   });
 
   final LibraryTrack track;
@@ -286,6 +293,8 @@ class _HeroTrackWideHeader extends StatelessWidget {
   final int? playRank;
   final VoidCallback onTogglePlayback;
   final VoidCallback onRestartPlayback;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
 
   @override
   Widget build(BuildContext context) {
@@ -381,6 +390,12 @@ class _HeroTrackWideHeader extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        _QuietTransportButton(
+                          icon: Icons.skip_previous_rounded,
+                          tooltip: _t(context, 'Previous', '前へ'),
+                          onPressed: busy ? null : onPrevious,
+                        ),
+                        const SizedBox(width: 6),
                         IconButton.filled(
                           style: IconButton.styleFrom(
                             backgroundColor: theme.colorScheme.primary,
@@ -397,6 +412,12 @@ class _HeroTrackWideHeader extends StatelessWidget {
                                 : Icons.play_arrow_rounded,
                             size: 31,
                           ),
+                        ),
+                        const SizedBox(width: 6),
+                        _QuietTransportButton(
+                          icon: Icons.skip_next_rounded,
+                          tooltip: _t(context, 'Next', '次へ'),
+                          onPressed: busy ? null : onNext,
                         ),
                         const SizedBox(width: 10),
                         IconButton.filledTonal(
@@ -439,48 +460,122 @@ class _HeroTrackWideHeader extends StatelessWidget {
   }
 }
 
-class _ArtworkPlaybackButton extends StatelessWidget {
-  const _ArtworkPlaybackButton({
+class _ArtworkTransportControls extends StatelessWidget {
+  const _ArtworkTransportControls({
     required this.isPlaying,
     required this.busy,
-    required this.onPressed,
-    required this.tooltip,
+    required this.onPrevious,
+    required this.onToggle,
+    required this.onNext,
   });
 
   final bool isPlaying;
   final bool busy;
-  final VoidCallback? onPressed;
-  final String tooltip;
+  final VoidCallback onPrevious;
+  final VoidCallback onToggle;
+  final VoidCallback onNext;
 
   @override
   Widget build(BuildContext context) {
-    return IconButton.filled(
-      style: ButtonStyle(
-        minimumSize: const WidgetStatePropertyAll(Size.square(48)),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        backgroundColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled) || busy) {
-            return Colors.black.withValues(alpha: 0.38);
-          }
-          return Colors.black.withValues(alpha: 0.68);
-        }),
-        foregroundColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled) || busy) {
-            return Colors.white.withValues(alpha: 0.46);
-          }
-          return Colors.white;
-        }),
-        side: WidgetStatePropertyAll(
-          BorderSide(color: Colors.white.withValues(alpha: 0.26)),
+    return DecoratedBox(
+      key: const ValueKey('hero-transport-controls'),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ArtworkTransportButton(
+              icon: Icons.skip_previous_rounded,
+              tooltip: _t(context, 'Previous', '前へ'),
+              onPressed: busy ? null : onPrevious,
+            ),
+            _ArtworkTransportButton(
+              icon: isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              tooltip: isPlaying
+                  ? _t(context, 'Pause', '一時停止')
+                  : _t(context, 'Play this track', 'この曲を再生'),
+              onPressed: busy ? null : onToggle,
+              emphasized: true,
+            ),
+            _ArtworkTransportButton(
+              icon: Icons.skip_next_rounded,
+              tooltip: _t(context, 'Next', '次へ'),
+              onPressed: busy ? null : onNext,
+            ),
+          ],
         ),
-        shape: const WidgetStatePropertyAll(CircleBorder()),
+      ),
+    );
+  }
+}
+
+class _ArtworkTransportButton extends StatelessWidget {
+  const _ArtworkTransportButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.emphasized = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = emphasized ? 42.0 : 34.0;
+    return IconButton(
+      style: IconButton.styleFrom(
+        minimumSize: Size.square(size),
+        maximumSize: Size.square(size),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        backgroundColor: emphasized
+            ? Colors.white.withValues(alpha: 0.16)
+            : Colors.transparent,
+        foregroundColor: onPressed == null
+            ? Colors.white.withValues(alpha: 0.4)
+            : Colors.white,
       ),
       onPressed: onPressed,
       tooltip: tooltip,
-      icon: Icon(
-        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-        size: 28,
+      icon: Icon(icon, size: emphasized ? 24 : 20),
+    );
+  }
+}
+
+class _QuietTransportButton extends StatelessWidget {
+  const _QuietTransportButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return IconButton(
+      style: IconButton.styleFrom(
+        minimumSize: const Size.square(40),
+        maximumSize: const Size.square(40),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: theme.colorScheme.onSurfaceVariant,
+        backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.58,
+        ),
       ),
+      onPressed: onPressed,
+      tooltip: tooltip,
+      icon: Icon(icon, size: 21),
     );
   }
 }

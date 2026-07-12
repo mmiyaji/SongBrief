@@ -83,6 +83,40 @@ void main() {
     expect(find.text('Paused'), findsWidgets);
   });
 
+  testWidgets('offers subtle previous and next controls on the hero', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final controller = _HeroTransportPlaybackController();
+
+    await _pumpApp(
+      tester,
+      AppLanguage.english,
+      playbackControllerBuilder: () => controller,
+    );
+    await tester.pumpAndSettle();
+
+    final controls = find.byKey(const ValueKey('hero-transport-controls'));
+    final previous = find.descendant(
+      of: controls,
+      matching: find.byTooltip('Previous'),
+    );
+    final next = find.descendant(
+      of: controls,
+      matching: find.byTooltip('Next'),
+    );
+    expect(previous, findsOneWidget);
+    expect(next, findsOneWidget);
+
+    await tester.tap(previous);
+    await tester.tap(next);
+    expect(controller.previousCalls, 1);
+    expect(controller.nextCalls, 1);
+  });
+
   testWidgets('opens track details from the mini player', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -852,6 +886,24 @@ class _NextTrackPlaybackController extends PlaybackController {
   @override
   Future<void> skipToNext() async {
     state = const PlaybackState(activeTrackId: 'next-track', isPlaying: true);
+  }
+}
+
+class _HeroTransportPlaybackController extends PlaybackController {
+  var previousCalls = 0;
+  var nextCalls = 0;
+
+  @override
+  PlaybackState build() => const PlaybackState();
+
+  @override
+  Future<void> skipToPrevious() async {
+    previousCalls += 1;
+  }
+
+  @override
+  Future<void> skipToNext() async {
+    nextCalls += 1;
   }
 }
 
