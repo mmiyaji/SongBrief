@@ -7,6 +7,8 @@
 - Added privacy-safe native diagnostics for background listening-record
   scheduling, capture, CloudKit upload, completion, and error results.
 - Added a settings status view and JSONL log export for support investigations.
+- Added an in-app recent background activity history that does not require
+  exporting diagnostic log files.
 
 ### Changed
 
@@ -16,6 +18,8 @@
   six-hour minimum request the next time the app opens.
 - Detailed logs rotate daily, expire after 14 days, and are capped at 512 KiB
   per file and 2 MiB in total.
+- Simplified the background-recording settings by hiding scheduling details
+  and placing support diagnostics in a secondary disclosure.
 
 ## [1.0.1] - 2026-07-10
 

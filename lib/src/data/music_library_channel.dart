@@ -196,6 +196,7 @@ class SnapshotRefreshDiagnostics {
     required this.retentionDays,
     required this.logFileCount,
     required this.logBytes,
+    this.recentEvents = const [],
     this.nextEarliestBeginAt,
     this.lastEvent,
     this.lastEventAt,
@@ -210,6 +211,7 @@ class SnapshotRefreshDiagnostics {
       retentionDays = 14,
       logFileCount = 0,
       logBytes = 0,
+      recentEvents = const [],
       nextEarliestBeginAt = null,
       lastEvent = null,
       lastEventAt = null,
@@ -222,6 +224,7 @@ class SnapshotRefreshDiagnostics {
   final int retentionDays;
   final int logFileCount;
   final int logBytes;
+  final List<SnapshotRefreshEvent> recentEvents;
   final DateTime? nextEarliestBeginAt;
   final String? lastEvent;
   final DateTime? lastEventAt;
@@ -257,6 +260,14 @@ class SnapshotRefreshDiagnostics {
 
     final retentionDays = nonNegativeIntValue('retentionDays', 14);
     final lastEvent = value['lastEvent'];
+    final recentEvents = switch (value['recentEvents']) {
+      final List<Object?> entries =>
+        entries
+            .map(SnapshotRefreshEvent.fromPlatformValue)
+            .whereType<SnapshotRefreshEvent>()
+            .toList(growable: false),
+      _ => const <SnapshotRefreshEvent>[],
+    };
 
     return SnapshotRefreshDiagnostics(
       availability: SnapshotBackgroundRefreshAvailability.fromPlatformValue(
@@ -267,6 +278,7 @@ class SnapshotRefreshDiagnostics {
       retentionDays: retentionDays == 0 ? 14 : retentionDays,
       logFileCount: nonNegativeIntValue('logFileCount', 0),
       logBytes: nonNegativeIntValue('logBytes', 0),
+      recentEvents: recentEvents,
       nextEarliestBeginAt: dateFromMillis(value['nextEarliestBeginAtMillis']),
       lastEvent: lastEvent is String ? lastEvent : null,
       lastEventAt: dateFromMillis(value['lastEventAtMillis']),
@@ -274,6 +286,33 @@ class SnapshotRefreshDiagnostics {
       lastSuccessfulCaptureAt: dateFromMillis(
         value['lastSuccessfulCaptureAtMillis'],
       ),
+    );
+  }
+}
+
+class SnapshotRefreshEvent {
+  const SnapshotRefreshEvent({required this.event, required this.at});
+
+  final String event;
+  final DateTime at;
+
+  static SnapshotRefreshEvent? fromPlatformValue(Object? value) {
+    if (value is! Map<Object?, Object?>) {
+      return null;
+    }
+    final event = value['event'];
+    final rawMillis = value['timestampMillis'];
+    final millis = switch (rawMillis) {
+      int value => value,
+      num value when value.isFinite => value.toInt(),
+      _ => null,
+    };
+    if (event is! String || event.isEmpty || millis == null || millis < 0) {
+      return null;
+    }
+    return SnapshotRefreshEvent(
+      event: event,
+      at: DateTime.fromMillisecondsSinceEpoch(millis),
     );
   }
 }

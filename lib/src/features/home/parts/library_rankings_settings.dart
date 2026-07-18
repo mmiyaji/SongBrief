@@ -3773,10 +3773,10 @@ class _SnapshotBackgroundRefreshSetting extends ConsumerWidget {
               Text(
                 _t(
                   context,
-                  'SongBrief requests another run after at least 6 hours. iOS chooses the actual time; runs on the same day update that day\'s record.',
-                  'SongBriefは6時間後以降の再実行を予約します。実際の時刻はiOSが決定し、同じ日の実行はその日の記録を更新します。',
-                  zh: 'SongBrief 会请求最早在 6 小时后再次运行。实际时间由 iOS 决定；同一天的运行会更新当天记录。',
-                  ko: 'SongBrief는 최소 6시간 후 다시 실행되도록 요청합니다. 실제 시각은 iOS가 결정하며, 같은 날의 실행은 그날의 기록을 업데이트합니다.',
+                  'iOS periodically updates the daily record in the background. The actual time is decided by iOS.',
+                  'iOSが日々の記録をバックグラウンドで定期的に更新します。実行時刻はiOSが決定します。',
+                  zh: 'iOS 会定期在后台更新每日记录。实际运行时间由 iOS 决定。',
+                  ko: 'iOS가 일일 기록을 백그라운드에서 주기적으로 업데이트합니다. 실제 실행 시각은 iOS가 결정합니다.',
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -3819,59 +3819,8 @@ class _SnapshotBackgroundRefreshSetting extends ConsumerWidget {
                     ko: '불러올 수 없음',
                   ),
                 ),
-                data: (value) => _SnapshotRefreshDiagnosticsRows(
-                  diagnostics: value,
-                  recordingEnabled: recordingEnabled,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _SettingsSwitchCard(
-                icon: Icons.description_outlined,
-                title: _t(
-                  context,
-                  'Detailed background logs',
-                  'バックグラウンド詳細ログ',
-                  zh: '后台详细日志',
-                  ko: '백그라운드 상세 로그',
-                ),
-                description: _t(
-                  context,
-                  'Stores schedule, result, counts, duration, and error codes. Song and library metadata are never included.',
-                  '予約・結果・件数・所要時間・エラーコードを保存します。曲やライブラリのメタデータは含めません。',
-                  zh: '保存计划、结果、数量、耗时和错误代码。绝不包含歌曲或资料库元数据。',
-                  ko: '예약, 결과, 개수, 소요 시간, 오류 코드를 저장합니다. 곡 또는 보관함 메타데이터는 포함하지 않습니다.',
-                ),
-                value: detailedLoggingEnabled,
-                surfaceAlpha: 0.18,
-                onChanged: diagnostics.isLoading || !supported
-                    ? null
-                    : (value) async {
-                        final saved = await ref
-                            .read(snapshotDetailedLoggingProvider.notifier)
-                            .setEnabled(value);
-                        if (!saved) {
-                          if (context.mounted) {
-                            _showDataManagementResult(
-                              context,
-                              _t(
-                                context,
-                                'Could not save the detailed-log setting.',
-                                '詳細ログの設定を保存できませんでした。',
-                                zh: '无法保存详细日志设置。',
-                                ko: '상세 로그 설정을 저장할 수 없습니다.',
-                              ),
-                            );
-                          }
-                          return;
-                        }
-                        try {
-                          await ref
-                              .read(musicStatsControllerProvider.notifier)
-                              .ensureSnapshotRefreshScheduled();
-                        } on Object {
-                          ref.invalidate(snapshotRefreshDiagnosticsProvider);
-                        }
-                      },
+                data: (value) =>
+                    _SnapshotRefreshDiagnosticsRows(diagnostics: value),
               ),
               const SizedBox(height: 10),
               Wrap(
@@ -3887,30 +3836,131 @@ class _SnapshotBackgroundRefreshSetting extends ConsumerWidget {
                     label: Text(
                       _t(
                         context,
-                        'Refresh status',
-                        '状態を更新',
-                        zh: '刷新状态',
-                        ko: '상태 새로고침',
-                      ),
-                    ),
-                  ),
-                  FilledButton.tonalIcon(
-                    key: const ValueKey('snapshot-refresh-log-download-button'),
-                    onPressed: currentDiagnostics?.hasLogs == true
-                        ? () => _saveSnapshotRefreshLogs(context, ref)
-                        : null,
-                    icon: const Icon(Icons.download_rounded),
-                    label: Text(
-                      _t(
-                        context,
-                        'Save logs',
-                        'ログを保存',
-                        zh: '保存日志',
-                        ko: '로그 저장',
+                        'Refresh history',
+                        '履歴を更新',
+                        zh: '刷新历史',
+                        ko: '기록 새로고침',
                       ),
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              Material(
+                color: Colors.transparent,
+                child: ExpansionTile(
+                  key: const ValueKey('snapshot-support-logs-expansion'),
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+                  childrenPadding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  leading: Icon(
+                    Icons.description_outlined,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(
+                    _t(
+                      context,
+                      'Support logs',
+                      'サポート用ログ',
+                      zh: '支持日志',
+                      ko: '지원용 로그',
+                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  children: [
+                    _SettingsSwitchCard(
+                      icon: Icons.article_outlined,
+                      title: _t(
+                        context,
+                        'Detailed logging',
+                        '詳細ログを記録',
+                        zh: '记录详细日志',
+                        ko: '상세 로그 기록',
+                      ),
+                      description: _t(
+                        context,
+                        'For troubleshooting. Song and library metadata are not included.',
+                        '問題調査用です。曲やライブラリのメタデータは含めません。',
+                        zh: '用于问题排查。不包含歌曲或资料库元数据。',
+                        ko: '문제 조사용입니다. 곡 또는 보관함 메타데이터는 포함하지 않습니다.',
+                      ),
+                      value: detailedLoggingEnabled,
+                      surfaceAlpha: 0.18,
+                      onChanged: diagnostics.isLoading || !supported
+                          ? null
+                          : (value) async {
+                              final saved = await ref
+                                  .read(
+                                    snapshotDetailedLoggingProvider.notifier,
+                                  )
+                                  .setEnabled(value);
+                              if (!saved) {
+                                if (context.mounted) {
+                                  _showDataManagementResult(
+                                    context,
+                                    _t(
+                                      context,
+                                      'Could not save the detailed-log setting.',
+                                      '詳細ログの設定を保存できませんでした。',
+                                      zh: '无法保存详细日志设置。',
+                                      ko: '상세 로그 설정을 저장할 수 없습니다.',
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+                              try {
+                                await ref
+                                    .read(musicStatsControllerProvider.notifier)
+                                    .ensureSnapshotRefreshScheduled();
+                              } on Object {
+                                ref.invalidate(
+                                  snapshotRefreshDiagnosticsProvider,
+                                );
+                              }
+                            },
+                    ),
+                    if (currentDiagnostics != null)
+                      _SettingsRow(
+                        icon: Icons.folder_outlined,
+                        label: _t(
+                          context,
+                          'Log storage',
+                          'ログ保存量',
+                          zh: '日志存储',
+                          ko: '로그 저장량',
+                        ),
+                        value: _snapshotRefreshLogStorageLabel(
+                          context,
+                          currentDiagnostics,
+                        ),
+                      ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.tonalIcon(
+                        key: const ValueKey(
+                          'snapshot-refresh-log-download-button',
+                        ),
+                        onPressed: currentDiagnostics?.hasLogs == true
+                            ? () => _saveSnapshotRefreshLogs(context, ref)
+                            : null,
+                        icon: const Icon(Icons.download_rounded),
+                        label: Text(
+                          _t(
+                            context,
+                            'Save logs',
+                            'ログを保存',
+                            zh: '保存日志',
+                            ko: '로그 저장',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -3947,10 +3997,10 @@ String _snapshotBackgroundSummaryLabel(
       if (value.lastSuccessfulCaptureAt == null) {
         return _t(
           context,
-          '6-hour minimum / no background record yet',
-          '最短6時間 / バックグラウンド記録はまだありません',
-          zh: '最短 6 小时 / 暂无后台记录',
-          ko: '최소 6시간 / 아직 백그라운드 기록 없음',
+          'No background record yet',
+          'バックグラウンド記録はまだありません',
+          zh: '暂无后台记录',
+          ko: '아직 백그라운드 기록 없음',
         );
       }
       final lastSuccess = _dateTimeFormat(
@@ -3968,54 +4018,14 @@ String _snapshotBackgroundSummaryLabel(
 }
 
 class _SnapshotRefreshDiagnosticsRows extends StatelessWidget {
-  const _SnapshotRefreshDiagnosticsRows({
-    required this.diagnostics,
-    required this.recordingEnabled,
-  });
+  const _SnapshotRefreshDiagnosticsRows({required this.diagnostics});
 
   final SnapshotRefreshDiagnostics diagnostics;
-  final bool recordingEnabled;
 
   @override
   Widget build(BuildContext context) {
-    final nextOpportunity = !recordingEnabled
-        ? _t(
-            context,
-            'Recording is off',
-            '記録がオフです',
-            zh: '记录已关闭',
-            ko: '기록이 꺼져 있음',
-          )
-        : diagnostics.nextEarliestBeginAt == null
-        ? _t(
-            context,
-            'Waiting for iOS',
-            'iOSの割り当て待ち',
-            zh: '等待 iOS 安排',
-            ko: 'iOS 배정 대기',
-          )
-        : _dateTimeFormat(
-            context,
-          ).format(diagnostics.nextEarliestBeginAt!.toLocal());
     return Column(
       children: [
-        _SettingsRow(
-          icon: Icons.timer_outlined,
-          label: _t(
-            context,
-            'Request interval',
-            '予約間隔',
-            zh: '请求间隔',
-            ko: '요청 간격',
-          ),
-          value: _t(
-            context,
-            '6 hours minimum',
-            '最短6時間',
-            zh: '最短 6 小时',
-            ko: '최소 6시간',
-          ),
-        ),
         _SettingsRow(
           icon: Icons.phonelink_setup_rounded,
           label: _t(
@@ -4028,31 +4038,6 @@ class _SnapshotRefreshDiagnosticsRows extends StatelessWidget {
           value: _snapshotRefreshAvailabilityLabel(
             context,
             diagnostics.availability,
-          ),
-        ),
-        _SettingsRow(
-          icon: Icons.update_rounded,
-          label: _t(
-            context,
-            'Next earliest opportunity',
-            '次回の最短実行時刻',
-            zh: '下次最早运行时间',
-            ko: '다음 최소 실행 시각',
-          ),
-          value: nextOpportunity,
-        ),
-        _SettingsRow(
-          icon: Icons.play_circle_outline_rounded,
-          label: _t(
-            context,
-            'Last background attempt',
-            '最後のバックグラウンド実行',
-            zh: '上次后台运行',
-            ko: '마지막 백그라운드 실행',
-          ),
-          value: _snapshotRefreshDateLabel(
-            context,
-            diagnostics.lastTaskStartedAt,
           ),
         ),
         _SettingsRow(
@@ -4069,23 +4054,77 @@ class _SnapshotRefreshDiagnosticsRows extends StatelessWidget {
             diagnostics.lastSuccessfulCaptureAt,
           ),
         ),
-        _SettingsRow(
-          icon: Icons.receipt_long_outlined,
-          label: _t(
-            context,
-            'Latest operation',
-            '直近の動作',
-            zh: '最近操作',
-            ko: '최근 동작',
-          ),
-          value: _snapshotRefreshLastEventLabel(context, diagnostics),
-        ),
-        _SettingsRow(
-          icon: Icons.folder_outlined,
-          label: _t(context, 'Log storage', 'ログ保存量', zh: '日志存储', ko: '로그 저장량'),
-          value: _snapshotRefreshLogStorageLabel(context, diagnostics),
-        ),
+        _SnapshotRefreshHistory(diagnostics: diagnostics),
       ],
+    );
+  }
+}
+
+class _SnapshotRefreshHistory extends StatelessWidget {
+  const _SnapshotRefreshHistory({required this.diagnostics});
+
+  final SnapshotRefreshDiagnostics diagnostics;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final events = diagnostics.recentEvents.reversed.take(6).toList();
+    return Material(
+      color: Colors.transparent,
+      child: ExpansionTile(
+        key: const ValueKey('snapshot-refresh-history-expansion'),
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(left: 8, bottom: 6),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        leading: Icon(Icons.history_rounded, color: theme.colorScheme.primary),
+        title: Text(
+          _t(context, 'Recent activity', '更新履歴', zh: '更新历史', ko: '업데이트 기록'),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle: Text(
+          _snapshotRefreshLastEventLabel(context, diagnostics),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        children: events.isEmpty
+            ? [
+                ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.only(left: 8, right: 4),
+                  title: Text(
+                    _t(
+                      context,
+                      'No activity yet',
+                      '更新履歴はまだありません',
+                      zh: '暂无更新历史',
+                      ko: '아직 업데이트 기록 없음',
+                    ),
+                  ),
+                ),
+              ]
+            : events
+                  .map(
+                    (event) => ListTile(
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      contentPadding: const EdgeInsets.only(left: 8, right: 4),
+                      leading: const Icon(Icons.circle, size: 7),
+                      title: Text(
+                        _snapshotRefreshEventLabel(context, event.event),
+                      ),
+                      subtitle: Text(
+                        _dateTimeFormat(context).format(event.at.toLocal()),
+                      ),
+                    ),
+                  )
+                  .toList(),
+      ),
     );
   }
 }
@@ -4137,7 +4176,16 @@ String _snapshotRefreshLastEventLabel(
   BuildContext context,
   SnapshotRefreshDiagnostics diagnostics,
 ) {
-  final eventLabel = switch (diagnostics.lastEvent) {
+  final eventLabel = _snapshotRefreshEventLabel(context, diagnostics.lastEvent);
+  final at = diagnostics.lastEventAt;
+  if (at == null) {
+    return eventLabel;
+  }
+  return '$eventLabel / ${_dateTimeFormat(context).format(at.toLocal())}';
+}
+
+String _snapshotRefreshEventLabel(BuildContext context, String? event) {
+  return switch (event) {
     'schedule_cancelled' => _t(
       context,
       'Request cancelled',
@@ -4244,11 +4292,6 @@ String _snapshotRefreshLastEventLabel(
       ko: '아직 동작 기록 없음',
     ),
   };
-  final at = diagnostics.lastEventAt;
-  if (at == null) {
-    return eventLabel;
-  }
-  return '$eventLabel / ${_dateTimeFormat(context).format(at.toLocal())}';
 }
 
 String _snapshotRefreshLogStorageLabel(

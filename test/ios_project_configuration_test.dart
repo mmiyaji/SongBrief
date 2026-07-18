@@ -69,6 +69,9 @@ void main() {
     expect(logStore, contains('static let retentionDays = 14'));
     expect(logStore, contains('maximumFileBytes = 512 * 1024'));
     expect(logStore, contains('maximumTotalBytes = 2 * 1024 * 1024'));
+    expect(logStore, contains('maximumRecentEvents = 12'));
+    expect(logStore, contains('recentEventsPreferenceKey'));
+    expect(logStore, contains('payload["recentEvents"]'));
     expect(logStore, contains('snapshot-refresh-'));
     expect(logStore, contains('.jsonl'));
     expect(logStore, contains('isExcludedFromBackup = true'));

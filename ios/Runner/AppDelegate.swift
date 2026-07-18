@@ -827,11 +827,14 @@ enum SnapshotRefreshLogStore {
     "songbrief_snapshot_refresh_last_task_started_at_v1"
   private static let lastSuccessfulCaptureAtPreferenceKey =
     "songbrief_snapshot_refresh_last_success_at_v1"
+  private static let recentEventsPreferenceKey =
+    "songbrief_snapshot_refresh_recent_events_v1"
   private static let logFilePrefix = "snapshot-refresh-"
   private static let logFileSuffix = ".jsonl"
   private static let operationLock = NSRecursiveLock()
   private static let maximumFileBytes = 512 * 1024
   private static let maximumTotalBytes = 2 * 1024 * 1024
+  private static let maximumRecentEvents = 12
   private static let allowedDetailKeys: Set<String> = [
     "dateKey",
     "durationMillis",
@@ -876,6 +879,7 @@ enum SnapshotRefreshLogStore {
         forKey: lastSuccessfulCaptureAtPreferenceKey
       )
     }
+    appendRecentEvent(event, at: now, defaults: defaults)
 
     if let existingDirectory = logsDirectory(create: false) {
       pruneLogs(in: existingDirectory, now: now)
@@ -940,6 +944,7 @@ enum SnapshotRefreshLogStore {
     if let lastSuccess {
       payload["lastSuccessfulCaptureAtMillis"] = lastSuccess.int64Value
     }
+    payload["recentEvents"] = recentEvents(defaults: defaults)
 
     guard let directory = logsDirectory(create: false) else {
       return payload
@@ -967,6 +972,43 @@ enum SnapshotRefreshLogStore {
       }
       return String(data: data, encoding: .utf8)
     }.joined()
+  }
+
+  private static func appendRecentEvent(
+    _ event: String,
+    at date: Date,
+    defaults: UserDefaults
+  ) {
+    var events = recentEvents(defaults: defaults)
+    events.append([
+      "event": event,
+      "timestampMillis": Int(date.timeIntervalSince1970 * 1000),
+    ])
+    if events.count > maximumRecentEvents {
+      events.removeFirst(events.count - maximumRecentEvents)
+    }
+    defaults.set(events, forKey: recentEventsPreferenceKey)
+  }
+
+  private static func recentEvents(
+    defaults: UserDefaults
+  ) -> [[String: Any]] {
+    guard let rawEvents = defaults.array(
+      forKey: recentEventsPreferenceKey
+    ) as? [[String: Any]] else {
+      return []
+    }
+    return rawEvents.compactMap { entry in
+      guard let event = entry["event"] as? String,
+            !event.isEmpty,
+            let timestamp = entry["timestampMillis"] as? NSNumber else {
+        return nil
+      }
+      return [
+        "event": event,
+        "timestampMillis": timestamp.int64Value,
+      ]
+    }
   }
 
   private static func sanitized(_ details: [String: Any]) -> [String: Any] {

@@ -15,6 +15,11 @@ void main() {
       'lastEventAtMillis': 2000,
       'lastTaskStartedAtMillis': 2500,
       'lastSuccessfulCaptureAtMillis': 3000,
+      'recentEvents': [
+        {'event': 'schedule_submitted', 'timestampMillis': 1500},
+        {'event': 'task_completed', 'timestampMillis': 2000},
+        {'event': 42, 'timestampMillis': 2500},
+      ],
     });
 
     expect(
@@ -36,6 +41,12 @@ void main() {
       DateTime.fromMillisecondsSinceEpoch(2500),
     );
     expect(diagnostics.hasLogs, isTrue);
+    expect(diagnostics.recentEvents, hasLength(2));
+    expect(diagnostics.recentEvents.first.event, 'schedule_submitted');
+    expect(
+      diagnostics.recentEvents.last.at,
+      DateTime.fromMillisecondsSinceEpoch(2000),
+    );
   });
 
   test('malformed diagnostics fall back without throwing', () {
@@ -61,6 +72,7 @@ void main() {
     expect(diagnostics.nextEarliestBeginAt, isNull);
     expect(diagnostics.lastEvent, isNull);
     expect(diagnostics.hasLogs, isFalse);
+    expect(diagnostics.recentEvents, isEmpty);
   });
 
   test('non-map diagnostics are unsupported', () {

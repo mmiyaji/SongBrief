@@ -901,6 +901,16 @@ void main() {
         lastEventAt: DateTime(2026, 7, 18, 12),
         lastTaskStartedAt: DateTime(2026, 7, 18, 11, 58),
         lastSuccessfulCaptureAt: DateTime(2026, 7, 18, 11, 59),
+        recentEvents: [
+          SnapshotRefreshEvent(
+            event: 'capture_succeeded',
+            at: DateTime(2026, 7, 18, 11, 59),
+          ),
+          SnapshotRefreshEvent(
+            event: 'task_completed',
+            at: DateTime(2026, 7, 18, 12),
+          ),
+        ],
       ),
       detailedLoggingEnabled: true,
     );
@@ -920,14 +930,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Background recording'), findsOneWidget);
-    expect(find.text('Detailed background logs'), findsNothing);
+    expect(find.text('Recent activity'), findsNothing);
     expect(find.text('Save logs'), findsNothing);
 
     await tester.tap(find.text('Background recording'));
     await tester.pumpAndSettle();
 
-    expect(find.text('6 hours minimum'), findsOneWidget);
-    expect(find.text('Detailed background logs'), findsOneWidget);
+    expect(find.textContaining('6 hours'), findsNothing);
+    expect(find.text('Next earliest opportunity'), findsNothing);
+    expect(find.text('Recent activity'), findsOneWidget);
+    expect(find.text('Support logs'), findsOneWidget);
+    expect(find.text('Detailed logging'), findsNothing);
+    expect(find.text('Save logs'), findsNothing);
+
+    await tester.tap(find.text('Recent activity'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Record saved'), findsOneWidget);
+    expect(find.text('Refresh completed'), findsAtLeastNWidgets(1));
+
+    await tester.ensureVisible(find.text('Support logs'));
+    await tester.tap(find.text('Support logs'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detailed logging'), findsOneWidget);
     expect(
       find.text('2 daily files / 2.00 KB / delete after 14 days'),
       findsOneWidget,
