@@ -878,7 +878,7 @@ void main() {
     }
   });
 
-  testWidgets('shows fixed background schedule and rotating log controls', (
+  testWidgets('keeps background diagnostics collapsed until requested', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -920,6 +920,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Background recording'), findsOneWidget);
+    expect(find.text('Detailed background logs'), findsNothing);
+    expect(find.text('Save logs'), findsNothing);
+
+    await tester.tap(find.text('Background recording'));
+    await tester.pumpAndSettle();
+
     expect(find.text('6 hours minimum'), findsOneWidget);
     expect(find.text('Detailed background logs'), findsOneWidget);
     expect(
