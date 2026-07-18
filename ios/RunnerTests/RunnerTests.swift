@@ -3,6 +3,35 @@ import XCTest
 @testable import Runner
 
 final class RunnerTests: XCTestCase {
+  func testSnapshotRefreshReplacesOnlyRequestsBeyondTheSixHourWindow() {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    XCTAssertFalse(
+      SongBriefSnapshotRefresh.shouldReplacePendingRequest(
+        earliestBeginDate: nil,
+        now: now
+      )
+    )
+    XCTAssertFalse(
+      SongBriefSnapshotRefresh.shouldReplacePendingRequest(
+        earliestBeginDate: now.addingTimeInterval(6 * 60 * 60),
+        now: now
+      )
+    )
+    XCTAssertFalse(
+      SongBriefSnapshotRefresh.shouldReplacePendingRequest(
+        earliestBeginDate: now.addingTimeInterval(6 * 60 * 60 + 5 * 60),
+        now: now
+      )
+    )
+    XCTAssertTrue(
+      SongBriefSnapshotRefresh.shouldReplacePendingRequest(
+        earliestBeginDate: now.addingTimeInterval(6 * 60 * 60 + 5 * 60 + 1),
+        now: now
+      )
+    )
+  }
+
   func testSnapshotOperationCoordinatorRunsAsyncWorkInFIFOOrder() {
     let coordinator = SnapshotOperationCoordinator(
       label: "app.songbrief.tests.snapshot-operation-coordinator"

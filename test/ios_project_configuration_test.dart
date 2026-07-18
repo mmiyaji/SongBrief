@@ -46,6 +46,9 @@ void main() {
     );
     expect(appDelegate, contains('TimeInterval(intervalHours * 60 * 60)'));
     expect(appDelegate, contains('getPendingTaskRequests'));
+    expect(appDelegate, contains('pendingRequestToleranceMinutes = 5'));
+    expect(appDelegate, contains('event: "schedule_replaced"'));
+    expect(appDelegate, contains('reason: "legacy_interval"'));
     expect(
       infoPlist,
       contains('<string>app.songbrief.snapshot-refresh</string>'),

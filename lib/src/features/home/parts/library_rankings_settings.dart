@@ -4152,6 +4152,13 @@ String _snapshotRefreshLastEventLabel(
       zh: '请求已排队',
       ko: '요청 대기 중',
     ),
+    'schedule_replaced' => _t(
+      context,
+      'Previous request updated',
+      '以前の予約を更新',
+      zh: '已更新之前的请求',
+      ko: '이전 요청 업데이트됨',
+    ),
     'schedule_submitted' => _t(
       context,
       'Refresh requested',

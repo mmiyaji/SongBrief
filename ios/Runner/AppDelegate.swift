@@ -33,6 +33,7 @@ enum SongBriefSnapshotRefresh {
     "flutter.songbrief_excluded_keywords_v1"
   private static let maxSnapshotTracks = 500
   private static let refreshIntervalHours = 6
+  private static let pendingRequestToleranceMinutes = 5
 
   static func register() {
     BGTaskScheduler.shared.register(
@@ -65,6 +66,24 @@ enum SongBriefSnapshotRefresh {
 
     BGTaskScheduler.shared.getPendingTaskRequests { requests in
       if let existing = requests.first(where: { $0.identifier == taskIdentifier }) {
+        if shouldReplacePendingRequest(
+          earliestBeginDate: existing.earliestBeginDate,
+          now: Date()
+        ) {
+          var details: [String: Any] = ["reason": "legacy_interval"]
+          if let previous = existing.earliestBeginDate {
+            details["previousEarliestBeginAtMillis"] = Int(
+              previous.timeIntervalSince1970 * 1000
+            )
+          }
+          BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: taskIdentifier)
+          SnapshotRefreshLogStore.record(
+            event: "schedule_replaced",
+            details: details
+          )
+          submitScheduleRequest(reason: "legacy_interval")
+          return
+        }
         var details: [String: Any] = [:]
         if let next = existing.earliestBeginDate {
           details["nextEarliestBeginAtMillis"] = Int(
@@ -79,6 +98,21 @@ enum SongBriefSnapshotRefresh {
       }
       submitScheduleRequest(reason: "no_pending_request")
     }
+  }
+
+  static func shouldReplacePendingRequest(
+    earliestBeginDate: Date?,
+    now: Date
+  ) -> Bool {
+    guard let earliestBeginDate else {
+      return false
+    }
+    let latestExpectedDate = now.addingTimeInterval(
+      TimeInterval(
+        refreshIntervalHours * 60 * 60 + pendingRequestToleranceMinutes * 60
+      )
+    )
+    return earliestBeginDate > latestExpectedDate
   }
 
   private static func submitScheduleRequest(reason: String) {
@@ -805,6 +839,7 @@ enum SnapshotRefreshLogStore {
     "errorDomain",
     "intervalHours",
     "nextEarliestBeginAtMillis",
+    "previousEarliestBeginAtMillis",
     "reason",
     "runId",
     "storedTrackCounterCount",

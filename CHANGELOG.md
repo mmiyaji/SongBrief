@@ -12,6 +12,8 @@
 
 - Background snapshot requests now use a fixed six-hour minimum opportunity;
   iOS still decides the actual execution time.
+- Pending 24-hour requests left by earlier builds are replaced with the new
+  six-hour minimum request the next time the app opens.
 - Detailed logs rotate daily, expire after 14 days, and are capped at 512 KiB
   per file and 2 MiB in total.
 

@@ -95,7 +95,9 @@ decides whether and when the task actually runs, so foreground launch, resume,
 and manual refresh scans remain the reliable source of truth. Multiple captures
 on the same local date update that day's snapshot. When scans are several days
 apart, the app treats the result as an observed multi-day window rather than
-exact per-day listening history.
+exact per-day listening history. On upgrade, pending requests from the earlier
+24-hour schedule are replaced when their earliest date is beyond the current
+six-hour window.
 
 Settings exposes the pending-request state, Background App Refresh availability,
 last successful capture, and an optional detailed diagnostic log. Detailed logs
