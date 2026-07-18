@@ -1,4 +1,5 @@
 import BackgroundTasks
+import Foundation
 import Flutter
 import MediaPlayer
 import UIKit
@@ -31,6 +32,7 @@ enum SongBriefSnapshotRefresh {
   private static let excludedKeywordsPreferenceKey =
     "flutter.songbrief_excluded_keywords_v1"
   private static let maxSnapshotTracks = 500
+  private static let refreshIntervalHours = 6
 
   static func register() {
     BGTaskScheduler.shared.register(
@@ -45,54 +47,160 @@ enum SongBriefSnapshotRefresh {
     }
   }
 
-  static func schedule() {
+  static func schedule(replaceExisting: Bool = false) {
     guard isRecordingEnabled else {
+      BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: taskIdentifier)
+      SnapshotRefreshLogStore.record(
+        event: "schedule_cancelled",
+        details: ["reason": "recording_disabled"]
+      )
       return
     }
 
+    if replaceExisting {
+      BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: taskIdentifier)
+      submitScheduleRequest(reason: "settings_changed")
+      return
+    }
+
+    BGTaskScheduler.shared.getPendingTaskRequests { requests in
+      if let existing = requests.first(where: { $0.identifier == taskIdentifier }) {
+        var details: [String: Any] = [:]
+        if let next = existing.earliestBeginDate {
+          details["nextEarliestBeginAtMillis"] = Int(
+            next.timeIntervalSince1970 * 1000
+          )
+        }
+        SnapshotRefreshLogStore.record(
+          event: "schedule_kept",
+          details: details
+        )
+        return
+      }
+      submitScheduleRequest(reason: "no_pending_request")
+    }
+  }
+
+  private static func submitScheduleRequest(reason: String) {
+    let intervalHours = refreshIntervalHours
     let request = BGAppRefreshTaskRequest(identifier: taskIdentifier)
-    request.earliestBeginDate = Date(timeIntervalSinceNow: 24 * 60 * 60)
+    request.earliestBeginDate = Date(
+      timeIntervalSinceNow: TimeInterval(intervalHours * 60 * 60)
+    )
     do {
       try BGTaskScheduler.shared.submit(request)
+      SnapshotRefreshLogStore.record(
+        event: "schedule_submitted",
+        details: [
+          "intervalHours": intervalHours,
+          "reason": reason,
+          "nextEarliestBeginAtMillis": Int(
+            (request.earliestBeginDate ?? Date()).timeIntervalSince1970 * 1000
+          )
+        ]
+      )
     } catch {
-      // iOS may reject scheduling when Background App Refresh is disabled or
-      // the system decides not to grant a slot. Foreground scans remain the
-      // source of truth, so this is intentionally best effort.
+      let failure = error as NSError
+      SnapshotRefreshLogStore.record(
+        event: "schedule_failed",
+        details: [
+          "errorDomain": failure.domain,
+          "errorCode": failure.code,
+          "intervalHours": intervalHours,
+          "reason": reason
+        ]
+      )
     }
   }
 
   private static func handle(_ task: BGAppRefreshTask) {
+    let runID = UUID().uuidString
+    SnapshotRefreshLogStore.record(
+      event: "task_started",
+      details: ["runId": runID, "intervalHours": refreshIntervalHours]
+    )
     schedule()
 
     let completion = SnapshotRefreshCompletion(task)
     task.expirationHandler = {
-      completion.complete(success: false)
+      completion.complete(success: false) {
+        SnapshotRefreshLogStore.record(
+          event: "task_expired",
+          details: ["runId": runID]
+        )
+        SnapshotRefreshLogStore.record(
+          event: "task_completed",
+          details: ["runId": runID, "success": false]
+        )
+      }
     }
 
     DispatchQueue.global(qos: .utility).async {
-      guard !completion.isCompleted, let dateKey = captureSnapshot() else {
-        completion.complete(success: false)
+      guard !completion.isCompleted, let dateKey = captureSnapshot(runID: runID) else {
+        completion.complete(success: false) {
+          SnapshotRefreshLogStore.record(
+            event: "task_completed",
+            details: ["runId": runID, "success": false]
+          )
+        }
         return
       }
 
       // The local capture already succeeded; the cloud upload is best effort
       // and must not fail the refresh task.
-      guard SnapshotCloudSync.isEnabled, !completion.isCompleted else {
-        completion.complete(success: true)
+      guard !completion.isCompleted else {
         return
       }
-      SnapshotCloudSync.uploadLocalSnapshot(dateKey: dateKey) { _ in
-        completion.complete(success: true)
+      guard SnapshotCloudSync.isEnabled else {
+        SnapshotRefreshLogStore.record(
+          event: "cloud_upload_skipped",
+          details: ["runId": runID, "reason": "disabled"]
+        )
+        completion.complete(success: true) {
+          SnapshotRefreshLogStore.record(
+            event: "task_completed",
+            details: ["runId": runID, "success": true]
+          )
+        }
+        return
+      }
+      SnapshotRefreshLogStore.record(
+        event: "cloud_upload_started",
+        details: ["runId": runID]
+      )
+      SnapshotCloudSync.uploadLocalSnapshot(dateKey: dateKey) { uploaded in
+        guard !completion.isCompleted else {
+          return
+        }
+        SnapshotRefreshLogStore.record(
+          event: "cloud_upload_completed",
+          details: ["runId": runID, "uploaded": uploaded]
+        )
+        completion.complete(success: true) {
+          SnapshotRefreshLogStore.record(
+            event: "task_completed",
+            details: ["runId": runID, "success": true]
+          )
+        }
       }
     }
   }
 
-  private static func captureSnapshot() -> String? {
+  private static func captureSnapshot(runID: String) -> String? {
+    let startedAt = Date()
     guard isRecordingEnabled else {
+      SnapshotRefreshLogStore.record(
+        event: "capture_skipped",
+        details: ["runId": runID, "reason": "recording_disabled"]
+      )
       return nil
     }
 
     guard MPMediaLibrary.authorizationStatus() == .authorized else {
+      SnapshotRefreshLogStore.record(
+        event: "capture_skipped",
+        details: ["runId": runID, "reason": "music_not_authorized"]
+      )
       return nil
     }
 
@@ -125,10 +233,47 @@ enum SongBriefSnapshotRefresh {
     ]
 
     guard write(snapshot: snapshot) else {
+      SnapshotRefreshLogStore.record(
+        event: "snapshot_write_failed",
+        details: [
+          "runId": runID,
+          "durationMillis": Int(Date().timeIntervalSince(startedAt) * 1000),
+          "trackCount": items.count
+        ]
+      )
       return nil
     }
     SongBriefWidgetDataStore.updateAfterBackgroundCapture(snapshot: snapshot)
+    SnapshotRefreshLogStore.record(
+      event: "capture_succeeded",
+      details: [
+        "runId": runID,
+        "dateKey": capturedDateKey,
+        "durationMillis": Int(Date().timeIntervalSince(startedAt) * 1000),
+        "trackCount": items.count,
+        "storedTrackCounterCount": tracks.count
+      ]
+    )
     return capturedDateKey
+  }
+
+  static func diagnostics(completion: @escaping ([String: Any]) -> Void) {
+    let availability = backgroundRefreshAvailability
+    BGTaskScheduler.shared.getPendingTaskRequests { requests in
+      let pending = requests.first(where: { $0.identifier == taskIdentifier })
+      var payload = SnapshotRefreshLogStore.summary()
+      payload["availability"] = availability
+      payload["intervalHours"] = refreshIntervalHours
+      payload["detailedLoggingEnabled"] = SnapshotRefreshLogStore.isEnabled
+      if let next = pending?.earliestBeginDate {
+        payload["nextEarliestBeginAtMillis"] = Int(next.timeIntervalSince1970 * 1000)
+      }
+      completion(payload)
+    }
+  }
+
+  static func exportDiagnosticsLog() -> String {
+    SnapshotRefreshLogStore.exportJSONLines()
   }
 
   static func localSnapshots() -> [[String: Any]] {
@@ -174,6 +319,19 @@ enum SongBriefSnapshotRefresh {
       return true
     }
     return defaults.bool(forKey: recordingEnabledPreferenceKey)
+  }
+
+  private static var backgroundRefreshAvailability: String {
+    switch UIApplication.shared.backgroundRefreshStatus {
+    case .available:
+      return "available"
+    case .denied:
+      return "denied"
+    case .restricted:
+      return "restricted"
+    @unknown default:
+      return "unsupported"
+    }
   }
 
   private static var exclusionRules: LibraryExclusionRules {
@@ -621,6 +779,324 @@ enum SnapshotFileStore {
   }
 }
 
+/// Stores privacy-safe diagnostics for the native background refresh path.
+/// Flutter may not be running when a refresh task launches, so this log must
+/// live entirely on the iOS side.
+enum SnapshotRefreshLogStore {
+  private static let detailedLoggingEnabledPreferenceKey =
+    "flutter.songbrief_snapshot_detailed_logging_enabled_v1"
+  private static let lastEventPreferenceKey =
+    "songbrief_snapshot_refresh_last_event_v1"
+  private static let lastEventAtPreferenceKey =
+    "songbrief_snapshot_refresh_last_event_at_v1"
+  private static let lastTaskStartedAtPreferenceKey =
+    "songbrief_snapshot_refresh_last_task_started_at_v1"
+  private static let lastSuccessfulCaptureAtPreferenceKey =
+    "songbrief_snapshot_refresh_last_success_at_v1"
+  private static let logFilePrefix = "snapshot-refresh-"
+  private static let logFileSuffix = ".jsonl"
+  private static let operationLock = NSRecursiveLock()
+  private static let maximumFileBytes = 512 * 1024
+  private static let maximumTotalBytes = 2 * 1024 * 1024
+  private static let allowedDetailKeys: Set<String> = [
+    "dateKey",
+    "durationMillis",
+    "errorCode",
+    "errorDomain",
+    "intervalHours",
+    "nextEarliestBeginAtMillis",
+    "reason",
+    "runId",
+    "storedTrackCounterCount",
+    "success",
+    "trackCount",
+    "uploaded",
+  ]
+
+  static let retentionDays = 14
+
+  static var isEnabled: Bool {
+    UserDefaults.standard.bool(forKey: detailedLoggingEnabledPreferenceKey)
+  }
+
+  static func record(event: String, details: [String: Any] = [:]) {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+
+    let now = Date()
+    let defaults = UserDefaults.standard
+    defaults.set(event, forKey: lastEventPreferenceKey)
+    defaults.set(
+      Int(now.timeIntervalSince1970 * 1000),
+      forKey: lastEventAtPreferenceKey
+    )
+    if event == "task_started" {
+      defaults.set(
+        Int(now.timeIntervalSince1970 * 1000),
+        forKey: lastTaskStartedAtPreferenceKey
+      )
+    } else if event == "capture_succeeded" {
+      defaults.set(
+        Int(now.timeIntervalSince1970 * 1000),
+        forKey: lastSuccessfulCaptureAtPreferenceKey
+      )
+    }
+
+    if let existingDirectory = logsDirectory(create: false) {
+      pruneLogs(in: existingDirectory, now: now)
+    }
+    guard isEnabled, let directory = logsDirectory(create: true) else {
+      return
+    }
+
+    var payload: [String: Any] = [
+      "formatVersion": 1,
+      "timestamp": isoTimestamp(now),
+      "timestampMillis": Int(now.timeIntervalSince1970 * 1000),
+      "event": event,
+    ]
+    let safeDetails = sanitized(details)
+    if !safeDetails.isEmpty {
+      payload["details"] = safeDetails
+    }
+    guard JSONSerialization.isValidJSONObject(payload),
+          var data = try? JSONSerialization.data(
+            withJSONObject: payload,
+            options: [.sortedKeys]
+          ) else {
+      return
+    }
+    data.append(0x0A)
+
+    let logURL = directory.appendingPathComponent(
+      "\(logFilePrefix)\(dateKey(now))\(logFileSuffix)"
+    )
+    append(data, to: logURL)
+    trimFileIfNeeded(logURL)
+    pruneLogs(in: directory, now: now)
+  }
+
+  static func summary() -> [String: Any] {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+
+    let defaults = UserDefaults.standard
+    var payload: [String: Any] = [
+      "retentionDays": retentionDays,
+      "logFileCount": 0,
+      "logBytes": 0,
+    ]
+    if let lastEvent = defaults.string(forKey: lastEventPreferenceKey) {
+      payload["lastEvent"] = lastEvent
+    }
+    let lastEventAt = defaults.object(forKey: lastEventAtPreferenceKey) as? NSNumber
+    if let lastEventAt {
+      payload["lastEventAtMillis"] = lastEventAt.int64Value
+    }
+    let lastTaskStarted = defaults.object(
+      forKey: lastTaskStartedAtPreferenceKey
+    ) as? NSNumber
+    if let lastTaskStarted {
+      payload["lastTaskStartedAtMillis"] = lastTaskStarted.int64Value
+    }
+    let lastSuccess = defaults.object(
+      forKey: lastSuccessfulCaptureAtPreferenceKey
+    ) as? NSNumber
+    if let lastSuccess {
+      payload["lastSuccessfulCaptureAtMillis"] = lastSuccess.int64Value
+    }
+
+    guard let directory = logsDirectory(create: false) else {
+      return payload
+    }
+    pruneLogs(in: directory, now: Date())
+    let files = logFiles(in: directory)
+    payload["logFileCount"] = files.count
+    payload["logBytes"] = files.reduce(0) { total, url in
+      total + fileSize(url)
+    }
+    return payload
+  }
+
+  static func exportJSONLines() -> String {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+
+    guard let directory = logsDirectory(create: false) else {
+      return ""
+    }
+    pruneLogs(in: directory, now: Date())
+    return logFiles(in: directory).compactMap { url in
+      guard let data = try? Data(contentsOf: url) else {
+        return nil
+      }
+      return String(data: data, encoding: .utf8)
+    }.joined()
+  }
+
+  private static func sanitized(_ details: [String: Any]) -> [String: Any] {
+    var result: [String: Any] = [:]
+    for (key, value) in details where allowedDetailKeys.contains(key) {
+      switch value {
+      case let string as String:
+        result[key] = String(string.prefix(160))
+      case let number as NSNumber:
+        result[key] = number
+      case is NSNull:
+        result[key] = NSNull()
+      default:
+        continue
+      }
+    }
+    return result
+  }
+
+  private static func append(_ data: Data, to url: URL) {
+    if !FileManager.default.fileExists(atPath: url.path) {
+      do {
+        try data.write(to: url, options: [.atomic])
+        protect(url)
+      } catch {
+        return
+      }
+      return
+    }
+    guard let handle = try? FileHandle(forWritingTo: url) else {
+      return
+    }
+    handle.seekToEndOfFile()
+    handle.write(data)
+    handle.closeFile()
+  }
+
+  private static func trimFileIfNeeded(_ url: URL) {
+    guard fileSize(url) > maximumFileBytes,
+          let data = try? Data(contentsOf: url),
+          let contents = String(data: data, encoding: .utf8) else {
+      return
+    }
+    let lines = contents.split(separator: "\n", omittingEmptySubsequences: true)
+    var kept: [Substring] = []
+    var keptBytes = 0
+    for line in lines.reversed() {
+      let lineBytes = line.utf8.count + 1
+      if keptBytes + lineBytes > maximumFileBytes {
+        break
+      }
+      kept.append(line)
+      keptBytes += lineBytes
+    }
+    let trimmed = kept.reversed().map(String.init).joined(separator: "\n") + "\n"
+    guard let trimmedData = trimmed.data(using: .utf8) else {
+      return
+    }
+    try? trimmedData.write(to: url, options: [.atomic])
+    protect(url)
+  }
+
+  private static func pruneLogs(in directory: URL, now: Date) {
+    let calendar = Calendar.autoupdatingCurrent
+    let oldestDate = calendar.date(
+      byAdding: .day,
+      value: -(retentionDays - 1),
+      to: now
+    ) ?? now
+    let oldestKey = dateKey(oldestDate)
+    var files = logFiles(in: directory)
+    for url in files where fileDateKey(url) < oldestKey {
+      try? FileManager.default.removeItem(at: url)
+    }
+
+    files = logFiles(in: directory)
+    var totalBytes = files.reduce(0) { $0 + fileSize($1) }
+    for url in files where totalBytes > maximumTotalBytes {
+      let bytes = fileSize(url)
+      do {
+        try FileManager.default.removeItem(at: url)
+        totalBytes = max(0, totalBytes - bytes)
+      } catch {
+        continue
+      }
+    }
+  }
+
+  private static func logsDirectory(create: Bool) -> URL? {
+    guard let support = FileManager.default.urls(
+      for: .applicationSupportDirectory,
+      in: .userDomainMask
+    ).first else {
+      return nil
+    }
+    let directory = support
+      .appendingPathComponent("SongBrief", isDirectory: true)
+      .appendingPathComponent("Logs", isDirectory: true)
+    if create {
+      do {
+        try FileManager.default.createDirectory(
+          at: directory,
+          withIntermediateDirectories: true
+        )
+        protect(directory)
+      } catch {
+        return nil
+      }
+    }
+    return directory
+  }
+
+  private static func logFiles(in directory: URL) -> [URL] {
+    guard let files = try? FileManager.default.contentsOfDirectory(
+      at: directory,
+      includingPropertiesForKeys: [.fileSizeKey]
+    ) else {
+      return []
+    }
+    return files.filter { url in
+      url.lastPathComponent.range(
+        of: #"^snapshot-refresh-\d{4}-\d{2}-\d{2}\.jsonl$"#,
+        options: .regularExpression
+      ) != nil
+    }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+  }
+
+  private static func fileDateKey(_ url: URL) -> String {
+    let name = url.lastPathComponent
+    return String(
+      name.dropFirst(logFilePrefix.count).dropLast(logFileSuffix.count)
+    )
+  }
+
+  private static func fileSize(_ url: URL) -> Int {
+    (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+  }
+
+  private static func protect(_ url: URL) {
+    try? FileManager.default.setAttributes(
+      [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+      ofItemAtPath: url.path
+    )
+    var protectedURL = url
+    var resourceValues = URLResourceValues()
+    resourceValues.isExcludedFromBackup = true
+    try? protectedURL.setResourceValues(resourceValues)
+  }
+
+  private static func dateKey(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = .autoupdatingCurrent
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: date)
+  }
+
+  private static func isoTimestamp(_ date: Date) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.string(from: date)
+  }
+}
+
 /// Guarantees `setTaskCompleted` is called exactly once even when the
 /// expiration handler races the cloud upload completion.
 private final class SnapshotRefreshCompletion {
@@ -638,14 +1114,20 @@ private final class SnapshotRefreshCompletion {
     return completed
   }
 
-  func complete(success: Bool) {
+  @discardableResult
+  func complete(
+    success: Bool,
+    beforeTaskCompletion: () -> Void = {}
+  ) -> Bool {
     lock.lock()
     let alreadyCompleted = completed
     completed = true
     lock.unlock()
     if alreadyCompleted {
-      return
+      return false
     }
+    beforeTaskCompletion()
     task.setTaskCompleted(success: success)
+    return true
   }
 }

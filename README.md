@@ -89,11 +89,21 @@ a single UserDefaults JSON string. This keeps large libraries from forcing
 multi-megabyte preference rewrites and allows cleanup to delete only the
 affected day files.
 
-The iOS app also registers a `BGAppRefreshTask` to attempt a daily background
-snapshot. iOS decides whether and when that task actually runs, so foreground
-launch, resume, and manual refresh scans remain the reliable source of truth.
-When scans are several days apart, the app treats the result as an observed
-multi-day window rather than exact per-day listening history.
+The iOS app also registers a `BGAppRefreshTask` and requests its next opportunity
+at least six hours after the current request. This is not a six-hour timer: iOS
+decides whether and when the task actually runs, so foreground launch, resume,
+and manual refresh scans remain the reliable source of truth. Multiple captures
+on the same local date update that day's snapshot. When scans are several days
+apart, the app treats the result as an observed multi-day window rather than
+exact per-day listening history.
+
+Settings exposes the pending-request state, Background App Refresh availability,
+last successful capture, and an optional detailed diagnostic log. Detailed logs
+contain only scheduling/result events, counts, durations, and error domain/code;
+they never contain song, artist, album, playlist, or library identifiers. Logs
+are stored as daily JSONL files under `SongBrief/Logs`, capped at 512 KiB per
+file and 2 MiB total, automatically removed after 14 days, excluded from device
+backups, and exportable from the app's data-management settings.
 
 ## iCloud Sync Notes
 

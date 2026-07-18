@@ -30,6 +30,14 @@ abstract class MusicLibraryClient {
 
   Future<void> scheduleSnapshotRefresh();
 
+  Future<void> rescheduleSnapshotRefresh() => scheduleSnapshotRefresh();
+
+  Future<SnapshotRefreshDiagnostics> snapshotRefreshDiagnostics() async {
+    return const SnapshotRefreshDiagnostics.unsupported();
+  }
+
+  Future<String?> exportSnapshotRefreshLogs() async => null;
+
   Future<SnapshotSyncResult> syncSnapshotHistory();
 
   Future<SnapshotSyncResult> deleteCloudSnapshots({String? olderThanDateKey});
@@ -125,6 +133,26 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
   }
 
   @override
+  Future<void> rescheduleSnapshotRefresh() {
+    return _channel.invokeMethod<void>('scheduleSnapshotRefresh', {
+      'replaceExisting': true,
+    });
+  }
+
+  @override
+  Future<SnapshotRefreshDiagnostics> snapshotRefreshDiagnostics() async {
+    final payload = await _channel.invokeMethod<Object?>(
+      'snapshotRefreshDiagnostics',
+    );
+    return SnapshotRefreshDiagnostics.fromPlatformValue(payload);
+  }
+
+  @override
+  Future<String?> exportSnapshotRefreshLogs() {
+    return _channel.invokeMethod<String>('exportSnapshotRefreshLogs');
+  }
+
+  @override
   Future<SnapshotSyncResult> syncSnapshotHistory() async {
     final payload = await _channel.invokeMethod<Object?>('syncSnapshotHistory');
     return SnapshotSyncResult.fromPlatformValue(payload);
@@ -139,6 +167,114 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
       {'olderThanDateKey': ?olderThanDateKey},
     );
     return SnapshotSyncResult.fromPlatformValue(payload);
+  }
+}
+
+enum SnapshotBackgroundRefreshAvailability {
+  available,
+  denied,
+  restricted,
+  unsupported;
+
+  static SnapshotBackgroundRefreshAvailability fromPlatformValue(
+    Object? value,
+  ) {
+    return switch (value) {
+      'available' => SnapshotBackgroundRefreshAvailability.available,
+      'denied' => SnapshotBackgroundRefreshAvailability.denied,
+      'restricted' => SnapshotBackgroundRefreshAvailability.restricted,
+      _ => SnapshotBackgroundRefreshAvailability.unsupported,
+    };
+  }
+}
+
+class SnapshotRefreshDiagnostics {
+  const SnapshotRefreshDiagnostics({
+    required this.availability,
+    required this.intervalHours,
+    required this.detailedLoggingEnabled,
+    required this.retentionDays,
+    required this.logFileCount,
+    required this.logBytes,
+    this.nextEarliestBeginAt,
+    this.lastEvent,
+    this.lastEventAt,
+    this.lastTaskStartedAt,
+    this.lastSuccessfulCaptureAt,
+  });
+
+  const SnapshotRefreshDiagnostics.unsupported()
+    : availability = SnapshotBackgroundRefreshAvailability.unsupported,
+      intervalHours = 6,
+      detailedLoggingEnabled = false,
+      retentionDays = 14,
+      logFileCount = 0,
+      logBytes = 0,
+      nextEarliestBeginAt = null,
+      lastEvent = null,
+      lastEventAt = null,
+      lastTaskStartedAt = null,
+      lastSuccessfulCaptureAt = null;
+
+  final SnapshotBackgroundRefreshAvailability availability;
+  final int intervalHours;
+  final bool detailedLoggingEnabled;
+  final int retentionDays;
+  final int logFileCount;
+  final int logBytes;
+  final DateTime? nextEarliestBeginAt;
+  final String? lastEvent;
+  final DateTime? lastEventAt;
+  final DateTime? lastTaskStartedAt;
+  final DateTime? lastSuccessfulCaptureAt;
+
+  bool get hasLogs => logFileCount > 0 && logBytes > 0;
+
+  static SnapshotRefreshDiagnostics fromPlatformValue(Object? value) {
+    if (value is! Map<Object?, Object?>) {
+      return const SnapshotRefreshDiagnostics.unsupported();
+    }
+    DateTime? dateFromMillis(Object? raw) {
+      final millis = switch (raw) {
+        int value => value,
+        num value when value.isFinite => value.toInt(),
+        _ => null,
+      };
+      return millis == null || millis < 0
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(millis);
+    }
+
+    int nonNegativeIntValue(String key, int fallback) {
+      final raw = value[key];
+      final parsed = switch (raw) {
+        int value => value,
+        num value when value.isFinite => value.toInt(),
+        _ => fallback,
+      };
+      return parsed < 0 ? fallback : parsed;
+    }
+
+    final retentionDays = nonNegativeIntValue('retentionDays', 14);
+    final lastEvent = value['lastEvent'];
+
+    return SnapshotRefreshDiagnostics(
+      availability: SnapshotBackgroundRefreshAvailability.fromPlatformValue(
+        value['availability'],
+      ),
+      intervalHours: 6,
+      detailedLoggingEnabled: value['detailedLoggingEnabled'] == true,
+      retentionDays: retentionDays == 0 ? 14 : retentionDays,
+      logFileCount: nonNegativeIntValue('logFileCount', 0),
+      logBytes: nonNegativeIntValue('logBytes', 0),
+      nextEarliestBeginAt: dateFromMillis(value['nextEarliestBeginAtMillis']),
+      lastEvent: lastEvent is String ? lastEvent : null,
+      lastEventAt: dateFromMillis(value['lastEventAtMillis']),
+      lastTaskStartedAt: dateFromMillis(value['lastTaskStartedAtMillis']),
+      lastSuccessfulCaptureAt: dateFromMillis(
+        value['lastSuccessfulCaptureAtMillis'],
+      ),
+    );
   }
 }
 

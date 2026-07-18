@@ -35,4 +35,44 @@ void main() {
       );
     }
   });
+
+  test('background snapshots use a fixed six-hour earliest request', () {
+    final appDelegate = File('ios/Runner/AppDelegate.swift').readAsStringSync();
+    final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
+
+    expect(
+      appDelegate,
+      contains('private static let refreshIntervalHours = 6'),
+    );
+    expect(appDelegate, contains('TimeInterval(intervalHours * 60 * 60)'));
+    expect(appDelegate, contains('getPendingTaskRequests'));
+    expect(
+      infoPlist,
+      contains('<string>app.songbrief.snapshot-refresh</string>'),
+    );
+    expect(infoPlist, contains('<string>fetch</string>'));
+  });
+
+  test('background diagnostics rotate privacy-safe JSONL files', () {
+    final appDelegate = File('ios/Runner/AppDelegate.swift').readAsStringSync();
+    final logStoreStart = appDelegate.indexOf('enum SnapshotRefreshLogStore');
+    final logStoreEnd = appDelegate.indexOf(
+      'private final class SnapshotRefreshCompletion',
+    );
+
+    expect(logStoreStart, greaterThanOrEqualTo(0));
+    expect(logStoreEnd, greaterThan(logStoreStart));
+    final logStore = appDelegate.substring(logStoreStart, logStoreEnd);
+    expect(logStore, contains('static let retentionDays = 14'));
+    expect(logStore, contains('maximumFileBytes = 512 * 1024'));
+    expect(logStore, contains('maximumTotalBytes = 2 * 1024 * 1024'));
+    expect(logStore, contains('snapshot-refresh-'));
+    expect(logStore, contains('.jsonl'));
+    expect(logStore, contains('isExcludedFromBackup = true'));
+    expect(logStore, contains('completeUntilFirstUserAuthentication'));
+    expect(logStore, isNot(contains('"title"')));
+    expect(logStore, isNot(contains('"artist"')));
+    expect(logStore, isNot(contains('"playlist"')));
+    expect(logStore, isNot(contains('localizedDescription')));
+  });
 }

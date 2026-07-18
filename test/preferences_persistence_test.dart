@@ -74,12 +74,47 @@ void main() {
     await _drainPreferenceRestore();
     expect(container.read(snapshotRecordingProvider), isFalse);
 
-    container.read(snapshotRecordingProvider.notifier).setEnabled(true);
-    await _drainPreferenceRestore();
+    await container.read(snapshotRecordingProvider.notifier).setEnabled(true);
 
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getBool(snapshotRecordingEnabledPreferenceKey), isTrue);
     expect(container.read(snapshotRecordingProvider), isTrue);
+  });
+
+  test('restores and saves detailed background log preference', () async {
+    SharedPreferences.setMockInitialValues({
+      snapshotDetailedLoggingEnabledPreferenceKey: true,
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    expect(container.read(snapshotDetailedLoggingProvider), isFalse);
+    await _drainPreferenceRestore();
+    expect(container.read(snapshotDetailedLoggingProvider), isTrue);
+
+    await container
+        .read(snapshotDetailedLoggingProvider.notifier)
+        .setEnabled(false);
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getBool(snapshotDetailedLoggingEnabledPreferenceKey),
+      isFalse,
+    );
+    expect(container.read(snapshotDetailedLoggingProvider), isFalse);
+  });
+
+  test('malformed detailed background log preference stays disabled', () async {
+    SharedPreferences.setMockInitialValues({
+      snapshotDetailedLoggingEnabledPreferenceKey: 'invalid',
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container.read(snapshotDetailedLoggingProvider);
+    await _drainPreferenceRestore();
+
+    expect(container.read(snapshotDetailedLoggingProvider), isFalse);
   });
 }
 

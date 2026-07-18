@@ -222,6 +222,17 @@ class _NoopMusicLibraryClient implements MusicLibraryClient {
   Future<void> scheduleSnapshotRefresh() async {}
 
   @override
+  Future<void> rescheduleSnapshotRefresh() async {}
+
+  @override
+  Future<SnapshotRefreshDiagnostics> snapshotRefreshDiagnostics() async {
+    return const SnapshotRefreshDiagnostics.unsupported();
+  }
+
+  @override
+  Future<String?> exportSnapshotRefreshLogs() async => null;
+
+  @override
   Future<SnapshotSyncResult> syncSnapshotHistory() async {
     return const SnapshotSyncResult(status: SnapshotSyncStatus.unchanged);
   }

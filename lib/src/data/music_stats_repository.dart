@@ -57,6 +57,34 @@ class MusicStatsRepository {
   final bool temporaryDemoLibraryEnabled;
   final LibraryFilterPreferences? libraryFilters;
 
+  Future<void> ensureSnapshotRefreshScheduled() async {
+    if (!_isIosMusicRuntime) {
+      return;
+    }
+    await _client.scheduleSnapshotRefresh();
+  }
+
+  Future<void> rescheduleSnapshotRefresh() async {
+    if (!_isIosMusicRuntime) {
+      return;
+    }
+    await _client.rescheduleSnapshotRefresh();
+  }
+
+  Future<SnapshotRefreshDiagnostics> snapshotRefreshDiagnostics() async {
+    if (!_isIosMusicRuntime) {
+      return const SnapshotRefreshDiagnostics.unsupported();
+    }
+    return _client.snapshotRefreshDiagnostics();
+  }
+
+  Future<String?> exportSnapshotRefreshLogs() async {
+    if (!_isIosMusicRuntime) {
+      return null;
+    }
+    return _client.exportSnapshotRefreshLogs();
+  }
+
   Future<MusicStatsState> load({bool requestAccess = false}) async {
     if (!_isIosMusicRuntime) {
       return _buildDemoState(MusicLibraryAuthorizationStatus.unsupported);

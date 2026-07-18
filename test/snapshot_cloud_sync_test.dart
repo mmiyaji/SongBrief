@@ -459,4 +459,15 @@ class _CloudSyncSpyClient implements MusicLibraryClient {
 
   @override
   Future<void> scheduleSnapshotRefresh() async {}
+
+  @override
+  Future<void> rescheduleSnapshotRefresh() async {}
+
+  @override
+  Future<SnapshotRefreshDiagnostics> snapshotRefreshDiagnostics() async {
+    return const SnapshotRefreshDiagnostics.unsupported();
+  }
+
+  @override
+  Future<String?> exportSnapshotRefreshLogs() async => null;
 }

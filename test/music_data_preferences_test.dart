@@ -22,6 +22,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         snapshotRecordingEnabledPreferenceKey: false,
         snapshotCloudSyncEnabledPreferenceKey: false,
+        snapshotDetailedLoggingEnabledPreferenceKey: true,
         temporaryDemoLibraryEnabledPreferenceKey: true,
         excludedPlaylistsPreferenceKey: ['Focus'],
         excludedGenresPreferenceKey: ['Ambient'],
@@ -46,6 +47,7 @@ void main() {
 
       expect(container.read(snapshotRecordingProvider), isFalse);
       expect(container.read(snapshotCloudSyncProvider), isFalse);
+      expect(container.read(snapshotDetailedLoggingProvider), isTrue);
       expect(container.read(temporaryDemoLibraryProvider), isTrue);
       final filters = container.read(libraryFilterPreferencesProvider);
       expect(filters.excludedPlaylists, ['Focus']);
@@ -62,6 +64,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       snapshotRecordingEnabledPreferenceKey: false,
       snapshotCloudSyncEnabledPreferenceKey: false,
+      snapshotDetailedLoggingEnabledPreferenceKey: true,
       temporaryDemoLibraryEnabledPreferenceKey: true,
       excludedGenresPreferenceKey: ['Ambient'],
     });
@@ -82,6 +85,7 @@ void main() {
 
     expect(container.read(snapshotRecordingProvider), isTrue);
     expect(container.read(snapshotCloudSyncProvider), isTrue);
+    expect(container.read(snapshotDetailedLoggingProvider), isFalse);
     expect(container.read(temporaryDemoLibraryProvider), isFalse);
     expect(container.read(libraryFilterPreferencesProvider).isEmpty, isTrue);
 
@@ -91,6 +95,7 @@ void main() {
     expect(fallbackCalls, 1);
     expect(container.read(snapshotRecordingProvider), isFalse);
     expect(container.read(snapshotCloudSyncProvider), isFalse);
+    expect(container.read(snapshotDetailedLoggingProvider), isTrue);
     expect(container.read(temporaryDemoLibraryProvider), isTrue);
     expect(container.read(libraryFilterPreferencesProvider).excludedGenres, [
       'Ambient',
@@ -116,6 +121,7 @@ void main() {
     expect(fallbackCalls, 1);
     expect(container.read(snapshotRecordingProvider), isTrue);
     expect(container.read(snapshotCloudSyncProvider), isTrue);
+    expect(container.read(snapshotDetailedLoggingProvider), isFalse);
     expect(container.read(temporaryDemoLibraryProvider), isFalse);
     expect(container.read(libraryFilterPreferencesProvider).isEmpty, isTrue);
   });
@@ -139,6 +145,7 @@ void main() {
 
       expect(container.read(snapshotRecordingProvider), isTrue);
       expect(container.read(snapshotCloudSyncProvider), isTrue);
+      expect(container.read(snapshotDetailedLoggingProvider), isFalse);
       expect(container.read(temporaryDemoLibraryProvider), isFalse);
       expect(container.read(libraryFilterPreferencesProvider).isEmpty, isTrue);
     },
@@ -168,6 +175,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       snapshotRecordingEnabledPreferenceKey: 'invalid',
       snapshotCloudSyncEnabledPreferenceKey: 1,
+      snapshotDetailedLoggingEnabledPreferenceKey: 'invalid',
       temporaryDemoLibraryEnabledPreferenceKey: 'invalid',
       excludedPlaylistsPreferenceKey: 'invalid',
       excludedGenresPreferenceKey: ['Ambient'],
@@ -187,6 +195,7 @@ void main() {
 
     expect(container.read(snapshotRecordingProvider), isTrue);
     expect(container.read(snapshotCloudSyncProvider), isTrue);
+    expect(container.read(snapshotDetailedLoggingProvider), isFalse);
     expect(container.read(temporaryDemoLibraryProvider), isFalse);
     final filters = container.read(libraryFilterPreferencesProvider);
     expect(filters.excludedPlaylists, isEmpty);

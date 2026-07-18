@@ -71,6 +71,13 @@ final snapshotSyncStateProvider =
       SnapshotSyncStateController.new,
     );
 
+final snapshotRefreshDiagnosticsProvider =
+    FutureProvider.autoDispose<SnapshotRefreshDiagnostics>((ref) {
+      return ref
+          .watch(musicStatsRepositoryProvider)
+          .snapshotRefreshDiagnostics();
+    });
+
 class SnapshotSyncState {
   const SnapshotSyncState({
     this.isSyncing = false,
@@ -269,6 +276,22 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       _replaceSnapshotHistory(history);
       unawaited(HomeWidgetBridge.update(history));
     });
+  }
+
+  Future<void> rescheduleSnapshotRefresh() async {
+    await ref.read(musicStatsRepositoryProvider).rescheduleSnapshotRefresh();
+    ref.invalidate(snapshotRefreshDiagnosticsProvider);
+  }
+
+  Future<void> ensureSnapshotRefreshScheduled() async {
+    await ref
+        .read(musicStatsRepositoryProvider)
+        .ensureSnapshotRefreshScheduled();
+    ref.invalidate(snapshotRefreshDiagnosticsProvider);
+  }
+
+  Future<String?> exportSnapshotRefreshLogs() {
+    return ref.read(musicStatsRepositoryProvider).exportSnapshotRefreshLogs();
   }
 
   Future<void> requestAccess() async {

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added privacy-safe native diagnostics for background listening-record
+  scheduling, capture, CloudKit upload, completion, and error results.
+- Added a settings status view and JSONL log export for support investigations.
+
+### Changed
+
+- Background snapshot requests now use a fixed six-hour minimum opportunity;
+  iOS still decides the actual execution time.
+- Detailed logs rotate daily, expire after 14 days, and are capped at 512 KiB
+  per file and 2 MiB in total.
+
 ## [1.0.1] - 2026-07-10
 
 Reliability, recovery, and accessibility update for the next App Store release.

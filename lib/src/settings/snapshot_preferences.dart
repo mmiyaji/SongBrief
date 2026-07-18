@@ -9,6 +9,8 @@ const snapshotRecordingEnabledPreferenceKey =
     'songbrief_snapshot_recording_enabled_v1';
 const snapshotCloudSyncEnabledPreferenceKey =
     'songbrief_snapshot_cloud_sync_enabled_v1';
+const snapshotDetailedLoggingEnabledPreferenceKey =
+    'songbrief_snapshot_detailed_logging_enabled_v1';
 
 final snapshotRecordingProvider =
     NotifierProvider<SnapshotRecordingController, bool>(
@@ -43,10 +45,15 @@ class SnapshotRecordingController extends Notifier<bool> {
     return true;
   }
 
-  void setEnabled(bool enabled) {
+  Future<bool> setEnabled(bool enabled) async {
     _changedByUser = true;
+    final previous = state;
     state = enabled;
-    unawaited(_save(enabled));
+    final saved = await _save(enabled);
+    if (!saved) {
+      state = previous;
+    }
+    return saved;
   }
 
   void _restore() {
@@ -77,16 +84,19 @@ class SnapshotRecordingController extends Notifier<bool> {
     }());
   }
 
-  Future<void> _save(bool enabled) async {
+  Future<bool> _save(bool enabled) async {
     try {
       final preferences = _preferences ?? await _preferencesFuture;
       if (preferences == null) {
-        return;
+        return false;
       }
       _preferences ??= preferences;
-      await preferences.setBool(snapshotRecordingEnabledPreferenceKey, enabled);
+      return preferences.setBool(
+        snapshotRecordingEnabledPreferenceKey,
+        enabled,
+      );
     } on Object {
-      // The in-memory choice remains valid when persistence is unavailable.
+      return false;
     }
   }
 
@@ -174,6 +184,101 @@ class SnapshotCloudSyncController extends Notifier<bool> {
       await preferences.setBool(snapshotCloudSyncEnabledPreferenceKey, enabled);
     } on Object {
       // The in-memory choice remains valid when persistence is unavailable.
+    }
+  }
+
+  void _completeRestore() {
+    if (!_restored.isCompleted) {
+      _restored.complete();
+    }
+  }
+}
+
+final snapshotDetailedLoggingProvider =
+    NotifierProvider<SnapshotDetailedLoggingController, bool>(
+      SnapshotDetailedLoggingController.new,
+    );
+
+class SnapshotDetailedLoggingController extends Notifier<bool> {
+  var _changedByUser = false;
+  var _restoreStarted = false;
+  final _restored = Completer<void>();
+  late Future<SharedPreferences?> _preferencesFuture;
+  SharedPreferences? _preferences;
+
+  Future<void> get restored =>
+      _restoreStarted ? _restored.future : Future<void>.value();
+
+  @override
+  bool build() {
+    _restoreStarted = true;
+    final preferences = ref.watch(musicDataSharedPreferencesProvider);
+    _preferences = preferences;
+    if (preferences != null) {
+      _completeRestore();
+      return _readBoolPreference(
+        preferences,
+        snapshotDetailedLoggingEnabledPreferenceKey,
+        fallback: false,
+      );
+    }
+    _preferencesFuture = ref.watch(musicDataPreferencesFallbackProvider);
+    _restore();
+    return false;
+  }
+
+  Future<bool> setEnabled(bool enabled) async {
+    _changedByUser = true;
+    final previous = state;
+    state = enabled;
+    final saved = await _save(enabled);
+    if (!saved) {
+      state = previous;
+    }
+    return saved;
+  }
+
+  void _restore() {
+    var disposed = false;
+    ref.onDispose(() {
+      disposed = true;
+    });
+    unawaited(() async {
+      try {
+        final preferences = await _preferencesFuture;
+        if (preferences == null) {
+          return;
+        }
+        _preferences ??= preferences;
+        final enabled = _readBoolPreference(
+          preferences,
+          snapshotDetailedLoggingEnabledPreferenceKey,
+          fallback: false,
+        );
+        if (!disposed && !_changedByUser) {
+          state = enabled;
+        }
+      } on Object {
+        // Keep logging disabled when preference restoration is unavailable.
+      } finally {
+        _completeRestore();
+      }
+    }());
+  }
+
+  Future<bool> _save(bool enabled) async {
+    try {
+      final preferences = _preferences ?? await _preferencesFuture;
+      if (preferences == null) {
+        return false;
+      }
+      _preferences ??= preferences;
+      return preferences.setBool(
+        snapshotDetailedLoggingEnabledPreferenceKey,
+        enabled,
+      );
+    } on Object {
+      return false;
     }
   }
 

@@ -71,8 +71,20 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       MPMusicPlayerController.systemMusicPlayer.skipToPreviousItem()
       result(nil)
     case "scheduleSnapshotRefresh":
-      SongBriefSnapshotRefresh.schedule()
+      let arguments = call.arguments as? [String: Any]
+      let replaceExisting = arguments?["replaceExisting"] as? Bool ?? false
+      SongBriefSnapshotRefresh.schedule(replaceExisting: replaceExisting)
       result(nil)
+    case "snapshotRefreshDiagnostics":
+      SongBriefSnapshotRefresh.diagnostics { payload in
+        DispatchQueue.main.async {
+          result(payload)
+        }
+      }
+    case "exportSnapshotRefreshLogs":
+      runSnapshotStoreOperation(result: result) {
+        SongBriefSnapshotRefresh.exportDiagnosticsLog()
+      }
     case "syncSnapshotHistory":
       SnapshotCloudSync.sync { payload in
         result(payload)

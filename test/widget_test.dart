@@ -9,6 +9,7 @@ import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/domain/music_library_authorization.dart';
 import 'package:songbrief/src/domain/music_stats_state.dart';
+import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
 import 'package:songbrief/src/settings/snapshot_preferences.dart';
@@ -876,6 +877,60 @@ void main() {
       await tester.pump();
     }
   });
+
+  testWidgets('shows fixed background schedule and rotating log controls', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(
+      tester,
+      AppLanguage.english,
+      snapshotRefreshDiagnostics: SnapshotRefreshDiagnostics(
+        availability: SnapshotBackgroundRefreshAvailability.available,
+        intervalHours: 6,
+        detailedLoggingEnabled: true,
+        retentionDays: 14,
+        logFileCount: 2,
+        logBytes: 2048,
+        nextEarliestBeginAt: DateTime(2026, 7, 18, 18),
+        lastEvent: 'task_completed',
+        lastEventAt: DateTime(2026, 7, 18, 12),
+        lastTaskStartedAt: DateTime(2026, 7, 18, 11, 58),
+        lastSuccessfulCaptureAt: DateTime(2026, 7, 18, 11, 59),
+      ),
+      detailedLoggingEnabled: true,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    final backgroundSetting = find.byKey(
+      const ValueKey('snapshot-background-refresh-setting'),
+    );
+    await tester.scrollUntilVisible(
+      backgroundSetting,
+      420,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Background recording'), findsOneWidget);
+    expect(find.text('6 hours minimum'), findsOneWidget);
+    expect(find.text('Detailed background logs'), findsOneWidget);
+    expect(
+      find.text('2 daily files / 2.00 KB / delete after 14 days'),
+      findsOneWidget,
+    );
+    expect(find.text('Save logs'), findsOneWidget);
+    expect(find.textContaining('12 hours'), findsNothing);
+    expect(find.textContaining('24 hours'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _scrollOverviewUntilVisible(
@@ -903,6 +958,8 @@ Future<void> _pumpApp(
   MusicStatsState? statsState,
   MusicStatsController Function()? musicStatsControllerBuilder,
   PlaybackController Function()? playbackControllerBuilder,
+  SnapshotRefreshDiagnostics? snapshotRefreshDiagnostics,
+  bool? detailedLoggingEnabled,
 }) {
   return tester.pumpWidget(
     ProviderScope(
@@ -913,6 +970,15 @@ Future<void> _pumpApp(
         snapshotRecordingProvider.overrideWith(
           () => _FixedSnapshotRecordingController(snapshotRecordingEnabled),
         ),
+        if (detailedLoggingEnabled != null)
+          snapshotDetailedLoggingProvider.overrideWith(
+            () =>
+                _FixedSnapshotDetailedLoggingController(detailedLoggingEnabled),
+          ),
+        if (snapshotRefreshDiagnostics != null)
+          snapshotRefreshDiagnosticsProvider.overrideWith(
+            (ref) => Future.value(snapshotRefreshDiagnostics),
+          ),
         if (musicStatsControllerBuilder != null)
           musicStatsControllerProvider.overrideWith(musicStatsControllerBuilder)
         else if (statsState != null)
@@ -1013,6 +1079,16 @@ class _FixedSnapshotRecordingController extends SnapshotRecordingController {
   bool build() {
     return enabled;
   }
+}
+
+class _FixedSnapshotDetailedLoggingController
+    extends SnapshotDetailedLoggingController {
+  _FixedSnapshotDetailedLoggingController(this.enabled);
+
+  final bool enabled;
+
+  @override
+  bool build() => enabled;
 }
 
 MusicStatsState _settingsDemoStats() {

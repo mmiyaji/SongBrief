@@ -15,6 +15,11 @@ final musicDataPreferencesReadyProvider = FutureProvider<void>((ref) async {
       restored: () => ref.read(snapshotCloudSyncProvider.notifier).restored,
     ),
     _waitForPreferenceRestore(
+      initialize: () => ref.read(snapshotDetailedLoggingProvider),
+      restored: () =>
+          ref.read(snapshotDetailedLoggingProvider.notifier).restored,
+    ),
+    _waitForPreferenceRestore(
       initialize: () => ref.read(temporaryDemoLibraryProvider),
       restored: () => ref.read(temporaryDemoLibraryProvider.notifier).restored,
     ),
