@@ -32,6 +32,49 @@ final class RunnerTests: XCTestCase {
     )
   }
 
+  func testSnapshotRefreshHistoryKeepsOnlyUserFacingOutcomes() {
+    XCTAssertEqual(
+      SnapshotRefreshLogStore.recentEventName("schedule_kept"),
+      "schedule_queued"
+    )
+    XCTAssertEqual(
+      SnapshotRefreshLogStore.recentEventName("capture_succeeded"),
+      "record_updated"
+    )
+    XCTAssertEqual(
+      SnapshotRefreshLogStore.recentEventName(
+        "cloud_upload_completed",
+        details: ["uploaded": true]
+      ),
+      "icloud_sync_completed"
+    )
+    XCTAssertEqual(
+      SnapshotRefreshLogStore.recentEventName(
+        "cloud_upload_completed",
+        details: ["uploaded": false]
+      ),
+      "icloud_sync_deferred"
+    )
+    XCTAssertNil(SnapshotRefreshLogStore.recentEventName("task_completed"))
+    XCTAssertNil(SnapshotRefreshLogStore.recentEventName("cloud_upload_started"))
+  }
+
+  func testSnapshotRefreshHistoryCoalescesAndMigratesRawEvents() {
+    let events = SnapshotRefreshLogStore.normalizedRecentEvents([
+      ["event": "schedule_kept", "timestampMillis": 1_000],
+      ["event": "schedule_kept", "timestampMillis": 2_000],
+      ["event": "capture_succeeded", "timestampMillis": 3_000],
+      ["event": "cloud_upload_started", "timestampMillis": 4_000],
+      ["event": "task_expired", "timestampMillis": 5_000],
+      ["event": "task_completed", "timestampMillis": 6_000],
+    ])
+
+    XCTAssertEqual(events.count, 3)
+    XCTAssertEqual(events[0]["event"] as? String, "schedule_queued")
+    XCTAssertEqual(events[1]["event"] as? String, "record_updated")
+    XCTAssertEqual(events[2]["event"] as? String, "icloud_sync_deferred")
+  }
+
   func testSnapshotOperationCoordinatorRunsAsyncWorkInFIFOOrder() {
     let coordinator = SnapshotOperationCoordinator(
       label: "app.songbrief.tests.snapshot-operation-coordinator"

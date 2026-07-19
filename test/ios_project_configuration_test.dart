@@ -49,6 +49,9 @@ void main() {
     expect(appDelegate, contains('pendingRequestToleranceMinutes = 5'));
     expect(appDelegate, contains('event: "schedule_replaced"'));
     expect(appDelegate, contains('reason: "legacy_interval"'));
+    expect(appDelegate, contains('cloudUploadWaitSeconds: TimeInterval = 10'));
+    expect(appDelegate, contains('completion.markLocalCaptureSucceeded()'));
+    expect(appDelegate, contains('event: "cloud_upload_deferred"'));
     expect(
       infoPlist,
       contains('<string>app.songbrief.snapshot-refresh</string>'),

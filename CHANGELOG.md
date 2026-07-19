@@ -20,6 +20,13 @@
   per file and 2 MiB in total.
 - Simplified the background-recording settings by hiding scheduling details
   and placing support diagnostics in a secondary disclosure.
+- Background history now groups duplicate reservations and shows user-facing
+  record and iCloud outcomes instead of low-level task lifecycle events.
+
+### Fixed
+
+- A successful local background record is no longer reported as failed when
+  its best-effort iCloud upload exceeds the background execution window.
 
 ## [1.0.1] - 2026-07-10
 

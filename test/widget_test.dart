@@ -903,11 +903,11 @@ void main() {
         lastSuccessfulCaptureAt: DateTime(2026, 7, 18, 11, 59),
         recentEvents: [
           SnapshotRefreshEvent(
-            event: 'capture_succeeded',
+            event: 'record_updated',
             at: DateTime(2026, 7, 18, 11, 59),
           ),
           SnapshotRefreshEvent(
-            event: 'task_completed',
+            event: 'icloud_sync_completed',
             at: DateTime(2026, 7, 18, 12),
           ),
         ],
@@ -946,8 +946,8 @@ void main() {
     await tester.tap(find.text('Recent activity'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Record saved'), findsOneWidget);
-    expect(find.text('Refresh completed'), findsAtLeastNWidgets(1));
+    expect(find.text('Daily record updated'), findsOneWidget);
+    expect(find.text('iCloud sync completed'), findsAtLeastNWidgets(1));
 
     await tester.ensureVisible(find.text('Support logs'));
     await tester.tap(find.text('Support logs'));

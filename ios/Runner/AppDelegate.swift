@@ -34,6 +34,7 @@ enum SongBriefSnapshotRefresh {
   private static let maxSnapshotTracks = 500
   private static let refreshIntervalHours = 6
   private static let pendingRequestToleranceMinutes = 5
+  private static let cloudUploadWaitSeconds: TimeInterval = 10
 
   static func register() {
     BGTaskScheduler.shared.register(
@@ -157,14 +158,21 @@ enum SongBriefSnapshotRefresh {
 
     let completion = SnapshotRefreshCompletion(task)
     task.expirationHandler = {
-      completion.complete(success: false) {
-        SnapshotRefreshLogStore.record(
-          event: "task_expired",
-          details: ["runId": runID]
-        )
+      completion.completeForExpiration { localCaptureSucceeded in
+        if localCaptureSucceeded {
+          SnapshotRefreshLogStore.record(
+            event: "cloud_upload_deferred",
+            details: ["runId": runID, "reason": "task_expired"]
+          )
+        } else {
+          SnapshotRefreshLogStore.record(
+            event: "task_expired",
+            details: ["runId": runID]
+          )
+        }
         SnapshotRefreshLogStore.record(
           event: "task_completed",
-          details: ["runId": runID, "success": false]
+          details: ["runId": runID, "success": localCaptureSucceeded]
         )
       }
     }
@@ -182,7 +190,7 @@ enum SongBriefSnapshotRefresh {
 
       // The local capture already succeeded; the cloud upload is best effort
       // and must not fail the refresh task.
-      guard !completion.isCompleted else {
+      guard completion.markLocalCaptureSucceeded() else {
         return
       }
       guard SnapshotCloudSync.isEnabled else {
@@ -202,15 +210,26 @@ enum SongBriefSnapshotRefresh {
         event: "cloud_upload_started",
         details: ["runId": runID]
       )
-      SnapshotCloudSync.uploadLocalSnapshot(dateKey: dateKey) { uploaded in
-        guard !completion.isCompleted else {
-          return
-        }
-        SnapshotRefreshLogStore.record(
-          event: "cloud_upload_completed",
-          details: ["runId": runID, "uploaded": uploaded]
-        )
+      DispatchQueue.global(qos: .utility).asyncAfter(
+        deadline: .now() + cloudUploadWaitSeconds
+      ) {
         completion.complete(success: true) {
+          SnapshotRefreshLogStore.record(
+            event: "cloud_upload_deferred",
+            details: ["runId": runID, "reason": "timeout"]
+          )
+          SnapshotRefreshLogStore.record(
+            event: "task_completed",
+            details: ["runId": runID, "success": true]
+          )
+        }
+      }
+      SnapshotCloudSync.uploadLocalSnapshot(dateKey: dateKey) { uploaded in
+        completion.complete(success: true) {
+          SnapshotRefreshLogStore.record(
+            event: "cloud_upload_completed",
+            details: ["runId": runID, "uploaded": uploaded]
+          )
           SnapshotRefreshLogStore.record(
             event: "task_completed",
             details: ["runId": runID, "success": true]
@@ -879,7 +898,12 @@ enum SnapshotRefreshLogStore {
         forKey: lastSuccessfulCaptureAtPreferenceKey
       )
     }
-    appendRecentEvent(event, at: now, defaults: defaults)
+    appendRecentEvent(
+      event,
+      details: details,
+      at: now,
+      defaults: defaults
+    )
 
     if let existingDirectory = logsDirectory(create: false) {
       pruneLogs(in: existingDirectory, now: now)
@@ -976,14 +1000,19 @@ enum SnapshotRefreshLogStore {
 
   private static func appendRecentEvent(
     _ event: String,
+    details: [String: Any],
     at date: Date,
     defaults: UserDefaults
   ) {
+    guard let displayEvent = recentEventName(event, details: details) else {
+      return
+    }
     var events = recentEvents(defaults: defaults)
-    events.append([
-      "event": event,
+    let entry: [String: Any] = [
+      "event": displayEvent,
       "timestampMillis": Int(date.timeIntervalSince1970 * 1000),
-    ])
+    ]
+    appendCoalesced(entry, to: &events)
     if events.count > maximumRecentEvents {
       events.removeFirst(events.count - maximumRecentEvents)
     }
@@ -998,17 +1027,85 @@ enum SnapshotRefreshLogStore {
     ) as? [[String: Any]] else {
       return []
     }
-    return rawEvents.compactMap { entry in
+    return normalizedRecentEvents(rawEvents)
+  }
+
+  static func normalizedRecentEvents(
+    _ rawEvents: [[String: Any]]
+  ) -> [[String: Any]] {
+    var normalized: [[String: Any]] = []
+    for entry in rawEvents {
       guard let event = entry["event"] as? String,
             !event.isEmpty,
             let timestamp = entry["timestampMillis"] as? NSNumber else {
-        return nil
+        continue
       }
-      return [
-        "event": event,
+      var displayEvent = recentEventName(event, details: entry)
+      if event == "task_expired",
+         let lastRecord = normalized.last(where: {
+           ($0["event"] as? String) == "record_updated"
+         }),
+         let lastRecordAt = lastRecord["timestampMillis"] as? NSNumber,
+         timestamp.int64Value >= lastRecordAt.int64Value,
+         timestamp.int64Value - lastRecordAt.int64Value <= 5 * 60 * 1000 {
+        displayEvent = "icloud_sync_deferred"
+      }
+      guard let displayEvent else {
+        continue
+      }
+      appendCoalesced([
+        "event": displayEvent,
         "timestampMillis": timestamp.int64Value,
-      ]
+      ], to: &normalized)
     }
+    return Array(normalized.suffix(maximumRecentEvents))
+  }
+
+  static func recentEventName(
+    _ event: String,
+    details: [String: Any] = [:]
+  ) -> String? {
+    switch event {
+    case "schedule_kept", "schedule_replaced", "schedule_submitted":
+      return "schedule_queued"
+    case "schedule_failed":
+      return "schedule_failed"
+    case "capture_succeeded":
+      return "record_updated"
+    case "snapshot_write_failed":
+      return "record_failed"
+    case "capture_skipped":
+      return "record_skipped"
+    case "task_expired":
+      return "background_update_interrupted"
+    case "cloud_upload_deferred":
+      return "icloud_sync_deferred"
+    case "cloud_upload_completed":
+      return (details["uploaded"] as? Bool) == true
+        ? "icloud_sync_completed"
+        : "icloud_sync_deferred"
+    case "schedule_queued", "record_updated", "record_failed",
+         "record_skipped", "background_update_interrupted",
+         "icloud_sync_completed", "icloud_sync_deferred":
+      return event
+    default:
+      return nil
+    }
+  }
+
+  private static func appendCoalesced(
+    _ entry: [String: Any],
+    to events: inout [[String: Any]]
+  ) {
+    if let last = events.last,
+       last["event"] as? String == entry["event"] as? String,
+       let lastAt = last["timestampMillis"] as? NSNumber,
+       let entryAt = entry["timestampMillis"] as? NSNumber,
+       abs(entryAt.int64Value - lastAt.int64Value) <= 60 * 1000 {
+      events[events.count - 1] = entry
+      return
+    }
+    events.append(entry)
   }
 
   private static func sanitized(_ details: [String: Any]) -> [String: Any] {
@@ -1179,6 +1276,7 @@ enum SnapshotRefreshLogStore {
 private final class SnapshotRefreshCompletion {
   private let lock = NSLock()
   private var completed = false
+  private var capturedLocally = false
   private let task: BGAppRefreshTask
 
   init(_ task: BGAppRefreshTask) {
@@ -1189,6 +1287,35 @@ private final class SnapshotRefreshCompletion {
     lock.lock()
     defer { lock.unlock() }
     return completed
+  }
+
+  @discardableResult
+  func markLocalCaptureSucceeded() -> Bool {
+    lock.lock()
+    guard !completed else {
+      lock.unlock()
+      return false
+    }
+    capturedLocally = true
+    lock.unlock()
+    return true
+  }
+
+  @discardableResult
+  func completeForExpiration(
+    beforeTaskCompletion: (Bool) -> Void
+  ) -> Bool {
+    lock.lock()
+    guard !completed else {
+      lock.unlock()
+      return false
+    }
+    completed = true
+    let success = capturedLocally
+    lock.unlock()
+    beforeTaskCompletion(success)
+    task.setTaskCompleted(success: success)
+    return true
   }
 
   @discardableResult

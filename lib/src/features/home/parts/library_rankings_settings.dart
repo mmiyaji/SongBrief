@@ -4069,6 +4069,7 @@ class _SnapshotRefreshHistory extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final events = diagnostics.recentEvents.reversed.take(6).toList();
+    final latestEvent = events.isEmpty ? null : events.first;
     return Material(
       color: Colors.transparent,
       child: ExpansionTile(
@@ -4085,7 +4086,10 @@ class _SnapshotRefreshHistory extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          _snapshotRefreshLastEventLabel(context, diagnostics),
+          latestEvent == null
+              ? _snapshotRefreshLastEventLabel(context, diagnostics)
+              : '${_snapshotRefreshEventLabel(context, latestEvent.event)} / '
+                    '${_dateTimeFormat(context).format(latestEvent.at.toLocal())}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.bodySmall?.copyWith(
@@ -4186,6 +4190,49 @@ String _snapshotRefreshLastEventLabel(
 
 String _snapshotRefreshEventLabel(BuildContext context, String? event) {
   return switch (event) {
+    'schedule_queued' => _t(context, 'Scheduled', '予約済み', zh: '已安排', ko: '예약됨'),
+    'record_updated' => _t(
+      context,
+      'Daily record updated',
+      '日々の記録を更新',
+      zh: '每日记录已更新',
+      ko: '일일 기록 업데이트됨',
+    ),
+    'record_failed' => _t(
+      context,
+      'Could not update record',
+      '記録を更新できませんでした',
+      zh: '无法更新记录',
+      ko: '기록을 업데이트할 수 없음',
+    ),
+    'record_skipped' => _t(
+      context,
+      'Record not needed',
+      '記録を見送り',
+      zh: '无需记录',
+      ko: '기록하지 않음',
+    ),
+    'background_update_interrupted' => _t(
+      context,
+      'Background update interrupted',
+      'バックグラウンド更新を中断',
+      zh: '后台更新已中断',
+      ko: '백그라운드 업데이트 중단됨',
+    ),
+    'icloud_sync_completed' => _t(
+      context,
+      'iCloud sync completed',
+      'iCloud同期が完了',
+      zh: 'iCloud 同步已完成',
+      ko: 'iCloud 동기화 완료됨',
+    ),
+    'icloud_sync_deferred' => _t(
+      context,
+      'iCloud sync will retry later',
+      'iCloud同期は後で再試行',
+      zh: 'iCloud 同步稍后重试',
+      ko: 'iCloud 동기화는 나중에 다시 시도',
+    ),
     'schedule_cancelled' => _t(
       context,
       'Request cancelled',
@@ -4279,10 +4326,10 @@ String _snapshotRefreshEventLabel(BuildContext context, String? event) {
     ),
     'task_completed' => _t(
       context,
-      'Refresh completed',
-      '更新が完了',
-      zh: '刷新已完成',
-      ko: '새로고침 완료됨',
+      'Background processing ended',
+      'バックグラウンド処理を終了',
+      zh: '后台处理已结束',
+      ko: '백그라운드 처리 종료됨',
     ),
     _ => _t(
       context,
