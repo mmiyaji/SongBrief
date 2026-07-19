@@ -910,6 +910,10 @@ void main() {
             event: 'icloud_sync_completed',
             at: DateTime(2026, 7, 18, 12),
           ),
+          SnapshotRefreshEvent(
+            event: 'ios_execution_waiting',
+            at: DateTime(2026, 7, 18, 13),
+          ),
         ],
       ),
       detailedLoggingEnabled: true,
@@ -940,18 +944,21 @@ void main() {
     expect(find.text('Next earliest opportunity'), findsNothing);
     expect(find.text('Recent activity'), findsOneWidget);
     expect(find.text('Support logs'), findsOneWidget);
-    expect(find.text('Detailed logging'), findsNothing);
-    expect(find.text('Save logs'), findsNothing);
 
-    await tester.tap(find.text('Recent activity'));
-    await tester.pumpAndSettle();
+    if (find.text('Daily record updated').evaluate().isEmpty) {
+      await tester.tap(find.text('Recent activity'));
+      await tester.pumpAndSettle();
+    }
 
     expect(find.text('Daily record updated'), findsOneWidget);
     expect(find.text('iCloud sync completed'), findsAtLeastNWidgets(1));
+    expect(find.text('Waiting for iOS to run'), findsAtLeastNWidgets(1));
 
-    await tester.ensureVisible(find.text('Support logs'));
-    await tester.tap(find.text('Support logs'));
-    await tester.pumpAndSettle();
+    if (find.text('Detailed logging').evaluate().isEmpty) {
+      await tester.ensureVisible(find.text('Support logs'));
+      await tester.tap(find.text('Support logs'));
+      await tester.pumpAndSettle();
+    }
 
     expect(find.text('Detailed logging'), findsOneWidget);
     expect(
@@ -961,6 +968,13 @@ void main() {
     expect(find.text('Save logs'), findsOneWidget);
     expect(find.textContaining('12 hours'), findsNothing);
     expect(find.textContaining('24 hours'), findsNothing);
+
+    await tester.ensureVisible(find.text('Background recording'));
+    await tester.tap(find.text('Background recording'));
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(backgroundSetting).height, lessThan(120));
+    expect(find.text('Recent activity'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

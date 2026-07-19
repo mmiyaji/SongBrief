@@ -2252,8 +2252,6 @@ class _SettingsSection extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        AdBannerSlot(placement: _t(context, 'Settings', '設定')),
       ],
     );
   }
@@ -3717,7 +3715,7 @@ class _SnapshotBackgroundRefreshSetting extends ConsumerWidget {
       child: ExpansionTile(
         key: const ValueKey('snapshot-background-refresh-expansion'),
         initiallyExpanded: false,
-        maintainState: true,
+        maintainState: false,
         tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
         childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
         backgroundColor: Colors.transparent,
@@ -3773,10 +3771,10 @@ class _SnapshotBackgroundRefreshSetting extends ConsumerWidget {
               Text(
                 _t(
                   context,
-                  'iOS periodically updates the daily record in the background. The actual time is decided by iOS.',
-                  'iOSが日々の記録をバックグラウンドで定期的に更新します。実行時刻はiOSが決定します。',
-                  zh: 'iOS 会定期在后台更新每日记录。实际运行时间由 iOS 决定。',
-                  ko: 'iOS가 일일 기록을 백그라운드에서 주기적으로 업데이트합니다. 실제 실행 시각은 iOS가 결정합니다.',
+                  'When iOS provides background time, SongBrief updates the daily record without opening the app. The timing is not fixed.',
+                  'アプリを開いていない間も、iOSが実行機会を割り当てたときに日々の記録を更新します。実行時刻は一定ではありません。',
+                  zh: '无需打开 App；当 iOS 分配后台运行机会时，SongBrief 会更新每日记录。运行时间并不固定。',
+                  ko: '앱을 열지 않아도 iOS가 백그라운드 실행 기회를 할당하면 일일 기록을 업데이트합니다. 실행 시각은 일정하지 않습니다.',
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -4191,6 +4189,13 @@ String _snapshotRefreshLastEventLabel(
 String _snapshotRefreshEventLabel(BuildContext context, String? event) {
   return switch (event) {
     'schedule_queued' => _t(context, 'Scheduled', '予約済み', zh: '已安排', ko: '예약됨'),
+    'ios_execution_waiting' => _t(
+      context,
+      'Waiting for iOS to run',
+      'iOSの実行待ち',
+      zh: '等待 iOS 运行',
+      ko: 'iOS 실행 대기 중',
+    ),
     'record_updated' => _t(
       context,
       'Daily record updated',

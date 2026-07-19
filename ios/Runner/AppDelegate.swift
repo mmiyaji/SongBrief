@@ -1066,7 +1066,9 @@ enum SnapshotRefreshLogStore {
     details: [String: Any] = [:]
   ) -> String? {
     switch event {
-    case "schedule_kept", "schedule_replaced", "schedule_submitted":
+    case "schedule_kept":
+      return "ios_execution_waiting"
+    case "schedule_replaced", "schedule_submitted":
       return "schedule_queued"
     case "schedule_failed":
       return "schedule_failed"
@@ -1084,7 +1086,7 @@ enum SnapshotRefreshLogStore {
       return (details["uploaded"] as? Bool) == true
         ? "icloud_sync_completed"
         : "icloud_sync_deferred"
-    case "schedule_queued", "record_updated", "record_failed",
+    case "schedule_queued", "ios_execution_waiting", "record_updated", "record_failed",
          "record_skipped", "background_update_interrupted",
          "icloud_sync_completed", "icloud_sync_deferred":
       return event

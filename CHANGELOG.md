@@ -22,11 +22,17 @@
   and placing support diagnostics in a secondary disclosure.
 - Background history now groups duplicate reservations and shows user-facing
   record and iCloud outcomes instead of low-level task lifecycle events.
+- Pending background requests are labeled as waiting for iOS instead of
+  implying execution at a fixed time.
+- Removed the settings-screen banner to prevent an iOS platform-ad surface
+  from obscuring data-management controls while scrolling.
 
 ### Fixed
 
 - A successful local background record is no longer reported as failed when
   its best-effort iCloud upload exceeds the background execution window.
+- Collapsing background diagnostics no longer retains the expanded child tree,
+  avoiding a large blank card in data management.
 
 ## [1.0.1] - 2026-07-10
 

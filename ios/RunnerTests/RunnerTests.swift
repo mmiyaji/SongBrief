@@ -35,7 +35,7 @@ final class RunnerTests: XCTestCase {
   func testSnapshotRefreshHistoryKeepsOnlyUserFacingOutcomes() {
     XCTAssertEqual(
       SnapshotRefreshLogStore.recentEventName("schedule_kept"),
-      "schedule_queued"
+      "ios_execution_waiting"
     )
     XCTAssertEqual(
       SnapshotRefreshLogStore.recentEventName("capture_succeeded"),
@@ -70,7 +70,7 @@ final class RunnerTests: XCTestCase {
     ])
 
     XCTAssertEqual(events.count, 3)
-    XCTAssertEqual(events[0]["event"] as? String, "schedule_queued")
+    XCTAssertEqual(events[0]["event"] as? String, "ios_execution_waiting")
     XCTAssertEqual(events[1]["event"] as? String, "record_updated")
     XCTAssertEqual(events[2]["event"] as? String, "icloud_sync_deferred")
   }
