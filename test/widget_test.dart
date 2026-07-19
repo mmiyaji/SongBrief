@@ -926,13 +926,24 @@ void main() {
     final backgroundSetting = find.byKey(
       const ValueKey('snapshot-background-refresh-setting'),
     );
+    final settingsScrollable = find.descendant(
+      of: find.byType(CustomScrollView),
+      matching: find.byType(Scrollable),
+    );
+    expect(settingsScrollable, findsOneWidget);
     await tester.scrollUntilVisible(
       backgroundSetting,
       420,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: settingsScrollable,
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Overview'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
     expect(find.text('Background recording'), findsOneWidget);
     expect(find.text('Recent activity'), findsNothing);
     expect(find.text('Save logs'), findsNothing);
@@ -940,6 +951,7 @@ void main() {
     await tester.tap(find.text('Background recording'));
     await tester.pumpAndSettle();
 
+    expect(tester.takeException(), isNull);
     expect(find.textContaining('6 hours'), findsNothing);
     expect(find.text('Next earliest opportunity'), findsNothing);
     expect(find.text('Recent activity'), findsOneWidget);
@@ -956,6 +968,16 @@ void main() {
 
     if (find.text('Detailed logging').evaluate().isEmpty) {
       await tester.ensureVisible(find.text('Support logs'));
+      await tester.pumpAndSettle();
+      final supportLogsCenter = tester.getCenter(find.text('Support logs'));
+      final settingsScroll = tester.state<ScrollableState>(settingsScrollable);
+      final supportLogsOffset =
+          (settingsScroll.position.pixels + supportLogsCenter.dy - 400).clamp(
+            settingsScroll.position.minScrollExtent,
+            settingsScroll.position.maxScrollExtent,
+          );
+      settingsScroll.position.jumpTo(supportLogsOffset.toDouble());
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Support logs'));
       await tester.pumpAndSettle();
     }
@@ -970,6 +992,18 @@ void main() {
     expect(find.textContaining('24 hours'), findsNothing);
 
     await tester.ensureVisible(find.text('Background recording'));
+    await tester.pumpAndSettle();
+    final backgroundCenter = tester.getCenter(
+      find.text('Background recording'),
+    );
+    final settingsScroll = tester.state<ScrollableState>(settingsScrollable);
+    final backgroundOffset =
+        (settingsScroll.position.pixels + backgroundCenter.dy - 300).clamp(
+          settingsScroll.position.minScrollExtent,
+          settingsScroll.position.maxScrollExtent,
+        );
+    settingsScroll.position.jumpTo(backgroundOffset.toDouble());
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Background recording'));
     await tester.pumpAndSettle();
 

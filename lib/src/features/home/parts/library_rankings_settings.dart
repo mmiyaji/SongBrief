@@ -2252,6 +2252,8 @@ class _SettingsSection extends ConsumerWidget {
             ],
           ),
         ),
+        const SizedBox(height: 14),
+        AdBannerSlot(placement: _t(context, 'Settings', '設定')),
       ],
     );
   }
@@ -3713,7 +3715,9 @@ class _SnapshotBackgroundRefreshSetting extends ConsumerWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        key: const ValueKey('snapshot-background-refresh-expansion'),
+        key: const PageStorageKey<String>(
+          'snapshot-background-refresh-expansion',
+        ),
         initiallyExpanded: false,
         maintainState: false,
         tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
@@ -3847,7 +3851,9 @@ class _SnapshotBackgroundRefreshSetting extends ConsumerWidget {
               Material(
                 color: Colors.transparent,
                 child: ExpansionTile(
-                  key: const ValueKey('snapshot-support-logs-expansion'),
+                  key: const PageStorageKey<String>(
+                    'snapshot-support-logs-expansion',
+                  ),
                   tilePadding: const EdgeInsets.symmetric(horizontal: 10),
                   childrenPadding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
                   shape: const Border(),
@@ -4071,7 +4077,7 @@ class _SnapshotRefreshHistory extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: ExpansionTile(
-        key: const ValueKey('snapshot-refresh-history-expansion'),
+        key: const PageStorageKey<String>('snapshot-refresh-history-expansion'),
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(left: 8, bottom: 6),
         shape: const Border(),
