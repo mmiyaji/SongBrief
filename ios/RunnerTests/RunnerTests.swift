@@ -201,6 +201,40 @@ final class RunnerTests: XCTestCase {
     )
   }
 
+  func testWidgetDailyTrendKeepsMissingDaysDistinctFromZeroGrowth() {
+    let snapshots = [
+      widgetSnapshot(dateKey: "2026-07-18", plays: 10),
+      widgetSnapshot(dateKey: "2026-07-19", plays: 10),
+      widgetSnapshot(dateKey: "2026-07-21", plays: 15),
+      widgetSnapshot(dateKey: "2026-07-22", plays: 18),
+    ]
+
+    let values = SongBriefWidgetDataStore.dailyPlayDeltas(from: snapshots)
+
+    XCTAssertEqual(values.count, 7)
+    XCTAssertEqual(values.last?["dateKey"] as? String, "2026-07-22")
+    XCTAssertEqual(values.last?["hasData"] as? Bool, true)
+    XCTAssertEqual(number(values.last?["playDelta"]), 3)
+    XCTAssertEqual(number(values.last?["listeningSecondsDelta"]), 180)
+    XCTAssertEqual(values[3]["dateKey"] as? String, "2026-07-19")
+    XCTAssertEqual(values[3]["hasData"] as? Bool, true)
+    XCTAssertEqual(number(values[3]["playDelta"]), 0)
+    XCTAssertEqual(values[5]["dateKey"] as? String, "2026-07-21")
+    XCTAssertEqual(values[5]["hasData"] as? Bool, false)
+  }
+
+  func testWidgetDailyTrendDoesNotCompareDifferentFilterProfiles() {
+    let snapshots = [
+      widgetSnapshot(dateKey: "2026-07-21", plays: 10, signature: "before"),
+      widgetSnapshot(dateKey: "2026-07-22", plays: 18, signature: "after"),
+    ]
+
+    let values = SongBriefWidgetDataStore.dailyPlayDeltas(from: snapshots)
+
+    XCTAssertEqual(values.last?["hasData"] as? Bool, false)
+    XCTAssertEqual(number(values.last?["playDelta"]), 0)
+  }
+
   private func snapshot(
     capturedAt: Int,
     signature: String,
@@ -224,6 +258,19 @@ final class RunnerTests: XCTestCase {
         "skipCount": 0,
         "listeningSeconds": plays * 180,
       ]],
+    ]
+  }
+
+  private func widgetSnapshot(
+    dateKey: String,
+    plays: Int,
+    signature: String = "same"
+  ) -> [String: Any] {
+    [
+      "dateKey": dateKey,
+      "filterSignature": signature,
+      "totalPlayCount": plays,
+      "totalListeningSeconds": plays * 60,
     ]
   }
 

@@ -9,6 +9,10 @@
 - Added a settings status view and JSONL log export for support investigations.
 - Added an in-app recent background activity history that does not require
   exporting diagnostic log files.
+- Added a seven-day daily play-gain chart to the medium Home Screen widget,
+  with missing daily records kept distinct from zero-growth days.
+- Added focused Home Screen widgets for a seven-day comparison and today's
+  listening record, without adding more density to the existing widget.
 
 ### Changed
 

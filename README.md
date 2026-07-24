@@ -158,7 +158,17 @@ The WidgetKit extension uses bundle ID `app.songbrief.songbrief.widget` and the
 App Group `group.app.songbrief.songbrief`. The Flutter app writes a compact
 summary of the latest local listening-record delta to shared `UserDefaults`;
 the widget never reads the Music library or CloudKit directly. Background
-snapshot capture also refreshes the widget's last-record timestamp.
+snapshot capture also refreshes the widget's last-record timestamp and its
+seven-day daily play-gain trend. Missing daily records are shown as unavailable
+rather than as zero growth.
+
+The widget extension offers three focused configurations:
+
+- `SongBrief`: the latest observed change in small and medium sizes.
+- `SongBrief 7-day summary`: recent and previous seven-day totals, listening
+  time, record coverage, and the daily trend in the medium size.
+- `SongBrief today`: today's increase and the latest record time in the small
+  size.
 
 Before creating a release build:
 
