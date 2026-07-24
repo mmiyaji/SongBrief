@@ -85,7 +85,8 @@ enum SongBriefWidgetDataStore {
     )
     let calendar = Calendar.current
 
-    return (0..<max(0, dayCount)).reversed().compactMap { dayOffset in
+    return (0..<max(0, dayCount)).reversed().compactMap {
+      dayOffset -> [String: Any]? in
       guard
         let date = calendar.date(byAdding: .day, value: -dayOffset, to: latestDate),
         let previousDate = calendar.date(byAdding: .day, value: -1, to: date)
