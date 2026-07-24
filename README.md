@@ -13,9 +13,9 @@ without an iPhone attached.
 
 - Latest App Store version: `1.0.0` (currently removed from sale in App Store Connect)
 - Next release candidate: `1.0.2` (source build `3`)
-- Latest accepted TestFlight upload: `1.0.2` (`CFBundleVersion` `2607180455`),
-  built by [iOS TestFlight #49](https://github.com/mmiyaji/SongBrief/actions/runs/29631332190)
-  on 2026-07-18
+- Latest accepted TestFlight upload: `1.0.2` (`CFBundleVersion` `2607241228`),
+  built by [iOS TestFlight #55](https://github.com/mmiyaji/SongBrief/actions/runs/30093135097)
+  on 2026-07-24
 - Public site: https://songbrief.ruhenheim.org/
 - Privacy Policy: https://songbrief.ruhenheim.org/privacy/
 - Terms of Use: https://songbrief.ruhenheim.org/terms/
