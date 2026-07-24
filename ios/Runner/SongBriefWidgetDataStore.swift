@@ -93,9 +93,9 @@ enum SongBriefWidgetDataStore {
       else {
         return nil
       }
-      let dateKey = dateKey(for: date)
+      let currentDateKey = dateKey(for: date)
       let previousDateKey = dateKey(for: previousDate)
-      let current = snapshotsByDate[dateKey]
+      let current = snapshotsByDate[currentDateKey]
       let previous = snapshotsByDate[previousDateKey]
       let hasData = current != nil && previous != nil
       let playDelta = hasData
@@ -113,7 +113,7 @@ enum SongBriefWidgetDataStore {
         )
         : 0
       return [
-        "dateKey": dateKey,
+        "dateKey": currentDateKey,
         "playDelta": playDelta,
         "listeningSecondsDelta": listeningSecondsDelta,
         "hasData": hasData,
