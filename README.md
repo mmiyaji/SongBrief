@@ -11,8 +11,9 @@ without an iPhone attached.
 
 ## Release Status
 
-- Latest App Store version: `1.0.0` (currently removed from sale in App Store Connect)
-- Next release candidate: `1.0.2` (source build `3`)
+- Current App Store version: `1.0.0` (available in 175 countries and regions)
+- Submitted App Store update: `1.0.2` (source build `3`, build `2607250444`;
+  waiting for App Review)
 - Latest accepted TestFlight upload: `1.0.2` (`CFBundleVersion` `2607250444`),
   built by [iOS TestFlight #56](https://github.com/mmiyaji/SongBrief/actions/runs/30144523606)
   on 2026-07-25
@@ -32,8 +33,11 @@ Release readiness for `1.0.2`:
   App Store provisioning profiles in GitHub Actions.
 - [x] Run the TestFlight workflow for `1.0.2` and verify the app, widget,
   Crashlytics dSYM upload, and App Store Connect processing.
-- [ ] Restore App Store availability under Pricing and Availability.
-- [ ] Complete App Store Connect metadata and submit `1.0.2` for review.
+- [x] Confirm App Store availability under Pricing and Availability (175
+  countries and regions).
+- [x] Complete the Japanese and English App Store metadata and submit `1.0.2`
+  for review on 2026-07-25. The version will release automatically to all users
+  after approval.
 
 ## Product Scope
 
@@ -140,8 +144,8 @@ CloudKit release checklist:
   CloudKit Dashboard before the App Store build (Console > CloudKit > Deploy
   Schema Changes). The `filterSignature` change was deployed and verified in
   Production on 2026-07-10.
-- [ ] In App Store Connect, restore availability under Pricing and Availability
-  before submitting the next version for release.
+- [x] In App Store Connect, confirm availability under Pricing and Availability.
+  SongBrief is available in 175 countries and regions as of 2026-07-25.
 - [x] No query indexes are required: sync fetches records by deterministic
   record IDs (dateKeys) instead of running CloudKit queries.
 
