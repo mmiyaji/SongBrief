@@ -225,7 +225,7 @@ struct SongBriefWidgetEntryView: View {
           ForEach(values) { value in
             VStack(spacing: 2) {
               Spacer(minLength: 0)
-              if value.hasData {
+              if value.hasData, value.playDelta > 0 {
                 Capsule()
                   .fill(
                     value.id == values.last?.id
@@ -234,10 +234,19 @@ struct SongBriefWidgetEntryView: View {
                   )
                   .frame(
                     height: max(
-                      3,
+                      7,
                       CGFloat(value.playDelta) / CGFloat(maximum) * 27
                     )
                   )
+              } else if value.hasData {
+                Circle()
+                  .stroke(
+                    value.id == values.last?.id
+                      ? Color(red: 0.08, green: 0.56, blue: 0.48)
+                      : Color.secondary.opacity(0.55),
+                    lineWidth: 1.25
+                  )
+                  .frame(width: 5, height: 5)
               } else {
                 Capsule()
                   .stroke(
@@ -447,7 +456,7 @@ struct SongBriefWeeklyWidgetEntryView: View {
       ForEach(values) { value in
         VStack(spacing: 2) {
           Spacer(minLength: 0)
-          if value.hasData {
+          if value.hasData, value.playDelta > 0 {
             Capsule()
               .fill(
                 value.id == values.last?.id
@@ -456,10 +465,19 @@ struct SongBriefWeeklyWidgetEntryView: View {
               )
               .frame(
                 height: max(
-                  3,
+                  7,
                   CGFloat(value.playDelta) / CGFloat(maximum) * 31
                 )
               )
+          } else if value.hasData {
+            Circle()
+              .stroke(
+                value.id == values.last?.id
+                  ? accent
+                  : Color.secondary.opacity(0.55),
+                lineWidth: 1.25
+              )
+              .frame(width: 5, height: 5)
           } else {
             Capsule()
               .stroke(
