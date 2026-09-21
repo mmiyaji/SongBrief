@@ -11,15 +11,16 @@ without an iPhone attached.
 
 ## Release Status
 
-- Prepared TestFlight update: `1.0.3` (source build `4`); native validation and
-  upload pending. See [release notes](docs/release-notes/v1.0.3.md).
+- Latest TestFlight update: `1.0.3` (source build `4`,
+  `CFBundleVersion` `2609211157`), available to the existing internal tester
+  group `ruhenheim`. See [release notes](docs/release-notes/v1.0.3.md).
 
 - Current App Store version: `1.0.0` (available in 175 countries and regions)
 - Submitted App Store update: `1.0.2` (source build `3`, build `2607250444`;
   waiting for App Review)
-- Latest accepted TestFlight upload: `1.0.2` (`CFBundleVersion` `2607250444`),
-  built by [iOS TestFlight #56](https://github.com/mmiyaji/SongBrief/actions/runs/30144523606)
-  on 2026-07-25
+- Latest accepted TestFlight upload: `1.0.3` (`CFBundleVersion` `2609211157`),
+  built by [iOS TestFlight #57](https://github.com/mmiyaji/SongBrief/actions/runs/35596634016)
+  on 2026-09-21
 - Public site: https://songbrief.ruhenheim.org/
 - Privacy Policy: https://songbrief.ruhenheim.org/privacy/
 - Terms of Use: https://songbrief.ruhenheim.org/terms/
@@ -223,6 +224,12 @@ verifies the production IPA, stores the IPA as a workflow artifact, and uploads
 it to App Store Connect when `upload_to_testflight` is enabled. Its optional
 `build_number` input overrides `CFBundleVersion`; when omitted, CI uses the UTC
 `yyMMddHHmm` timestamp.
+
+To check processing and tester availability without uploading another build,
+dispatch the same workflow with `inspect_testflight=true` and
+`upload_to_testflight=false`. This reads recent build states and the existing
+beta groups through App Store Connect. Credentials and tester identities are
+not printed in the status report.
 
 ## Crash Reporting Notes
 
