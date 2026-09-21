@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ios-testflight-${{ github.ref }}
+  group: ios-testflight-${{ inputs.inspect_testflight && 'status-' || '' }}${{ github.ref }}
   cancel-in-progress: false
 
 env:
