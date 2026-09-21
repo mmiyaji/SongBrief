@@ -235,7 +235,7 @@ class AppLockController extends AsyncNotifier<AppLockState> {
 
   Future<bool> _authenticate(String localizedReason) async {
     try {
-      return ref
+      return await ref
           .read(localAuthenticationProvider)
           .authenticate(
             localizedReason: localizedReason,
