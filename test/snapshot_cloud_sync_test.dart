@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/data/library_snapshot_repository.dart';
 import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/data/music_stats_repository.dart';
+import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/domain/music_library_authorization.dart';
 import 'package:songbrief/src/settings/demo_library_preferences.dart';
@@ -106,6 +107,18 @@ void main() {
       expect(result.deleted, 3);
       expect(result.changedLocally, isTrue);
     });
+
+    test(
+      'a cloud deletion without downloads requires local history reload',
+      () {
+        final result = SnapshotSyncResult.fromPlatformValue({
+          'status': 'synced',
+          'downloaded': 0,
+          'deleted': 2,
+        });
+        expect(result.changedLocally, isTrue);
+      },
+    );
 
     test('maps every known status string', () {
       const expected = {
@@ -232,6 +245,35 @@ void main() {
 
       expect(client.deleteCalls, 1);
       expect(client.lastDeleteCutoff, isNull);
+    });
+
+    test(
+      'native deletion does not clear a subsequently captured record',
+      () async {
+        final client = _CloudSyncSpyClient();
+        final snapshots = _DeletionRepositorySpy();
+        final stats = MusicStatsRepository(client, snapshots);
+
+        await stats.clearSnapshotHistory();
+        await stats.deleteSnapshotsOlderThan(DateTime(2026, 7, 1));
+
+        expect(client.deleteCalls, 2);
+        expect(snapshots.loadCalls, 4);
+        expect(snapshots.deleteCalls, 0);
+      },
+    );
+
+    test('non-iOS deletion still clears the local repository', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final client = _CloudSyncSpyClient();
+      final snapshots = _DeletionRepositorySpy();
+      final stats = MusicStatsRepository(client, snapshots);
+
+      await stats.clearSnapshotHistory();
+      await stats.deleteSnapshotsOlderThan(DateTime(2026, 7, 1));
+
+      expect(client.deleteCalls, 0);
+      expect(snapshots.deleteCalls, 2);
     });
 
     test('deleting old records propagates the cutoff dateKey', () async {
@@ -368,6 +410,29 @@ void main() {
       expect(stats.overview.latestTrack?.title, 'Real Track');
     });
   });
+}
+
+class _DeletionRepositorySpy extends LibrarySnapshotRepository {
+  int loadCalls = 0;
+  int deleteCalls = 0;
+
+  @override
+  Future<SnapshotHistory> loadHistory() async {
+    loadCalls += 1;
+    return SnapshotHistory.empty;
+  }
+
+  @override
+  Future<SnapshotHistory> clearHistory() async {
+    deleteCalls += 1;
+    return SnapshotHistory.empty;
+  }
+
+  @override
+  Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
+    deleteCalls += 1;
+    return SnapshotHistory.empty;
+  }
 }
 
 class _CloudSyncSpyClient implements MusicLibraryClient {

@@ -228,12 +228,20 @@ class MusicStatsRepository {
 
   Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
     await _propagateCloudDeletion(olderThanDateKey: snapshotDateKey(cutoff));
+    if (_isIosMusicRuntime) {
+      return _snapshotRepository.loadHistory();
+    }
     final history = await _snapshotRepository.deleteSnapshotsOlderThan(cutoff);
     return history;
   }
 
   Future<SnapshotHistory> clearSnapshotHistory() async {
     await _propagateCloudDeletion();
+    // Native deletion applies its cutoff atomically. A later background capture
+    // must survive even if it completes before this platform call returns.
+    if (_isIosMusicRuntime) {
+      return _snapshotRepository.loadHistory();
+    }
     final history = await _snapshotRepository.clearHistory();
     return history;
   }
@@ -262,6 +270,9 @@ class MusicStatsRepository {
     if (!_isIosMusicRuntime) {
       return;
     }
+    // Finish legacy migration before native code establishes the deletion
+    // cutoff, so a later load cannot restore records from old preferences.
+    await _snapshotRepository.loadHistory();
     final result = await _client.deleteCloudSnapshots(
       olderThanDateKey: olderThanDateKey,
     );

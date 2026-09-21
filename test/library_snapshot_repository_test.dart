@@ -306,6 +306,41 @@ void main() {
     expect(loaded.latest?.filterSignature, 'filtered');
   });
 
+  test('same-day merge retains newly selected recent low-play tracks', () async {
+    final store = FileSnapshotStore(
+      directoryProvider: () async => snapshotDirectory,
+    );
+    final older = _largeSnapshot(0);
+    final recent = TrackCounterSnapshot(
+      id: 'recent-low-play',
+      title: 'Recent song',
+      artist: 'Recent artist',
+      albumTitle: 'Recent album',
+      playCount: 1,
+      skipCount: 0,
+      listeningSeconds: 180,
+      lastPlayedAt: older.capturedAt.add(const Duration(hours: 1)),
+    );
+    final newer = DailyLibrarySnapshot(
+      dateKey: older.dateKey,
+      capturedAt: recent.lastPlayedAt!,
+      source: 'background',
+      trackCount: older.trackCount,
+      totalPlayCount: older.totalPlayCount + 1,
+      totalSkipCount: older.totalSkipCount,
+      totalListeningSeconds: older.totalListeningSeconds + 180,
+      tracks: [...older.tracks.take(maxSnapshotTrackCounters - 1), recent],
+    );
+    await store.writeSnapshot(older);
+    await store.writeSnapshot(newer);
+    // A delayed earlier write must not evict the latest scan's recent song either.
+    await store.writeSnapshot(older);
+    final persisted = (await store.loadHistory()).latest!;
+    expect(persisted.tracks, hasLength(maxSnapshotTrackCounters));
+    expect(persisted.tracks.map((track) => track.id), contains(recent.id));
+    expect(persisted.totalPlayCount, newer.totalPlayCount);
+  });
+
   test('does not record empty overviews', () async {
     await _writeSnapshotFile(
       snapshotDirectory,

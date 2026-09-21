@@ -3,6 +3,26 @@ import XCTest
 @testable import Runner
 
 final class RunnerTests: XCTestCase {
+  func testFailedMusicQueryIsNotTreatedAsAnEmptyLibrary() throws {
+    let unavailable: [Int]? = nil
+    XCTAssertThrowsError(try MusicLibraryBridge.requireQueryResult(unavailable))
+    XCTAssertEqual(try MusicLibraryBridge.requireQueryResult([Int]()), [])
+    XCTAssertEqual(try MusicLibraryBridge.requireQueryResult([1, 2]), [1, 2])
+  }
+
+  func testBackgroundDateKeyUsesGregorianLocalDay() {
+    let formatter = ISO8601DateFormatter()
+    let date = formatter.date(from: "2026-09-20T16:00:00Z")!
+    XCTAssertEqual(
+      SongBriefSnapshotRefresh.dateKey(for: date, timeZone: TimeZone(secondsFromGMT: 0)!),
+      "2026-09-20"
+    )
+    XCTAssertEqual(
+      SongBriefSnapshotRefresh.dateKey(for: date, timeZone: TimeZone(identifier: "Asia/Tokyo")!),
+      "2026-09-21"
+    )
+  }
+
   func testSnapshotRefreshReplacesOnlyRequestsBeyondTheSixHourWindow() {
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 

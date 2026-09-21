@@ -693,8 +693,17 @@ List<TrackCounterSnapshot> _mergeTrackCounters(
       lastPlayedAt: _latestDate(previous.lastPlayedAt, track.lastPlayedAt),
     );
   }
+  // Keep the latest scan's balanced selection (including recent low-play songs).
+  // Ranking the union only by lifetime plays lets old favourites evict them.
+  final newerIds = newer.map((track) => track.id).toSet();
   final ranked = byId.values.toList(growable: false)
     ..sort((a, b) {
+      final selectedComparison = (newerIds.contains(b.id) ? 1 : 0).compareTo(
+        newerIds.contains(a.id) ? 1 : 0,
+      );
+      if (selectedComparison != 0) {
+        return selectedComparison;
+      }
       final playComparison = b.playCount.compareTo(a.playCount);
       if (playComparison != 0) {
         return playComparison;

@@ -105,6 +105,11 @@ class DailyLibrarySnapshot {
   final List<TrackCounterSnapshot> tracks;
   final String? filterSignature;
 
+  bool hasCompatibleFilterProfileWith(DailyLibrarySnapshot other) {
+    return _normalizedFilterSignature(filterSignature) ==
+        _normalizedFilterSignature(other.filterSignature);
+  }
+
   factory DailyLibrarySnapshot.fromOverview(
     LibraryOverview overview, {
     DateTime? capturedAt,
@@ -188,6 +193,47 @@ class SnapshotHistory {
       return null;
     }
     return SnapshotDelta.compare(previous: baseline, current: current);
+  }
+
+  /// Compares the latest record with the last baseline before [period].
+  ///
+  /// Only the latest uninterrupted filter profile is considered. This keeps a
+  /// filter change from being counted as listening activity, including when a
+  /// profile changes and later changes back. Rolling calendar windows can set
+  /// [includePeriodDate] to include a record captured on the boundary date.
+  SnapshotDelta? latestDeltaSince(
+    DateTime period, {
+    bool includePeriodDate = false,
+  }) {
+    final current = latest;
+    if (current == null || current.capturedAt.isBefore(period)) {
+      return null;
+    }
+
+    var segmentStart = snapshots.length - 1;
+    while (segmentStart > 0 &&
+        snapshots[segmentStart - 1].hasCompatibleFilterProfileWith(current)) {
+      segmentStart -= 1;
+    }
+    if (segmentStart == snapshots.length - 1) {
+      return null;
+    }
+
+    var baselineIndex = segmentStart;
+    final periodDate = _dateOnly(period);
+    for (var index = segmentStart; index < snapshots.length - 1; index += 1) {
+      final snapshot = snapshots[index];
+      final isBaseline = includePeriodDate
+          ? !_dateOnly(snapshot.capturedAt).isAfter(periodDate)
+          : snapshot.capturedAt.isBefore(period);
+      if (isBaseline) {
+        baselineIndex = index;
+      }
+    }
+    return SnapshotDelta.compare(
+      previous: snapshots[baselineIndex],
+      current: current,
+    );
   }
 
   int get snapshotCount => snapshots.length;
@@ -308,10 +354,13 @@ class SnapshotDelta {
   final int totalListeningSecondsDelta;
   final List<TrackCounterDelta> trackDeltas;
 
-  factory SnapshotDelta.compare({
+  static SnapshotDelta? compare({
     required DailyLibrarySnapshot previous,
     required DailyLibrarySnapshot current,
   }) {
+    if (!previous.hasCompatibleFilterProfileWith(current)) {
+      return null;
+    }
     final previousTracks = {
       for (final track in previous.tracks) track.id: track,
     };
@@ -367,6 +416,11 @@ class SnapshotDelta {
       trackDeltas: List.unmodifiable(trackDeltas),
     );
   }
+}
+
+String? _normalizedFilterSignature(String? value) {
+  final normalized = value?.trim();
+  return normalized == null || normalized.isEmpty ? null : normalized;
 }
 
 class TrackCounterDelta {

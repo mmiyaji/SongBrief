@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,9 +17,127 @@ import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/settings/snapshot_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+
+  for (final clearAll in [true, false]) {
+    test(
+      'history ${clearAll ? 'clear' : 'prune'} updates the native widget',
+      () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        const channel = MethodChannel('app.songbrief/music_library');
+        final updates = <MethodCall>[];
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'updateHomeWidget') updates.add(call);
+          return null;
+        });
+        addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+        final repository = _WidgetDeletionRepository();
+        final container = ProviderContainer(
+          overrides: [
+            musicStatsRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+        await container.read(musicStatsControllerProvider.future);
+        final controller = container.read(
+          musicStatsControllerProvider.notifier,
+        );
+        await controller.syncCloudSnapshots();
+        expect((updates.last.arguments as Map)['summary']['snapshotCount'], 2);
+        updates.clear();
+
+        if (clearAll) {
+          await controller.clearSnapshotHistory();
+        } else {
+          await controller.deleteSnapshotsOlderThan(DateTime(2026, 7, 9));
+        }
+
+        expect(updates, hasLength(1));
+        final summary = (updates.single.arguments as Map)['summary'] as Map?;
+        if (clearAll) {
+          expect(summary, isNull);
+        } else {
+          expect(summary!['snapshotCount'], 1);
+          expect(summary['recent7PlayDelta'], 0);
+        }
+        expect(
+          container
+              .read(musicStatsControllerProvider)
+              .requireValue
+              .snapshotHistory
+              .snapshotCount,
+          clearAll ? 0 : 1,
+        );
+      },
+    );
+  }
+
+  test('demo refresh does not replace the native widget history', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    const channel = MethodChannel('app.songbrief/music_library');
+    final updates = <MethodCall>[];
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'updateHomeWidget') updates.add(call);
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final repository = _WidgetRefreshRepository();
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+    await container.read(musicStatsControllerProvider.future);
+    final controller = container.read(musicStatsControllerProvider.notifier);
+    await controller.syncCloudSnapshots();
+    updates.clear();
+    repository.demo = true;
+    await controller.refreshStatsSilently();
+    expect(
+      container.read(musicStatsControllerProvider).requireValue.isDemo,
+      isTrue,
+    );
+    expect(updates, isEmpty);
+  });
+
+  test(
+    'granting music access publishes the captured history and starts sync',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      const channel = MethodChannel('app.songbrief/music_library');
+      final updates = <MethodCall>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'updateHomeWidget') updates.add(call);
+        return null;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final repository = _WidgetRefreshRepository()..demo = true;
+      final container = ProviderContainer(
+        overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      await container.read(musicStatsControllerProvider.future);
+      final controller = container.read(musicStatsControllerProvider.notifier);
+      repository.demo = false;
+      await controller.requestAccess();
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.syncCalls, 1);
+      expect(updates, hasLength(1));
+      expect((updates.single.arguments as Map)['summary']['snapshotCount'], 2);
+    },
+  );
 
   test('silent stats refresh keeps previous data while loading', () async {
     final repository = _ControlledMusicStatsRepository();
@@ -309,6 +428,55 @@ class _SnapshotRaceRepository extends MusicStatsRepository {
     if (!_syncRelease.isCompleted) {
       _syncRelease.complete();
     }
+  }
+}
+
+class _WidgetDeletionRepository extends _SnapshotRaceRepository {
+  late final history = SnapshotHistory(
+    snapshots: [
+      DailyLibrarySnapshot(
+        dateKey: '2026-07-08',
+        capturedAt: DateTime(2026, 7, 8, 12),
+        source: 'foreground',
+        trackCount: 1,
+        totalPlayCount: 1,
+        totalSkipCount: 0,
+        totalListeningSeconds: 180,
+        tracks: const [],
+      ),
+      ..._history.snapshots,
+    ],
+  );
+
+  @override
+  Future<MusicStatsState> load({bool requestAccess = false}) async =>
+      _libraryState(history);
+
+  @override
+  Future<SnapshotSyncResult?> syncCloudSnapshots() async => null;
+
+  @override
+  Future<SnapshotHistory> deleteSnapshotsOlderThan(DateTime cutoff) async {
+    return SnapshotHistory(
+      snapshots: history.snapshots
+          .where((snapshot) => !snapshot.capturedAt.isBefore(cutoff))
+          .toList(),
+    );
+  }
+}
+
+class _WidgetRefreshRepository extends _WidgetDeletionRepository {
+  bool demo = false;
+  int syncCalls = 0;
+
+  @override
+  Future<MusicStatsState> load({bool requestAccess = false}) async =>
+      demo ? _state('Demo') : _libraryState(history);
+
+  @override
+  Future<SnapshotSyncResult?> syncCloudSnapshots() async {
+    syncCalls += 1;
+    return null;
   }
 }
 

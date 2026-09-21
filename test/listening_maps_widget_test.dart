@@ -217,6 +217,50 @@ void main() {
     expect(find.text('Late Bloom'), findsWidgets);
   });
 
+  testWidgets('stale denied-access history is not shown as this period', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final previousTrack = LibraryTrack(
+      id: 'stale-recap',
+      title: 'Stale recap track',
+      artist: 'Unavailable Artist',
+      albumTitle: 'Old Counts',
+      playCount: 100,
+      skipCount: 0,
+      duration: const Duration(minutes: 3),
+      lastPlayedAt: now.subtract(const Duration(days: 30)),
+      isCloudItem: false,
+    );
+    final currentTrack = previousTrack.copyWith(playCount: 1100);
+    final history = SnapshotHistory(
+      snapshots: [
+        DailyLibrarySnapshot.fromOverview(
+          LibraryOverview.fromTracks([previousTrack], isDemo: false),
+          capturedAt: now.subtract(const Duration(days: 30)),
+        ),
+        DailyLibrarySnapshot.fromOverview(
+          LibraryOverview.fromTracks([currentTrack], isDemo: false),
+          capturedAt: now.subtract(const Duration(days: 20)),
+        ),
+      ],
+    );
+    await _pumpOverview(
+      tester,
+      statsState: MusicStatsState(
+        authorizationStatus: MusicLibraryAuthorizationStatus.denied,
+        overview: LibraryOverview.fromTracks([currentTrack], isDemo: false),
+        snapshotHistory: history,
+        snapshotRecordingEnabled: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollOverviewUntilVisible(tester, find.text('Recap highlights'));
+    expect(find.text('Waiting'), findsOneWidget);
+    expect(find.text('1,000'), findsNothing);
+  });
+
   testWidgets('opens an album completion list', (tester) async {
     await _pumpOverview(tester);
     await tester.pumpAndSettle();
@@ -302,6 +346,7 @@ Future<void> _pumpOverview(
   WidgetTester tester, {
   List<LibraryTrack>? tracks,
   bool snapshotRecordingEnabled = false,
+  MusicStatsState? statsState,
 }) {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(900, 1200);
@@ -317,7 +362,11 @@ Future<void> _pumpOverview(
         homeSectionProvider.overrideWith(
           () => _FixedHomeSectionController(HomeSection.overview),
         ),
-        if (tracks != null)
+        if (statsState != null)
+          musicStatsControllerProvider.overrideWith(
+            () => _StaticMusicStatsController(statsState),
+          )
+        else if (tracks != null)
           musicStatsControllerProvider.overrideWith(
             () => _FixedMusicStatsController(
               tracks,
@@ -328,6 +377,15 @@ Future<void> _pumpOverview(
       child: const SongBriefApp(),
     ),
   );
+}
+
+class _StaticMusicStatsController extends MusicStatsController {
+  _StaticMusicStatsController(this.statsState);
+
+  final MusicStatsState statsState;
+
+  @override
+  Future<MusicStatsState> build() async => statsState;
 }
 
 class _FixedMusicStatsController extends MusicStatsController {

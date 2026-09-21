@@ -1462,16 +1462,23 @@ List<_SnapshotTrendValue> _snapshotTrendValues(
 
   final start = _clampInt(snapshots.length - 8, 1, snapshots.length - 1);
   final dateFormat = DateFormat.Md(_localeName(context));
-  return [
-    for (var index = start; index < snapshots.length; index++)
+  final values = <_SnapshotTrendValue>[];
+  for (var index = start; index < snapshots.length; index++) {
+    final delta = SnapshotDelta.compare(
+      previous: snapshots[index - 1],
+      current: snapshots[index],
+    );
+    if (delta == null) {
+      continue;
+    }
+    values.add(
       _SnapshotTrendValue.fromDelta(
         label: dateFormat.format(snapshots[index].capturedAt),
-        delta: SnapshotDelta.compare(
-          previous: snapshots[index - 1],
-          current: snapshots[index],
-        ),
+        delta: delta,
       ),
-  ];
+    );
+  }
+  return List.unmodifiable(values);
 }
 
 class _SnapshotTrendValue {
@@ -2126,6 +2133,9 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
         previous: history.snapshots[index - 1],
         current: history.snapshots[index],
       );
+      if (delta == null || delta.observedDays != 1) {
+        continue;
+      }
       final key = snapshotDateKey(delta.current.capturedAt);
       valuesByDay[key] = (valuesByDay[key] ?? 0) + delta.totalPlayDelta;
       if (delta.trackDeltas.isNotEmpty) {

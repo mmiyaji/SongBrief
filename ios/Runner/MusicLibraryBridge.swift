@@ -208,9 +208,17 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     }
 
     DispatchQueue.global(qos: .userInitiated).async {
-      let query = MPMediaQuery.songs()
-      let items = query.items ?? []
-      let playlistNamesByItemID = Self.playlistNamesByItemID()
+      let items: [MPMediaItem]
+      let playlistNamesByItemID: [UInt64: [String]]
+      do {
+        items = try Self.requireQueryResult(MPMediaQuery.songs().items)
+        playlistNamesByItemID = try Self.playlistNamesByItemID()
+      } catch {
+        DispatchQueue.main.async {
+          result(Self.libraryQueryError())
+        }
+        return
+      }
       let tracks = items.map { item in
         Self.trackMap(
           from: item,
@@ -289,7 +297,13 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     }
 
     let player = MPMusicPlayerController.systemMusicPlayer
-    var queueItems = SongBriefSnapshotRefresh.filteredLibraryItems()
+    var queueItems: [MPMediaItem]
+    do {
+      queueItems = try SongBriefSnapshotRefresh.filteredLibraryItems()
+    } catch {
+      result(Self.libraryQueryError())
+      return
+    }
     if !queueItems.contains(where: { $0.persistentID == item.persistentID }) {
       queueItems.append(item)
     }
@@ -343,9 +357,9 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     return track
   }
 
-  static func playlistNamesByItemID() -> [UInt64: [String]] {
+  static func playlistNamesByItemID() throws -> [UInt64: [String]] {
     var namesByID: [UInt64: Set<String>] = [:]
-    let playlists = MPMediaQuery.playlists().collections ?? []
+    let playlists = try requireQueryResult(MPMediaQuery.playlists().collections)
 
     for collection in playlists {
       guard
@@ -367,6 +381,22 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
         $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
       }
     }
+  }
+
+  // MediaPlayer distinguishes an empty query result from a failed query (nil).
+  static func requireQueryResult<T>(_ values: [T]?) throws -> [T] {
+    guard let values else {
+      throw NSError(domain: "app.songbrief.music-library", code: 1)
+    }
+    return values
+  }
+
+  private static func libraryQueryError() -> FlutterError {
+    FlutterError(
+      code: "music_library_unavailable",
+      message: "The music library could not be read. Please try again.",
+      details: nil
+    )
   }
 
   private static func mediaItem(withPersistentID id: UInt64) -> MPMediaItem? {

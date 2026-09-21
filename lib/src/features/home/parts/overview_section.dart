@@ -559,17 +559,23 @@ class _SnapshotStatusPanel extends StatelessWidget {
               final metrics = [
                 _SnapshotMetric(
                   label: _t(context, 'Window', '期間'),
-                  value: observedDays <= 0
+                  value: delta == null && history.previous != null
+                      ? _t(context, 'Unavailable', '利用不可')
+                      : observedDays <= 0
                       ? _t(context, 'Baseline', '基準値')
                       : _dayCountLabel(context, observedDays),
                 ),
                 _SnapshotMetric(
                   label: _t(context, 'New plays', '増加再生'),
-                  value: number.format(delta?.totalPlayDelta ?? 0),
+                  value: delta == null && history.previous != null
+                      ? '—'
+                      : number.format(delta?.totalPlayDelta ?? 0),
                 ),
                 _SnapshotMetric(
                   label: _t(context, 'New skips', '増加スキップ'),
-                  value: number.format(delta?.totalSkipDelta ?? 0),
+                  value: delta == null && history.previous != null
+                      ? '—'
+                      : number.format(delta?.totalSkipDelta ?? 0),
                 ),
               ];
 

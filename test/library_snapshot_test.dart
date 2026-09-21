@@ -62,9 +62,9 @@ void main() {
 
     final delta = SnapshotDelta.compare(previous: previous, current: current);
 
-    expect(delta.trackDeltas, hasLength(1));
-    expect(delta.trackDeltas.single.title, 'Synced Song');
-    expect(delta.trackDeltas.single.playDelta, 2);
+    expect(delta?.trackDeltas, hasLength(1));
+    expect(delta?.trackDeltas.single.title, 'Synced Song');
+    expect(delta?.trackDeltas.single.playDelta, 2);
   });
 
   test('keeps same-title tracks on different albums separate', () {
@@ -85,7 +85,7 @@ void main() {
 
     final delta = SnapshotDelta.compare(previous: previous, current: current);
 
-    expect(delta.trackDeltas, hasLength(2));
+    expect(delta?.trackDeltas, hasLength(2));
   });
 
   test('limits stored track counters for large libraries', () {
@@ -125,6 +125,121 @@ void main() {
     expect(decoded.filterSignature, 'deadbeef');
     expect(decoded.toJson(), snapshot.toJson());
   });
+
+  test('does not compare snapshots from different filter profiles', () {
+    final previous = _snapshotWithTracks(
+      date: DateTime(2026, 7, 11),
+      tracks: [_counter(id: 'track', playCount: 100)],
+      filterSignature: 'exclude-100',
+    );
+    final current = _snapshotWithTracks(
+      date: DateTime(2026, 7, 12),
+      tracks: [_counter(id: 'track', playCount: 1100)],
+      filterSignature: 'exclude-0',
+    );
+
+    final history = SnapshotHistory(snapshots: [previous, current]);
+
+    expect(SnapshotDelta.compare(previous: previous, current: current), isNull);
+    expect(history.latestDelta, isNull);
+  });
+
+  test('period delta stays within the latest uninterrupted filter profile', () {
+    final snapshots = [
+      _snapshotWithTracks(
+        date: DateTime(2026, 7, 1),
+        tracks: [_counter(id: 'track', playCount: 100)],
+        filterSignature: 'profile-a',
+      ),
+      _snapshotWithTracks(
+        date: DateTime(2026, 7, 2),
+        tracks: [_counter(id: 'track', playCount: 1100)],
+        filterSignature: 'profile-b',
+      ),
+      _snapshotWithTracks(
+        date: DateTime(2026, 7, 3),
+        tracks: [_counter(id: 'track', playCount: 104)],
+        filterSignature: 'profile-a',
+      ),
+      _snapshotWithTracks(
+        date: DateTime(2026, 7, 4),
+        tracks: [_counter(id: 'track', playCount: 109)],
+        filterSignature: 'profile-a',
+      ),
+    ];
+
+    final delta = SnapshotHistory(
+      snapshots: snapshots,
+    ).latestDeltaSince(DateTime(2026, 7, 1));
+
+    expect(delta?.previous.dateKey, '2026-07-03');
+    expect(delta?.totalPlayDelta, 5);
+  });
+
+  test('period delta is unavailable when the latest record is stale', () {
+    final history = SnapshotHistory(
+      snapshots: [
+        _snapshotWithTracks(
+          date: DateTime(2026, 7, 1),
+          tracks: [_counter(id: 'track', playCount: 100)],
+        ),
+        _snapshotWithTracks(
+          date: DateTime(2026, 7, 2),
+          tracks: [_counter(id: 'track', playCount: 105)],
+        ),
+      ],
+    );
+
+    expect(history.latestDeltaSince(DateTime(2026, 7, 6)), isNull);
+  });
+
+  test('weekly period includes plays recorded on the first day', () {
+    final history = SnapshotHistory(
+      snapshots: [
+        _snapshotWithTracks(
+          date: DateTime(2026, 7, 5, 20),
+          tracks: [_counter(id: 'track', playCount: 10)],
+        ),
+        _snapshotWithTracks(
+          date: DateTime(2026, 7, 6, 20),
+          tracks: [_counter(id: 'track', playCount: 15)],
+        ),
+        _snapshotWithTracks(
+          date: DateTime(2026, 7, 7, 20),
+          tracks: [_counter(id: 'track', playCount: 18)],
+        ),
+      ],
+    );
+
+    final delta = history.latestDeltaSince(DateTime(2026, 7, 6));
+
+    expect(delta?.previous.dateKey, '2026-07-05');
+    expect(delta?.totalPlayDelta, 8);
+  });
+
+  test('monthly period includes plays recorded on the first day', () {
+    final history = SnapshotHistory(
+      snapshots: [
+        _snapshotWithTracks(
+          date: DateTime(2026, 7, 31, 20),
+          tracks: [_counter(id: 'track', playCount: 10)],
+        ),
+        _snapshotWithTracks(
+          date: DateTime(2026, 8, 1, 20),
+          tracks: [_counter(id: 'track', playCount: 15)],
+        ),
+        _snapshotWithTracks(
+          date: DateTime(2026, 8, 2, 20),
+          tracks: [_counter(id: 'track', playCount: 18)],
+        ),
+      ],
+    );
+
+    final delta = history.latestDeltaSince(DateTime(2026, 8));
+
+    expect(delta?.previous.dateKey, '2026-07-31');
+    expect(delta?.totalPlayDelta, 8);
+  });
 }
 
 LibraryOverview _overview({required int playCount, int skipCount = 0}) {
@@ -162,6 +277,7 @@ TrackCounterSnapshot _counter({
 DailyLibrarySnapshot _snapshotWithTracks({
   required DateTime date,
   required List<TrackCounterSnapshot> tracks,
+  String? filterSignature,
 }) {
   return DailyLibrarySnapshot(
     dateKey: snapshotDateKey(date),
@@ -175,5 +291,6 @@ DailyLibrarySnapshot _snapshotWithTracks({
       (sum, track) => sum + track.listeningSeconds,
     ),
     tracks: tracks,
+    filterSignature: filterSignature,
   );
 }

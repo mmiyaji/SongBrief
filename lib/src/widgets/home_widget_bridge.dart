@@ -33,6 +33,7 @@ class HomeWidgetSummary {
   const HomeWidgetSummary({
     required this.latestCapturedAtMillis,
     required this.snapshotCount,
+    required this.hasComparableDelta,
     required this.playDelta,
     required this.skipDelta,
     required this.listeningSecondsDelta,
@@ -50,6 +51,7 @@ class HomeWidgetSummary {
 
   final int latestCapturedAtMillis;
   final int snapshotCount;
+  final bool hasComparableDelta;
   final int playDelta;
   final int skipDelta;
   final int listeningSecondsDelta;
@@ -84,6 +86,7 @@ class HomeWidgetSummary {
     return HomeWidgetSummary(
       latestCapturedAtMillis: latest.capturedAt.millisecondsSinceEpoch,
       snapshotCount: history.snapshotCount,
+      hasComparableDelta: delta != null,
       playDelta: delta?.totalPlayDelta ?? 0,
       skipDelta: delta?.totalSkipDelta ?? 0,
       listeningSecondsDelta: delta?.totalListeningSecondsDelta ?? 0,
@@ -112,6 +115,7 @@ class HomeWidgetSummary {
     return {
       'latestCapturedAtMillis': latestCapturedAtMillis,
       'snapshotCount': snapshotCount,
+      'hasComparableDelta': hasComparableDelta,
       'playDelta': playDelta,
       'skipDelta': skipDelta,
       'listeningSecondsDelta': listeningSecondsDelta,
@@ -172,7 +176,7 @@ class HomeWidgetSummary {
     final hasData =
         current != null &&
         previous != null &&
-        current.filterSignature == previous.filterSignature;
+        current.hasCompatibleFilterProfileWith(previous);
     return HomeWidgetDailyPlayDelta(
       dateKey: snapshotDateKey(date),
       playDelta: hasData

@@ -1352,28 +1352,28 @@ _PeriodRecap _periodRecap({
     _RecapPeriod.month => DateTime(periodStart.year, periodStart.month - 1),
     _RecapPeriod.year => DateTime(periodStart.year - 1),
   };
-  final current = snapshots.last;
-  var baseline = snapshots.first;
-  var previousBaseline = snapshots.first;
-  for (final snapshot in snapshots) {
-    if (snapshot.capturedAt.isBefore(periodStart)) {
-      baseline = snapshot;
-    }
-    if (snapshot.capturedAt.isBefore(previousPeriodStart)) {
-      previousBaseline = snapshot;
-    }
+  final delta = history.latestDeltaSince(periodStart);
+  if (delta == null) {
+    return const _PeriodRecap(
+      playDelta: 0,
+      skipDelta: 0,
+      listeningSecondsDelta: 0,
+      observedDays: 0,
+      newArtistCount: 0,
+    );
   }
-  if (baseline.dateKey == current.dateKey && snapshots.length >= 2) {
-    baseline = snapshots[snapshots.length - 2];
-  }
-
-  final delta = SnapshotDelta.compare(previous: baseline, current: current);
-  final previousPlayDelta = previousBaseline.dateKey == baseline.dateKey
-      ? null
-      : SnapshotDelta.compare(
-          previous: previousBaseline,
-          current: baseline,
-        ).totalPlayDelta;
+  final baseline = delta.previous;
+  final current = delta.current;
+  final baselineDate = _localDateOnly(baseline.capturedAt);
+  final previousPlayDelta = baselineDate.isBefore(periodStart)
+      ? SnapshotHistory(
+          snapshots: snapshots
+              .takeWhile(
+                (snapshot) => !snapshot.capturedAt.isAfter(baseline.capturedAt),
+              )
+              .toList(growable: false),
+        ).latestDeltaSince(previousPeriodStart)?.totalPlayDelta
+      : null;
   final topTrack = delta.trackDeltas.isEmpty
       ? null
       : _TrackDeltaSummary(

@@ -5,6 +5,13 @@ import WidgetKit
 private let suiteName = "group.app.songbrief.songbrief"
 private let summaryKey = "songbrief.widget.summary.v1"
 
+private var songBriefGregorianCalendar: Calendar {
+  var calendar = Calendar(identifier: .gregorian)
+  calendar.timeZone = .current
+  calendar.locale = Locale(identifier: "en_US_POSIX")
+  return calendar
+}
+
 struct SongBriefWidgetEntry: TimelineEntry {
   let date: Date
   let summary: SongBriefWidgetSummary?
@@ -13,6 +20,7 @@ struct SongBriefWidgetEntry: TimelineEntry {
 struct SongBriefWidgetSummary {
   let latestCapturedAt: Date
   let snapshotCount: Int
+  let hasComparableDelta: Bool
   let playDelta: Int
   let listeningSecondsDelta: Int
   let observedDays: Int
@@ -32,6 +40,7 @@ struct SongBriefWidgetSummary {
     }
     latestCapturedAt = Date(timeIntervalSince1970: Double(capturedAtMillis) / 1000)
     snapshotCount = Self.int(dictionary["snapshotCount"]) ?? 0
+    hasComparableDelta = Self.bool(dictionary["hasComparableDelta"]) ?? (snapshotCount >= 2)
     playDelta = Self.int(dictionary["playDelta"]) ?? 0
     listeningSecondsDelta = Self.int(dictionary["listeningSecondsDelta"]) ?? 0
     observedDays = Self.int(dictionary["observedDays"]) ?? 0
@@ -51,6 +60,12 @@ struct SongBriefWidgetSummary {
   private static func int(_ value: Any?) -> Int? {
     if let value = value as? Int { return value }
     if let value = value as? NSNumber { return value.intValue }
+    return nil
+  }
+
+  private static func bool(_ value: Any?) -> Bool? {
+    if let value = value as? Bool { return value }
+    if let value = value as? NSNumber { return value.boolValue }
     return nil
   }
 }
@@ -111,7 +126,11 @@ struct SongBriefWidgetProvider: TimelineProvider {
     completion: @escaping (Timeline<SongBriefWidgetEntry>) -> Void
   ) {
     let current = entry()
-    let nextRefresh = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date()
+    let nextRefresh = songBriefGregorianCalendar.date(
+      byAdding: .hour,
+      value: 1,
+      to: Date()
+    ) ?? Date()
     completion(Timeline(entries: [current], policy: .after(nextRefresh)))
   }
 
@@ -160,13 +179,17 @@ struct SongBriefWidgetEntryView: View {
         HStack(spacing: 18) {
           metric(
             localized("Listening", "聴取時間"),
-            value: hours(summary.listeningSecondsDelta)
+            value: summary.hasComparableDelta
+              ? hours(summary.listeningSecondsDelta)
+              : "—"
           )
           metric(
             localized("Window", "集計期間"),
-            value: localized("\(summary.observedDays)d", "\(summary.observedDays)日")
+            value: summary.hasComparableDelta
+              ? localized("\(summary.observedDays)d", "\(summary.observedDays)日")
+              : "—"
           )
-          if let title = summary.topTrackTitle {
+          if summary.hasComparableDelta, let title = summary.topTrackTitle {
             VStack(alignment: .leading, spacing: 2) {
               Text(localized("Top song", "トップ曲"))
                 .font(.caption2.weight(.semibold))
@@ -179,6 +202,8 @@ struct SongBriefWidgetEntryView: View {
                 .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+          } else {
+            metric(localized("Top song", "トップ曲"), value: "—")
           }
         }
       } else {
@@ -195,12 +220,16 @@ struct SongBriefWidgetEntryView: View {
     size: CGFloat
   ) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 5) {
-      Text("+\(summary.playDelta)")
+      Text(summary.hasComparableDelta ? "+\(summary.playDelta)" : "—")
         .font(.system(size: size, weight: .black, design: .rounded))
         .foregroundStyle(Color(red: 0.08, green: 0.56, blue: 0.48))
         .lineLimit(1)
         .minimumScaleFactor(0.7)
-      Text(localized("plays", "再生"))
+      Text(
+        summary.hasComparableDelta
+          ? localized("plays", "再生")
+          : localized("comparison unavailable", "比較不可")
+      )
         .font(.caption.weight(.bold))
         .foregroundStyle(.secondary)
     }
@@ -570,7 +599,7 @@ struct SongBriefTodayWidgetEntryView: View {
   private func todayContent(
     _ summary: SongBriefWidgetSummary
   ) -> some View {
-    let recordedToday = Calendar.current.isDateInToday(
+    let recordedToday = songBriefGregorianCalendar.isDateInToday(
       summary.latestCapturedAt
     )
     let todayDelta = summary.dailyPlayDeltas.last
@@ -581,7 +610,20 @@ struct SongBriefTodayWidgetEntryView: View {
 
       Spacer(minLength: 0)
 
-      if recordedToday, let todayDelta, todayDelta.hasData {
+      if recordedToday, !summary.hasComparableDelta {
+        Label(
+          localized("Comparison unavailable", "比較不可"),
+          systemImage: "questionmark.circle"
+        )
+        .font(.title3.weight(.bold))
+        .foregroundStyle(.secondary)
+        Text(localized(
+          "A matching profile and previous-day record are needed.",
+          "同じ条件の前日記録が必要です"
+        ))
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+      } else if recordedToday, let todayDelta, todayDelta.hasData {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
           Text("+\(todayDelta.playDelta)")
             .font(.system(size: 34, weight: .black, design: .rounded))

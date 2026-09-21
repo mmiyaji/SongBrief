@@ -352,7 +352,7 @@ class SnapshotSyncResult {
   final int uploaded;
   final int deleted;
 
-  bool get changedLocally => downloaded > 0;
+  bool get changedLocally => downloaded > 0 || deleted > 0;
 
   bool get deletionCompleted =>
       status == SnapshotSyncStatus.synced ||

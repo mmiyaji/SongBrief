@@ -66,6 +66,10 @@ enum SongBriefSnapshotRefresh {
     }
 
     BGTaskScheduler.shared.getPendingTaskRequests { requests in
+      guard isRecordingEnabled else {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: taskIdentifier)
+        return
+      }
       if let existing = requests.first(where: { $0.identifier == taskIdentifier }) {
         if shouldReplacePendingRequest(
           earliestBeginDate: existing.earliestBeginDate,
@@ -117,6 +121,9 @@ enum SongBriefSnapshotRefresh {
   }
 
   private static func submitScheduleRequest(reason: String) {
+    guard isRecordingEnabled else {
+      return
+    }
     let intervalHours = refreshIntervalHours
     let request = BGAppRefreshTaskRequest(identifier: taskIdentifier)
     request.earliestBeginDate = Date(
@@ -178,7 +185,10 @@ enum SongBriefSnapshotRefresh {
     }
 
     DispatchQueue.global(qos: .utility).async {
-      guard !completion.isCompleted, let dateKey = captureSnapshot(runID: runID) else {
+      guard !completion.isCompleted, let dateKey = captureSnapshot(
+        runID: runID,
+        shouldContinue: { !completion.isCompleted }
+      ) else {
         completion.complete(success: false) {
           SnapshotRefreshLogStore.record(
             event: "task_completed",
@@ -224,7 +234,10 @@ enum SongBriefSnapshotRefresh {
           )
         }
       }
-      SnapshotCloudSync.uploadLocalSnapshot(dateKey: dateKey) { uploaded in
+      SnapshotCloudSync.uploadLocalSnapshot(
+        dateKey: dateKey,
+        shouldContinue: { !completion.isCompleted }
+      ) { uploaded in
         completion.complete(success: true) {
           SnapshotRefreshLogStore.record(
             event: "cloud_upload_completed",
@@ -239,7 +252,10 @@ enum SongBriefSnapshotRefresh {
     }
   }
 
-  private static func captureSnapshot(runID: String) -> String? {
+  private static func captureSnapshot(
+    runID: String,
+    shouldContinue: () -> Bool
+  ) -> String? {
     let startedAt = Date()
     guard isRecordingEnabled else {
       SnapshotRefreshLogStore.record(
@@ -258,7 +274,23 @@ enum SongBriefSnapshotRefresh {
     }
 
     let rules = exclusionRules
-    let items = filteredLibraryItems(using: rules)
+    let items: [MPMediaItem]
+    do {
+      items = try filteredLibraryItems(using: rules)
+    } catch {
+      SnapshotRefreshLogStore.record(
+        event: "capture_skipped",
+        details: ["runId": runID, "reason": "music_library_unavailable"]
+      )
+      return nil
+    }
+    guard !items.isEmpty else {
+      SnapshotRefreshLogStore.record(
+        event: "capture_skipped",
+        details: ["runId": runID, "reason": "empty_library"]
+      )
+      return nil
+    }
 
     let now = Date()
     let tracks = compactTrackSnapshots(from: items)
@@ -285,6 +317,17 @@ enum SongBriefSnapshotRefresh {
       "filterSignature": rules.signature
     ]
 
+    // A query can outlive the task or a change to recording/exclusion settings.
+    // Never persist an observation obtained under an obsolete configuration.
+    guard shouldContinue(), isRecordingEnabled,
+          MPMediaLibrary.authorizationStatus() == .authorized,
+          rules.signature == activeFilterSignature else {
+      SnapshotRefreshLogStore.record(
+        event: "capture_skipped",
+        details: ["runId": runID, "reason": "capture_cancelled"]
+      )
+      return nil
+    }
     guard write(snapshot: snapshot) else {
       SnapshotRefreshLogStore.record(
         event: "snapshot_write_failed",
@@ -333,8 +376,8 @@ enum SongBriefSnapshotRefresh {
     SnapshotFileStore.readSnapshots()
   }
 
-  static func filteredLibraryItems() -> [MPMediaItem] {
-    filteredLibraryItems(using: exclusionRules)
+  static func filteredLibraryItems() throws -> [MPMediaItem] {
+    try filteredLibraryItems(using: exclusionRules)
   }
 
   static var activeFilterSignature: String {
@@ -345,21 +388,18 @@ enum SongBriefSnapshotRefresh {
     !exclusionRules.isEmpty
   }
 
-  /// Replaces the given dateKeys in the stored history with already merged
-  /// snapshots coming from cloud sync.
-  static func mergeExternalSnapshots(_ incoming: [[String: Any]]) -> Bool {
-    guard !incoming.isEmpty else {
-      return false
-    }
-
-    var changed = false
+  /// Merges downloaded snapshots and returns the number successfully written.
+  static func mergeExternalSnapshots(_ incoming: [[String: Any]]) -> Int {
+    var written = 0
     for snapshot in incoming {
       guard snapshot["dateKey"] as? String != nil else {
         continue
       }
-      changed = SnapshotFileStore.write(snapshot: snapshot) || changed
+      if SnapshotFileStore.write(snapshot: snapshot) {
+        written += 1
+      }
     }
-    return changed
+    return written
   }
 
   private static func write(snapshot: [String: Any]) -> Bool {
@@ -404,11 +444,12 @@ enum SongBriefSnapshotRefresh {
 
   private static func filteredLibraryItems(
     using rules: LibraryExclusionRules
-  ) -> [MPMediaItem] {
+  ) throws -> [MPMediaItem] {
     let playlistNamesByItemID: [UInt64: [String]] = rules.needsPlaylistNames
-      ? MusicLibraryBridge.playlistNamesByItemID()
+      ? try MusicLibraryBridge.playlistNamesByItemID()
       : [:]
-    return (MPMediaQuery.songs().items ?? []).filter { item in
+    let items = try MusicLibraryBridge.requireQueryResult(MPMediaQuery.songs().items)
+    return items.filter { item in
       !rules.excludes(
         item,
         playlistNames: playlistNamesByItemID[item.persistentID] ?? []
@@ -507,8 +548,10 @@ enum SongBriefSnapshotRefresh {
       .map(trackSnapshot)
   }
 
-  private static func dateKey(for date: Date) -> String {
-    let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+  static func dateKey(for date: Date, timeZone: TimeZone = .autoupdatingCurrent) -> String {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    let components = calendar.dateComponents([.year, .month, .day], from: date)
     return String(
       format: "%04d-%02d-%02d",
       components.year ?? 0,
@@ -588,11 +631,50 @@ enum SongBriefSnapshotRefresh {
 }
 
 enum SnapshotFileStore {
+  // The lock also orders deletion against captures that were already in flight.
+  // Process-local state is sufficient: captures cannot survive process death.
+  private static var appliedDeletionPolicy = SnapshotDeletionPolicy.empty
   private static let snapshotFileNamePattern =
     #"^\d{4}-\d{2}-\d{2}\.json$"#
   private static let snapshotIndexFileName = "_snapshot_index_v1.json"
   private static let snapshotIndexVersion = 1
   private static let operationLock = NSRecursiveLock()
+
+  static func readSnapshot(dateKey: String) -> [String: Any]? {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+    guard isValidDateKey(dateKey), let directory = snapshotsDirectory(create: false) else {
+      return nil
+    }
+    return readSnapshot(from: directory.appendingPathComponent("\(dateKey).json"))
+  }
+
+  static func readRecentSnapshots(limit: Int) -> [[String: Any]] {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+    guard limit > 0, let directory = snapshotsDirectory(create: false),
+          let files = try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil
+          ) else {
+      return []
+    }
+    return files.filter(isSnapshotFile)
+      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+      .suffix(limit)
+      .compactMap { readSnapshot(from: $0) }
+  }
+
+  static func snapshotCount() -> Int {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+    guard let directory = snapshotsDirectory(create: false),
+          let files = try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil
+          ) else {
+      return 0
+    }
+    return files.filter(isSnapshotFile).count
+  }
 
   static func readSnapshots() -> [[String: Any]] {
     operationLock.lock()
@@ -628,6 +710,9 @@ enum SnapshotFileStore {
     }
 
     let incoming = SnapshotMerge.normalized(snapshot)
+    guard !appliedDeletionPolicy.deletes(incoming) else {
+      return false
+    }
     let url = directory.appendingPathComponent("\(dateKey).json")
     let normalized: [String: Any]
     if let existing = readSnapshot(from: url) {
@@ -669,6 +754,46 @@ enum SnapshotFileStore {
       for url in files where isSnapshotFile(url) {
         let dateKey = url.deletingPathExtension().lastPathComponent
         if cutoffDateKey.map({ dateKey < $0 }) ?? true {
+          try FileManager.default.removeItem(at: url)
+        }
+      }
+      return rebuildIndex(in: directory)
+    } catch {
+      _ = rebuildIndex(in: directory)
+      return false
+    }
+  }
+
+  /// Apply cloud deletion markers without removing a later capture on the same day.
+  /// Unlike the explicit clear-history API above, two nil cutoffs delete nothing.
+  static func deleteSnapshots(
+    olderThan cutoffDateKey: String?,
+    capturedAtOrBefore cutoffMillis: Int64?
+  ) -> Bool {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+    appliedDeletionPolicy = appliedDeletionPolicy.merged(
+      with: SnapshotDeletionPolicy(
+        deletedBeforeDateKey: cutoffDateKey,
+        deleteAllThroughMillis: cutoffMillis
+      )
+    )
+    guard cutoffDateKey != nil || cutoffMillis != nil,
+          let directory = snapshotsDirectory(create: false) else {
+      return true
+    }
+    do {
+      let files = try FileManager.default.contentsOfDirectory(
+        at: directory, includingPropertiesForKeys: nil
+      )
+      for url in files where isSnapshotFile(url) {
+        let dateKey = url.deletingPathExtension().lastPathComponent
+        let capturedAt = (readSnapshot(from: url)?["capturedAtMillis"] as? NSNumber)?.int64Value
+        let removedByDate = cutoffDateKey.map { dateKey < $0 } ?? false
+        let removedByTime = cutoffMillis.map { cutoff in
+          capturedAt.map { $0 <= cutoff } ?? true
+        } ?? false
+        if removedByDate || removedByTime {
           try FileManager.default.removeItem(at: url)
         }
       }

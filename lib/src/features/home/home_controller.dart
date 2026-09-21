@@ -303,6 +303,10 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     );
     if (state.hasValue) {
       unawaited(ref.read(appAnalyticsProvider).logEvent('music_access_loaded'));
+      if (!state.requireValue.overview.isDemo) {
+        unawaited(HomeWidgetBridge.update(state.requireValue.snapshotHistory));
+        unawaited(syncCloudSnapshots());
+      }
       await ref.read(playbackControllerProvider.notifier).syncWithPlayer();
     }
   }
@@ -347,6 +351,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
           .read(musicStatsRepositoryProvider)
           .deleteSnapshotsOlderThan(cutoff);
       _replaceSnapshotHistory(history);
+      await HomeWidgetBridge.update(history);
       return history;
     });
   }
@@ -358,6 +363,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
           .read(musicStatsRepositoryProvider)
           .clearSnapshotHistory();
       _replaceSnapshotHistory(history);
+      await HomeWidgetBridge.update(history);
       return history;
     });
   }
@@ -411,7 +417,9 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     };
     if (state.hasValue) {
       final overview = state.requireValue.overview;
-      unawaited(HomeWidgetBridge.update(state.requireValue.snapshotHistory));
+      if (!overview.isDemo) {
+        unawaited(HomeWidgetBridge.update(state.requireValue.snapshotHistory));
+      }
       unawaited(
         ref
             .read(appAnalyticsProvider)

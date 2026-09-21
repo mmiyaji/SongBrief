@@ -13,6 +13,7 @@ void main() {
 
     final summary = HomeWidgetSummary.fromHistory(history)!;
     expect(summary.snapshotCount, 2);
+    expect(summary.hasComparableDelta, isTrue);
     expect(summary.observedDays, 2);
     expect(summary.playDelta, 8);
     expect(summary.skipDelta, 3);
@@ -62,7 +63,7 @@ void main() {
     ]);
   });
 
-  test('home widget daily trend does not compare different filters', () {
+  test('home widget summary is unavailable across different filters', () {
     final history = SnapshotHistory(
       snapshots: [
         _snapshot(
@@ -84,10 +85,11 @@ void main() {
       ],
     );
 
-    final latest = HomeWidgetSummary.fromHistory(history)!.dailyPlayDeltas.last;
+    final summary = HomeWidgetSummary.fromHistory(history)!;
 
-    expect(latest.hasData, isFalse);
-    expect(latest.playDelta, 0);
+    expect(summary.hasComparableDelta, isFalse);
+    expect(summary.dailyPlayDeltas.last.hasData, isFalse);
+    expect(summary.toMap()['hasComparableDelta'], isFalse);
   });
 
   test('home widget summary compares recent and previous seven days', () {

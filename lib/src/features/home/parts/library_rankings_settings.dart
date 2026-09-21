@@ -884,26 +884,14 @@ SnapshotDelta? _snapshotDeltaForRange(
   SnapshotHistory history,
   TrendRange range,
 ) {
-  if (history.snapshots.length < 2) {
+  final current = history.latest;
+  if (current == null) {
     return null;
   }
-  final snapshots = history.snapshots.toList(growable: false)
-    ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
-  final current = snapshots.last;
   final windowStart = _localDateOnly(
     current.capturedAt,
   ).subtract(_rankingRangeDuration(range));
-  DailyLibrarySnapshot? baseline;
-  for (final snapshot in snapshots) {
-    if (!_localDateOnly(snapshot.capturedAt).isAfter(windowStart)) {
-      baseline = snapshot;
-    }
-  }
-  baseline ??= snapshots.first;
-  if (baseline.dateKey == current.dateKey) {
-    return null;
-  }
-  return SnapshotDelta.compare(previous: baseline, current: current);
+  return history.latestDeltaSince(windowStart, includePeriodDate: true);
 }
 
 Duration _rankingRangeDuration(TrendRange range) {
