@@ -83,6 +83,23 @@ def main():
                 "groupIds": groups_by_build.get(build_id, []),
             }
         )
+    # Upload records expose Apple's import state before a build is listed.
+    uploads = get(f"apps/{app_id}/buildUploads", limit=200)
+    recent_uploads = sorted(
+        uploads.get("data", []),
+        key=lambda item: item["attributes"].get("createdDate") or "",
+        reverse=True,
+    )[:5]
+    result["uploads"] = [
+        {
+            "id": upload["id"],
+            "version": upload["attributes"].get("cfBundleShortVersionString"),
+            "build": upload["attributes"].get("cfBundleVersion"),
+            "state": upload["attributes"].get("state"),
+            "createdAt": upload["attributes"].get("createdDate"),
+        }
+        for upload in recent_uploads
+    ]
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
