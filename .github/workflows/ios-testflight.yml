@@ -25,6 +25,7 @@ on:
         options:
           - none
           - inspect
+          - prepare
           - submit
 
 permissions:
@@ -476,6 +477,8 @@ jobs:
           python-version: "3.12"
       - name: Install API token dependency
         run: python -m pip install 'PyJWT[crypto]==2.10.1'
+      - name: Test submission guards
+        run: python -m unittest discover -s tool -p 'test_app_store_release.py'
       - name: Inspect or submit App Store version
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}

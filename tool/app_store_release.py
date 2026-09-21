@@ -11,6 +11,11 @@ from urllib.request import Request, urlopen
 
 import jwt
 
+WHATS_NEW = {
+    "ja": "動作の安定性を改善し、軽微な不具合を修正しました。",
+    "en-US": "Improved stability and fixed minor bugs.",
+}
+
 
 class AppStoreAPI:
     def __init__(self):
@@ -78,6 +83,123 @@ def version_summary(api, version):
     }
 
 
+def prepare_release(api, versions, version_name, build_number):
+    if not build_number:
+        raise RuntimeError("An explicit RELEASE_BUILD_NUMBER is required.")
+    builds = api.request("builds", **{
+        "filter[app]": api.app_id, "filter[version]": build_number, "limit": 200,
+    })["data"]
+    matches = []
+    for build in builds:
+        pre_release = api.request(f"builds/{build['id']}/preReleaseVersion")["data"]["attributes"]
+        if pre_release["version"] == version_name and pre_release["platform"] == "IOS":
+            matches.append(build)
+    if len(matches) != 1:
+        raise RuntimeError("Exactly one matching iOS version/build must exist.")
+    build = matches[0]
+    if build["attributes"].get("expired") or build["attributes"].get("processingState") != "VALID":
+        raise RuntimeError("The selected build must be valid and unexpired.")
+    target = next((item for item in versions if item["attributes"]["versionString"] == version_name), None)
+    if target and target["attributes"]["appStoreState"] in (
+        "WAITING_FOR_REVIEW", "IN_REVIEW", "PENDING_APPLE_RELEASE", "READY_FOR_SALE",
+    ):
+        summary = version_summary(api, target)
+        if summary["build"] != build_number:
+            raise RuntimeError("The existing submitted version uses a different build.")
+        return target, summary
+    if target and target["attributes"]["appStoreState"] not in (
+        "PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED",
+        "READY_FOR_REVIEW",
+    ):
+        raise RuntimeError("The target version is not editable; no changes were made.")
+    if not target:
+        previous = next((item for item in versions if item["attributes"]["appStoreState"] == "READY_FOR_SALE"), None)
+        if previous is None:
+            raise RuntimeError("A released version is required to preserve existing metadata.")
+        target = api.request("appStoreVersions", method="POST", data={"data": {
+            "type": "appStoreVersions",
+            "attributes": {"platform": "IOS", "versionString": version_name,
+                           "releaseType": "AFTER_APPROVAL",
+                           "copyright": previous["attributes"]["copyright"]},
+            "relationships": {"app": {"data": {"type": "apps", "id": api.app_id}}},
+        }})["data"]
+    version_id = target["id"]
+    api.request(f"appStoreVersions/{version_id}", method="PATCH", data={"data": {
+        "type": "appStoreVersions", "id": version_id,
+        "attributes": {"releaseType": "AFTER_APPROVAL"},
+    }})
+    api.request(f"appStoreVersions/{version_id}/relationships/build", method="PATCH", data={
+        "data": {"type": "builds", "id": build["id"]},
+    })
+    locales = api.request(f"appStoreVersions/{version_id}/appStoreVersionLocalizations", limit=200)["data"]
+    if {locale["attributes"]["locale"] for locale in locales} != set(WHATS_NEW):
+        raise RuntimeError("Localized metadata must contain the existing Japanese and English locales.")
+    for locale in locales:
+        api.request(f"appStoreVersionLocalizations/{locale['id']}", method="PATCH", data={"data": {
+            "type": "appStoreVersionLocalizations", "id": locale["id"],
+            "attributes": {"whatsNew": WHATS_NEW[locale["attributes"]["locale"]]},
+        }})
+    target = api.request(f"appStoreVersions/{version_id}")["data"]
+    summary = version_summary(api, target)
+    if summary["build"] != build_number or summary["releaseType"] != "AFTER_APPROVAL":
+        raise RuntimeError("Build or automatic release setting could not be verified.")
+    if not summary["hasReviewContact"]:
+        raise RuntimeError("Review contact details were not inherited; preparation is incomplete.")
+    for locale in summary["localizations"]:
+        if not locale["hasDescription"] or not locale["screenshotSets"]:
+            raise RuntimeError("Existing description/screenshots were not inherited.")
+        if locale["whatsNew"] != WHATS_NEW[locale["locale"]]:
+            raise RuntimeError("Release notes could not be verified.")
+    return target, summary
+
+
+def submit_release(api, target):
+    version_id = target["id"]
+    if target["attributes"]["appStoreState"] in (
+        "WAITING_FOR_REVIEW", "IN_REVIEW", "PENDING_APPLE_RELEASE", "READY_FOR_SALE",
+    ):
+        return {"alreadySubmitted": True, "versionState": target["attributes"]["appStoreState"]}
+    submissions = api.request(f"apps/{api.app_id}/reviewSubmissions", limit=200)["data"]
+    selected = None
+    existing_items = []
+    for submission in submissions:
+        if submission["attributes"].get("state") != "READY_FOR_REVIEW":
+            continue
+        items = api.request(f"reviewSubmissions/{submission['id']}/items", include="appStoreVersion", limit=200)["data"]
+        version_ids = [item.get("relationships", {}).get("appStoreVersion", {}).get("data", {}).get("id")
+                       for item in items if item.get("relationships", {}).get("appStoreVersion", {}).get("data")]
+        if version_id in version_ids:
+            if len(items) != 1:
+                raise RuntimeError("The review submission contains unrelated items; refusing to submit them.")
+            selected, existing_items = submission, items
+            break
+        if not items and submission["attributes"].get("platform") in (None, "IOS"):
+            selected, existing_items = submission, items
+    if selected is None:
+        selected = api.request("reviewSubmissions", method="POST", data={"data": {
+            "type": "reviewSubmissions",
+            "relationships": {"app": {"data": {"type": "apps", "id": api.app_id}}},
+        }})["data"]
+    submission_id = selected["id"]
+    if not existing_items:
+        api.request("reviewSubmissionItems", method="POST", data={"data": {
+            "type": "reviewSubmissionItems",
+            "relationships": {
+                "reviewSubmission": {"data": {"type": "reviewSubmissions", "id": submission_id}},
+                "appStoreVersion": {"data": {"type": "appStoreVersions", "id": version_id}},
+            },
+        }})
+    # Recheck the exact contents immediately before the irreversible submission.
+    items = api.request(f"reviewSubmissions/{submission_id}/items", include="appStoreVersion", limit=200)["data"]
+    if len(items) != 1 or items[0].get("relationships", {}).get("appStoreVersion", {}).get("data", {}).get("id") != version_id:
+        raise RuntimeError("Review contents changed before submission.")
+    submitted = api.request(f"reviewSubmissions/{submission_id}", method="PATCH", data={"data": {
+        "type": "reviewSubmissions", "id": submission_id,
+        "attributes": {"submitted": True},
+    }})["data"]
+    return {"id": submitted["id"], "state": submitted["attributes"].get("state")}
+
+
 def main():
     api = AppStoreAPI()
     version_name = next(
@@ -88,8 +210,18 @@ def main():
     versions = api.request(f"apps/{api.app_id}/appStoreVersions", **{
         "filter[platform]": "IOS", "limit": 200,
     })["data"]
-    if os.environ.get("APP_STORE_ACTION", "inspect") != "inspect":
-        raise RuntimeError("Submission implementation requires inspection first.")
+    action = os.environ.get("APP_STORE_ACTION", "inspect")
+    if action in ("prepare", "submit"):
+        target, summary = prepare_release(api, versions, version_name, os.environ.get("RELEASE_BUILD_NUMBER"))
+        print(json.dumps({"prepared": summary}, ensure_ascii=False, indent=2), flush=True)
+        if action == "submit":
+            submission = submit_release(api, target)
+            target = api.request(f"appStoreVersions/{target['id']}")["data"]
+            print(json.dumps({"submission": submission, "verified": version_summary(api, target)},
+                             ensure_ascii=False, indent=2), flush=True)
+        return
+    if action != "inspect":
+        raise RuntimeError("Unsupported App Store action.")
     summaries = [version_summary(api, version) for version in versions[:5]]
     submissions = api.request(f"apps/{api.app_id}/reviewSubmissions", limit=200)["data"]
     print(json.dumps({
