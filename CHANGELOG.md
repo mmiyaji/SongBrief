@@ -1,6 +1,23 @@
 # Changelog
 
-## Unreleased
+## [1.0.3] - 2026-09-21
+
+### Fixed
+
+- Distinguish failed Music library queries from empty libraries, and discard
+  background captures after task expiration or recording/filter changes.
+- Retry pending background uploads and start sync after the first successful
+  Music access request.
+- Apply shared deletion policies across devices, protect newer captures during
+  deletion, merge CloudKit conflicts, and report partial sync failures.
+- Rebuild all widget summary fields after background capture and history deletion.
+- Avoid comparing incompatible filter profiles or presenting stale records as
+  current-period activity; include the first day in weekly and monthly recaps.
+- Retain recently selected tracks when compacting same-day snapshot counters.
+- Use Gregorian date keys with the local time zone for native recording.
+- Allow App Lock authentication to be retried after asynchronous errors.
+
+## [1.0.2] - 2026-07-25
 
 ### Added
 

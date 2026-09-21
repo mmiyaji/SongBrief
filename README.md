@@ -11,6 +11,9 @@ without an iPhone attached.
 
 ## Release Status
 
+- Prepared TestFlight update: `1.0.3` (source build `4`); native validation and
+  upload pending. See [release notes](docs/release-notes/v1.0.3.md).
+
 - Current App Store version: `1.0.0` (available in 175 countries and regions)
 - Submitted App Store update: `1.0.2` (source build `3`, build `2607250444`;
   waiting for App Review)
@@ -21,7 +24,7 @@ without an iPhone attached.
 - Privacy Policy: https://songbrief.ruhenheim.org/privacy/
 - Terms of Use: https://songbrief.ruhenheim.org/terms/
 - Initial release notes: [docs/release-notes/v1.0.0.md](docs/release-notes/v1.0.0.md)
-- Next release notes: [docs/release-notes/v1.0.2.md](docs/release-notes/v1.0.2.md)
+- Next release notes: [docs/release-notes/v1.0.3.md](docs/release-notes/v1.0.3.md)
 
 Release readiness for `1.0.2`:
 
@@ -103,6 +106,13 @@ exact per-day listening history. On upgrade, pending requests from the earlier
 24-hour schedule are replaced when their earliest date is beyond the current
 six-hour window.
 
+Failed native library queries do not create empty snapshots. Background captures
+also recheck authorization, recording preferences, filter settings, and task
+expiration before saving. Date keys use the local Gregorian date regardless of
+the device's preferred calendar. Deltas require matching filter profiles; a
+filter change starts a new comparison baseline, and missing days are not filled
+with invented daily activity.
+
 Settings exposes the pending-request state, Background App Refresh availability,
 last successful capture, and an optional detailed diagnostic log. Detailed logs
 contain only scheduling/result events, counts, durations, and error domain/code;
@@ -117,9 +127,10 @@ Daily records can sync through the user's private CloudKit database
 (`iCloud.app.songbrief.songbrief`, record type `DailySnapshot`, one record per
 day keyed by the local dateKey). Counters are monotonic, so devices converge by
 max-merging totals and per-track counters regardless of sync order. Sync runs
-after each library scan, and the background refresh task uploads its own day
-best effort. Deleting history inside the app also deletes the matching cloud
-records so cleared data does not resurface on the next sync. Users can opt out
+after each library scan. Background refresh uploads its own day and retries the
+oldest pending day when time permits; failed dates remain queued. Saves use
+CloudKit change tags and retry conflicting counter merges. Partial failures
+remain visible as partial or failed syncs. Users can opt out
 with the "Sync records with iCloud" toggle in settings (stored under
 `songbrief_snapshot_cloud_sync_enabled_v1`, default on).
 
@@ -127,6 +138,16 @@ Cloud sync fetches deterministic daily record IDs rather than using CloudKit
 queries. It checks all locally known days plus a trailing 1,095-day window, so
 normal multi-device use and reinstall recovery cover roughly three years
 without requiring query indexes.
+
+History deletion stores a shared deletion policy in the existing `DailySnapshot`
+record type using its `payload` field. Deleted daily records are reduced to
+metadata without listening details, and devices apply the policy before
+importing or uploading history. Clear-all removes captures through the deletion
+timestamp while allowing later captures on the same day. This prevents stale
+copies on other updated devices from restoring cleared history. Older app
+versions do not understand the policy; update all syncing devices. Cloud-only
+records outside the discovery window are redacted when encountered by a device
+that still knows those dates.
 
 CloudKit release checklist:
 
