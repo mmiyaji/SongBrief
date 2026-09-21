@@ -15,9 +15,9 @@ without an iPhone attached.
   `CFBundleVersion` `2609211157`), available to the existing internal tester
   group `ruhenheim`. See [release notes](docs/release-notes/v1.0.3.md).
 
-- Current App Store version: `1.0.0` (available in 175 countries and regions)
-- Submitted App Store update: `1.0.2` (source build `3`, build `2607250444`;
-  waiting for App Review)
+- Current App Store version: `1.0.2` (public availability verified on 2026-09-21)
+- Submitted App Store update: `1.0.3` (source build `4`, build `2609211157`;
+  `WAITING_FOR_REVIEW`, automatic release after approval)
 - Latest accepted TestFlight upload: `1.0.3` (`CFBundleVersion` `2609211157`),
   built by [iOS TestFlight #57](https://github.com/mmiyaji/SongBrief/actions/runs/35596634016)
   on 2026-09-21
@@ -27,7 +27,7 @@ without an iPhone attached.
 - Initial release notes: [docs/release-notes/v1.0.0.md](docs/release-notes/v1.0.0.md)
 - Next release notes: [docs/release-notes/v1.0.3.md](docs/release-notes/v1.0.3.md)
 
-Release readiness for `1.0.2`:
+Previous release verification (`1.0.2`):
 
 - [x] Deploy the `DailySnapshot.filterSignature` String field to the Production
   CloudKit schema.
@@ -230,6 +230,12 @@ dispatch the same workflow with `inspect_testflight=true` and
 `upload_to_testflight=false`. This reads recent build states and the existing
 beta groups through App Store Connect. Credentials and tester identities are
 not printed in the status report.
+
+The `app_store_action` input supports `inspect`, `prepare`, and `submit` for the
+already-uploaded version in `pubspec.yaml`. Preparation and submission require
+an explicit `build_number`, verify its version and processing state, preserve
+existing store metadata, and set automatic release after approval. The final
+submission checks that the review contains only the intended app version.
 
 ## Crash Reporting Notes
 
