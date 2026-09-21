@@ -50,21 +50,25 @@ def main():
     builds = get("builds", **{"filter[app]": app_id, "sort": "-uploadedDate", "limit": 5})
     groups = get("betaGroups", **{"filter[app]": app_id, "limit": 200})
     result = {"builds": [], "groups": []}
+    groups_by_build = {}
     for group in groups.get("data", []):
         attributes = group["attributes"]
+        group_builds = get(f"betaGroups/{group['id']}/builds", limit=200)
+        for group_build in group_builds.get("data", []):
+            groups_by_build.setdefault(group_build["id"], []).append(group["id"])
         result["groups"].append(
             {
                 "id": group["id"],
                 "name": attributes.get("name"),
                 "internal": attributes.get("isInternalGroup"),
                 "allBuilds": attributes.get("hasAccessToAllBuilds"),
+                "buildListHasMore": bool(group_builds.get("links", {}).get("next")),
             }
         )
     for build in builds.get("data", []):
         build_id = build["id"]
         version = get(f"builds/{build_id}/preReleaseVersion")["data"]["attributes"]
         beta = get(f"builds/{build_id}/buildBetaDetail")["data"]["attributes"]
-        assigned_groups = get(f"builds/{build_id}/betaGroups", limit=200)
         attributes = build["attributes"]
         result["builds"].append(
             {
@@ -76,7 +80,7 @@ def main():
                 "expired": attributes.get("expired"),
                 "internalBuildState": beta.get("internalBuildState"),
                 "externalBuildState": beta.get("externalBuildState"),
-                "groupIds": [group["id"] for group in assigned_groups.get("data", [])],
+                "groupIds": groups_by_build.get(build_id, []),
             }
         )
     print(json.dumps(result, ensure_ascii=False, indent=2))
