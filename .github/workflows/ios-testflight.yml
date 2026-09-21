@@ -12,6 +12,11 @@ on:
         required: true
         default: true
         type: boolean
+      inspect_testflight:
+        description: "Only read recent TestFlight build and group status; do not build or upload."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -33,6 +38,7 @@ env:
 
 jobs:
   build-and-upload:
+    if: ${{ !inputs.inspect_testflight }}
     name: Build iOS IPA and upload to TestFlight
     runs-on: macos-26
     timeout-minutes: 60
@@ -428,3 +434,23 @@ jobs:
           KEYCHAIN_PATH="$RUNNER_TEMP/$KEYCHAIN_NAME"
           security delete-keychain "$KEYCHAIN_PATH" || true
           rm -rf "$HOME/.appstoreconnect/private_keys" || true
+
+  inspect-testflight:
+    name: Read TestFlight processing and distribution status
+    if: ${{ inputs.inspect_testflight }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install API token dependency
+        run: python -m pip install 'PyJWT[crypto]==2.10.1'
+      - name: Read App Store Connect status
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+          APP_STORE_APPLE_ID: ${{ secrets.APP_STORE_APPLE_ID || secrets.SONGBRIEF_APP_STORE_ID }}
+        run: python tool/testflight_status.py
