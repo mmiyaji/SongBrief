@@ -192,7 +192,15 @@ final trackArtworkProvider = FutureProvider.autoDispose
       ref.onDispose(() {
         disposeTimer?.cancel();
       });
-      return ref.watch(musicStatsRepositoryProvider).fetchArtwork(trackId);
+      // Read the repository: it is rebuilt whenever preferences such as
+      // exclusion rules change, which must not discard cached artwork.
+      return ref.read(musicStatsRepositoryProvider).fetchArtwork(trackId);
+    });
+
+// Lyrics are fetched on demand because reading them for the whole library is slow.
+final trackLyricsProvider = FutureProvider.autoDispose
+    .family<String?, String>((ref, trackId) {
+      return ref.read(musicStatsRepositoryProvider).fetchLyrics(trackId);
     });
 
 final playbackControllerProvider =

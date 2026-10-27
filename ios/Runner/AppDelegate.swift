@@ -457,11 +457,20 @@ enum SongBriefSnapshotRefresh {
     }
   }
 
+  // Dedupe and order by UTF-16 code units, matching Dart's String comparison
+  // used by LibraryFilterPreferences.snapshotSignature. Swift's String equality
+  // and ordering are not code-unit based, so Set/sorted() would diverge.
   private static func normalizedRules(_ values: [String]) -> [String] {
-    Array(Set(values.compactMap { value -> String? in
+    var seenKeys = Set<[UInt16]>()
+    var rules: [String] = []
+    for value in values {
       let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-      return normalized.isEmpty ? nil : normalized
-    })).sorted()
+      guard !normalized.isEmpty, seenKeys.insert(Array(normalized.utf16)).inserted else {
+        continue
+      }
+      rules.append(normalized)
+    }
+    return rules.sorted { $0.utf16.lexicographicallyPrecedes($1.utf16) }
   }
 
   private static func trackSnapshot(from item: MPMediaItem) -> [String: Any] {
@@ -674,6 +683,21 @@ enum SnapshotFileStore {
       return 0
     }
     return files.filter(isSnapshotFile).count
+  }
+
+  /// Date keys of stored snapshots, from file names only (no JSON reads).
+  static func snapshotDateKeys() -> [String] {
+    operationLock.lock()
+    defer { operationLock.unlock() }
+    guard let directory = snapshotsDirectory(create: false),
+          let files = try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil
+          ) else {
+      return []
+    }
+    return files.filter(isSnapshotFile).map {
+      $0.deletingPathExtension().lastPathComponent
+    }
   }
 
   static func readSnapshots() -> [[String: Any]] {

@@ -4,6 +4,13 @@ import WidgetKit
 enum SongBriefWidgetDataStore {
   static let suiteName = "group.app.songbrief.songbrief"
   static let summaryKey = "songbrief.widget.summary.v1"
+  /// Mirrors the in-app lock for the widget extension, which cannot read the
+  /// app's standard defaults. It is refreshed on every summary write, so a lock
+  /// toggle reaches the widget with the next summary update.
+  static let privacyLockedKey = "songbrief.widget.privacyLocked.v1"
+  /// Flutter's shared_preferences stores `songbrief_app_lock_enabled_v1` with
+  /// the `flutter.` prefix in the standard defaults.
+  private static let appLockEnabledKey = "flutter.songbrief_app_lock_enabled_v1"
   private static let trendDayCount = 7
   private static let comparisonDayCount = trendDayCount * 2
   private static let widgetKinds = [
@@ -16,11 +23,7 @@ enum SongBriefWidgetDataStore {
     guard let defaults = UserDefaults(suiteName: suiteName) else {
       return
     }
-    if let summary {
-      defaults.set(summary, forKey: summaryKey)
-    } else {
-      defaults.removeObject(forKey: summaryKey)
-    }
+    persist(summary, in: defaults)
     reloadWidgetTimelines()
   }
 
@@ -37,12 +40,43 @@ enum SongBriefWidgetDataStore {
       including: snapshot,
       snapshotCount: persistedSnapshotCount
     ) else {
-      defaults.removeObject(forKey: summaryKey)
+      persist(nil, in: defaults)
       reloadWidgetTimelines()
       return
     }
-    defaults.set(summary, forKey: summaryKey)
+    persist(summary, in: defaults)
     reloadWidgetTimelines()
+  }
+
+  /// Every summary write goes through here so the app lock redaction cannot be
+  /// bypassed by an individual caller.
+  private static func persist(
+    _ summary: [String: Any]?,
+    in defaults: UserDefaults
+  ) {
+    let locked = UserDefaults.standard.bool(forKey: appLockEnabledKey)
+    defaults.set(locked, forKey: privacyLockedKey)
+    if let summary {
+      defaults.set(redactedSummary(summary, locked: locked), forKey: summaryKey)
+    } else {
+      defaults.removeObject(forKey: summaryKey)
+    }
+  }
+
+  /// Drops track-identifying fields while the app lock is enabled and keeps
+  /// the numeric totals.
+  static func redactedSummary(
+    _ summary: [String: Any],
+    locked: Bool
+  ) -> [String: Any] {
+    guard locked else {
+      return summary
+    }
+    var redacted = summary
+    redacted.removeValue(forKey: "topTrackTitle")
+    redacted.removeValue(forKey: "topTrackArtist")
+    redacted["topTrackHidden"] = true
+    return redacted
   }
 
   /// Rebuilds every widget field from snapshot history. The supplied snapshot

@@ -18,6 +18,8 @@ abstract class MusicLibraryClient {
 
   Future<Uint8List?> fetchArtwork(String trackId, {required int size});
 
+  Future<String?> fetchLyrics(String trackId) async => null;
+
   Future<void> playTrack(String trackId);
 
   Future<void> play();
@@ -100,6 +102,11 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
       'id': trackId,
       'size': size,
     });
+  }
+
+  @override
+  Future<String?> fetchLyrics(String trackId) {
+    return _channel.invokeMethod<String>('fetchLyrics', {'id': trackId});
   }
 
   @override
@@ -345,28 +352,39 @@ class SnapshotSyncResult {
     this.downloaded = 0,
     this.uploaded = 0,
     this.deleted = 0,
-  });
+    bool? localDeletionCompleted,
+  }) : _localDeletionCompleted = localDeletionCompleted;
 
   final SnapshotSyncStatus status;
   final int downloaded;
   final int uploaded;
   final int deleted;
+  final bool? _localDeletionCompleted;
 
   bool get changedLocally => downloaded > 0 || deleted > 0;
 
+  /// Local and cloud deletion both finished.
   bool get deletionCompleted =>
       status == SnapshotSyncStatus.synced ||
       status == SnapshotSyncStatus.unchanged;
+
+  /// Local history was deleted even if the cloud push is deferred (for example
+  /// no iCloud account). Falls back to [deletionCompleted] when the platform
+  /// does not report it.
+  bool get localDeletionCompleted =>
+      _localDeletionCompleted ?? deletionCompleted;
 
   static SnapshotSyncResult fromPlatformValue(Object? value) {
     if (value is! Map) {
       return const SnapshotSyncResult(status: SnapshotSyncStatus.error);
     }
+    final localDeletion = value['localDeletionCompleted'];
     return SnapshotSyncResult(
       status: SnapshotSyncStatus.fromPlatformValue(value['status']),
       downloaded: _readCount(value['downloaded']),
       uploaded: _readCount(value['uploaded']),
       deleted: _readCount(value['deleted']),
+      localDeletionCompleted: localDeletion is bool ? localDeletion : null,
     );
   }
 

@@ -59,14 +59,25 @@ class _NowPlayingSection extends ConsumerWidget {
   }
 }
 
-class _NowPlayingLyricsPanel extends StatelessWidget {
+/// Prefers in-memory lyrics (demo data) and otherwise loads them on demand.
+AsyncValue<String?> _watchTrackLyrics(WidgetRef ref, LibraryTrack track) {
+  final inMemoryLyrics = track.lyrics;
+  if (inMemoryLyrics != null) {
+    return AsyncValue<String?>.data(inMemoryLyrics);
+  }
+  return ref.watch(trackLyricsProvider(track.id));
+}
+
+class _NowPlayingLyricsPanel extends ConsumerWidget {
   const _NowPlayingLyricsPanel({required this.track});
 
   final LibraryTrack track;
 
   @override
-  Widget build(BuildContext context) {
-    final lyrics = track.lyrics?.trim();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lyricsAsync = _watchTrackLyrics(ref, track);
+    final lyrics = lyricsAsync.asData?.value?.trim();
+    final isLoadingLyrics = lyricsAsync.isLoading;
 
     return GlassSurface(
       padding: const EdgeInsets.all(18),
@@ -82,7 +93,9 @@ class _NowPlayingLyricsPanel extends StatelessWidget {
             title: _t(context, 'Lyrics', '歌詞'),
           ),
           const SizedBox(height: 12),
-          if (lyrics == null || lyrics.isEmpty)
+          if (isLoadingLyrics)
+            const SizedBox.shrink()
+          else if (lyrics == null || lyrics.isEmpty)
             _TrackContextEmptyText(
               text: _t(
                 context,
@@ -2733,7 +2746,9 @@ class _TrackLibraryContextPanel extends ConsumerWidget {
         .asData
         ?.value
         .overview;
-    final lyrics = track.lyrics?.trim();
+    final lyricsAsync = _watchTrackLyrics(ref, track);
+    final lyrics = lyricsAsync.asData?.value?.trim();
+    final isLoadingLyrics = lyricsAsync.isLoading;
 
     return GlassSurface(
       padding: const EdgeInsets.all(18),
@@ -2797,7 +2812,9 @@ class _TrackLibraryContextPanel extends ConsumerWidget {
             title: _t(context, 'Lyrics', '歌詞'),
           ),
           const SizedBox(height: 12),
-          if (lyrics == null || lyrics.isEmpty)
+          if (isLoadingLyrics)
+            const SizedBox.shrink()
+          else if (lyrics == null || lyrics.isEmpty)
             _TrackContextEmptyText(
               text: _t(
                 context,

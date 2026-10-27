@@ -517,6 +517,9 @@ class _NoopMusicLibraryClient implements MusicLibraryClient {
   }
 
   @override
+  Future<String?> fetchLyrics(String trackId) async => null;
+
+  @override
   Future<void> playTrack(String trackId) {
     return Future.value();
   }

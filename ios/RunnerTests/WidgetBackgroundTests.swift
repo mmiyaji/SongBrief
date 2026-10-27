@@ -126,6 +126,29 @@ final class WidgetBackgroundTests: XCTestCase {
     XCTAssertNil(summary["topTrackPlayDelta"])
   }
 
+  func testRedactedSummaryStripsTrackFieldsOnlyWhileLocked() throws {
+    let snapshots = [
+      snapshot(dateKey: "2026-07-20", capturedAt: 100, plays: 10),
+      snapshot(dateKey: "2026-07-21", capturedAt: 200, plays: 14),
+    ]
+    let summary = try XCTUnwrap(
+      SongBriefWidgetDataStore.buildSummary(from: snapshots)
+    )
+
+    let unlocked = SongBriefWidgetDataStore.redactedSummary(
+      summary,
+      locked: false
+    )
+    XCTAssertNotNil(unlocked["topTrackTitle"])
+    XCTAssertNil(unlocked["topTrackHidden"])
+
+    let locked = SongBriefWidgetDataStore.redactedSummary(summary, locked: true)
+    XCTAssertNil(locked["topTrackTitle"])
+    XCTAssertNil(locked["topTrackArtist"])
+    XCTAssertEqual(locked["topTrackHidden"] as? Bool, true)
+    XCTAssertEqual(number(locked["playDelta"]), 4)
+  }
+
   private func snapshot(
     dateKey: String,
     capturedAt: Int,

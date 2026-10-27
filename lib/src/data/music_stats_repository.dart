@@ -157,6 +157,13 @@ class MusicStatsRepository {
     return _client.fetchArtwork(trackId, size: size);
   }
 
+  Future<String?> fetchLyrics(String trackId) {
+    if (!_isIosMusicRuntime) {
+      return Future<String?>.value();
+    }
+    return _client.fetchLyrics(trackId);
+  }
+
   Future<bool> openAppSettings() {
     if (!_isIosMusicRuntime) {
       return Future.value(false);
@@ -276,7 +283,9 @@ class MusicStatsRepository {
     final result = await _client.deleteCloudSnapshots(
       olderThanDateKey: olderThanDateKey,
     );
-    if (!result.deletionCompleted) {
+    // Local deletion must not depend on iCloud: native code applies it first
+    // and defers the cloud push when the account is unavailable.
+    if (!result.localDeletionCompleted) {
       throw SnapshotCloudDeletionException(result.status);
     }
   }

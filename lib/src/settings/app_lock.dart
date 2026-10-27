@@ -191,6 +191,9 @@ class AppLockController extends AsyncNotifier<AppLockState> {
   Future<void> _saveEnabled(bool enabled) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool(appLockEnabledPreferenceKey, enabled);
+    // The home widget mirrors this flag when its summary is next written
+    // (HomeWidgetBridge / SongBriefWidgetDataStore), so a toggle reaches the
+    // widget with the next library refresh rather than immediately.
   }
 
   Future<void> _verifySavedLockSupport() async {

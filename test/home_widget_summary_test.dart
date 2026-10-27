@@ -26,6 +26,38 @@ void main() {
     expect(summary.previous7PlayDelta, 0);
   });
 
+  test('home widget summary hides the top track while the app is locked', () {
+    final history = SnapshotHistory(
+      snapshots: [
+        _snapshot(day: 1, plays: 10, skips: 2, seconds: 1800, trackPlays: 4),
+        _snapshot(day: 3, plays: 18, skips: 5, seconds: 3600, trackPlays: 9),
+      ],
+    );
+
+    final open = HomeWidgetSummary.fromHistory(history)!.toMap();
+    expect(open['topTrackTitle'], 'Signal');
+    expect(open['topTrackArtist'], 'Northbound');
+    expect(open.containsKey('topTrackHidden'), isFalse);
+
+    final summary = HomeWidgetSummary.fromHistory(history, hideTopTrack: true)!;
+    final map = summary.toMap();
+    expect(summary.topTrackHidden, isTrue);
+    expect(map.containsKey('topTrackTitle'), isFalse);
+    expect(map.containsKey('topTrackArtist'), isFalse);
+    expect(map['topTrackHidden'], isTrue);
+    expect(map['playDelta'], 8);
+    expect(map['skipDelta'], 3);
+    expect(map['topTrackPlayDelta'], 5);
+    expect(map['snapshotCount'], 2);
+  });
+
+  test('hiding the top track keeps the summary absent without a record', () {
+    expect(
+      HomeWidgetSummary.fromHistory(SnapshotHistory.empty, hideTopTrack: true),
+      isNull,
+    );
+  });
+
   test('home widget summary is absent without a listening record', () {
     expect(HomeWidgetSummary.fromHistory(SnapshotHistory.empty), isNull);
   });

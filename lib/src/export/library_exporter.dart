@@ -55,7 +55,6 @@ String buildLibraryCsv(MusicStatsState stats) {
         'lastPlayedAt',
         'isCloudItem',
         'playlistNames',
-        'hasLyrics',
       ].map(_csvCell).join(','),
     );
 
@@ -77,7 +76,6 @@ String buildLibraryCsv(MusicStatsState stats) {
         track.lastPlayedAt?.toIso8601String() ?? '',
         track.isCloudItem.toString(),
         track.playlistNames.join('|'),
-        (track.lyrics?.trim().isNotEmpty ?? false).toString(),
       ].map(_csvCell).join(','),
     );
   }
@@ -121,7 +119,6 @@ String buildLibraryJson(MusicStatsState stats, {DateTime? exportedAt}) {
               'lastPlayedAt': track.lastPlayedAt!.toIso8601String(),
             'isCloudItem': track.isCloudItem,
             'playlistNames': track.playlistNames,
-            'hasLyrics': track.lyrics?.trim().isNotEmpty ?? false,
           },
         )
         .toList(growable: false),

@@ -9,6 +9,7 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     qos: .utility
   )
   private var eventSink: FlutterEventSink?
+  private static let playbackQueueWindowSize = 200
 
   private override init() {
     super.init()
@@ -56,6 +57,8 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       result(playbackMap())
     case "fetchArtwork":
       fetchArtwork(call, result: result)
+    case "fetchLyrics":
+      fetchLyrics(call, result: result)
     case "playTrack":
       playTrack(call, result: result)
     case "play":
@@ -285,8 +288,7 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
 
     guard
       let arguments = call.arguments as? [String: Any],
-      let id = Self.persistentID(from: arguments["id"]),
-      let item = Self.mediaItem(withPersistentID: id)
+      let id = Self.persistentID(from: arguments["id"])
     else {
       result(FlutterError(
         code: "track_not_found",
@@ -296,22 +298,85 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       return
     }
 
-    let player = MPMusicPlayerController.systemMusicPlayer
-    var queueItems: [MPMediaItem]
-    do {
-      queueItems = try SongBriefSnapshotRefresh.filteredLibraryItems()
-    } catch {
-      result(Self.libraryQueryError())
+    // Library queries can take seconds on large libraries, so keep them off the main thread.
+    DispatchQueue.global(qos: .userInitiated).async {
+      guard let item = Self.mediaItem(withPersistentID: id) else {
+        DispatchQueue.main.async {
+          result(FlutterError(
+            code: "track_not_found",
+            message: "The requested track was not found in the music library.",
+            details: nil
+          ))
+        }
+        return
+      }
+
+      let libraryItems: [MPMediaItem]
+      do {
+        libraryItems = try SongBriefSnapshotRefresh.filteredLibraryItems()
+      } catch {
+        DispatchQueue.main.async {
+          result(Self.libraryQueryError())
+        }
+        return
+      }
+
+      // Queue only a window starting at the target track instead of the whole library.
+      let queueItems: [MPMediaItem]
+      if let targetIndex = libraryItems.firstIndex(where: {
+        $0.persistentID == item.persistentID
+      }) {
+        let endIndex = min(
+          libraryItems.count,
+          targetIndex + 1 + Self.playbackQueueWindowSize
+        )
+        queueItems = Array(libraryItems[targetIndex..<endIndex])
+      } else {
+        queueItems = [item] + Array(libraryItems.prefix(Self.playbackQueueWindowSize))
+      }
+
+      DispatchQueue.main.async {
+        let player = MPMusicPlayerController.systemMusicPlayer
+        player.setQueue(with: MPMediaItemCollection(items: queueItems))
+        player.nowPlayingItem = item
+        player.currentPlaybackTime = 0
+        player.play()
+        result(nil)
+      }
+    }
+  }
+
+  private func fetchLyrics(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard MPMediaLibrary.authorizationStatus() == .authorized else {
+      result(FlutterError(
+        code: "music_library_not_authorized",
+        message: "Music library access has not been authorized.",
+        details: nil
+      ))
       return
     }
-    if !queueItems.contains(where: { $0.persistentID == item.persistentID }) {
-      queueItems.append(item)
+
+    guard
+      let arguments = call.arguments as? [String: Any],
+      let id = Self.persistentID(from: arguments["id"])
+    else {
+      result(FlutterError(
+        code: "invalid_track_id",
+        message: "A valid track id is required.",
+        details: nil
+      ))
+      return
     }
-    player.setQueue(with: MPMediaItemCollection(items: queueItems))
-    player.nowPlayingItem = item
-    player.currentPlaybackTime = 0
-    player.play()
-    result(nil)
+
+    DispatchQueue.global(qos: .userInitiated).async {
+      let lyrics = Self.mediaItem(withPersistentID: id).flatMap { item in
+        Self.nonEmpty(item.value(forProperty: MPMediaItemPropertyLyrics) as? String)
+      }
+
+      DispatchQueue.main.async {
+        result(lyrics)
+      }
+    }
   }
 
   private static func trackMap(
@@ -341,11 +406,6 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     }
     if let releaseDate = item.value(forProperty: MPMediaItemPropertyReleaseDate) as? Date {
       track["releaseDateMillis"] = Int(releaseDate.timeIntervalSince1970 * 1000)
-    }
-    if let lyrics = nonEmpty(
-      item.value(forProperty: MPMediaItemPropertyLyrics) as? String
-    ) {
-      track["lyrics"] = lyrics
     }
     if !playlistNames.isEmpty {
       track["playlistNames"] = playlistNames

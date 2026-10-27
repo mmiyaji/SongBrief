@@ -13,6 +13,14 @@ final premiumControllerProvider =
       PremiumController.new,
     );
 
+final premiumPurchasesEnabledProvider = Provider<bool>(
+  (ref) => MonetizationConfig.premiumPurchasesEnabled,
+);
+
+final purchaseClientFactoryProvider = Provider<PurchaseClient Function()>(
+  (ref) => createPurchaseClient,
+);
+
 class PremiumState {
   const PremiumState({
     required this.entitled,
@@ -79,6 +87,9 @@ class PremiumState {
 class PremiumController extends AsyncNotifier<PremiumState> {
   PurchaseClient? _client;
   StreamSubscription<List<PurchaseUpdate>>? _subscription;
+  final _pendingUpdates = <List<PurchaseUpdate>>[];
+  var _buildFinished = false;
+  Future<void> _updateQueue = Future<void>.value();
 
   @override
   Future<PremiumState> build() async {
@@ -96,12 +107,14 @@ class PremiumController extends AsyncNotifier<PremiumState> {
           : null,
     );
 
-    if (!MonetizationConfig.premiumPurchasesEnabled) {
+    if (!ref.read(premiumPurchasesEnabledProvider)) {
       return base;
     }
 
-    final client = createPurchaseClient();
+    final client = ref.read(purchaseClientFactoryProvider)();
     _client = client;
+    _buildFinished = false;
+    _pendingUpdates.clear();
     _subscription = client.updates.listen(_handleUpdates);
     ref.onDispose(() {
       unawaited(_subscription?.cancel());
@@ -110,11 +123,21 @@ class PremiumController extends AsyncNotifier<PremiumState> {
 
     final purchaseBase = base.copyWith(storeSupported: client.isSupported);
 
-    if (entitled || !client.isSupported) {
-      return purchaseBase;
-    }
+    var result = (entitled || !client.isSupported)
+        ? purchaseBase
+        : await _queryProduct(purchaseBase);
 
-    return _queryProduct(purchaseBase);
+    // Updates that the store re-delivers at launch can arrive before the
+    // product has loaded. Apply them here so the returned state includes them.
+    while (_pendingUpdates.isNotEmpty) {
+      final batch = _pendingUpdates.removeAt(0);
+      result = await _applyUpdates(client, result, batch);
+    }
+    _buildFinished = true;
+    // Live batches start after an event-loop turn, by which time Riverpod has
+    // published the returned state, so they never observe a null state.
+    _updateQueue = Future<void>(() {});
+    return result;
   }
 
   Future<void> reloadProduct() async {
@@ -188,51 +211,91 @@ class PremiumController extends AsyncNotifier<PremiumState> {
     }
   }
 
-  Future<void> _handleUpdates(List<PurchaseUpdate> updates) async {
-    final current = state.value;
+  void _handleUpdates(List<PurchaseUpdate> updates) {
+    if (!_buildFinished) {
+      _pendingUpdates.add(updates);
+      return;
+    }
+    // Batches run one at a time so each reads the state left by the previous
+    // batch. A failed batch must not stop later ones, and any transaction it
+    // did not complete stays queued for the store to deliver again.
+    _updateQueue = _updateQueue
+        .then((_) => _processLiveUpdates(updates))
+        .catchError((Object _) {});
+  }
+
+  Future<void> _processLiveUpdates(List<PurchaseUpdate> updates) async {
     final client = _client;
-    if (current == null || client == null) {
+    final current = state.value;
+    if (client == null || current == null) {
       return;
     }
 
+    final next = await _applyUpdates(client, current, updates);
+    if (!ref.mounted) {
+      return;
+    }
+    state = AsyncData(next);
+  }
+
+  Future<PremiumState> _applyUpdates(
+    PurchaseClient client,
+    PremiumState current,
+    List<PurchaseUpdate> updates,
+  ) async {
     var next = current;
     for (final update in updates) {
-      if (update.productId != current.productId) {
-        continue;
-      }
-
-      switch (update.status) {
-        case PurchaseUpdateStatus.purchased:
-        case PurchaseUpdateStatus.restored:
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool(_premiumEntitlementKey, true);
-          next = next.copyWith(
-            entitled: true,
-            busy: false,
-            message: 'Premium is active. Ads are removed.',
-            errorMessage: null,
-          );
-        case PurchaseUpdateStatus.pending:
-          next = next.copyWith(
-            busy: false,
-            message: 'Purchase is pending.',
-            errorMessage: null,
-          );
-        case PurchaseUpdateStatus.error:
-          next = next.copyWith(
-            busy: false,
-            message: null,
-            errorMessage: update.errorMessage ?? 'Purchase failed.',
-          );
+      // A transaction is completed only after its result is saved, so a
+      // failed save is redelivered by the store on the next launch.
+      var canComplete = true;
+      if (update.productId == current.productId) {
+        switch (update.status) {
+          case PurchaseUpdateStatus.purchased:
+          case PurchaseUpdateStatus.restored:
+            canComplete = await _saveEntitlement();
+            next = canComplete
+                ? next.copyWith(
+                    entitled: true,
+                    busy: false,
+                    message: 'Premium is active. Ads are removed.',
+                    errorMessage: null,
+                  )
+                : next.copyWith(
+                    busy: false,
+                    message: null,
+                    errorMessage:
+                        'Premium could not be saved. Try again later.',
+                  );
+          case PurchaseUpdateStatus.pending:
+            next = next.copyWith(
+              busy: false,
+              message: 'Purchase is pending.',
+              errorMessage: null,
+            );
+          case PurchaseUpdateStatus.error:
+            next = next.copyWith(
+              busy: false,
+              message: null,
+              errorMessage: update.errorMessage ?? 'Purchase failed.',
+            );
+        }
       }
 
       final completionKey = update.completionKey;
-      if (completionKey != null) {
+      if (completionKey != null && canComplete) {
         await client.completePurchase(completionKey);
       }
     }
+    return next;
+  }
 
-    state = AsyncData(next);
+  Future<bool> _saveEntitlement() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return await prefs.setBool(_premiumEntitlementKey, true);
+    } on Object {
+      return false;
+    }
   }
 
   Future<PremiumState> _queryProduct(PremiumState base) async {

@@ -102,6 +102,23 @@ void main() {
     expect(first.snapshotSignature, hasLength(8));
   });
 
+  test('snapshot signature orders rules by UTF-16 code units', () {
+    final emojiFirst = LibraryFilterPreferences(
+      excludedPlaylists: ['😀', 'ｱ'],
+      excludedGenres: ['ｱ', '😀'],
+      excludedKeywords: ['😀 mix'],
+    );
+    final fullwidthFirst = LibraryFilterPreferences(
+      excludedPlaylists: ['ｱ', '😀'],
+      excludedGenres: ['😀', 'ｱ'],
+      excludedKeywords: ['😀 mix'],
+    );
+
+    expect(emojiFirst.excludedPlaylists, ['😀', 'ｱ']);
+    expect(fullwidthFirst.snapshotSignature, emojiFirst.snapshotSignature);
+    expect(emojiFirst.snapshotSignature, '7c45552c');
+  });
+
   test('returns the original track list when there are no filter rules', () {
     final filters = LibraryFilterPreferences();
     final tracks = [

@@ -20,6 +20,63 @@ final class SnapshotCloudSyncTests: XCTestCase {
     XCTAssertEqual(merged.deleteAllThroughMillis, 200)
   }
 
+  func testPendingPolicySubsumptionKeepsNewerDeletionRequests() {
+    let pushed = SnapshotDeletionPolicy(
+      deletedBeforeDateKey: "2026-01-01",
+      deleteAllThroughMillis: 200
+    )
+    let covered = SnapshotDeletionPolicy(
+      deletedBeforeDateKey: "2025-06-01",
+      deleteAllThroughMillis: 100
+    )
+    let newer = SnapshotDeletionPolicy(
+      deletedBeforeDateKey: nil,
+      deleteAllThroughMillis: 300
+    )
+
+    XCTAssertTrue(pushed.subsumes(covered))
+    XCTAssertTrue(pushed.subsumes(.empty))
+    XCTAssertFalse(pushed.subsumes(newer))
+  }
+
+  func testCandidateWindowIsThrottledAfterARecentFullSync() {
+    let now = Date()
+    let recent = now.addingTimeInterval(-60 * 60)
+    let stale = now.addingTimeInterval(-SnapshotCloudSync.fullSyncInterval - 1)
+    let future = now.addingTimeInterval(60)
+
+    XCTAssertEqual(
+      SnapshotCloudSync.candidateWindowDays(
+        lastFullSyncAt: recent, now: now, forceFull: false
+      ),
+      SnapshotCloudSync.incrementalWindowDays
+    )
+    XCTAssertEqual(
+      SnapshotCloudSync.candidateWindowDays(
+        lastFullSyncAt: nil, now: now, forceFull: false
+      ),
+      SnapshotCloudSync.maxTrackedDays
+    )
+    XCTAssertEqual(
+      SnapshotCloudSync.candidateWindowDays(
+        lastFullSyncAt: stale, now: now, forceFull: false
+      ),
+      SnapshotCloudSync.maxTrackedDays
+    )
+    XCTAssertEqual(
+      SnapshotCloudSync.candidateWindowDays(
+        lastFullSyncAt: future, now: now, forceFull: false
+      ),
+      SnapshotCloudSync.maxTrackedDays
+    )
+    XCTAssertEqual(
+      SnapshotCloudSync.candidateWindowDays(
+        lastFullSyncAt: recent, now: now, forceFull: true
+      ),
+      SnapshotCloudSync.maxTrackedDays
+    )
+  }
+
   func testDeleteAllFrontierAllowsALaterCaptureOnTheSameDay() {
     let policy = SnapshotDeletionPolicy(
       deletedBeforeDateKey: nil,

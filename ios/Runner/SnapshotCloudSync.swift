@@ -11,13 +11,31 @@ enum SnapshotCloudSync {
     "flutter.songbrief_snapshot_cloud_sync_enabled_v1"
   private static let pendingUploadDateKeysPreferenceKey =
     "songbrief_snapshot_cloud_pending_date_keys_v1"
-  private static let maxTrackedDays = 1095
+  private static let pendingDeletionPolicyPreferenceKey =
+    "songbrief_snapshot_cloud_pending_deletion_policy_v1"
+  private static let lastFullSyncAtPreferenceKey =
+    "songbrief_snapshot_cloud_last_full_sync_at_v1"
+  private static let lastFullSyncPolicyPreferenceKey =
+    "songbrief_snapshot_cloud_last_full_sync_policy_v1"
+  static let maxTrackedDays = 1095
+  // After a successful full-window sync, syncs within this interval only
+  // inspect local date keys plus the trailing `incrementalWindowDays`.
+  static let incrementalWindowDays = 14
+  static let fullSyncInterval: TimeInterval = 6 * 60 * 60
   private static let modifyBatchSize = 200
   private static let maxConflictRetryCount = 3
   private static let maxBackgroundUploadsPerRun = 2
   private static let pendingUploadLock = NSRecursiveLock()
+  private static let pendingDeletionPolicyLock = NSRecursiveLock()
   private static let operationCoordinator = SnapshotOperationCoordinator(
     label: "app.songbrief.snapshot-cloud-operations"
+  )
+  // CloudKit callbacks hop here instead of the main queue, so the snapshot
+  // file reads and writes done in completions never block the UI. Mutation of
+  // fetch/save accumulators is serialized on this one queue.
+  private static let cloudWorkQueue = DispatchQueue(
+    label: "app.songbrief.snapshot-cloud-work",
+    qos: .utility
   )
 
   private static let payloadField = "payload"
@@ -66,14 +84,14 @@ enum SnapshotCloudSync {
       return
     }
 
-    withAvailableAccount(completion) {
+    withAvailableAccountAfterPendingPush(completion) { deletionPolicyChanged in
       fetchDeletionPolicy { policy, _, policyError in
         if let policyError {
           finish(completion, status: "error", message: policyError.localizedDescription)
           return
         }
 
-        let localCountBeforePolicy = SongBriefSnapshotRefresh.localSnapshots().count
+        let localCountBeforePolicy = SnapshotFileStore.snapshotCount()
         guard applyDeletionPolicyLocally(policy) else {
           finish(
             completion,
@@ -88,7 +106,16 @@ enum SnapshotCloudSync {
         let localByDateKey = snapshotsByDateKey(localSnapshots).filter {
           !policy.deletes($0.value)
         }
-        let candidateIDs = candidateRecordIDs(localDateKeys: Set(localByDateKey.keys))
+        let windowDays = candidateWindowDays(
+          lastFullSyncAt: lastFullSyncDate(),
+          now: Date(),
+          forceFull: deletionPolicyChanged || policy != lastFullSyncPolicy()
+        )
+        let isFullWindow = windowDays >= maxTrackedDays
+        let candidateIDs = candidateRecordIDs(
+          localDateKeys: Set(localByDateKey.keys),
+          trailingDays: windowDays
+        )
 
         fetchRecords(ids: candidateIDs, desiredKeys: summaryFields) { summaries, error in
           if let error {
@@ -234,6 +261,9 @@ enum SnapshotCloudSync {
                 )
                 return
               }
+              if isFullWindow {
+                recordFullSync(policy: policy)
+              }
               finish(
                 completion,
                 status: downloaded > 0 || uploaded > 0 || locallyDeleted > 0
@@ -279,6 +309,26 @@ enum SnapshotCloudSync {
       completion(false)
       return
     }
+    // A deferred local deletion must reach the cloud policy record before any
+    // upload, so stale cloud records cannot be re-downloaded afterwards.
+    pushPendingDeletionPolicyIfAccountAvailable { pushed in
+      guard pushed else {
+        completion(false)
+        return
+      }
+      uploadPendingDateKeys(
+        triggeringDateKey: triggeringDateKey,
+        shouldContinue: shouldContinue,
+        completion: completion
+      )
+    }
+  }
+
+  private static func uploadPendingDateKeys(
+    triggeringDateKey: String,
+    shouldContinue: @escaping () -> Bool,
+    completion: @escaping (Bool) -> Void
+  ) {
     let pending = pendingUploadDateKeys()
     var selected = [triggeringDateKey]
     if let oldest = pending.first(where: { $0 != triggeringDateKey }) {
@@ -378,18 +428,7 @@ enum SnapshotCloudSync {
         completion(false, false)
         return
       }
-      let recordToSave: CKRecord
-      if let cloudRecord = records[recordID],
-         let cloudSnapshot = snapshot(from: cloudRecord),
-         policy.deletes(cloudSnapshot) {
-        recordToSave = apply(
-          snapshot: merged,
-          protectedBy: policy,
-          to: record
-        )
-      } else {
-        recordToSave = apply(snapshot: merged, protectedBy: policy, to: record)
-      }
+      let recordToSave = apply(snapshot: merged, protectedBy: policy, to: record)
       saveRecords([recordToSave]) { uploaded, error in
         guard error == nil, uploaded > 0 else {
           completion(false, false)
@@ -492,103 +531,248 @@ enum SnapshotCloudSync {
     olderThan cutoffDateKey: String?,
     completion: @escaping ([String: Any]) -> Void
   ) {
-    withAvailableAccount(completion) {
-      let requestedPolicy = SnapshotDeletionPolicy(
-        deletedBeforeDateKey: cutoffDateKey,
-        deleteAllThroughMillis: cutoffDateKey == nil
-          ? Int64(Date().timeIntervalSince1970 * 1000) : nil
+    let requestedPolicy = SnapshotDeletionPolicy(
+      deletedBeforeDateKey: cutoffDateKey,
+      deleteAllThroughMillis: cutoffDateKey == nil
+        ? Int64(Date().timeIntervalSince1970 * 1000) : nil
+    )
+    if cutoffDateKey != nil, requestedPolicy.deletedBeforeDateKey == nil {
+      finish(
+        completion,
+        status: "error",
+        localDeletionCompleted: false,
+        message: "The deletion cutoff date is invalid."
       )
-      if cutoffDateKey != nil, requestedPolicy.deletedBeforeDateKey == nil {
-        finish(completion, status: "error", message: "The deletion cutoff date is invalid.")
-        return
-      }
-      fetchDeletionPolicy { existingPolicy, existingRecord, fetchError in
-        if let fetchError {
-          finish(completion, status: "error", message: fetchError.localizedDescription)
+      return
+    }
+
+    // Local deletion never depends on iCloud. Apply it first (this also
+    // records the process-local policy that blocks in-flight captures), then
+    // persist the policy so a deferred cloud push survives relaunches.
+    let localDateKeysBeforePolicy = Set(SnapshotFileStore.snapshotDateKeys())
+    guard applyDeletionPolicyLocally(requestedPolicy) else {
+      finish(
+        completion,
+        status: "error",
+        localDeletionCompleted: false,
+        message: "Local snapshot history could not be deleted."
+      )
+      return
+    }
+    mergePendingDeletionPolicy(requestedPolicy)
+
+    withAvailableAccount(completion, localDeletionCompleted: true) {
+      pushPendingDeletionPolicy { mergedPolicy, policySaved, pushError in
+        if let pushError {
+          finish(
+            completion,
+            status: "partial",
+            localDeletionCompleted: true,
+            message: pushError.localizedDescription
+          )
           return
         }
 
-        let mergedPolicy = existingPolicy.merged(with: requestedPolicy)
-        let savePolicy: (@escaping (Int, Error?) -> Void) -> Void = { saved in
-          guard mergedPolicy != existingPolicy || existingRecord == nil else {
-            saved(0, nil)
-            return
-          }
-          let record = apply(
-            deletionPolicy: mergedPolicy,
-            to: existingRecord ?? CKRecord(
-              recordType: recordType,
-              recordID: CKRecord.ID(recordName: deletionPolicyRecordName)
-            )
-          )
-          saveRecords([record], completion: saved)
-        }
-
-        savePolicy { policySaved, policySaveError in
-          if let policySaveError {
-            finish(completion, status: "error", message: policySaveError.localizedDescription)
-            return
-          }
-          let localDateKeysBeforePolicy = Set(
-            SongBriefSnapshotRefresh.localSnapshots().compactMap { $0["dateKey"] as? String }
-          )
-          guard applyDeletionPolicyLocally(mergedPolicy) else {
+        let candidateIDs = candidateRecordIDs(
+          localDateKeys: localDateKeysBeforePolicy,
+          trailingDays: maxTrackedDays
+        )
+        fetchRecords(ids: candidateIDs, desiredKeys: summaryFields) { summaries, error in
+          if let error {
             finish(
               completion,
               status: "partial",
               uploaded: policySaved,
-              message: "The cloud deletion policy was saved, but local history cleanup failed."
+              localDeletionCompleted: true,
+              message: error.localizedDescription
             )
             return
           }
-
-          let candidateIDs = candidateRecordIDs(localDateKeys: localDateKeysBeforePolicy)
-          fetchRecords(ids: candidateIDs, desiredKeys: summaryFields) { summaries, error in
-            if let error {
+          let recordsToRedact: [CKRecord] = summaries.compactMap { recordID, record in
+            guard !isRedactedSummary(record) else {
+              return nil
+            }
+            return mergedPolicy.deletes(
+              dateKey: recordID.recordName,
+              capturedAtMillis: int64Value(record[capturedAtField])
+            ) ? apply(
+              redactionFor: recordID.recordName,
+              policy: mergedPolicy,
+              to: record
+            ) : nil
+          }
+          saveRecords(recordsToRedact) { redacted, redactionError in
+            if let redactionError {
               finish(
                 completion,
                 status: "partial",
                 uploaded: policySaved,
-                message: error.localizedDescription
+                deleted: redacted,
+                localDeletionCompleted: true,
+                message: redactionError.localizedDescription
               )
               return
             }
-            let recordsToRedact: [CKRecord] = summaries.compactMap { recordID, record in
-              guard !isRedactedSummary(record) else {
-                return nil
-              }
-              return mergedPolicy.deletes(
-                dateKey: recordID.recordName,
-                capturedAtMillis: int64Value(record[capturedAtField])
-              ) ? apply(
-                redactionFor: recordID.recordName,
-                policy: mergedPolicy,
-                to: record
-              ) : nil
-            }
-            saveRecords(recordsToRedact) { redacted, redactionError in
-              if let redactionError {
-                finish(
-                  completion,
-                  status: "partial",
-                  uploaded: policySaved,
-                  deleted: redacted,
-                  message: redactionError.localizedDescription
-                )
-                return
-              }
-              finish(completion, status: "synced", uploaded: policySaved, deleted: redacted)
-            }
+            finish(
+              completion,
+              status: "synced",
+              uploaded: policySaved,
+              deleted: redacted,
+              localDeletionCompleted: true
+            )
           }
         }
       }
     }
   }
 
+  // MARK: - Pending deletion policy
+
+  /// Pushes a deletion policy that could not reach iCloud earlier (offline,
+  /// signed out) by max-merging it into the cloud policy record. Completion
+  /// carries the merged cloud policy (`.empty` when nothing was pending).
+  /// The caller must already know the account is available.
+  private static func pushPendingDeletionPolicy(
+    completion: @escaping (
+      _ mergedPolicy: SnapshotDeletionPolicy, _ saved: Int, _ error: Error?
+    ) -> Void
+  ) {
+    let pending = pendingDeletionPolicy()
+    guard !pending.isEmpty else {
+      completion(.empty, 0, nil)
+      return
+    }
+    fetchDeletionPolicy { existingPolicy, existingRecord, fetchError in
+      if let fetchError {
+        completion(pending, 0, fetchError)
+        return
+      }
+      let mergedPolicy = existingPolicy.merged(with: pending)
+      guard mergedPolicy != existingPolicy || existingRecord == nil else {
+        clearPendingDeletionPolicy(subsumedBy: mergedPolicy)
+        completion(mergedPolicy, 0, nil)
+        return
+      }
+      let record = apply(
+        deletionPolicy: mergedPolicy,
+        to: existingRecord ?? CKRecord(
+          recordType: recordType,
+          recordID: CKRecord.ID(recordName: deletionPolicyRecordName)
+        )
+      )
+      saveRecords([record]) { saved, saveError in
+        if saveError == nil {
+          clearPendingDeletionPolicy(subsumedBy: mergedPolicy)
+        }
+        completion(mergedPolicy, saved, saveError)
+      }
+    }
+  }
+
+  /// Like `pushPendingDeletionPolicy`, but checks the account first. Reports
+  /// true when nothing was pending or the push succeeded.
+  private static func pushPendingDeletionPolicyIfAccountAvailable(
+    completion: @escaping (Bool) -> Void
+  ) {
+    guard !pendingDeletionPolicy().isEmpty else {
+      completion(true)
+      return
+    }
+    CKContainer(identifier: containerIdentifier).accountStatus { status, _ in
+      guard status == .available else {
+        completion(false)
+        return
+      }
+      pushPendingDeletionPolicy { _, _, error in
+        completion(error == nil)
+      }
+    }
+  }
+
+  private static func pendingDeletionPolicy() -> SnapshotDeletionPolicy {
+    pendingDeletionPolicyLock.lock()
+    defer { pendingDeletionPolicyLock.unlock() }
+    return storedPolicy(forKey: pendingDeletionPolicyPreferenceKey)
+  }
+
+  private static func mergePendingDeletionPolicy(_ policy: SnapshotDeletionPolicy) {
+    pendingDeletionPolicyLock.lock()
+    defer { pendingDeletionPolicyLock.unlock() }
+    store(
+      policy: storedPolicy(forKey: pendingDeletionPolicyPreferenceKey).merged(with: policy),
+      forKey: pendingDeletionPolicyPreferenceKey
+    )
+  }
+
+  /// Clears the pending policy only when the pushed policy covers it, so a
+  /// deletion requested while a push was in flight is not lost.
+  private static func clearPendingDeletionPolicy(subsumedBy pushed: SnapshotDeletionPolicy) {
+    pendingDeletionPolicyLock.lock()
+    defer { pendingDeletionPolicyLock.unlock() }
+    let current = storedPolicy(forKey: pendingDeletionPolicyPreferenceKey)
+    if pushed.subsumes(current) {
+      store(policy: .empty, forKey: pendingDeletionPolicyPreferenceKey)
+    }
+  }
+
+  private static func storedPolicy(forKey key: String) -> SnapshotDeletionPolicy {
+    guard let payload = UserDefaults.standard.dictionary(forKey: key),
+          let policy = SnapshotDeletionPolicy(
+            payload: payload,
+            expectedKind: deletionPolicyKind
+          ) else {
+      return .empty
+    }
+    return policy
+  }
+
+  private static func store(policy: SnapshotDeletionPolicy, forKey key: String) {
+    if policy.isEmpty {
+      UserDefaults.standard.removeObject(forKey: key)
+    } else {
+      UserDefaults.standard.set(policy.payload(kind: deletionPolicyKind), forKey: key)
+    }
+  }
+
+  // MARK: - Full-sync throttling
+
+  /// How many trailing days to inspect in CloudKit. A full window runs when no
+  /// full sync succeeded yet, the last one is older than `fullSyncInterval`
+  /// (or in the future), or the deletion policy changed since then.
+  static func candidateWindowDays(
+    lastFullSyncAt: Date?,
+    now: Date,
+    forceFull: Bool
+  ) -> Int {
+    guard !forceFull, let lastFullSyncAt else {
+      return maxTrackedDays
+    }
+    let elapsed = now.timeIntervalSince(lastFullSyncAt)
+    return elapsed >= 0 && elapsed < fullSyncInterval ? incrementalWindowDays : maxTrackedDays
+  }
+
+  private static func lastFullSyncDate() -> Date? {
+    let defaults = UserDefaults.standard
+    guard defaults.object(forKey: lastFullSyncAtPreferenceKey) != nil else {
+      return nil
+    }
+    return Date(timeIntervalSince1970: defaults.double(forKey: lastFullSyncAtPreferenceKey))
+  }
+
+  private static func lastFullSyncPolicy() -> SnapshotDeletionPolicy {
+    storedPolicy(forKey: lastFullSyncPolicyPreferenceKey)
+  }
+
+  private static func recordFullSync(policy: SnapshotDeletionPolicy) {
+    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastFullSyncAtPreferenceKey)
+    store(policy: policy, forKey: lastFullSyncPolicyPreferenceKey)
+  }
+
   // MARK: - Account and helpers
 
   private static func withAvailableAccount(
     _ completion: @escaping ([String: Any]) -> Void,
+    localDeletionCompleted: Bool? = nil,
     then body: @escaping () -> Void
   ) {
     CKContainer(identifier: containerIdentifier).accountStatus { status, _ in
@@ -596,21 +780,42 @@ enum SnapshotCloudSync {
       case .available:
         body()
       case .noAccount:
-        finish(completion, status: "noAccount")
+        finish(completion, status: "noAccount", localDeletionCompleted: localDeletionCompleted)
       default:
-        finish(completion, status: "unavailable")
+        finish(completion, status: "unavailable", localDeletionCompleted: localDeletionCompleted)
+      }
+    }
+  }
+
+  /// Runs `body` once the account is available and any deferred deletion
+  /// policy has been pushed. `deletionPolicyChanged` is true when a pending
+  /// policy was just pushed, so the caller should inspect the full window.
+  private static func withAvailableAccountAfterPendingPush(
+    _ completion: @escaping ([String: Any]) -> Void,
+    then body: @escaping (_ deletionPolicyChanged: Bool) -> Void
+  ) {
+    withAvailableAccount(completion) {
+      pushPendingDeletionPolicy { pushedPolicy, _, pushError in
+        if let pushError {
+          finish(completion, status: "error", message: pushError.localizedDescription)
+          return
+        }
+        body(!pushedPolicy.isEmpty)
       }
     }
   }
 
   /// Record IDs worth inspecting: every locally known day plus the trailing
-  /// tracked window, so queries need no CloudKit indexes.
-  private static func candidateRecordIDs(localDateKeys: Set<String>) -> [CKRecord.ID] {
+  /// `trailingDays`, so queries need no CloudKit indexes.
+  private static func candidateRecordIDs(
+    localDateKeys: Set<String>,
+    trailingDays: Int
+  ) -> [CKRecord.ID] {
     var dateKeys = localDateKeys
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = .current
     let today = Date()
-    for offset in 0..<maxTrackedDays {
+    for offset in 0..<trailingDays {
       guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else {
         continue
       }
@@ -866,13 +1071,13 @@ enum SnapshotCloudSync {
       operation.desiredKeys = desiredKeys
       operation.perRecordCompletionBlock = { record, recordID, _ in
         if let record, let recordID {
-          DispatchQueue.main.async {
+          cloudWorkQueue.async {
             results[recordID] = record
           }
         }
       }
       operation.fetchRecordsCompletionBlock = { _, error in
-        DispatchQueue.main.async {
+        cloudWorkQueue.async {
           if let error, !isMissingItemError(error) {
             lastError = error
           }
@@ -881,7 +1086,7 @@ enum SnapshotCloudSync {
       }
       database.add(operation)
     }
-    group.notify(queue: .main) {
+    group.notify(queue: cloudWorkQueue) {
       completion(results, lastError)
     }
   }
@@ -910,7 +1115,7 @@ enum SnapshotCloudSync {
         group.leave()
       }
     }
-    group.notify(queue: .main) {
+    group.notify(queue: cloudWorkQueue) {
       completion(savedCount, lastError)
     }
   }
@@ -924,7 +1129,7 @@ enum SnapshotCloudSync {
     operation.isAtomic = false
     operation.savePolicy = .ifServerRecordUnchanged
     operation.modifyRecordsCompletionBlock = { saved, _, error in
-      DispatchQueue.main.async {
+      cloudWorkQueue.async {
         let savedIDs = Set((saved ?? []).map(\.recordID))
         let savedCount = savedIDs.count
         guard let error else {
@@ -1049,6 +1254,7 @@ enum SnapshotCloudSync {
     downloaded: Int = 0,
     uploaded: Int = 0,
     deleted: Int = 0,
+    localDeletionCompleted: Bool? = nil,
     message: String? = nil
   ) {
     var payload: [String: Any] = [
@@ -1057,9 +1263,13 @@ enum SnapshotCloudSync {
       "uploaded": uploaded,
       "deleted": deleted,
     ]
+    if let localDeletionCompleted {
+      payload["localDeletionCompleted"] = localDeletionCompleted
+    }
     if let message {
       payload["message"] = message
     }
+    // Flutter results must be delivered on the main thread.
     DispatchQueue.main.async {
       completion(payload)
     }
@@ -1117,6 +1327,11 @@ struct SnapshotDeletionPolicy: Equatable {
         other.deleteAllThroughMillis
       )
     )
+  }
+
+  /// True when this policy already deletes everything `other` would.
+  func subsumes(_ other: SnapshotDeletionPolicy) -> Bool {
+    merged(with: other) == self
   }
 
   func deletes(_ snapshot: [String: Any]) -> Bool {

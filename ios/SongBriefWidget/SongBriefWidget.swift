@@ -4,6 +4,7 @@ import WidgetKit
 
 private let suiteName = "group.app.songbrief.songbrief"
 private let summaryKey = "songbrief.widget.summary.v1"
+private let privacyLockedKey = "songbrief.widget.privacyLocked.v1"
 
 private var songBriefGregorianCalendar: Calendar {
   var calendar = Calendar(identifier: .gregorian)
@@ -33,8 +34,9 @@ struct SongBriefWidgetSummary {
   let topTrackTitle: String?
   let topTrackArtist: String?
   let topTrackPlayDelta: Int
+  let topTrackHidden: Bool
 
-  init?(dictionary: [String: Any]) {
+  init?(dictionary: [String: Any], privacyLocked: Bool = false) {
     guard let capturedAtMillis = Self.int(dictionary["latestCapturedAtMillis"]) else {
       return nil
     }
@@ -52,8 +54,12 @@ struct SongBriefWidgetSummary {
       Self.int(dictionary["recent7ListeningSecondsDelta"]) ?? 0
     recent7ObservedDays = Self.int(dictionary["recent7ObservedDays"]) ?? 0
     previous7ObservedDays = Self.int(dictionary["previous7ObservedDays"]) ?? 0
-    topTrackTitle = dictionary["topTrackTitle"] as? String
-    topTrackArtist = dictionary["topTrackArtist"] as? String
+    // Hide the track whenever either the summary or the lock mirror says the
+    // app is locked, even if an older summary still carries a title.
+    topTrackHidden =
+      privacyLocked || (Self.bool(dictionary["topTrackHidden"]) ?? false)
+    topTrackTitle = topTrackHidden ? nil : dictionary["topTrackTitle"] as? String
+    topTrackArtist = topTrackHidden ? nil : dictionary["topTrackArtist"] as? String
     topTrackPlayDelta = Self.int(dictionary["topTrackPlayDelta"]) ?? 0
   }
 
@@ -135,10 +141,14 @@ struct SongBriefWidgetProvider: TimelineProvider {
   }
 
   private func entry() -> SongBriefWidgetEntry {
-    let dictionary = UserDefaults(suiteName: suiteName)?.dictionary(forKey: summaryKey)
+    let defaults = UserDefaults(suiteName: suiteName)
+    let dictionary = defaults?.dictionary(forKey: summaryKey)
+    let privacyLocked = defaults?.bool(forKey: privacyLockedKey) ?? false
     return SongBriefWidgetEntry(
       date: Date(),
-      summary: dictionary.flatMap(SongBriefWidgetSummary.init(dictionary:))
+      summary: dictionary.flatMap {
+        SongBriefWidgetSummary(dictionary: $0, privacyLocked: privacyLocked)
+      }
     )
   }
 }
@@ -189,7 +199,20 @@ struct SongBriefWidgetEntryView: View {
               ? localized("\(summary.observedDays)d", "\(summary.observedDays)日")
               : "—"
           )
-          if summary.hasComparableDelta, let title = summary.topTrackTitle {
+          if summary.hasComparableDelta, summary.topTrackHidden {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(localized("Top song", "トップ曲"))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+              Text(localized(
+                "Hidden while SongBrief is locked",
+                "ロック中は非表示"
+              ))
+                .font(.caption.weight(.bold))
+                .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+          } else if summary.hasComparableDelta, let title = summary.topTrackTitle {
             VStack(alignment: .leading, spacing: 2) {
               Text(localized("Top song", "トップ曲"))
                 .font(.caption2.weight(.semibold))
@@ -197,6 +220,7 @@ struct SongBriefWidgetEntryView: View {
               Text(title)
                 .font(.caption.weight(.bold))
                 .lineLimit(1)
+                .privacySensitive()
               Text("+\(summary.topTrackPlayDelta)")
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(.secondary)

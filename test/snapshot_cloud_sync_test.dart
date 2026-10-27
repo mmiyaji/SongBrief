@@ -120,6 +120,30 @@ void main() {
       },
     );
 
+    test('parses whether local deletion completed independently of cloud', () {
+      final deferred = SnapshotSyncResult.fromPlatformValue({
+        'status': 'noAccount',
+        'localDeletionCompleted': true,
+      });
+      expect(deferred.deletionCompleted, isFalse);
+      expect(deferred.localDeletionCompleted, isTrue);
+
+      final failed = SnapshotSyncResult.fromPlatformValue({
+        'status': 'error',
+        'localDeletionCompleted': false,
+      });
+      expect(failed.localDeletionCompleted, isFalse);
+
+      final legacySynced = SnapshotSyncResult.fromPlatformValue({
+        'status': 'synced',
+      });
+      expect(legacySynced.localDeletionCompleted, isTrue);
+      final legacyNoAccount = SnapshotSyncResult.fromPlatformValue({
+        'status': 'noAccount',
+      });
+      expect(legacyNoAccount.localDeletionCompleted, isFalse);
+    });
+
     test('maps every known status string', () {
       const expected = {
         'synced': SnapshotSyncStatus.synced,
@@ -304,10 +328,30 @@ void main() {
       expect(client.deleteCalls, 1);
     });
 
-    test('cloud deletion status errors stop local deletion', () async {
+    test('deletion succeeds locally when iCloud is unavailable', () async {
+      for (final status in [
+        SnapshotSyncStatus.noAccount,
+        SnapshotSyncStatus.unavailable,
+        SnapshotSyncStatus.partial,
+      ]) {
+        final client = _CloudSyncSpyClient()
+          ..deleteResult = SnapshotSyncResult(
+            status: status,
+            localDeletionCompleted: true,
+          );
+
+        await repository(client).clearSnapshotHistory();
+        await repository(client).deleteSnapshotsOlderThan(DateTime(2026, 7, 1));
+
+        expect(client.deleteCalls, 2, reason: status.name);
+      }
+    });
+
+    test('a genuine local deletion failure throws', () async {
       final client = _CloudSyncSpyClient()
         ..deleteResult = const SnapshotSyncResult(
-          status: SnapshotSyncStatus.noAccount,
+          status: SnapshotSyncStatus.error,
+          localDeletionCompleted: false,
         );
 
       await expectLater(
@@ -316,12 +360,24 @@ void main() {
           isA<SnapshotCloudDeletionException>().having(
             (error) => error.status,
             'status',
-            SnapshotSyncStatus.noAccount,
+            SnapshotSyncStatus.error,
           ),
         ),
       );
 
       expect(client.deleteCalls, 1);
+    });
+
+    test('a status without a local deletion report is not trusted', () async {
+      final client = _CloudSyncSpyClient()
+        ..deleteResult = const SnapshotSyncResult(
+          status: SnapshotSyncStatus.noAccount,
+        );
+
+      await expectLater(
+        repository(client).clearSnapshotHistory(),
+        throwsA(isA<SnapshotCloudDeletionException>()),
+      );
     });
 
     test('loads a large library through the overview build path', () async {
@@ -506,6 +562,9 @@ class _CloudSyncSpyClient implements MusicLibraryClient {
   Future<Uint8List?> fetchArtwork(String trackId, {required int size}) async {
     return null;
   }
+
+  @override
+  Future<String?> fetchLyrics(String trackId) async => null;
 
   @override
   Future<void> playTrack(String trackId) async {}

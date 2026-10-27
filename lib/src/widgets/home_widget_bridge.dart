@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/library_snapshot.dart';
+import '../settings/app_lock.dart';
 
 const _homeWidgetTrendDayCount = 7;
 const _homeWidgetComparisonDayCount = _homeWidgetTrendDayCount * 2;
@@ -47,6 +49,7 @@ class HomeWidgetSummary {
     this.topTrackTitle,
     this.topTrackArtist,
     this.topTrackPlayDelta = 0,
+    this.topTrackHidden = false,
   });
 
   final int latestCapturedAtMillis;
@@ -66,7 +69,40 @@ class HomeWidgetSummary {
   final String? topTrackArtist;
   final int topTrackPlayDelta;
 
-  static HomeWidgetSummary? fromHistory(SnapshotHistory history) {
+  /// True when the track fields were withheld because the app lock is on.
+  final bool topTrackHidden;
+
+  /// Drops track-identifying fields (keeping numeric totals) so the widget does
+  /// not reveal listening details while the app lock is enabled.
+  HomeWidgetSummary withTopTrackHidden() {
+    return HomeWidgetSummary(
+      latestCapturedAtMillis: latestCapturedAtMillis,
+      snapshotCount: snapshotCount,
+      hasComparableDelta: hasComparableDelta,
+      playDelta: playDelta,
+      skipDelta: skipDelta,
+      listeningSecondsDelta: listeningSecondsDelta,
+      observedDays: observedDays,
+      dailyPlayDeltas: dailyPlayDeltas,
+      recent7PlayDelta: recent7PlayDelta,
+      previous7PlayDelta: previous7PlayDelta,
+      recent7ListeningSecondsDelta: recent7ListeningSecondsDelta,
+      recent7ObservedDays: recent7ObservedDays,
+      previous7ObservedDays: previous7ObservedDays,
+      topTrackPlayDelta: topTrackPlayDelta,
+      topTrackHidden: true,
+    );
+  }
+
+  static HomeWidgetSummary? fromHistory(
+    SnapshotHistory history, {
+    bool hideTopTrack = false,
+  }) {
+    final summary = _fromHistory(history);
+    return hideTopTrack ? summary?.withTopTrackHidden() : summary;
+  }
+
+  static HomeWidgetSummary? _fromHistory(SnapshotHistory history) {
     final latest = history.latest;
     if (latest == null) {
       return null;
@@ -131,6 +167,7 @@ class HomeWidgetSummary {
       if (topTrackTitle != null) 'topTrackTitle': topTrackTitle,
       if (topTrackArtist != null) 'topTrackArtist': topTrackArtist,
       'topTrackPlayDelta': topTrackPlayDelta,
+      if (topTrackHidden) 'topTrackHidden': true,
     };
   }
 
@@ -216,7 +253,10 @@ class HomeWidgetBridge {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
       return;
     }
-    final summary = HomeWidgetSummary.fromHistory(history);
+    final summary = HomeWidgetSummary.fromHistory(
+      history,
+      hideTopTrack: await _isAppLockEnabled(),
+    );
     try {
       await _channel.invokeMethod<void>('updateHomeWidget', {
         'summary': ?summary?.toMap(),
@@ -225,6 +265,18 @@ class HomeWidgetBridge {
       // Older native builds can safely ignore widget updates.
     } on PlatformException {
       // Widget data is a convenience surface and must not block library scans.
+    }
+  }
+
+  // The native store applies the same redaction to every write; this keeps the
+  // Dart payload consistent with it. When the preference cannot be read, hide
+  // the track rather than risk exposing it while locked.
+  static Future<bool> _isAppLockEnabled() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      return preferences.getBool(appLockEnabledPreferenceKey) ?? false;
+    } on Object {
+      return true;
     }
   }
 }
