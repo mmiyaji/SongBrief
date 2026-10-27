@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.4] - Unreleased
+
+### Fixed
+
+- Keep iCloud sync and Music library queries off the main thread, and queue
+  only nearby tracks when starting playback.
+- Load lyrics on demand instead of reading them for every track.
+- Delete listening records locally even when iCloud is unavailable; the
+  deletion reaches iCloud once the account is available again.
+- Throttle full iCloud history scans to once every six hours.
+- Hide the top track in home screen widgets while App Lock is enabled.
+- Keep purchase updates delivered at launch and finish every transaction.
+
+### Changed
+
+- Upgrade to Flutter 3.47.8 and refresh dependencies (Firebase iOS SDK 13).
+- Remove the `hasLyrics` column from CSV and JSON exports.
+
 ## [1.0.3] - 2026-09-21
 
 ### Fixed
