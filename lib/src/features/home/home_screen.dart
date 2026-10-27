@@ -39,7 +39,14 @@ part 'parts/overview_section.dart';
 part 'parts/overview_listening_maps.dart';
 part 'parts/overview_insights.dart';
 part 'parts/overview_recaps.dart';
-part 'parts/library_rankings_settings.dart';
+part 'parts/rankings_section.dart';
+part 'parts/library_section.dart';
+part 'parts/settings_general.dart';
+part 'parts/settings_filters.dart';
+part 'parts/settings_snapshots.dart';
+part 'parts/settings_data.dart';
+part 'parts/settings_privacy.dart';
+part 'parts/external_links.dart';
 part 'parts/shared_helpers.dart';
 
 const _privacyPolicyUrl = 'https://songbrief.ruhenheim.org/privacy/';
