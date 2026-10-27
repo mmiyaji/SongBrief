@@ -179,7 +179,8 @@ jobs:
       - name: Install CocoaPods dependencies
         run: |
           set -euo pipefail
-          find ios -name "Podfile" -execdir pod install \;
+          # `find -execdir` ignores pod install failures, so run it directly.
+          (cd ios && pod install)
 
       - name: Validate Crashlytics symbol uploader
         run: |
