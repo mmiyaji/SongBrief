@@ -352,8 +352,8 @@ class SnapshotSyncResult {
     this.downloaded = 0,
     this.uploaded = 0,
     this.deleted = 0,
-    bool? localDeletionCompleted,
-  }) : _localDeletionCompleted = localDeletionCompleted;
+    this._localDeletionCompleted,
+  });
 
   final SnapshotSyncStatus status;
   final int downloaded;

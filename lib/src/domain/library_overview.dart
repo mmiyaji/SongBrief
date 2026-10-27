@@ -41,24 +41,18 @@ class LibraryOverview {
     required this.totalAlbums,
     required this.generatedAt,
     required this.isDemo,
-    required Map<String, LibraryTrack> tracksById,
-    required Map<String, List<LibraryTrack>> tracksByArtist,
-    required Map<String, List<LibraryTrack>> tracksByAlbumArtist,
-    required Map<String, List<LibraryTrack>> tracksByAlbum,
-    required Map<String, List<LibraryTrack>> tracksByGenre,
-    required Map<String, List<LibraryTrack>> tracksByPlaylist,
-    required List<String> searchTexts,
+    required this._tracksById,
+    required this._tracksByArtist,
+    required this._tracksByAlbumArtist,
+    required this._tracksByAlbum,
+    required this._tracksByGenre,
+    required this._tracksByPlaylist,
+    required this._searchTexts,
     required this.tracksByRecent,
     required this.tracksByPlayCount,
     required this.tracksBySkipCount,
     required this.tracksByTitle,
-  }) : _tracksById = tracksById,
-       _tracksByArtist = tracksByArtist,
-       _tracksByAlbumArtist = tracksByAlbumArtist,
-       _tracksByAlbum = tracksByAlbum,
-       _tracksByGenre = tracksByGenre,
-       _tracksByPlaylist = tracksByPlaylist,
-       _searchTexts = searchTexts;
+  });
 
   final List<LibraryTrack> tracks;
   final List<RankingEntry> topTracks;

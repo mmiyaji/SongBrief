@@ -19,8 +19,7 @@ SnapshotStore createSnapshotStore() {
 }
 
 class FileSnapshotStore implements SnapshotStore {
-  const FileSnapshotStore({SnapshotDirectoryProvider? directoryProvider})
-    : _directoryProvider = directoryProvider;
+  const FileSnapshotStore({this._directoryProvider});
 
   static final _snapshotFileNamePattern = RegExp(r'^\d{4}-\d{2}-\d{2}\.json$');
   static final _dateKeyPattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');

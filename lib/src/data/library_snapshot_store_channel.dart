@@ -5,8 +5,8 @@ import 'library_snapshot_store_base.dart';
 
 class MethodChannelSnapshotStore implements SnapshotStore {
   const MethodChannelSnapshotStore({
-    MethodChannel channel = const MethodChannel(channelName),
-  }) : _channel = channel;
+    this._channel = const MethodChannel(channelName),
+  });
 
   static const channelName = 'app.songbrief/music_library';
 

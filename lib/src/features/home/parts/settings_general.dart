@@ -390,22 +390,28 @@ class _SettingsSwitchCard extends StatelessWidget {
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
         ),
       ),
-      child: SwitchListTile(
-        value: value,
-        onChanged: onChanged,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        secondary: Icon(icon, color: theme.colorScheme.primary),
-        title: Text(
-          title,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w800,
+      child: Material(
+        type: MaterialType.transparency,
+        child: SwitchListTile(
+          value: value,
+          onChanged: onChanged,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 2,
           ),
-        ),
-        subtitle: Text(
-          description,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
+          secondary: Icon(icon, color: theme.colorScheme.primary),
+          title: Text(
+            title,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          subtitle: Text(
+            description,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),

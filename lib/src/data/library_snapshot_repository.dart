@@ -15,7 +15,7 @@ final librarySnapshotRepositoryProvider = Provider<LibrarySnapshotRepository>((
 });
 
 class LibrarySnapshotRepository {
-  LibrarySnapshotRepository({SnapshotStore? store}) : _store = store;
+  LibrarySnapshotRepository({this._store});
 
   static const _legacyMigrationPreferenceKey =
       'songbrief_daily_snapshots_file_store_migrated_v1';

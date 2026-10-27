@@ -91,7 +91,7 @@ class SnapshotRecordingController extends Notifier<bool> {
         return false;
       }
       _preferences ??= preferences;
-      return preferences.setBool(
+      return await preferences.setBool(
         snapshotRecordingEnabledPreferenceKey,
         enabled,
       );
@@ -273,7 +273,7 @@ class SnapshotDetailedLoggingController extends Notifier<bool> {
         return false;
       }
       _preferences ??= preferences;
-      return preferences.setBool(
+      return await preferences.setBool(
         snapshotDetailedLoggingEnabledPreferenceKey,
         enabled,
       );
