@@ -12,8 +12,8 @@ from urllib.request import Request, urlopen
 import jwt
 
 WHATS_NEW = {
-    "ja": "動作の安定性を改善し、軽微な不具合を修正しました。",
-    "en-US": "Improved stability and fixed minor bugs.",
+    "ja": "iPhone Duoの外側・内側の両画面に対応しました。狭い画面での表示も改善しています。",
+    "en-US": "Added support for both the outer and inner displays of iPhone Duo, with improved layouts on narrow screens.",
 }
 
 
