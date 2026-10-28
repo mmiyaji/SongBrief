@@ -40,6 +40,9 @@ env:
   APPLE_TEAM_ID: "B8LGAS7YHH"
   BUNDLE_ID: "app.songbrief.songbrief"
   WIDGET_BUNDLE_ID: "app.songbrief.songbrief.widget"
+  # iPhone Duo (iOS 27.1) full-screen support requires building with the iOS 27.1 SDK.
+  XCODE_PATH: "/Applications/Xcode_27.1.app"
+  MIN_IOS_SDK_VERSION: "27.1"
   KEYCHAIN_NAME: "songbrief-build.keychain-db"
   SONGBRIEF_AD_MODE: "admobLive"
   SONGBRIEF_ADMOB_IOS_BANNER_AD_UNIT_ID: "ca-app-pub-5321136982470738/2315074663"
@@ -50,12 +53,31 @@ jobs:
   build-and-upload:
     if: ${{ !inputs.inspect_testflight && (inputs.app_store_action == 'none' || !inputs.app_store_action) }}
     name: Build iOS IPA and upload to TestFlight
-    runs-on: macos-26
+    # Xcode 27 image (macOS 27, arm64). macos-26 images only ship Xcode 26.x.
+    runs-on: xcode-27
     timeout-minutes: 60
 
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Select Xcode and verify iOS SDK
+        run: |
+          set -euo pipefail
+          if [ ! -d "$XCODE_PATH" ]; then
+            echo "$XCODE_PATH not found on this runner. Installed Xcode versions:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="$XCODE_PATH/Contents/Developer"
+          SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "iPhoneOS SDK version: $SDK_VERSION"
+          if [ "$(printf '%s %s' "$MIN_IOS_SDK_VERSION" "$SDK_VERSION" | tr ' ' '\n' | sort -V | head -n 1)" != "$MIN_IOS_SDK_VERSION" ]; then
+            echo "::error::iPhoneOS SDK $SDK_VERSION is older than required $MIN_IOS_SDK_VERSION. Builds with an older SDK are letterboxed on iPhone Duo. Check runs-on and XCODE_PATH."
+            exit 1
+          fi
 
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -210,16 +232,22 @@ jobs:
       - name: Run iOS unit tests
         run: |
           set -euo pipefail
+          # Pick a regular iPhone (not Duo) from the newest available iOS runtime.
           SIMULATOR_ID="$(
             xcrun simctl list devices available --json |
               /usr/bin/python3 -c '
           import json
+          import re
           import sys
 
-          runtimes = json.load(sys.stdin).get("devices", {}).values()
-          for devices in runtimes:
-              for device in devices:
-                  if device.get("isAvailable", True) and device.get("name", "").startswith("iPhone"):
+          def key(runtime):
+              return [int(n) for n in re.findall(r"\d+", runtime.rsplit("iOS-", 1)[-1])]
+
+          data = json.load(sys.stdin).get("devices", {})
+          for runtime in sorted((r for r in data if ".iOS-" in r), key=key, reverse=True):
+              for device in data[runtime]:
+                  name = device.get("name", "")
+                  if device.get("isAvailable", True) and name.startswith("iPhone") and "Duo" not in name:
                       print(device["udid"])
                       raise SystemExit
           '

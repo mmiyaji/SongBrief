@@ -439,20 +439,27 @@ class _HeroTrackWideHeader extends StatelessWidget {
                           icon: const Icon(Icons.replay_rounded),
                         ),
                         const SizedBox(width: 14),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              number.format(track.playCount),
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w900,
-                              ),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  number.format(track.playCount),
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                ),
+                                _SmallMetricPill(
+                                  label: _t(context, 'Plays', '再生回数'),
+                                ),
+                              ],
                             ),
-                            _SmallMetricPill(
-                              label: _t(context, 'Plays', '再生回数'),
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
@@ -1405,11 +1412,15 @@ class _RecentTrackRow extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 10),
-            Text(
-              _shortPlayedAtLabel(context, track.lastPlayedAt),
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w800,
+            Flexible(
+              child: Text(
+                _shortPlayedAtLabel(context, track.lastPlayedAt),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
             IconButton(

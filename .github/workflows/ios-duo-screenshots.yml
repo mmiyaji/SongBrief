@@ -1,0 +1,144 @@
+name: iPhone Duo Screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      launch_wait_seconds:
+        description: "Seconds to wait after launching the app before each screenshot."
+        required: false
+        default: "15"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.8"
+  BUNDLE_ID: "app.songbrief.songbrief"
+  XCODE_PATH: "/Applications/Xcode_27.1.app"
+  MIN_IOS_SDK_VERSION: "27.1"
+
+jobs:
+  duo-screenshots:
+    name: Capture iPhone Duo simulator screenshots
+    # Xcode 27 image (macOS 27, arm64) ships Xcode 27.1 and the iPhone Duo device type.
+    runs-on: xcode-27
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Select Xcode and verify iOS SDK
+        run: |
+          set -euo pipefail
+          if [ ! -d "$XCODE_PATH" ]; then
+            echo "$XCODE_PATH not found on this runner. Installed Xcode versions:"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="$XCODE_PATH/Contents/Developer"
+          SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "iPhoneOS SDK version: $SDK_VERSION"
+          if [ "$(printf '%s %s' "$MIN_IOS_SDK_VERSION" "$SDK_VERSION" | tr ' ' '\n' | sort -V | head -n 1)" != "$MIN_IOS_SDK_VERSION" ]; then
+            echo "::error::iPhoneOS SDK $SDK_VERSION is older than required $MIN_IOS_SDK_VERSION. Check runs-on and XCODE_PATH."
+            exit 1
+          fi
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Generate app icon and splash assets
+        run: |
+          set -euo pipefail
+          dart run flutter_launcher_icons
+          dart run flutter_native_splash:create
+
+      - name: Install CocoaPods dependencies
+        run: |
+          set -euo pipefail
+          (cd ios && pod install)
+
+      - name: Build simulator app
+        # Ads and Crashlytics stay off; with no Music library the app shows demo data.
+        run: |
+          set -euo pipefail
+          flutter build ios --simulator --debug \
+            --dart-define=SONGBRIEF_AD_MODE=off \
+            --dart-define=SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED=false
+          test -d build/ios/iphonesimulator/Runner.app
+
+      - name: Find and boot iPhone Duo simulator
+        run: |
+          set -euo pipefail
+          DUO_ID="$(
+            xcrun simctl list devices available --json |
+              /usr/bin/python3 -c '
+          import json
+          import sys
+
+          data = json.load(sys.stdin).get("devices", {})
+          for runtime in sorted(data, reverse=True):
+              for device in data[runtime]:
+                  if device.get("isAvailable", True) and "Duo" in device.get("name", ""):
+                      print(device["udid"])
+                      raise SystemExit
+          '
+          )"
+          if [ -z "$DUO_ID" ]; then
+            # Fall back to creating one from a matching device type + iOS runtime.
+            DUO_TYPE="$(xcrun simctl list devicetypes | grep -i 'Duo' | head -n 1 | sed -E 's/.*\((com\.apple[^)]*)\)$/\1/')"
+            RUNTIME="$(xcrun simctl list runtimes available | grep -E 'iOS 27\.1' | head -n 1 | sed -E 's/.* - (com\.apple[^ ]*)$/\1/')"
+            if [ -z "$DUO_TYPE" ] || [ -z "$RUNTIME" ]; then
+              echo "::error::No iPhone Duo simulator or device type found. Available device types and runtimes:"
+              xcrun simctl list devicetypes
+              xcrun simctl list runtimes
+              exit 1
+            fi
+            DUO_ID="$(xcrun simctl create "SongBrief Duo" "$DUO_TYPE" "$RUNTIME")"
+          fi
+          echo "DUO_ID=$DUO_ID" >> "$GITHUB_ENV"
+          echo "Using iPhone Duo simulator: $DUO_ID"
+          xcrun simctl bootstatus "$DUO_ID" -b
+
+      - name: Install and launch app, capture screenshots
+        run: |
+          set -euo pipefail
+          WAIT="${{ inputs.launch_wait_seconds }}"
+          OUT="$RUNNER_TEMP/duo-screenshots"
+          mkdir -p "$OUT"
+          xcrun simctl install "$DUO_ID" build/ios/iphonesimulator/Runner.app
+          xcrun simctl launch "$DUO_ID" "$BUNDLE_ID"
+          sleep "$WAIT"
+
+          # Default display (outer display / whichever is currently active).
+          xcrun simctl io "$DUO_ID" screenshot "$OUT/duo-default.png"
+
+          # NOTE: As of Xcode 27.1 there is no documented simctl subcommand to fold/unfold
+          # the iPhone Duo simulator (the Simulator/Device Hub UI posture control is manual).
+          # Best effort: enumerate displays and capture each one (the inner panel is reported
+          # to be exposed as a second display). Failures here are non-fatal; verify on CI.
+          xcrun simctl io "$DUO_ID" enumerate > "$OUT/display-enumerate.txt" 2>&1 || true
+          cat "$OUT/display-enumerate.txt"
+          for DISPLAY_NAME in internal external; do
+            xcrun simctl io "$DUO_ID" screenshot --display="$DISPLAY_NAME" "$OUT/duo-display-$DISPLAY_NAME.png" \
+              || echo "Display '$DISPLAY_NAME' screenshot not available."
+          done
+          ls -la "$OUT"
+          echo "SCREENSHOT_DIR=$OUT" >> "$GITHUB_ENV"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: songbrief-duo-screenshots-${{ github.run_number }}
+          path: ${{ runner.temp }}/duo-screenshots/*
+          if-no-files-found: error

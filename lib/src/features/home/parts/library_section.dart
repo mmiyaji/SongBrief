@@ -688,11 +688,15 @@ class _MiniStatLabel extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: theme.colorScheme.onSurfaceVariant),
         const SizedBox(width: 3),
-        Text(
-          value,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
