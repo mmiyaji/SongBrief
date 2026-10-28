@@ -717,10 +717,10 @@ Future<void> _saveLibraryExport(
       : fileName;
 
   try {
-    final savedPath = await FileSaver.instance.saveAs(
-      name: baseName,
+    final saved = await _shareFileForSaving(
+      context,
       bytes: Uint8List.fromList(utf8.encode(payload.content)),
-      fileExtension: extension,
+      fileName: '$baseName.$extension',
       mimeType: _libraryExportMimeType(format),
     );
 
@@ -728,7 +728,7 @@ Future<void> _saveLibraryExport(
       return;
     }
 
-    if (savedPath == null) {
+    if (!saved) {
       messenger?.showSnackBar(
         SnackBar(
           content: Text(
@@ -738,7 +738,7 @@ Future<void> _saveLibraryExport(
       );
       return;
     }
-  } on Exception {
+  } on Object {
     if (!context.mounted) {
       return;
     }
@@ -779,7 +779,7 @@ String _libraryExportExtension(LibraryExportFormat format) => switch (format) {
   LibraryExportFormat.json => 'json',
 };
 
-MimeType _libraryExportMimeType(LibraryExportFormat format) => switch (format) {
-  LibraryExportFormat.csv => MimeType.csv,
-  LibraryExportFormat.json => MimeType.json,
+String _libraryExportMimeType(LibraryExportFormat format) => switch (format) {
+  LibraryExportFormat.csv => 'text/csv',
+  LibraryExportFormat.json => 'application/json',
 };

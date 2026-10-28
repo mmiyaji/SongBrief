@@ -898,11 +898,11 @@ Future<void> _saveSnapshotRefreshLogs(
     }
     final timestamp = DateFormat('yyyyMMdd-HHmm').format(DateTime.now());
     final fileName = 'songbrief-background-log-$timestamp';
-    final savedPath = await FileSaver.instance.saveAs(
-      name: fileName,
+    final saved = await _shareFileForSaving(
+      context,
       bytes: Uint8List.fromList(utf8.encode(content)),
-      fileExtension: 'jsonl',
-      mimeType: MimeType.text,
+      fileName: '$fileName.jsonl',
+      mimeType: 'text/plain',
     );
     if (!context.mounted) {
       return;
@@ -910,20 +910,20 @@ Future<void> _saveSnapshotRefreshLogs(
     messenger?.showSnackBar(
       SnackBar(
         content: Text(
-          savedPath == null
+          saved
               ? _t(
-                  context,
-                  'Log save was cancelled.',
-                  'ログの保存をキャンセルしました。',
-                  zh: '已取消保存日志。',
-                  ko: '로그 저장을 취소했습니다.',
-                )
-              : _t(
                   context,
                   'Saved $fileName.jsonl.',
                   '$fileName.jsonl を保存しました。',
                   zh: '已保存 $fileName.jsonl。',
                   ko: '$fileName.jsonl 저장됨.',
+                )
+              : _t(
+                  context,
+                  'Log save was cancelled.',
+                  'ログの保存をキャンセルしました。',
+                  zh: '已取消保存日志。',
+                  ko: '로그 저장을 취소했습니다.',
                 ),
         ),
       ),

@@ -2959,3 +2959,28 @@ String _sectionSubtitle(
     ),
   };
 }
+
+/// Offers [bytes] through the system share sheet, whose "Save to Files" action
+/// replaces a dedicated save dialog. Returns false when the sheet is dismissed.
+Future<bool> _shareFileForSaving(
+  BuildContext context, {
+  required Uint8List bytes,
+  required String fileName,
+  required String mimeType,
+}) async {
+  final renderObject = context.findRenderObject();
+  final origin = renderObject is RenderBox && renderObject.hasSize
+      ? renderObject.localToGlobal(Offset.zero) & renderObject.size
+      : null;
+  final result = await SharePlus.instance.share(
+    ShareParams(
+      files: [XFile.fromData(bytes, mimeType: mimeType, name: fileName)],
+      fileNameOverrides: [fileName],
+      sharePositionOrigin: origin,
+    ),
+  );
+  if (result.status == ShareResultStatus.unavailable) {
+    throw StateError('Sharing is not available on this device.');
+  }
+  return result.status != ShareResultStatus.dismissed;
+}

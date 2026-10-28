@@ -5,7 +5,6 @@
 import FlutterMacOS
 import Foundation
 
-import file_saver
 import firebase_analytics
 import firebase_core
 import firebase_crashlytics
@@ -18,7 +17,6 @@ import url_launcher_macos
 import webview_flutter_wkwebview
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
-  FileSaverPlugin.register(with: registry.registrar(forPlugin: "FileSaverPlugin"))
   FirebaseAnalyticsPlugin.register(with: registry.registrar(forPlugin: "FirebaseAnalyticsPlugin"))
   FLTFirebaseCorePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseCorePlugin"))
   FirebaseCrashlyticsPlugin.register(with: registry.registrar(forPlugin: "FirebaseCrashlyticsPlugin"))

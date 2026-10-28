@@ -339,11 +339,14 @@ class _RecapSummaryCardState extends State<_RecapSummaryCard> {
           'リキャップ画像を保存しました。',
         );
         final bytes = await _captureImageBytes();
-        final savedPath = await FileSaver.instance.saveAs(
-          name: _fileStem,
+        if (!mounted) {
+          return;
+        }
+        final saved = await _shareFileForSaving(
+          context,
           bytes: bytes,
-          fileExtension: 'png',
-          mimeType: MimeType.png,
+          fileName: '$_fileStem.png',
+          mimeType: 'image/png',
         );
 
         if (!mounted) {
@@ -351,7 +354,7 @@ class _RecapSummaryCardState extends State<_RecapSummaryCard> {
         }
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
           SnackBar(
-            content: Text(savedPath == null ? cancelledMessage : savedMessage),
+            content: Text(saved ? savedMessage : cancelledMessage),
           ),
         );
       },
