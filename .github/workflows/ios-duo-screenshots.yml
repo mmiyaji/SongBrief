@@ -109,6 +109,19 @@ jobs:
           echo "Using iPhone Duo simulator: $DUO_ID"
           xcrun simctl bootstatus "$DUO_ID" -b
 
+      # simctl cannot fold or unfold the Duo, so use duo-hinge (MIT, tosbaha/duo-fold-control),
+      # which sends the same hinge event as Device Hub through private CoreSimulator SPI.
+      - name: Build duo-hinge
+        env:
+          DUO_HINGE_SHA: "6207cc897648959c3c2213ac3a2dcf38f6f9eb41"
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/duo-hinge"
+          curl -fsSL "https://raw.githubusercontent.com/tosbaha/duo-fold-control/$DUO_HINGE_SHA/tools/duo-hinge.m" \
+            -o "$RUNNER_TEMP/duo-hinge/duo-hinge.m"
+          clang -fobjc-arc -framework Foundation -o "$RUNNER_TEMP/duo-hinge/duo-hinge" "$RUNNER_TEMP/duo-hinge/duo-hinge.m"
+          echo "DUO_HINGE=$RUNNER_TEMP/duo-hinge/duo-hinge" >> "$GITHUB_ENV"
+
       - name: Install and launch app, capture screenshots
         run: |
           set -euo pipefail
@@ -119,21 +132,42 @@ jobs:
           xcrun simctl launch "$DUO_ID" "$BUNDLE_ID"
           sleep "$WAIT"
 
-          # Default display (outer display / whichever is currently active).
-          xcrun simctl io "$DUO_ID" screenshot "$OUT/duo-default.png"
-
-          # NOTE: As of Xcode 27.1 there is no documented simctl subcommand to fold/unfold
-          # the iPhone Duo simulator (the Simulator/Device Hub UI posture control is manual).
-          # Best effort: enumerate displays and capture each one (the inner panel is reported
-          # to be exposed as a second display). Failures here are non-fatal; verify on CI.
+          # The Duo exposes one display per panel and simctl refuses to pick one, listing the
+          # choices as "--display=N  NAME (ROLE) WxH". Outer is 1398 px wide, inner 2007 px.
           xcrun simctl io "$DUO_ID" enumerate > "$OUT/display-enumerate.txt" 2>&1 || true
-          cat "$OUT/display-enumerate.txt"
-          for DISPLAY_NAME in internal external; do
-            xcrun simctl io "$DUO_ID" screenshot --display="$DISPLAY_NAME" "$OUT/duo-display-$DISPLAY_NAME.png" \
-              || echo "Display '$DISPLAY_NAME' screenshot not available."
-          done
+          xcrun simctl io "$DUO_ID" screenshot "$OUT/unused.png" > "$OUT/display-choices.txt" 2>&1 || true
+          rm -f "$OUT/unused.png"
+          cat "$OUT/display-choices.txt"
+          display_for_width() {
+            grep -E -- "--display=[0-9]+ .* $1x[0-9]+" "$OUT/display-choices.txt" \
+              | grep -oE -- '--display=[0-9]+' | head -n 1 | cut -d= -f2 || true
+          }
+          OUTER_DISPLAY="$(display_for_width 1398)"
+          INNER_DISPLAY="$(display_for_width 2007)"
+          echo "Outer display: ${OUTER_DISPLAY:-unknown}, inner display: ${INNER_DISPLAY:-unknown}"
+
+          capture() {
+            local display="$1" name="$2"
+            if [ -z "$display" ]; then
+              echo "::warning::Display for $name was not found."
+              return 0
+            fi
+            xcrun simctl io "$DUO_ID" screenshot --display="$display" "$OUT/$name.png" \
+              || echo "::warning::Screenshot $name failed."
+          }
+          set_hinge() {
+            "$DUO_HINGE" -d "$DUO_ID" "$1" || echo "::warning::duo-hinge $1 failed."
+            sleep 5
+          }
+
+          set_hinge closed
+          capture "$OUTER_DISPLAY" outer-closed
+          set_hinge flat
+          capture "$INNER_DISPLAY" inner-flat
+          set_hinge half
+          capture "$INNER_DISPLAY" inner-half
+          capture "$OUTER_DISPLAY" outer-half
           ls -la "$OUT"
-          echo "SCREENSHOT_DIR=$OUT" >> "$GITHUB_ENV"
 
       - name: Upload screenshots
         if: always()

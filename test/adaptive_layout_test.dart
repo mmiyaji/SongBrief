@@ -9,12 +9,13 @@ import 'package:songbrief/src/settings/snapshot_preferences.dart';
 void main() {
   const sizes = <Size>[
     Size(320, 690),
+    Size(466, 678),
     Size(466, 1000),
     Size(560, 800),
-    Size(626, 760),
+    Size(669, 951),
     Size(720, 800),
     Size(760, 900),
-    Size(890, 626),
+    Size(951, 669),
   ];
 
   for (final size in sizes) {
@@ -35,7 +36,7 @@ void main() {
     ) async {
       await _pumpAt(
         tester,
-        const Size(890, 626),
+        const Size(951, 669),
         section,
         padding: const FakeViewPadding(left: 0, right: 44, top: 0, bottom: 21),
       );
