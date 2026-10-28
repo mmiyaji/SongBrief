@@ -48,12 +48,6 @@ class _SettingsSection extends ConsumerWidget {
                     ? _t(context, 'Sample library', 'サンプルライブラリ')
                     : _t(context, 'iOS Music library', 'iOSミュージックライブラリ'),
               ),
-              const SizedBox(height: 10),
-              _TemporaryDemoLibrarySetting(
-                enabled: temporaryDemoLibraryEnabled,
-                stats: stats,
-              ),
-              const SizedBox(height: 10),
               _SettingsRow(
                 icon: Icons.update,
                 label: _t(context, 'Last record', '最終記録'),
@@ -73,6 +67,11 @@ class _SettingsSection extends ConsumerWidget {
                   icon: const Icon(Icons.refresh),
                   label: Text(_t(context, 'Refresh', '更新')),
                 ),
+              ),
+              const SizedBox(height: 10),
+              _TemporaryDemoLibrarySetting(
+                enabled: temporaryDemoLibraryEnabled,
+                stats: stats,
               ),
             ],
           ),
@@ -336,15 +335,16 @@ class _TemporaryDemoLibrarySetting extends ConsumerWidget {
             ko: '음악 접근이 불가능하거나 곡을 찾을 수 없을 때 앱을 시험해 볼 수 있는 샘플 데이터를 표시합니다.',
           );
 
-    return _SettingsSwitchCard(
+    final title = _t(
+      context,
+      'Temporary demo data',
+      '一時的なデモデータ',
+      zh: '临时演示数据',
+      ko: '임시 데모 데이터',
+    );
+    final switchCard = _SettingsSwitchCard(
       icon: Icons.preview_rounded,
-      title: _t(
-        context,
-        'Temporary demo data',
-        '一時的なデモデータ',
-        zh: '临时演示数据',
-        ko: '임시 데모 데이터',
-      ),
+      title: title,
       description: description,
       value: enabled,
       surfaceAlpha: 0.22,
@@ -356,6 +356,34 @@ class _TemporaryDemoLibrarySetting extends ConsumerWidget {
         ref.read(temporaryDemoLibraryProvider.notifier).setEnabled(false);
         await ref.read(musicStatsControllerProvider.notifier).refreshStats();
       },
+    );
+    if (enabled || !realLibraryAvailable) {
+      return switchCard;
+    }
+
+    // Most users have a real library, so keep the demo switch out of the way.
+    final theme = Theme.of(context);
+    return ExpansionTile(
+      key: const PageStorageKey<String>('temporary-demo-library-expansion'),
+      initiallyExpanded: false,
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: EdgeInsets.zero,
+      shape: const Border(),
+      collapsedShape: const Border(),
+      dense: true,
+      leading: Icon(
+        Icons.preview_rounded,
+        size: 20,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+      title: Text(
+        title,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      children: [switchCard],
     );
   }
 }
