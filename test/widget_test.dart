@@ -392,6 +392,8 @@ void main() {
     await _pumpApp(tester, AppLanguage.english);
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byTooltip('About this trend'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('About this trend'));
     await tester.pumpAndSettle();
 

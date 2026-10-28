@@ -9,6 +9,7 @@ import 'package:songbrief/src/settings/snapshot_preferences.dart';
 void main() {
   const sizes = <Size>[
     Size(320, 690),
+    Size(380, 678),
     Size(466, 678),
     Size(466, 1000),
     Size(560, 800),

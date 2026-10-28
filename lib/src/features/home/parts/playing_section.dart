@@ -318,8 +318,8 @@ class _HeroTrackWideHeader extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final artworkSize = (constraints.maxWidth * 0.34)
-              .clamp(210.0, 310.0)
+          final artworkSize = (constraints.maxWidth * 0.42)
+              .clamp(210.0, 340.0)
               .toDouble();
 
           return Row(
@@ -895,13 +895,18 @@ class _HeroStat extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleLarge?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w900,
+        // Shrink rather than truncate so values like "Today 09:12" stay
+        // readable on narrow screens such as the iPhone Duo outer display.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],

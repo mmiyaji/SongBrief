@@ -1138,7 +1138,7 @@ class _Header extends StatelessWidget {
               Text('SongBrief', style: theme.textTheme.headlineLarge),
               const SizedBox(height: 6),
               Text(
-                _sectionSubtitle(context, selectedSection, overview.isDemo),
+                _sectionSubtitle(context, selectedSection, _labelsDemo(overview)),
                 style: theme.textTheme.titleSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
@@ -1148,8 +1148,8 @@ class _Header extends StatelessWidget {
           ),
         ),
         _MusicAccessStatusPill(
-          isDemo: overview.isDemo,
-          status: stats.authorizationStatus,
+          isDemo: _labelsDemo(overview),
+          status: _displayedAuthorizationStatus(stats),
           lastDataRefreshAt: stats.lastDataRefreshAt,
         ),
       ],

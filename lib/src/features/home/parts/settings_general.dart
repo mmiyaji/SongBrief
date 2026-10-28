@@ -37,14 +37,17 @@ class _SettingsSection extends ConsumerWidget {
               _SettingsRow(
                 icon: Icons.privacy_tip,
                 label: _t(context, 'Authorization', '認証状態'),
-                value: overview.isDemo
+                value: _labelsDemo(overview)
                     ? _t(context, 'Demo mode', 'デモモード')
-                    : _authorizationLabel(context, stats.authorizationStatus),
+                    : _authorizationLabel(
+                        context,
+                        _displayedAuthorizationStatus(stats),
+                      ),
               ),
               _SettingsRow(
                 icon: Icons.storage,
                 label: _t(context, 'Data source', 'データソース'),
-                value: overview.isDemo
+                value: _labelsDemo(overview)
                     ? _t(context, 'Sample library', 'サンプルライブラリ')
                     : _t(context, 'iOS Music library', 'iOSミュージックライブラリ'),
               ),
@@ -68,11 +71,13 @@ class _SettingsSection extends ConsumerWidget {
                   label: Text(_t(context, 'Refresh', '更新')),
                 ),
               ),
-              const SizedBox(height: 10),
-              _TemporaryDemoLibrarySetting(
-                enabled: temporaryDemoLibraryEnabled,
-                stats: stats,
-              ),
+              if (!screenshotModeEnabled) ...[
+                const SizedBox(height: 10),
+                _TemporaryDemoLibrarySetting(
+                  enabled: temporaryDemoLibraryEnabled,
+                  stats: stats,
+                ),
+              ],
             ],
           ),
         ),

@@ -53,7 +53,7 @@ class _DataManagementSetting extends ConsumerWidget {
         const SizedBox(height: 10),
         _SettingsRow(
           icon: Icons.calendar_month_outlined,
-          label: stats.overview.isDemo
+          label: _labelsDemo(stats.overview)
               ? _t(context, 'Sample records', 'サンプル記録', zh: '示例记录', ko: '샘플 기록')
               : _t(context, 'Listening record history', '聴取記録の履歴'),
           value:

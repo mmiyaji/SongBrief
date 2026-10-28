@@ -79,7 +79,7 @@ List<Widget> _overviewPanelItems(
   if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo) {
     add(_AuthorizationPanel(status: stats.authorizationStatus), spaceAfter: 16);
   }
-  if (overview.isDemo) {
+  if (_labelsDemo(overview)) {
     add(const _DemoBanner(), spaceAfter: 16);
   }
   add(_OverviewPanel(overview: overview));

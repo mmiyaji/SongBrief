@@ -30,8 +30,9 @@ class RankingFocus {
 
 enum HomeSection { playing, overview, rankings, library, settings }
 
-/// Lets CI screenshot builds open on a chosen tab; compiled out otherwise.
-const _screenshotModeEnabled = bool.fromEnvironment(
+/// CI App Store screenshot builds open on a chosen tab and present the demo
+/// library as a regular Music library; compiled out otherwise.
+const screenshotModeEnabled = bool.fromEnvironment(
   'SONGBRIEF_SCREENSHOT_MODE',
 );
 const screenshotSectionPreferenceKey = 'songbrief_screenshot_section';
@@ -44,7 +45,7 @@ final homeSectionProvider =
 class HomeSectionController extends Notifier<HomeSection> {
   @override
   HomeSection build() {
-    if (_screenshotModeEnabled) {
+    if (screenshotModeEnabled) {
       final name = ref
           .read(musicDataSharedPreferencesProvider)
           ?.getString(screenshotSectionPreferenceKey);

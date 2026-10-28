@@ -13,6 +13,14 @@ on:
         required: false
         default: "japanese english"
         type: string
+      appearance:
+        description: "System appearance for the screenshots."
+        required: false
+        default: dark
+        type: choice
+        options:
+          - dark
+          - light
 
 permissions:
   contents: read
@@ -136,6 +144,7 @@ jobs:
           OUT="$RUNNER_TEMP/duo-screenshots"
           mkdir -p "$OUT"
           xcrun simctl install "$DUO_ID" build/ios/iphonesimulator/Runner.app
+          xcrun simctl ui "$DUO_ID" appearance "${{ inputs.appearance }}"
           xcrun simctl status_bar "$DUO_ID" override --time "9:41" --batteryState charged --batteryLevel 100 \
             --wifiBars 3 --cellularMode active --cellularBars 4 || echo "::warning::Status bar override failed."
 

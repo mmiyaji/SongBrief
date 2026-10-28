@@ -2909,6 +2909,19 @@ IconData _sectionSelectedIcon(HomeSection section) {
   };
 }
 
+/// Whether demo data should be labelled as such in the UI.
+bool _labelsDemo(LibraryOverview overview) =>
+    overview.isDemo && !screenshotModeEnabled;
+
+MusicLibraryAuthorizationStatus _displayedAuthorizationStatus(
+  MusicStatsState stats,
+) {
+  if (stats.overview.isDemo && screenshotModeEnabled) {
+    return MusicLibraryAuthorizationStatus.authorized;
+  }
+  return stats.authorizationStatus;
+}
+
 String _sectionSubtitle(
   BuildContext context,
   HomeSection section,
