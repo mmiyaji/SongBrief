@@ -8,6 +8,11 @@ on:
         required: false
         default: "15"
         type: string
+      languages:
+        description: "Space-separated app languages to capture (japanese english chineseSimplified korean)."
+        required: false
+        default: "japanese english"
+        type: string
 
 permissions:
   contents: read
@@ -73,7 +78,7 @@ jobs:
           set -euo pipefail
           flutter build ios --simulator --debug \
             --dart-define=SONGBRIEF_AD_MODE=off \
-            --dart-define=SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED=false
+            --dart-define=SONGBRIEF_FIREBASE_CRASHLYTICS_ENABLED=false             --dart-define=SONGBRIEF_SCREENSHOT_MODE=true
           test -d build/ios/iphonesimulator/Runner.app
 
       - name: Find and boot iPhone Duo simulator
@@ -123,14 +128,16 @@ jobs:
           echo "DUO_HINGE=$RUNNER_TEMP/duo-hinge/duo-hinge" >> "$GITHUB_ENV"
 
       - name: Install and launch app, capture screenshots
+        env:
+          LANGUAGES: ${{ inputs.languages }}
         run: |
           set -euo pipefail
           WAIT="${{ inputs.launch_wait_seconds }}"
           OUT="$RUNNER_TEMP/duo-screenshots"
           mkdir -p "$OUT"
           xcrun simctl install "$DUO_ID" build/ios/iphonesimulator/Runner.app
-          xcrun simctl launch "$DUO_ID" "$BUNDLE_ID"
-          sleep "$WAIT"
+          xcrun simctl status_bar "$DUO_ID" override --time "9:41" --batteryState charged --batteryLevel 100 \
+            --wifiBars 3 --cellularMode active --cellularBars 4 || echo "::warning::Status bar override failed."
 
           # The Duo exposes one display per panel and simctl refuses to pick one, listing the
           # choices as "--display=N  NAME (ROLE) WxH". Outer is 1398 px wide, inner 2007 px.
@@ -147,32 +154,55 @@ jobs:
           echo "Outer display: ${OUTER_DISPLAY:-unknown}, inner display: ${INNER_DISPLAY:-unknown}"
 
           capture() {
-            local display="$1" name="$2"
+            local display="$1" path="$2"
             if [ -z "$display" ]; then
-              echo "::warning::Display for $name was not found."
+              echo "::warning::Display for $path was not found."
               return 0
             fi
-            xcrun simctl io "$DUO_ID" screenshot --display="$display" "$OUT/$name.png" \
-              || echo "::warning::Screenshot $name failed."
+            mkdir -p "$(dirname "$path")"
+            xcrun simctl io "$DUO_ID" screenshot --display="$display" "$path" \
+              || echo "::warning::Screenshot $path failed."
           }
           set_hinge() {
             "$DUO_HINGE" -d "$DUO_ID" "$1" || echo "::warning::duo-hinge $1 failed."
             sleep 5
           }
+          # shared_preferences stores keys in NSUserDefaults with a "flutter." prefix.
+          write_pref() {
+            xcrun simctl spawn "$DUO_ID" defaults write "$BUNDLE_ID" "flutter.$1" "$2" "$3"
+          }
+          launch_section() {
+            xcrun simctl terminate "$DUO_ID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+            write_pref songbrief_screenshot_section -string "$1"
+            xcrun simctl launch "$DUO_ID" "$BUNDLE_ID" >/dev/null
+            sleep "$WAIT"
+          }
 
-          set_hinge closed
-          capture "$OUTER_DISPLAY" outer-closed
-          set_hinge flat
-          capture "$INNER_DISPLAY" inner-flat
-          set_hinge half
-          capture "$INNER_DISPLAY" inner-half
-          capture "$OUTER_DISPLAY" outer-half
-          ls -la "$OUT"
+          write_pref songbrief_temporary_demo_library_enabled_v1 -bool YES
+          SECTIONS="playing overview rankings library settings"
+          for LANGUAGE in $LANGUAGES; do
+            write_pref songbrief_app_language_v1 -string "$LANGUAGE"
+            set_hinge closed
+            INDEX=1
+            for SECTION in $SECTIONS; do
+              launch_section "$SECTION"
+              capture "$OUTER_DISPLAY" "$OUT/$LANGUAGE/outer/$INDEX-$SECTION.png"
+              INDEX=$((INDEX + 1))
+            done
+            set_hinge flat
+            INDEX=1
+            for SECTION in $SECTIONS; do
+              launch_section "$SECTION"
+              capture "$INNER_DISPLAY" "$OUT/$LANGUAGE/inner/$INDEX-$SECTION.png"
+              INDEX=$((INDEX + 1))
+            done
+          done
+          find "$OUT" -type f | sort
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: songbrief-duo-screenshots-${{ github.run_number }}
-          path: ${{ runner.temp }}/duo-screenshots/*
+          path: ${{ runner.temp }}/duo-screenshots/
           if-no-files-found: error

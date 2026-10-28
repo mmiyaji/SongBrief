@@ -10,6 +10,7 @@ import '../../domain/library_overview.dart';
 import '../../domain/library_snapshot.dart';
 import '../../domain/music_stats_state.dart';
 import '../../settings/music_data_preferences.dart';
+import '../../settings/music_data_preferences_storage.dart';
 import '../../widgets/home_widget_bridge.dart';
 
 enum TrendRange { week, month, year }
@@ -29,6 +30,12 @@ class RankingFocus {
 
 enum HomeSection { playing, overview, rankings, library, settings }
 
+/// Lets CI screenshot builds open on a chosen tab; compiled out otherwise.
+const _screenshotModeEnabled = bool.fromEnvironment(
+  'SONGBRIEF_SCREENSHOT_MODE',
+);
+const screenshotSectionPreferenceKey = 'songbrief_screenshot_section';
+
 final homeSectionProvider =
     NotifierProvider<HomeSectionController, HomeSection>(
       HomeSectionController.new,
@@ -37,6 +44,16 @@ final homeSectionProvider =
 class HomeSectionController extends Notifier<HomeSection> {
   @override
   HomeSection build() {
+    if (_screenshotModeEnabled) {
+      final name = ref
+          .read(musicDataSharedPreferencesProvider)
+          ?.getString(screenshotSectionPreferenceKey);
+      for (final section in HomeSection.values) {
+        if (section.name == name) {
+          return section;
+        }
+      }
+    }
     return HomeSection.playing;
   }
 
