@@ -167,13 +167,16 @@ jobs:
             "$DUO_HINGE" -d "$DUO_ID" "$1" || echo "::warning::duo-hinge $1 failed."
             sleep 5
           }
-          # shared_preferences stores keys in NSUserDefaults with a "flutter." prefix.
+          # shared_preferences stores keys in NSUserDefaults with a "flutter." prefix. The app is
+          # sandboxed, so write its container plist (by path, through the simulator's cfprefsd).
+          PREFS="$(xcrun simctl get_app_container "$DUO_ID" "$BUNDLE_ID" data)/Library/Preferences/$BUNDLE_ID"
           write_pref() {
-            xcrun simctl spawn "$DUO_ID" defaults write "$BUNDLE_ID" "flutter.$1" "$2" "$3"
+            xcrun simctl spawn "$DUO_ID" defaults write "$PREFS" "flutter.$1" "$2" "$3"
           }
           launch_section() {
             xcrun simctl terminate "$DUO_ID" "$BUNDLE_ID" >/dev/null 2>&1 || true
             write_pref songbrief_screenshot_section -string "$1"
+            xcrun simctl spawn "$DUO_ID" defaults read "$PREFS" | grep songbrief_ || true
             xcrun simctl launch "$DUO_ID" "$BUNDLE_ID" >/dev/null
             sleep "$WAIT"
           }
