@@ -71,6 +71,12 @@ final snapshotSyncStateProvider =
       SnapshotSyncStateController.new,
     );
 
+/// True while a library refresh runs; the previous stats stay on screen.
+final statsRefreshInFlightProvider =
+    NotifierProvider<StatsRefreshInFlightController, bool>(
+      StatsRefreshInFlightController.new,
+    );
+
 final snapshotRefreshDiagnosticsProvider =
     FutureProvider.autoDispose<SnapshotRefreshDiagnostics>((ref) {
       return ref
@@ -108,6 +114,15 @@ class SnapshotSyncStateController extends Notifier<SnapshotSyncState> {
 
   void unavailable() {
     complete(const SnapshotSyncResult(status: SnapshotSyncStatus.disabled));
+  }
+}
+
+class StatsRefreshInFlightController extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) {
+    state = value;
   }
 }
 
@@ -342,10 +357,15 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
           .read(appAnalyticsProvider)
           .logEvent('library_refresh', parameters: {'mode': mode}),
     );
+    final inFlightIndicator = ref.read(statsRefreshInFlightProvider.notifier)
+      ..set(true);
     late final Future<void> operation;
     operation = _load(showLoading: showLoading).whenComplete(() {
       if (identical(_refreshInFlight, operation)) {
         _refreshInFlight = null;
+        if (ref.mounted) {
+          inFlightIndicator.set(false);
+        }
       }
     });
     _refreshInFlight = operation;

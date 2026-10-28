@@ -847,14 +847,40 @@ class _SnapshotMetric extends StatelessWidget {
   }
 }
 
-class _SnapshotTrendChart extends StatelessWidget {
+class _SnapshotTrendChart extends ConsumerWidget {
   const _SnapshotTrendChart({required this.history});
 
   final SnapshotHistory history;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isUpdating =
+        ref.watch(statsRefreshInFlightProvider) ||
+        ref.watch(snapshotSyncStateProvider.select((s) => s.isSyncing));
+    final capturedAt = history.latest?.capturedAt;
+    final capturedAtLabel = capturedAt == null
+        ? null
+        : _dateTimeFormat(context).format(capturedAt);
+    final statusLabel = isUpdating
+        ? capturedAtLabel == null
+              ? _t(context, 'Updating…', '更新中…', zh: '正在更新…', ko: '업데이트 중…')
+              : _t(
+                  context,
+                  'Updating… Showing records as of $capturedAtLabel',
+                  '更新中… 前回 $capturedAtLabel 時点の記録を表示',
+                  zh: '正在更新… 显示截至 $capturedAtLabel 的记录',
+                  ko: '업데이트 중… $capturedAtLabel 기준 기록 표시',
+                )
+        : capturedAtLabel == null
+        ? null
+        : _t(
+            context,
+            'As of $capturedAtLabel',
+            '$capturedAtLabel 時点',
+            zh: '截至 $capturedAtLabel',
+            ko: '$capturedAtLabel 기준',
+          );
     final number = _numberFormat(context);
     final values = _snapshotTrendValues(context, history);
     final maxPlayDelta = values.fold<int>(
@@ -893,8 +919,35 @@ class _SnapshotTrendChart extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (isUpdating)
+                  SizedBox.square(
+                    key: const ValueKey('snapshot-trend-updating'),
+                    dimension: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.primary,
+                      semanticsLabel: _t(
+                        context,
+                        'Updating',
+                        '更新中',
+                        zh: '正在更新',
+                        ko: '업데이트 중',
+                      ),
+                    ),
+                  ),
               ],
             ),
+            if (statusLabel != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 26, top: 2),
+                child: Text(
+                  statusLabel,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             if (values.isEmpty)
               Text(

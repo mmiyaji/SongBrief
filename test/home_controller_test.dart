@@ -164,6 +164,27 @@ void main() {
     expect(afterRefresh.requireValue.overview.latestTrack?.title, 'Updated');
   });
 
+  test('stats refresh reports when it is in flight', () async {
+    final repository = _ControlledMusicStatsRepository();
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(musicStatsControllerProvider.future);
+    expect(container.read(statsRefreshInFlightProvider), isFalse);
+
+    final refresh = container
+        .read(musicStatsControllerProvider.notifier)
+        .refreshStatsSilently();
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(statsRefreshInFlightProvider), isTrue);
+
+    repository.completeRefresh(_state('Updated'));
+    await refresh;
+    expect(container.read(statsRefreshInFlightProvider), isFalse);
+  });
+
   test('stats refresh does not wait for playback synchronization', () async {
     final repository = _HangingPlaybackRepository();
     final container = ProviderContainer(
