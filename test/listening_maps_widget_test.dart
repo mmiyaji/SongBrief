@@ -247,6 +247,15 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    // A week that has already ended is not partial, even with missing days.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('activity-calendar-week-0')).last,
+        matching: find.textContaining('(partial)'),
+      ),
+      findsNothing,
+    );
+
     final now = DateTime.now();
     final rawStart = DateTime(now.year, now.month, now.day - 83);
     final start = DateTime(
@@ -494,8 +503,18 @@ void main() {
     await tester.pumpAndSettle();
     await _openExpandedListeningMaps(tester);
     expect(find.text('Song detail is unavailable for this day.'), findsWidgets);
-    expect(find.text('Top song'), findsNothing);
-    expect(find.text('Top artist'), findsNothing);
+    // Other overview cards also have a "Top song" label; check the calendar.
+    final calendarCard = find
+        .byKey(const ValueKey('activity-card-content'))
+        .last;
+    expect(
+      find.descendant(of: calendarCard, matching: find.text('Top song')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: calendarCard, matching: find.text('Top artist')),
+      findsNothing,
+    );
     final todayCell = find
         .byKey(ValueKey('activity-calendar-day-${_dateKey(now)}'))
         .last;

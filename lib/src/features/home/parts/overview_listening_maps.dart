@@ -170,17 +170,9 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
                 return releaseCard;
               }
 
-              if (constraints.maxWidth >= 760) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: releaseCard),
-                    const SizedBox(width: 14),
-                    Expanded(child: heatmapCard),
-                  ],
-                );
-              }
-
+              // The calendar is much taller than the release-year chart, so
+              // they stack even on wide screens; the calendar card lays its
+              // grid and day details side by side instead.
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -939,27 +931,27 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
                 ),
               ),
             ),
-      child: Column(
-        key: const ValueKey('activity-card-content'),
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (widget.expanded) ...[
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final view in _ActivityHeatmapView.values)
-                  ChoiceChip(
-                    label: Text(_activityHeatmapViewLabel(context, view)),
-                    selected: _view == view,
-                    showCheckmark: false,
-                    onSelected: (_) => setState(() => _view = view),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-          ],
-          AnimatedSwitcher(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final chips = <Widget>[
+            if (widget.expanded) ...[
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final view in _ActivityHeatmapView.values)
+                    ChoiceChip(
+                      label: Text(_activityHeatmapViewLabel(context, view)),
+                      selected: _view == view,
+                      showCheckmark: false,
+                      onSelected: (_) => setState(() => _view = view),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          ];
+          final view = AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
             child: switch (widget.expanded
                 ? _view
@@ -999,47 +991,83 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
                 days: days,
               ),
             },
-          ),
-          const SizedBox(height: 12),
-          if (calendarVisible) ...[
-            _ActivityDaySelector(
-              days: days,
-              selectedDay: selectedDay,
-              onSelectDay: _selectDay,
-            ),
-            const SizedBox(height: 10),
-          ],
-          if (selectedDay != null)
-            _ActivityDayDetail(
-              day: selectedDay,
-              sourceLabel: sourceLabel,
-              overview: widget.overview,
-              byArtist: _byArtist,
-            ),
-          if (!calendarVisible) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                _AnalysisPill(
-                  label: _t(context, 'Active days', '再生日'),
-                  value: _numberFormat(context).format(summary.activeDays),
-                ),
-                _AnalysisPill(
-                  label: _t(context, 'Longest streak', '最長連続'),
-                  value: _dayCountLabel(context, summary.longestStreak),
-                ),
-                if (summary.bestWeekday != null)
+          );
+          final dayDetails = <Widget>[
+            if (calendarVisible) ...[
+              _ActivityDaySelector(
+                days: days,
+                selectedDay: selectedDay,
+                onSelectDay: _selectDay,
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (selectedDay != null)
+              _ActivityDayDetail(
+                day: selectedDay,
+                sourceLabel: sourceLabel,
+                overview: widget.overview,
+                byArtist: _byArtist,
+              ),
+            if (!calendarVisible) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
                   _AnalysisPill(
-                    label: _t(context, 'Best weekday', 'よく聴く曜日'),
-                    value: _weekdayLabel(context, summary.bestWeekday!),
+                    label: _t(context, 'Active days', '再生日'),
+                    value: _numberFormat(context).format(summary.activeDays),
                   ),
+                  _AnalysisPill(
+                    label: _t(context, 'Longest streak', '最長連続'),
+                    value: _dayCountLabel(context, summary.longestStreak),
+                  ),
+                  if (summary.bestWeekday != null)
+                    _AnalysisPill(
+                      label: _t(context, 'Best weekday', 'よく聴く曜日'),
+                      value: _weekdayLabel(context, summary.bestWeekday!),
+                    ),
+                ],
+              ),
+            ],
+          ];
+          // Wide screens put the grid and the selected day side by side so the
+          // card is not one tall column with an empty half beside it.
+          if (calendarVisible && constraints.maxWidth >= 640) {
+            return Column(
+              key: const ValueKey('activity-card-content'),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...chips,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: view),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: dayDetails,
+                      ),
+                    ),
+                  ],
+                ),
               ],
-            ),
-          ],
-        ],
+            );
+          }
+          return Column(
+            key: const ValueKey('activity-card-content'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ...chips,
+              view,
+              const SizedBox(height: 12),
+              ...dayDetails,
+            ],
+          );
+        },
       ),
     );
   }
@@ -1162,7 +1190,7 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             final inlineToday =
-                constraints.maxWidth >= 260 &&
+                constraints.maxWidth >= 320 &&
                 MediaQuery.textScalerOf(context).scale(1) < 1.5;
             final todayButton = TextButton(
               key: const ValueKey('activity-calendar-today'),
@@ -1174,6 +1202,8 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    // Mirror the Today button's slot so the month stays centred.
+                    if (inlineToday) const SizedBox(width: 72),
                     IconButton(
                       key: const ValueKey('activity-calendar-previous-month'),
                       tooltip: _t(
@@ -1212,7 +1242,14 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
                           : null,
                       icon: const Icon(Icons.chevron_right_rounded),
                     ),
-                    if (inlineToday) todayButton,
+                    if (inlineToday)
+                      SizedBox(
+                        width: 72,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: todayButton,
+                        ),
+                      ),
                   ],
                 ),
                 if (!inlineToday)
@@ -1308,10 +1345,10 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
                       (date) =>
                           byDate[snapshotDateKey(date)]?.hasRecord ?? false,
                     ),
+                    // Only a week that has not ended yet is partial; past
+                    // days without a record already show as "–".
                     incomplete: fullWeeks[weekIndex].any(
-                      (date) =>
-                          date.isAfter(today) ||
-                          !(byDate[snapshotDateKey(date)]?.hasRecord ?? false),
+                      (date) => !date.isBefore(today),
                     ),
                   ),
                 ],
@@ -1585,6 +1622,28 @@ class _ActivityCalendarWeekTotal extends StatelessWidget {
   }
 }
 
+/// Library tracks that may hold artwork for a recorded song. Recorded ids can
+/// point at a duplicate without artwork (snapshots merge same-name copies) or
+/// go stale when the Music library reassigns persistent ids, so the same song
+/// by title, artist and album is tried after the recorded id.
+List<LibraryTrack> _libraryTracksForDelta(
+  LibraryOverview overview,
+  TrackCounterDelta delta,
+) {
+  String normalize(String value) => value.trim().toLowerCase();
+  final title = normalize(delta.title);
+  final album = normalize(delta.albumTitle);
+  final byId = overview.trackById(delta.id);
+  return [
+    ?byId,
+    for (final track in overview.tracksForArtist(delta.artist))
+      if (track.id != delta.id &&
+          normalize(track.title) == title &&
+          normalize(track.albumTitle) == album)
+        track,
+  ];
+}
+
 class _ActivityCalendarArtwork extends ConsumerWidget {
   const _ActivityCalendarArtwork({required this.overview, required this.track});
   final LibraryOverview overview;
@@ -1592,8 +1651,18 @@ class _ActivityCalendarArtwork extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bytes = ref.watch(trackArtworkProvider(track.id)).asData?.value;
-    final asset = overview.trackById(track.id)?.artworkAsset;
+    final candidates = _libraryTracksForDelta(overview, track);
+    Uint8List? bytes;
+    for (final id in [
+      if (candidates.isEmpty) track.id,
+      for (final candidate in candidates) candidate.id,
+    ]) {
+      final artwork = ref.watch(trackArtworkProvider(id));
+      bytes = artwork.asData?.value;
+      // Move to the next copy only once this one is known to have no artwork.
+      if (bytes != null || artwork.isLoading) break;
+    }
+    final asset = candidates.firstOrNull?.artworkAsset;
     final colors = Theme.of(context).colorScheme;
     Widget fallback() => ColoredBox(
       color: colors.primaryContainer.withValues(alpha: 0.3),
