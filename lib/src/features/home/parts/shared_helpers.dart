@@ -1820,11 +1820,67 @@ class _ActivityHeatmapDay {
     required this.date,
     required this.playCount,
     this.trackDeltas = const [],
+    this.hasRecord = false,
+    this.estimated = false,
   });
 
   final DateTime date;
   final int playCount;
   final List<TrackCounterDelta> trackDeltas;
+  final bool hasRecord;
+  final bool estimated;
+}
+
+class _ActivityCalendarEntry {
+  const _ActivityCalendarEntry({
+    required this.track,
+    required this.label,
+    required this.playCount,
+  });
+
+  final TrackCounterDelta track;
+  final String label;
+  final int playCount;
+}
+
+_ActivityCalendarEntry? _activityCalendarEntry(
+  _ActivityHeatmapDay day, {
+  required bool byArtist,
+}) {
+  if (!day.hasRecord) return null;
+  final tracks = _topActivityTrackDeltas(day.trackDeltas);
+  if (tracks.isEmpty) return null;
+  if (!byArtist) {
+    final track = tracks.first;
+    return _ActivityCalendarEntry(
+      track: track,
+      label: track.title,
+      playCount: track.playDelta,
+    );
+  }
+
+  // Aggregate before choosing a winner: an artist's many less-played songs
+  // can exceed the artist of the most-played individual track.
+  final artists = <String, List<TrackCounterDelta>>{};
+  for (final track in tracks) {
+    final name = track.artist.trim().replaceAll(RegExp(r'\s+'), ' ');
+    artists.putIfAbsent(name.toLowerCase(), () => []).add(track);
+  }
+  final entries =
+      artists.values.map((songs) {
+        final representative = songs.first;
+        return _ActivityCalendarEntry(
+          track: representative,
+          label: representative.artist,
+          playCount: songs.fold<int>(0, (sum, song) => sum + song.playDelta),
+        );
+      }).toList()..sort((a, b) {
+        final byPlays = b.playCount.compareTo(a.playCount);
+        if (byPlays != 0) return byPlays;
+        final byName = a.label.toLowerCase().compareTo(b.label.toLowerCase());
+        return byName != 0 ? byName : a.track.id.compareTo(b.track.id);
+      });
+  return entries.first;
 }
 
 class _ActivityHeatmapSummary {
@@ -2122,7 +2178,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
   required SnapshotHistory history,
 }) {
   final today = _localDateOnly(DateTime.now());
-  final rawStart = today.subtract(const Duration(days: 83));
+  final rawStart = DateTime(today.year, today.month, today.day - 83);
   final start = _mondayOfWeek(rawStart);
   final valuesByDay = <String, int>{};
   final trackDeltasByDay = <String, List<TrackCounterDelta>>{};
@@ -2144,7 +2200,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
             .addAll(delta.trackDeltas);
       }
     }
-  } else {
+  } else if (overview.isDemo) {
     for (final track in overview.tracks) {
       final playedAt = track.lastPlayedAt;
       if (playedAt == null) {
@@ -2177,7 +2233,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
   for (
     var day = start;
     !day.isAfter(today);
-    day = day.add(const Duration(days: 1))
+    day = DateTime(day.year, day.month, day.day + 1)
   ) {
     final key = snapshotDateKey(day);
     final trackDeltas = trackDeltasByDay[key] ?? const <TrackCounterDelta>[];
@@ -2186,6 +2242,8 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
         date: day,
         playCount: valuesByDay[key] ?? 0,
         trackDeltas: _topActivityTrackDeltas(trackDeltas),
+        hasRecord: valuesByDay.containsKey(key),
+        estimated: overview.isDemo && history.snapshots.length < 2,
       ),
     );
   }
@@ -2195,7 +2253,13 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
 List<TrackCounterDelta> _topActivityTrackDeltas(
   Iterable<TrackCounterDelta> deltas,
 ) {
-  final sorted = deltas.toList(growable: false)
+  final byId = <String, TrackCounterDelta>{};
+  for (final delta in deltas) {
+    if (delta.playDelta <= 0) continue;
+    final previous = byId[delta.id];
+    byId[delta.id] = previous == null ? delta : previous.merge(delta);
+  }
+  final sorted = byId.values.toList(growable: false)
     ..sort((a, b) {
       final byPlays = b.playDelta.compareTo(a.playDelta);
       if (byPlays != 0) {
@@ -2207,30 +2271,10 @@ List<TrackCounterDelta> _topActivityTrackDeltas(
       if (bySeconds != 0) {
         return bySeconds;
       }
-      return a.title.compareTo(b.title);
+      final byTitle = a.title.compareTo(b.title);
+      return byTitle != 0 ? byTitle : a.id.compareTo(b.id);
     });
-  return List.unmodifiable(sorted.take(5));
-}
-
-List<List<_ActivityHeatmapDay>> _activityHeatmapWeeks(
-  List<_ActivityHeatmapDay> days,
-) {
-  final weeks = <List<_ActivityHeatmapDay>>[];
-  for (var index = 0; index < days.length; index += 7) {
-    weeks.add(
-      List.unmodifiable(days.skip(index).take(7).toList(growable: false)),
-    );
-  }
-  return List.unmodifiable(weeks);
-}
-
-Color _activityHeatmapColor(ThemeData theme, int value, int maxValue) {
-  if (value <= 0 || maxValue <= 0) {
-    return theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.48);
-  }
-  final normalized = (value / maxValue).clamp(0.0, 1.0);
-  final base = theme.colorScheme.primary.withValues(alpha: 0.28);
-  return Color.lerp(base, theme.colorScheme.primary, 0.32 + normalized * 0.68)!;
+  return List.unmodifiable(sorted);
 }
 
 _ActivityHeatmapSummary _activityHeatmapSummary(
@@ -2368,16 +2412,6 @@ String _activityHeatmapViewLabel(
     _ActivityHeatmapView.highlights => _t(context, 'Highlights', 'ハイライト'),
   };
 }
-
-const _calendarWeekdayOrder = <int>[
-  DateTime.monday,
-  DateTime.tuesday,
-  DateTime.wednesday,
-  DateTime.thursday,
-  DateTime.friday,
-  DateTime.saturday,
-  DateTime.sunday,
-];
 
 String _weekdayLabel(BuildContext context, int weekday) {
   final monday = DateTime(2026, 1, 5);

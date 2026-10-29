@@ -60,7 +60,7 @@ void main() {
 
     expect(find.text('Genre stack by release year'), findsOneWidget);
     expect(find.text('Era mix'), findsOneWidget);
-    expect(find.text('Activity heatmap'), findsWidgets);
+    expect(find.text('Listening calendar'), findsWidgets);
     expect(find.text('Selected day'), findsWidgets);
     expect(find.text('Mo'), findsWidgets);
     expect(find.text('Su'), findsWidgets);
@@ -69,8 +69,12 @@ void main() {
     expect(find.text('Weekdays'), findsOneWidget);
     expect(find.text('Highlights'), findsWidgets);
     expect(
-      tester.getTopLeft(find.text('Mo').first).dy,
-      lessThan(tester.getTopLeft(find.text('Su').first).dy),
+      tester.getTopLeft(find.text('Su').first).dx,
+      lessThan(tester.getTopLeft(find.text('Mo').first).dx),
+    );
+    expect(
+      tester.getTopLeft(find.text('Mo').first).dx,
+      lessThan(tester.getTopLeft(find.text('Sa').first).dx),
     );
 
     final weekdaysTab = find.text('Weekdays');
@@ -174,6 +178,336 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Yesterday Peak Track - Peak Artist'), findsOneWidget);
+  });
+
+  testWidgets('calendar month controls navigate and return to today', (
+    tester,
+  ) async {
+    await _pumpOverview(
+      tester,
+      tracks: _heatmapSelectionTracks(),
+      snapshotRecordingEnabled: true,
+    );
+    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
+
+    final monthLabel = find
+        .byKey(const ValueKey('activity-calendar-month-label'))
+        .last;
+    final initialMonth = tester.widget<Text>(monthLabel).data;
+    final previous = find
+        .byKey(const ValueKey('activity-calendar-previous-month'))
+        .last;
+    await tester.ensureVisible(previous);
+    await tester.tap(previous);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(monthLabel).data, isNot(initialMonth));
+
+    await tester.tap(
+      find.byKey(const ValueKey('activity-calendar-today')).last,
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(monthLabel).data, initialMonth);
+
+    final next = find
+        .byKey(const ValueKey('activity-calendar-next-month'))
+        .last;
+    expect(tester.widget<IconButton>(next).onPressed, isNull);
+    final now = DateTime.now();
+    final futureDay = find
+        .byKey(
+          ValueKey(
+            'activity-calendar-day-${_dateKey(DateTime(now.year, now.month, now.day + 1))}',
+          ),
+        )
+        .last;
+    if (now.day < DateTime(now.year, now.month + 1, 0).day) {
+      expect(futureDay, findsOneWidget);
+      expect(tester.widget<Semantics>(futureDay).properties.enabled, isFalse);
+    } else {
+      expect(futureDay, findsNothing);
+    }
+  });
+
+  testWidgets('focused calendar preserves the selected artist mode', (
+    tester,
+  ) async {
+    await _pumpOverview(
+      tester,
+      tracks: _heatmapSelectionTracks(),
+      snapshotRecordingEnabled: true,
+    );
+    await tester.pumpAndSettle();
+    final artist = find.byKey(const ValueKey('activity-calendar-artist'));
+    await _scrollOverviewUntilVisible(tester, artist);
+    await tester.tap(artist);
+    await tester.pumpAndSettle();
+    final expand = find.byKey(const ValueKey('activity-calendar-expand'));
+    await tester.ensureVisible(expand);
+    await tester.pumpAndSettle();
+    await tester.tap(expand);
+    await tester.pumpAndSettle();
+    final modal = find.byType(BottomSheet).last;
+    expect(
+      find.descendant(of: modal, matching: find.text('Top artist')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: modal, matching: find.text('Today Artist')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip('Close').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+  });
+
+  testWidgets('real library without adjacent daily records has no estimate', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final track = _calendarTrack(
+      'single-record',
+      'Single Record',
+      'Artist',
+      100,
+    );
+    final onlySnapshot = DailyLibrarySnapshot.fromOverview(
+      LibraryOverview.fromTracks([track], isDemo: false),
+      capturedAt: now,
+    );
+    await _pumpOverview(
+      tester,
+      statsState: MusicStatsState(
+        authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+        overview: LibraryOverview.fromTracks([track], isDemo: false),
+        snapshotHistory: SnapshotHistory(snapshots: [onlySnapshot]),
+        snapshotRecordingEnabled: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
+
+    expect(find.textContaining('No daily records this month'), findsWidgets);
+    expect(find.textContaining('Recent-track estimate'), findsNothing);
+  });
+
+  testWidgets(
+    'calendar does not create winners across gaps or filter changes',
+    (tester) async {
+      final now = DateTime.now();
+      final track = _calendarTrack(
+        'calendar-history',
+        'History Song',
+        'History Artist',
+        20,
+      );
+      final overview = LibraryOverview.fromTracks([track], isDemo: false);
+      for (final gap in [false, true]) {
+        final previousTime = now.subtract(Duration(days: gap ? 2 : 1));
+        final previous = DailyLibrarySnapshot.fromOverview(
+          LibraryOverview.fromTracks([
+            track.copyWith(playCount: 10),
+          ], isDemo: false),
+          capturedAt: previousTime,
+          filterSignature: 'profile-a',
+        );
+        final current = DailyLibrarySnapshot.fromOverview(
+          overview,
+          capturedAt: now,
+          filterSignature: gap ? 'profile-a' : 'profile-b',
+        );
+        await _pumpOverview(
+          tester,
+          statsState: MusicStatsState(
+            authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+            overview: overview,
+            snapshotHistory: SnapshotHistory(snapshots: [previous, current]),
+            snapshotRecordingEnabled: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await _openExpandedListeningMaps(tester);
+        expect(
+          find.textContaining('No daily records this month'),
+          findsWidgets,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
+
+  testWidgets('jacket and artist modes compare all tracked songs', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final currentTracks = <LibraryTrack>[
+      _calendarTrack('jacket-winner', 'Jacket Winner', 'Solo Artist', 10),
+      for (var index = 0; index < 4; index++)
+        _calendarTrack(
+          'other-$index',
+          'Other $index',
+          'Other Artist $index',
+          9 - index,
+        ),
+      for (var index = 0; index < 6; index++)
+        _calendarTrack(
+          'artist-two-$index',
+          'Artist Two $index',
+          'Artist Two',
+          3,
+        ),
+    ];
+    final previousTracks = [
+      for (final track in currentTracks) track.copyWith(playCount: 0),
+    ];
+    final previous = DailyLibrarySnapshot.fromOverview(
+      LibraryOverview.fromTracks(previousTracks, isDemo: false),
+      capturedAt: now.subtract(const Duration(days: 1)),
+    );
+    final current = DailyLibrarySnapshot.fromOverview(
+      LibraryOverview.fromTracks(currentTracks, isDemo: false),
+      capturedAt: now,
+    );
+    final overview = LibraryOverview.fromTracks(currentTracks, isDemo: false);
+    await _pumpOverview(
+      tester,
+      statsState: MusicStatsState(
+        authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+        overview: overview,
+        snapshotHistory: SnapshotHistory(snapshots: [previous, current]),
+        snapshotRecordingEnabled: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
+
+    final artistMode = find
+        .byKey(const ValueKey('activity-calendar-artist'))
+        .last;
+    await tester.ensureVisible(artistMode);
+    await tester.tap(artistMode);
+    await tester.pumpAndSettle();
+    expect(find.text('Artist Two'), findsWidgets);
+    expect(find.text('Top artist'), findsWidgets);
+    expect(find.text('18 plays'), findsWidgets);
+
+    final jacketMode = find
+        .byKey(const ValueKey('activity-calendar-jacket'))
+        .last;
+    await tester.tap(jacketMode);
+    await tester.pumpAndSettle();
+    expect(find.text('Jacket Winner'), findsWidgets);
+    expect(find.text('Top song'), findsWidgets);
+    expect(find.text('10 plays'), findsWidgets);
+  });
+
+  testWidgets('total-only snapshot days do not show a zero winner', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final overview = LibraryOverview.fromTracks([
+      _calendarTrack('total-only', 'Unavailable Detail', 'Unknown Artist', 5),
+    ], isDemo: false);
+    final previousOverview = LibraryOverview.fromTracks([
+      _calendarTrack('total-only', 'Unavailable Detail', 'Unknown Artist', 0),
+    ], isDemo: false);
+    final previousBase = DailyLibrarySnapshot.fromOverview(
+      previousOverview,
+      capturedAt: now.subtract(const Duration(days: 1)),
+    );
+    final currentBase = DailyLibrarySnapshot.fromOverview(
+      overview,
+      capturedAt: now,
+    );
+    final history = SnapshotHistory(
+      snapshots: [
+        DailyLibrarySnapshot(
+          dateKey: previousBase.dateKey,
+          capturedAt: previousBase.capturedAt,
+          source: previousBase.source,
+          trackCount: previousBase.trackCount,
+          totalPlayCount: 0,
+          totalSkipCount: previousBase.totalSkipCount,
+          totalListeningSeconds: previousBase.totalListeningSeconds,
+          tracks: const [],
+        ),
+        DailyLibrarySnapshot(
+          dateKey: currentBase.dateKey,
+          capturedAt: currentBase.capturedAt,
+          source: currentBase.source,
+          trackCount: currentBase.trackCount,
+          totalPlayCount: 5,
+          totalSkipCount: currentBase.totalSkipCount,
+          totalListeningSeconds: currentBase.totalListeningSeconds,
+          tracks: const [],
+        ),
+      ],
+    );
+    await _pumpOverview(
+      tester,
+      statsState: MusicStatsState(
+        authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+        overview: overview,
+        snapshotHistory: history,
+        snapshotRecordingEnabled: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
+    expect(find.text('Song detail is unavailable for this day.'), findsWidgets);
+    expect(find.text('Top song'), findsNothing);
+    expect(find.text('Top artist'), findsNothing);
+    final todayCell = find
+        .byKey(ValueKey('activity-calendar-day-${_dateKey(now)}'))
+        .last;
+    expect(
+      tester.widget<Semantics>(todayCell).properties.label,
+      isNot(contains('Unavailable Detail')),
+    );
+    expect(
+      find.descendant(of: todayCell, matching: find.text('0')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('calendar remains usable at narrow widths and enlarged text', (
+    tester,
+  ) async {
+    await _pumpOverview(
+      tester,
+      tracks: _heatmapSelectionTracks(),
+      snapshotRecordingEnabled: true,
+    );
+    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
+    final calendarCards = find.byWidgetPredicate(
+      (widget) => widget.runtimeType.toString() == '_ActivityHeatmapCard',
+    );
+    final expandedCalendar = tester.widget<Widget>(calendarCards.last);
+
+    for (final width in [320.0, 390.0]) {
+      tester.view.physicalSize = Size(width, 1200);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      await tester.pumpWidget(
+        ProviderScope(
+          key: ValueKey('isolated-calendar-$width'),
+          overrides: [
+            appLanguageProvider.overrideWith(
+              () => _FixedLanguageController(AppLanguage.english),
+            ),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(child: expandedCalendar),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('activity-calendar')), findsOneWidget);
+    }
   });
 
   testWidgets('shows recap and collection insight panels', (tester) async {
@@ -347,11 +681,15 @@ Future<void> _pumpOverview(
   List<LibraryTrack>? tracks,
   bool snapshotRecordingEnabled = false,
   MusicStatsState? statsState,
+  double width = 900,
+  double textScaleFactor = 1,
 }) {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(900, 1200);
+  tester.view.physicalSize = Size(width, 1200);
+  tester.platformDispatcher.textScaleFactorTestValue = textScaleFactor;
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
   return tester.pumpWidget(
     ProviderScope(
@@ -376,6 +714,29 @@ Future<void> _pumpOverview(
       ],
       child: const SongBriefApp(),
     ),
+  );
+}
+
+String _dateKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+LibraryTrack _calendarTrack(
+  String id,
+  String title,
+  String artist,
+  int playCount,
+) {
+  return LibraryTrack(
+    id: id,
+    title: title,
+    artist: artist,
+    albumTitle: 'Calendar Test',
+    playCount: playCount,
+    skipCount: 0,
+    duration: const Duration(minutes: 3),
+    isCloudItem: false,
   );
 }
 
