@@ -790,7 +790,7 @@ class _ActivityHeatmapCard extends StatefulWidget {
     this.expanded = false,
     this.initialDay,
     this.initialMonth,
-    this.initialByArtist = false,
+    this.initialMode = _ActivityCalendarMode.song,
   });
 
   final LibraryOverview overview;
@@ -798,7 +798,7 @@ class _ActivityHeatmapCard extends StatefulWidget {
   final bool expanded;
   final _ActivityHeatmapDay? initialDay;
   final DateTime? initialMonth;
-  final bool initialByArtist;
+  final _ActivityCalendarMode initialMode;
 
   @override
   State<_ActivityHeatmapCard> createState() => _ActivityHeatmapCardState();
@@ -808,14 +808,14 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
   _ActivityHeatmapDay? _selectedDay;
   _ActivityHeatmapView _view = _ActivityHeatmapView.calendar;
   DateTime? _visibleMonth;
-  bool _byArtist = false;
+  _ActivityCalendarMode _mode = _ActivityCalendarMode.song;
 
   @override
   void initState() {
     super.initState();
     _selectedDay = widget.initialDay;
     _visibleMonth = widget.initialMonth;
-    _byArtist = widget.initialByArtist;
+    _mode = widget.initialMode;
   }
 
   void _selectDay(_ActivityHeatmapDay day) {
@@ -922,7 +922,7 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
                             expanded: true,
                             initialDay: selectedDay,
                             initialMonth: visibleMonth,
-                            initialByArtist: _byArtist,
+                            initialMode: _mode,
                           ),
                         ],
                       ),
@@ -961,8 +961,8 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
                 days: days,
                 overview: widget.overview,
                 visibleMonth: visibleMonth,
-                byArtist: _byArtist,
-                onModeChanged: (value) => setState(() => _byArtist = value),
+                mode: _mode,
+                onModeChanged: (value) => setState(() => _mode = value),
                 onMonthChanged: (month) {
                   setState(() {
                     _visibleMonth = month;
@@ -1006,7 +1006,7 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
                 day: selectedDay,
                 sourceLabel: sourceLabel,
                 overview: widget.overview,
-                byArtist: _byArtist,
+                mode: _mode,
               ),
             if (!calendarVisible) ...[
               const SizedBox(height: 10),
@@ -1079,7 +1079,7 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
     required this.days,
     required this.overview,
     required this.visibleMonth,
-    required this.byArtist,
+    required this.mode,
     required this.onModeChanged,
     required this.onMonthChanged,
     required this.selectedDay,
@@ -1089,8 +1089,8 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
   final List<_ActivityHeatmapDay> days;
   final LibraryOverview overview;
   final DateTime visibleMonth;
-  final bool byArtist;
-  final ValueChanged<bool> onModeChanged;
+  final _ActivityCalendarMode mode;
+  final ValueChanged<_ActivityCalendarMode> onModeChanged;
   final ValueChanged<DateTime> onMonthChanged;
   final _ActivityHeatmapDay? selectedDay;
   final ValueChanged<_ActivityHeatmapDay> onSelectDay;
@@ -1150,48 +1150,87 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(
-              child: _ActivityCalendarModeButton(
-                key: const ValueKey('activity-calendar-jacket'),
-                label: _t(context, 'Jacket', 'ジャケット', zh: '封面', ko: '재킷'),
-                selected: !byArtist,
-                onPressed: () => onModeChanged(false),
+            for (final (index, option) in _ActivityCalendarMode.values.indexed)
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(left: index == 0 ? 0 : 6),
+                  child: _ActivityCalendarModeButton(
+                    key: ValueKey('activity-calendar-mode-${option.name}'),
+                    label: switch (option) {
+                      _ActivityCalendarMode.song => _t(
+                        context,
+                        'Song',
+                        '曲',
+                        zh: '歌曲',
+                        ko: '곡',
+                      ),
+                      _ActivityCalendarMode.album => _t(
+                        context,
+                        'Album',
+                        'アルバム',
+                        zh: '专辑',
+                        ko: '앨범',
+                      ),
+                      _ActivityCalendarMode.artist => _t(
+                        context,
+                        'Artist',
+                        'アーティスト',
+                        zh: '艺人',
+                        ko: '아티스트',
+                      ),
+                    },
+                    selected: mode == option,
+                    onPressed: () => onModeChanged(option),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: _ActivityCalendarModeButton(
-                key: const ValueKey('activity-calendar-artist'),
-                label: _t(context, 'Artist', 'アーティスト', zh: '艺人', ko: '아티스트'),
-                selected: byArtist,
-                onPressed: () => onModeChanged(true),
-              ),
-            ),
           ],
         ),
-        if (byArtist)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              _t(
+        // Always one line, so switching modes never shifts the calendar.
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            switch (mode) {
+              _ActivityCalendarMode.song => _t(
                 context,
-                'Shown with a representative song cover',
-                '代表ジャケットで表示',
-                zh: '使用代表歌曲封面显示',
-                ko: '대표 곡 재킷으로 표시',
+                'Cover of the most-played song each day',
+                'その日いちばん聴いた曲',
+                zh: '当天播放最多的歌曲',
+                ko: '그날 가장 많이 들은 곡',
               ),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              _ActivityCalendarMode.album => _t(
+                context,
+                'Cover of the most-played album each day',
+                'その日いちばん聴いたアルバム',
+                zh: '当天播放最多的专辑',
+                ko: '그날 가장 많이 들은 앨범',
               ),
+              _ActivityCalendarMode.artist => _t(
+                context,
+                'Top song of the most-played artist each day',
+                'その日いちばん聴いたアーティストの代表曲',
+                zh: '当天播放最多的艺人的代表歌曲',
+                ko: '그날 가장 많이 들은 아티스트의 대표 곡',
+              ),
+            },
+            key: const ValueKey('activity-calendar-mode-caption'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+        ),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final inlineToday =
-                constraints.maxWidth >= 320 &&
+                constraints.maxWidth >= 260 &&
                 MediaQuery.textScalerOf(context).scale(1) < 1.5;
+            // Phones lack room to mirror the Today slot without squeezing the
+            // month, so only wider cards keep the month exactly centred.
+            final mirrorToday = inlineToday && constraints.maxWidth >= 340;
             final todayButton = TextButton(
               key: const ValueKey('activity-calendar-today'),
               onPressed: () => onSelectDay(days.last),
@@ -1203,7 +1242,7 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
                 Row(
                   children: [
                     // Mirror the Today button's slot so the month stays centred.
-                    if (inlineToday) const SizedBox(width: 72),
+                    if (mirrorToday) const SizedBox(width: 60),
                     IconButton(
                       key: const ValueKey('activity-calendar-previous-month'),
                       tooltip: _t(
@@ -1219,12 +1258,16 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
                       icon: const Icon(Icons.chevron_left_rounded),
                     ),
                     Expanded(
-                      child: Text(
-                        DateFormat.yMMMM(_localeName(context)).format(first),
-                        key: const ValueKey('activity-calendar-month-label'),
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          DateFormat.yMMMM(_localeName(context)).format(first),
+                          key: const ValueKey('activity-calendar-month-label'),
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),
@@ -1244,7 +1287,7 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
                     ),
                     if (inlineToday)
                       SizedBox(
-                        width: 72,
+                        width: 60,
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: todayButton,
@@ -1318,7 +1361,7 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
                                     date: date,
                                     day: byDate[snapshotDateKey(date)],
                                     overview: overview,
-                                    byArtist: byArtist,
+                                    mode: mode,
                                     selected:
                                         selectedDay != null &&
                                         _sameLocalDate(date, selectedDay!.date),
@@ -1411,7 +1454,11 @@ class _ActivityCalendarModeButton extends StatelessWidget {
                 : colors.outlineVariant.withValues(alpha: 0.5),
           ),
         ),
-        child: Text(label, textAlign: TextAlign.center),
+        // Scale down rather than wrap so all mode buttons keep one height.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, maxLines: 1, textAlign: TextAlign.center),
+        ),
       ),
     );
   }
@@ -1422,7 +1469,7 @@ class _ActivityCalendarDayCell extends StatelessWidget {
     required this.date,
     required this.day,
     required this.overview,
-    required this.byArtist,
+    required this.mode,
     required this.selected,
     required this.future,
     required this.onTap,
@@ -1430,7 +1477,7 @@ class _ActivityCalendarDayCell extends StatelessWidget {
   final DateTime date;
   final _ActivityHeatmapDay? day;
   final LibraryOverview overview;
-  final bool byArtist;
+  final _ActivityCalendarMode mode;
   final bool selected;
   final bool future;
   final VoidCallback? onTap;
@@ -1443,7 +1490,7 @@ class _ActivityCalendarDayCell extends StatelessWidget {
     final outsideRange = day == null && !future;
     final entry = day == null || future
         ? null
-        : _activityCalendarEntry(day!, byArtist: byArtist);
+        : _activityCalendarEntry(day!, mode: mode, overview: overview);
     final status = future
         ? _t(context, 'Future day', '未来の日', zh: '未来日期', ko: '미래 날짜')
         : outsideRange
@@ -1896,19 +1943,19 @@ class _ActivityDayDetail extends StatelessWidget {
     required this.day,
     required this.sourceLabel,
     required this.overview,
-    required this.byArtist,
+    required this.mode,
   });
 
   final _ActivityHeatmapDay day;
   final String sourceLabel;
   final LibraryOverview overview;
-  final bool byArtist;
+  final _ActivityCalendarMode mode;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final topTracks = day.trackDeltas.take(3).toList(growable: false);
-    final winner = _activityCalendarEntry(day, byArtist: byArtist);
+    final winner = _activityCalendarEntry(day, mode: mode, overview: overview);
     final recordLabel = !day.hasRecord
         ? _t(context, 'No daily record', '日別記録なし', zh: '无每日记录', ko: '일별 기록 없음')
         : day.estimated
@@ -1996,21 +2043,29 @@ class _ActivityDayDetail extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          byArtist
-                              ? _t(
-                                  context,
-                                  'Top artist',
-                                  'トップアーティスト',
-                                  zh: '热门艺人',
-                                  ko: '최다 재생 아티스트',
-                                )
-                              : _t(
-                                  context,
-                                  'Top song',
-                                  'トップソング',
-                                  zh: '热门歌曲',
-                                  ko: '최다 재생 곡',
-                                ),
+                          switch (mode) {
+                            _ActivityCalendarMode.song => _t(
+                              context,
+                              'Top song',
+                              'トップソング',
+                              zh: '热门歌曲',
+                              ko: '최다 재생 곡',
+                            ),
+                            _ActivityCalendarMode.album => _t(
+                              context,
+                              'Top album',
+                              'トップアルバム',
+                              zh: '热门专辑',
+                              ko: '최다 재생 앨범',
+                            ),
+                            _ActivityCalendarMode.artist => _t(
+                              context,
+                              'Top artist',
+                              'トップアーティスト',
+                              zh: '热门艺人',
+                              ko: '최다 재생 아티스트',
+                            ),
+                          },
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -2024,7 +2079,16 @@ class _ActivityDayDetail extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          byArtist ? winner.track.title : winner.track.artist,
+                          switch (mode) {
+                            _ActivityCalendarMode.song => winner.track.artist,
+                            _ActivityCalendarMode.album =>
+                              _libraryTracksForDelta(
+                                    overview,
+                                    winner.track,
+                                  ).firstOrNull?.albumArtist ??
+                                  winner.track.artist,
+                            _ActivityCalendarMode.artist => winner.track.title,
+                          },
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(

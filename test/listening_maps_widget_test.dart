@@ -285,7 +285,7 @@ void main() {
       snapshotRecordingEnabled: true,
     );
     await tester.pumpAndSettle();
-    final artist = find.byKey(const ValueKey('activity-calendar-artist'));
+    final artist = find.byKey(const ValueKey('activity-calendar-mode-artist'));
     await _scrollOverviewUntilVisible(tester, artist);
     await tester.tap(artist);
     await tester.pumpAndSettle();
@@ -430,7 +430,7 @@ void main() {
     await _openExpandedListeningMaps(tester);
 
     final artistMode = find
-        .byKey(const ValueKey('activity-calendar-artist'))
+        .byKey(const ValueKey('activity-calendar-mode-artist'))
         .last;
     await tester.ensureVisible(artistMode);
     await tester.tap(artistMode);
@@ -440,13 +440,81 @@ void main() {
     expect(find.text('18 plays'), findsWidgets);
 
     final jacketMode = find
-        .byKey(const ValueKey('activity-calendar-jacket'))
+        .byKey(const ValueKey('activity-calendar-mode-song'))
         .last;
     await tester.tap(jacketMode);
     await tester.pumpAndSettle();
     expect(find.text('Jacket Winner'), findsWidgets);
     expect(find.text('Top song'), findsWidgets);
     expect(find.text('10 plays'), findsWidgets);
+  });
+
+  testWidgets('album mode groups a compilation by its album artist', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    LibraryTrack mixTrack(int index) => LibraryTrack(
+      id: 'mix-$index',
+      title: 'Mix Song $index',
+      artist: 'Mix Artist $index',
+      albumTitle: 'Mix Album',
+      albumArtist: 'Various Artists',
+      playCount: 4,
+      skipCount: 0,
+      duration: const Duration(minutes: 3),
+      isCloudItem: false,
+    );
+    final currentTracks = <LibraryTrack>[
+      _calendarTrack('single-winner', 'Single Winner', 'Solo Artist', 10),
+      for (var index = 0; index < 4; index++) mixTrack(index),
+    ];
+    final previous = DailyLibrarySnapshot.fromOverview(
+      LibraryOverview.fromTracks([
+        for (final track in currentTracks) track.copyWith(playCount: 0),
+      ], isDemo: false),
+      capturedAt: now.subtract(const Duration(days: 1)),
+    );
+    final overview = LibraryOverview.fromTracks(currentTracks, isDemo: false);
+    final current = DailyLibrarySnapshot.fromOverview(
+      overview,
+      capturedAt: now,
+    );
+    await _pumpOverview(
+      tester,
+      statsState: MusicStatsState(
+        authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+        overview: overview,
+        snapshotHistory: SnapshotHistory(snapshots: [previous, current]),
+        snapshotRecordingEnabled: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
+
+    final caption = find
+        .byKey(const ValueKey('activity-calendar-mode-caption'))
+        .last;
+    final songCaptionHeight = tester.getSize(caption).height;
+    final albumMode = find
+        .byKey(const ValueKey('activity-calendar-mode-album'))
+        .last;
+    await tester.ensureVisible(albumMode);
+    await tester.tap(albumMode);
+    await tester.pumpAndSettle();
+    expect(find.text('Top album'), findsWidgets);
+    expect(find.text('Mix Album'), findsWidgets);
+    expect(find.text('Various Artists'), findsWidgets);
+    expect(find.text('16 plays'), findsWidgets);
+    // The caption keeps its height, so switching modes does not move the grid.
+    expect(tester.getSize(caption).height, songCaptionHeight);
+
+    await tester.tap(
+      find.byKey(const ValueKey('activity-calendar-mode-artist')).last,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Solo Artist'), findsWidgets);
+    expect(find.text('10 plays'), findsWidgets);
+    expect(tester.getSize(caption).height, songCaptionHeight);
   });
 
   testWidgets('total-only snapshot days do not show a zero winner', (

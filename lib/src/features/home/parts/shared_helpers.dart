@@ -1843,15 +1843,20 @@ class _ActivityCalendarEntry {
   final int playCount;
 }
 
+/// What a listening calendar day is ranked by; each shows the cover of the
+/// most-played song within the winning group.
+enum _ActivityCalendarMode { song, album, artist }
+
 _ActivityCalendarEntry? _activityCalendarEntry(
   _ActivityHeatmapDay day, {
-  required bool byArtist,
+  required _ActivityCalendarMode mode,
+  LibraryOverview? overview,
 }) {
   if (!day.hasRecord) return null;
   // Already merged per track and sorted by _activityHeatmapDays.
   final tracks = day.trackDeltas;
   if (tracks.isEmpty) return null;
-  if (!byArtist) {
+  if (mode == _ActivityCalendarMode.song) {
     final track = tracks.first;
     return _ActivityCalendarEntry(
       track: track,
@@ -1860,19 +1865,35 @@ _ActivityCalendarEntry? _activityCalendarEntry(
     );
   }
 
-  // Aggregate before choosing a winner: an artist's many less-played songs
-  // can exceed the artist of the most-played individual track.
-  final artists = <String, List<TrackCounterDelta>>{};
+  String normalize(String value) =>
+      value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+  // Records keep only the song artist, so compilations are grouped by the
+  // album artist from the current library when the song is still there.
+  String albumArtist(TrackCounterDelta track) {
+    final libraryTrack = overview == null
+        ? null
+        : _libraryTracksForDelta(overview, track).firstOrNull;
+    final name = libraryTrack?.albumArtist?.trim();
+    return name == null || name.isEmpty ? track.artist : name;
+  }
+
+  // Aggregate before choosing a winner: a group's many less-played songs can
+  // exceed the group of the most-played individual track.
+  final groups = <String, List<TrackCounterDelta>>{};
   for (final track in tracks) {
-    final name = track.artist.trim().replaceAll(RegExp(r'\s+'), ' ');
-    artists.putIfAbsent(name.toLowerCase(), () => []).add(track);
+    final key = mode == _ActivityCalendarMode.artist
+        ? normalize(track.artist)
+        : '${normalize(track.albumTitle)}\u{1f}${normalize(albumArtist(track))}';
+    groups.putIfAbsent(key, () => []).add(track);
   }
   final entries =
-      artists.values.map((songs) {
+      groups.values.map((songs) {
         final representative = songs.first;
         return _ActivityCalendarEntry(
           track: representative,
-          label: representative.artist,
+          label: mode == _ActivityCalendarMode.artist
+              ? representative.artist
+              : representative.albumTitle,
           playCount: songs.fold<int>(0, (sum, song) => sum + song.playDelta),
         );
       }).toList()..sort((a, b) {
