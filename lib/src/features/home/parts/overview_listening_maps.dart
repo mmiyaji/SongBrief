@@ -1092,15 +1092,22 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
             : DateTime(first.year, first.month, day);
       }),
     );
-    final totals = weeks
+    // Week totals cover all seven days, including those that spill into the
+    // neighbouring months, so partial rows at month edges stay comparable.
+    final fullWeeks = List.generate(
+      rowCount,
+      (week) => List<DateTime>.generate(
+        7,
+        (column) =>
+            DateTime(first.year, first.month, week * 7 + column - offset + 1),
+      ),
+    );
+    final totals = fullWeeks
         .map(
           (week) => week.fold<int>(
             0,
             (total, date) =>
-                total +
-                (date == null
-                    ? 0
-                    : byDate[snapshotDateKey(date)]?.playCount ?? 0),
+                total + (byDate[snapshotDateKey(date)]?.playCount ?? 0),
           ),
         )
         .toList();
@@ -1297,11 +1304,11 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
                   _ActivityCalendarWeekTotal(
                     total: totals[weekIndex],
                     maxTotal: maxTotal,
-                    hasRecord: weeks[weekIndex].whereType<DateTime>().any(
+                    hasRecord: fullWeeks[weekIndex].any(
                       (date) =>
                           byDate[snapshotDateKey(date)]?.hasRecord ?? false,
                     ),
-                    incomplete: weeks[weekIndex].whereType<DateTime>().any(
+                    incomplete: fullWeeks[weekIndex].any(
                       (date) =>
                           date.isAfter(today) ||
                           !(byDate[snapshotDateKey(date)]?.hasRecord ?? false),
@@ -1394,11 +1401,22 @@ class _ActivityCalendarDayCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Days before the ~12-week window have no data at all, which is not the
+    // same as a recorded day without plays.
+    final outsideRange = day == null && !future;
     final entry = day == null || future
         ? null
         : _activityCalendarEntry(day!, byArtist: byArtist);
     final status = future
         ? _t(context, 'Future day', '未来の日', zh: '未来日期', ko: '미래 날짜')
+        : outsideRange
+        ? _t(
+            context,
+            'Outside the record period',
+            '記録期間外',
+            zh: '不在记录期间内',
+            ko: '기록 기간 외',
+          )
         : day?.hasRecord == true
         ? _playCountLabel(context, day!.playCount)
         : _t(context, 'No record', '記録なし', zh: '无记录', ko: '기록 없음');
@@ -1421,7 +1439,7 @@ class _ActivityCalendarDayCell extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(6),
             child: Opacity(
-              opacity: future ? 0.35 : 1,
+              opacity: future || outsideRange ? 0.35 : 1,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1473,7 +1491,7 @@ class _ActivityCalendarDayCell extends StatelessWidget {
                                       .withValues(alpha: 0.22),
                                   child: Center(
                                     child: Text(
-                                      future
+                                      future || outsideRange
                                           ? ''
                                           : day?.hasRecord == true &&
                                                 day!.playCount == 0

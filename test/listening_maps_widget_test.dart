@@ -229,6 +229,44 @@ void main() {
     }
   });
 
+  testWidgets('calendar marks days before the record period', (tester) async {
+    await _pumpOverview(
+      tester,
+      tracks: _heatmapSelectionTracks(),
+      snapshotRecordingEnabled: true,
+    );
+    await tester.pumpAndSettle();
+    await _openExpandedListeningMaps(tester);
+
+    final previous = find
+        .byKey(const ValueKey('activity-calendar-previous-month'))
+        .last;
+    while (tester.widget<IconButton>(previous).onPressed != null) {
+      await tester.ensureVisible(previous);
+      await tester.tap(previous);
+      await tester.pumpAndSettle();
+    }
+
+    final now = DateTime.now();
+    final rawStart = DateTime(now.year, now.month, now.day - 83);
+    final start = DateTime(
+      rawStart.year,
+      rawStart.month,
+      rawStart.day - (rawStart.weekday - DateTime.monday),
+    );
+    if (start.day == 1) return;
+    final firstOfMonth = find
+        .byKey(
+          ValueKey(
+            'activity-calendar-day-${_dateKey(DateTime(start.year, start.month))}',
+          ),
+        )
+        .last;
+    final semantics = tester.widget<Semantics>(firstOfMonth).properties;
+    expect(semantics.enabled, isFalse);
+    expect(semantics.label, contains('Outside the record period'));
+  });
+
   testWidgets('focused calendar preserves the selected artist mode', (
     tester,
   ) async {

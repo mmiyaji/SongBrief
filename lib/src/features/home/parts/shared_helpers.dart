@@ -1848,7 +1848,8 @@ _ActivityCalendarEntry? _activityCalendarEntry(
   required bool byArtist,
 }) {
   if (!day.hasRecord) return null;
-  final tracks = _topActivityTrackDeltas(day.trackDeltas);
+  // Already merged per track and sorted by _activityHeatmapDays.
+  final tracks = day.trackDeltas;
   if (tracks.isEmpty) return null;
   if (!byArtist) {
     final track = tracks.first;
@@ -2241,7 +2242,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
       _ActivityHeatmapDay(
         date: day,
         playCount: valuesByDay[key] ?? 0,
-        trackDeltas: _topActivityTrackDeltas(trackDeltas),
+        trackDeltas: _mergedActivityTrackDeltas(trackDeltas),
         hasRecord: valuesByDay.containsKey(key),
         estimated: overview.isDemo && history.snapshots.length < 2,
       ),
@@ -2250,7 +2251,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
   return List.unmodifiable(days);
 }
 
-List<TrackCounterDelta> _topActivityTrackDeltas(
+List<TrackCounterDelta> _mergedActivityTrackDeltas(
   Iterable<TrackCounterDelta> deltas,
 ) {
   final byId = <String, TrackCounterDelta>{};
