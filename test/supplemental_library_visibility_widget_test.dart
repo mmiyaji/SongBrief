@@ -68,11 +68,11 @@ void main() {
       expect(find.text('Gyakko'), findsAtLeastNWidgets(1));
       expect(find.text('STAY AWAY'), findsAtLeastNWidgets(1));
       expect(
-        find.textContaining('Supplemental · 3 plays (minimum)'),
+        find.textContaining('Confirmed from history: at least 3'),
         findsOneWidget,
       );
       expect(
-        find.textContaining('1 library tracks · 1 supplemental history tracks'),
+        find.textContaining('1 library tracks · 1 outside-library history tracks'),
         findsOneWidget,
       );
       final supplementalRow = find.ancestor(

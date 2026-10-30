@@ -50,13 +50,11 @@ void main() {
       );
       expect(find.text('2 tracks ・ 2 artists ・ 2 albums'), findsOneWidget);
       expect(
-        find.textContaining(
-          'Includes 3 confirmed supplemental plays (minimum)',
-        ),
+        find.textContaining('Includes at least 3 plays confirmed from history'),
         findsOneWidget,
       );
       expect(
-        find.textContaining('1 supplemental track has unknown play times'),
+        find.textContaining('1 outside-library track has unknown play times'),
         findsOneWidget,
       );
       expect(find.text('20.0%'), findsOneWidget);
@@ -90,9 +88,7 @@ void main() {
     (tester) async {
       final container = await pumpCounts(tester, HomeSection.rankings);
       expect(
-        find.textContaining(
-          'Includes 3 confirmed supplemental plays (minimum)',
-        ),
+        find.textContaining('Includes at least 3 plays confirmed from history'),
         findsOneWidget,
       );
       expect(find.text('Outside Song'), findsOneWidget);
@@ -134,9 +130,7 @@ void main() {
     (tester) async {
       await pumpCounts(tester, HomeSection.overview, dated: true);
       expect(
-        find.textContaining(
-          'Includes 3 confirmed supplemental plays (minimum)',
-        ),
+        find.textContaining('Includes at least 3 plays confirmed from history'),
         findsOneWidget,
       );
       expect(find.textContaining('unknown play times'), findsNothing);

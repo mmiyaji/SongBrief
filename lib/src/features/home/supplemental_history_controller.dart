@@ -21,7 +21,7 @@ class SupplementalHistoryController
     extends Notifier<SupplementalListeningHistory> {
   SharedPreferences? _preferences;
   Future<void> _writes = Future<void>.value();
-  final _pending = <LibraryTrack>[];
+  final _pending = <_PendingHistoryOperation>[];
   bool _restoring = false;
   bool _disposed = false;
 
@@ -46,8 +46,17 @@ class SupplementalHistoryController
   /// Ingest only confirmed history rows with their original nullable dates.
   void ingest(List<LibraryTrack> tracks) {
     if (tracks.isEmpty) return;
-    if (_restoring) _pending.addAll(tracks);
+    if (_restoring) _pending.add(_PendingHistoryOperation.ingest(tracks));
     final next = state.ingest(tracks);
+    if (identical(next, state)) return;
+    state = next;
+    if (!_restoring) _save();
+  }
+
+  /// Records an observed play as a minimum count with a display-only date.
+  void observe(LibraryTrack track, {required DateTime at}) {
+    if (_restoring) _pending.add(_PendingHistoryOperation.observe(track, at));
+    final next = state.observe(track, at: at);
     if (identical(next, state)) return;
     state = next;
     if (!_restoring) _save();
@@ -58,7 +67,13 @@ class SupplementalHistoryController
       final preferences = await fallback;
       if (_disposed) return;
       _preferences = preferences;
-      if (preferences != null) state = _read(preferences).ingest(_pending);
+      if (preferences != null) {
+        var restored = _read(preferences);
+        for (final operation in _pending) {
+          restored = operation.apply(restored);
+        }
+        state = restored;
+      }
     } on Object {
       // Confirmed observations remain usable when storage is unavailable.
     } finally {
@@ -75,25 +90,67 @@ class SupplementalHistoryController
       var ledger = SupplementalListeningHistory.decode(
         preferences.getString(supplementalListeningHistoryPreferenceKey),
       );
-      for (final key in [
-        'songbrief_apple_music_recent_v1',
-        'songbrief_outside_library_plays_v1',
-      ]) {
-        final cached = preferences.getString(key);
-        if (cached == null) continue;
+      final recent = preferences.getString('songbrief_apple_music_recent_v1');
+      if (recent != null) {
         try {
-          final rows = jsonDecode(cached) as List<dynamic>;
-          ledger = ledger.ingest(
-            rows.whereType<Map<String, dynamic>>().map((row) {
-              // Observed playback times are not confirmed completion timestamps.
-              // Strip all date fields from these rows before the platform parser.
-              final map = {...row};
-              if (key == 'songbrief_outside_library_plays_v1') {
-                map.remove('lastPlayedAtMillis');
+          final rows = jsonDecode(recent);
+          if (rows is List) {
+            final validTracks = <LibraryTrack>[];
+            for (final row in rows) {
+              if (row is! Map) continue;
+              try {
+                validTracks.add(
+                  LibraryTrack.fromPlatformMap(Map<Object?, Object?>.from(row)),
+                );
+              } on Object {
+                // Keep valid rows when one legacy row is malformed.
               }
-              return LibraryTrack.fromPlatformMap(map);
-            }),
-          );
+            }
+            // Build the ledger's matching indexes once for the whole cache.
+            ledger = ledger.ingest(validTracks);
+          }
+        } on Object {
+          // One malformed legacy cache does not hide the persisted ledger.
+        }
+      }
+      final outside = preferences.getString(
+        'songbrief_outside_library_plays_v1',
+      );
+      if (outside != null) {
+        try {
+          final rows = jsonDecode(outside);
+          if (rows is List) {
+            final observations = <(int, LibraryTrack)>[];
+            for (final row in rows) {
+              if (row is! Map) continue;
+              try {
+                final map = Map<Object?, Object?>.from(row);
+                final rawAt = map['playedAtMillis'];
+                final at = rawAt is int
+                    ? rawAt
+                    : rawAt is double
+                    ? rawAt.round()
+                    : null;
+                map.remove('playedAtMillis');
+                map.remove('lastPlayedAtMillis');
+                final track = LibraryTrack.fromPlatformMap(map);
+                if (at != null && at > 0) {
+                  observations.add((at, track));
+                } else {
+                  ledger = ledger.ingest([track]);
+                }
+              } on Object {
+                // Keep valid rows when one legacy row is malformed.
+              }
+            }
+            observations.sort((a, b) => a.$1.compareTo(b.$1));
+            for (final observation in observations) {
+              ledger = ledger.observe(
+                observation.$2,
+                at: DateTime.fromMillisecondsSinceEpoch(observation.$1),
+              );
+            }
+          }
         } on Object {
           // One malformed legacy cache does not hide the persisted ledger.
         }
@@ -120,5 +177,24 @@ class SupplementalHistoryController
       }
     });
     unawaited(_writes);
+  }
+}
+
+class _PendingHistoryOperation {
+  const _PendingHistoryOperation._(this.tracks, this.at);
+
+  factory _PendingHistoryOperation.ingest(Iterable<LibraryTrack> tracks) =>
+      _PendingHistoryOperation._(List.unmodifiable(tracks), null);
+
+  factory _PendingHistoryOperation.observe(LibraryTrack track, DateTime at) =>
+      _PendingHistoryOperation._([track], at);
+
+  final List<LibraryTrack> tracks;
+  final DateTime? at;
+
+  SupplementalListeningHistory apply(SupplementalListeningHistory history) {
+    final observedAt = at;
+    if (observedAt == null) return history.ingest(tracks);
+    return history.observe(tracks.single, at: observedAt);
   }
 }

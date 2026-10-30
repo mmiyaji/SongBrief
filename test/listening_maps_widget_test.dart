@@ -214,16 +214,14 @@ void main() {
         .last;
     expect(tester.widget<IconButton>(next).onPressed, isNull);
     final now = DateTime.now();
-    final futureDay = find
-        .byKey(
-          ValueKey(
-            'activity-calendar-day-${_dateKey(DateTime(now.year, now.month, now.day + 1))}',
-          ),
-        )
-        .last;
+    final futureDay = find.byKey(
+      ValueKey(
+        'activity-calendar-day-${_dateKey(DateTime(now.year, now.month, now.day + 1))}',
+      ),
+    );
     if (now.day < DateTime(now.year, now.month + 1, 0).day) {
-      expect(futureDay, findsOneWidget);
-      expect(tester.widget<Semantics>(futureDay).properties.enabled, isFalse);
+      expect(futureDay.last, findsOneWidget);
+      expect(tester.widget<Semantics>(futureDay.last).properties.enabled, isFalse);
     } else {
       expect(futureDay, findsNothing);
     }

@@ -801,7 +801,8 @@ class _ActivityHeatmapCard extends ConsumerStatefulWidget {
   final _ActivityCalendarMode initialMode;
 
   @override
-  ConsumerState<_ActivityHeatmapCard> createState() => _ActivityHeatmapCardState();
+  ConsumerState<_ActivityHeatmapCard> createState() =>
+      _ActivityHeatmapCardState();
 }
 
 class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
@@ -831,8 +832,12 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
       overview: widget.overview,
       history: widget.history,
       supplementalEvents: widget.overview.isDemo
-          ? const [] : ref.watch(countedSupplementalEventsProvider),
+          ? const []
+          : ref.watch(countedSupplementalEventsProvider),
     );
+    final unplacedSupplementalTrackCount = widget.overview.isDemo
+        ? 0
+        : ref.watch(calendarUnplacedSupplementalTrackCountProvider);
     final summary = _activityHeatmapSummary(days);
     final sourceLabel = widget.history.snapshotCount >= 2
         ? _t(
@@ -849,6 +854,14 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
             '最近再生からの推定',
             zh: '最近播放估算',
             ko: '최근 재생 추정',
+          )
+        : days.any((day) => day.playCount > 0)
+        ? _t(
+            context,
+            'Listening history from outside your library',
+            'ライブラリ外の再生履歴',
+            zh: '资料库外的播放记录',
+            ko: '보관함 외 재생 기록',
           )
         : _t(
             context,
@@ -995,6 +1008,22 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
             },
           );
           final dayDetails = <Widget>[
+            if (unplacedSupplementalTrackCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  _t(
+                    context,
+                    '$unplacedSupplementalTrackCount outside-library ${unplacedSupplementalTrackCount == 1 ? 'track has' : 'tracks have'} no known playback/observation date and ${unplacedSupplementalTrackCount == 1 ? 'is' : 'are'} excluded from daily totals.',
+                    '再生日または確認日が不明なライブラリ外の曲が$unplacedSupplementalTrackCount曲あり、日別合計には含まれていません。',
+                    zh: '$unplacedSupplementalTrackCount 首资料库外歌曲没有已知的播放或确认日期，因此不计入每日总数。',
+                    ko: '재생일 또는 확인일을 알 수 없는 보관함 외 곡 $unplacedSupplementalTrackCount곡은 일별 합계에서 제외됩니다.',
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
             if (calendarVisible) ...[
               _ActivityDaySelector(
                 days: days,
@@ -2024,6 +2053,22 @@ class _ActivityDayDetail extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (day.observationPlayCount > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                _t(
+                  context,
+                  'Includes at least ${day.observationPlayCount} play(s) confirmed from history on the observation day.',
+                  '確認日に履歴から確認できた再生${day.observationPlayCount}回以上を含みます',
+                  zh: '包含在确认日从历史记录确认的至少 ${day.observationPlayCount} 次播放。',
+                  ko: '확인일에 기록에서 확인된 재생을 최소 ${day.observationPlayCount}회 포함합니다.',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             if (winner != null) ...[
               const SizedBox(height: 12),
               Row(
@@ -2085,7 +2130,7 @@ class _ActivityDayDetail extends StatelessWidget {
                             _ActivityCalendarMode.song => winner.track.artist,
                             _ActivityCalendarMode.album =>
                               winner.track.albumArtist ??
-                              _libraryTracksForDelta(
+                                  _libraryTracksForDelta(
                                     overview,
                                     winner.track,
                                   ).firstOrNull?.albumArtist ??

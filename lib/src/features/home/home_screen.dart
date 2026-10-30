@@ -30,6 +30,7 @@ import '../../settings/app_preferences.dart';
 import '../../settings/demo_library_preferences.dart';
 import '../../settings/library_filter_preferences.dart';
 import '../../settings/snapshot_preferences.dart';
+import '../../settings/supplemental_history_preferences.dart';
 import '../../theme/app_theme.dart';
 import 'home_controller.dart';
 import 'counted_listening_provider.dart';
@@ -1126,7 +1127,10 @@ class _SectionBody extends ConsumerWidget {
   }
 
   Widget _buildRankings(BuildContext context, WidgetRef ref) {
-    final countedOverview = ref.watch(countedListeningOverviewProvider);
+    final countedOverview =
+        ref.watch(rankingScopeProvider) == RankingScope.recent
+        ? ref.watch(libraryBrowsingOverviewProvider)
+        : ref.watch(countedListeningOverviewProvider);
     final supplementalTracks = ref.watch(countedOutsideTracksProvider);
     if (!countedOverview.hasTracks) return const _EmptyLibraryPanel();
 

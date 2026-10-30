@@ -71,7 +71,10 @@ void main() {
         matching: rows,
       );
       expect(
-        find.descendant(of: supplementalRow, matching: find.text('2 minimum')),
+        find.descendant(
+          of: supplementalRow,
+          matching: find.text('Confirmed from history: at least 2'),
+        ),
         findsOneWidget,
       );
       expect(
@@ -130,7 +133,7 @@ void main() {
     expect(_summaryValue(3, '12.0'), findsOneWidget);
     expect(find.text('20.0%'), findsOneWidget);
     expect(find.text('2'), findsWidgets); // Native skips stay at two.
-    expect(find.textContaining('minimum'), findsWidgets);
+    expect(find.textContaining('confirmed from history'), findsWidgets);
 
     final beforeReingest = container.read(supplementalHistoryProvider);
     container.read(supplementalHistoryProvider.notifier).ingest([
@@ -164,7 +167,7 @@ void main() {
       expect(counted.totalListeningSeconds, 10 * 60 * 60);
       expect(container.read(supplementalUndatedTrackCountProvider), 1);
       expect(find.text('11'), findsWidgets);
-      expect(find.textContaining('minimum'), findsWidgets);
+      expect(find.textContaining('confirmed from history'), findsWidgets);
       expect(find.textContaining('unknown play times'), findsOneWidget);
     },
   );

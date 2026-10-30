@@ -25,7 +25,7 @@ final _recentListeningEvidenceProvider = Provider<RecentListeningEvidence>((
     snapshotHistory: stats.snapshotHistory,
     recentTracks: ref.watch(recentAppleMusicPlaysProvider),
     observedTracks: ref.watch(outsideLibraryPlaysProvider),
-    supplementalEvents: ref.watch(supplementalHistoryProvider).datedEvents,
+    supplementalEvents: ref.watch(supplementalHistoryProvider).calendarEvents,
     visibleOutsideTracks: ref.watch(visibleOutsideLibraryPlaysProvider),
     libraryTrackMatching: ref
         .watch(musicStatsRepositoryProvider)

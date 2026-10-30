@@ -14,6 +14,7 @@ import '../../domain/music_stats_state.dart';
 import '../../settings/music_data_preferences.dart';
 import '../../settings/library_filter_preferences.dart';
 import '../../settings/music_data_preferences_storage.dart';
+import '../../settings/supplemental_history_preferences.dart';
 import '../../widgets/home_widget_bridge.dart';
 import 'supplemental_history_controller.dart';
 
@@ -603,6 +604,7 @@ final outsideLibraryPlaysProvider =
     );
 
 final visibleOutsideLibraryPlaysProvider = Provider<List<LibraryTrack>>((ref) {
+  if (!ref.watch(supplementalHistoryIncludedProvider)) return const [];
   final observed = ref.watch(outsideLibraryPlaysProvider);
   final recent = ref.watch(recentAppleMusicPlaysProvider);
   final countedTracks = ref.watch(supplementalHistoryProvider).tracks;
@@ -754,18 +756,10 @@ class OutsideLibraryPlaysController extends Notifier<List<LibraryTrack>> {
   /// Records [track] as played now; a repeat of the latest entry only moves
   /// its time forward.
   void record(LibraryTrack track, {DateTime? at}) {
+    final playedAt = at ?? DateTime.now();
     // Seeing a song proves a minimum of one play, not a distinct MusicKit
     // timestamped event. Polls and pause/resume must not add playback events.
-    ref.read(supplementalHistoryProvider.notifier).ingest([
-      LibraryTrack(
-        id: track.id, title: track.title, artist: track.artist,
-        albumTitle: track.albumTitle, albumArtist: track.albumArtist,
-        appleMusicStoreId: track.appleMusicStoreId, genre: track.genre,
-        playlistNames: track.playlistNames, duration: track.duration,
-        playCount: 0, skipCount: 0, isCloudItem: true,
-      ),
-    ]);
-    final playedAt = at ?? DateTime.now();
+    ref.read(supplementalHistoryProvider.notifier).observe(track, at: playedAt);
     final entry = track.copyWith(lastPlayedAt: playedAt);
     final rest = state.isNotEmpty && state.first.id == track.id
         ? state.skip(1)

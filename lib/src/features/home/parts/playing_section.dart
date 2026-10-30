@@ -56,7 +56,10 @@ class _NowPlayingSection extends ConsumerWidget {
           const SizedBox(height: 14),
         ],
         if (outsideLibrary) ...[
-          _OutsideLibraryNotice(playCount: track.playCount),
+          _OutsideLibraryNotice(
+            playCount: track.playCount,
+            includedInTotals: ref.watch(supplementalHistoryIncludedProvider),
+          ),
           const SizedBox(height: 8),
         ],
         _HeroTrackPanel(track: track, artwork: artwork, playRank: playRank),
@@ -88,9 +91,13 @@ class _NowPlayingSection extends ConsumerWidget {
 /// include (for example, streamed from an Apple Music playlist without being
 /// added). Supplemental counts represent confirmed minimum plays.
 class _OutsideLibraryNotice extends StatelessWidget {
-  const _OutsideLibraryNotice({required this.playCount});
+  const _OutsideLibraryNotice({
+    required this.playCount,
+    this.includedInTotals = true,
+  });
 
   final int playCount;
+  final bool includedInTotals;
 
   @override
   Widget build(BuildContext context) {
@@ -101,13 +108,21 @@ class _OutsideLibraryNotice extends StatelessWidget {
         key: const ValueKey('outside-library-notice'),
         triggerMode: TooltipTriggerMode.tap,
         showDuration: const Duration(seconds: 4),
-        message: _t(
-          context,
-          'Confirmed supplemental plays (minimum): ${_numberFormat(context).format(playCount)}',
-          '確認済みの補完再生（最低回数）: ${_numberFormat(context).format(playCount)}回',
-          zh: '已确认的补充播放（最低次数）：${_numberFormat(context).format(playCount)}',
-          ko: '확인된 보완 재생 (최소 횟수): ${_numberFormat(context).format(playCount)}회',
-        ),
+        message: !includedInTotals
+            ? _t(
+                context,
+                'History from outside your library is excluded from totals and history lists.',
+                'ライブラリ外の再生履歴は集計・履歴一覧への反映がオフです。',
+                zh: '资料库外的播放记录不计入汇总和历史列表。',
+                ko: '보관함 외 재생 기록은 합계와 기록 목록에 반영되지 않습니다.',
+              )
+            : _t(
+                context,
+                'Plays confirmed from history: at least ${_numberFormat(context).format(playCount)}',
+                '履歴から確認：${_numberFormat(context).format(playCount)}回以上',
+                zh: '从历史记录确认：至少${_numberFormat(context).format(playCount)}次',
+                ko: '기록에서 확인: ${_numberFormat(context).format(playCount)}회 이상',
+              ),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerHighest.withValues(
@@ -127,7 +142,13 @@ class _OutsideLibraryNotice extends StatelessWidget {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  _t(context, 'Supplemental', '補完', zh: '补充', ko: '보완'),
+                  _t(
+                    context,
+                    'Outside library',
+                    'ライブラリ外',
+                    zh: '资料库外',
+                    ko: '보관함 외',
+                  ),
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
@@ -1551,7 +1572,7 @@ class _RecentTrackRow extends ConsumerWidget {
                   const SizedBox(height: 3),
                   Text(
                     outsideLibrary
-                        ? '${track.artist} · ${_t(context, 'Supplemental', '補完', zh: '补充', ko: '보완')} · ${_playCountLabel(context, track.playCount)} (${_t(context, 'minimum', '最低', zh: '最低', ko: '최소')})'
+                        ? '${track.artist} · ${_t(context, 'Confirmed from history: at least ${_numberFormat(context).format(track.playCount)}', '履歴から確認：${_numberFormat(context).format(track.playCount)}回以上', zh: '从历史记录确认：至少${_numberFormat(context).format(track.playCount)}次', ko: '기록에서 확인: ${_numberFormat(context).format(track.playCount)}회 이상')}'
                         : track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -2315,7 +2336,7 @@ class _GroupTrackRow extends ConsumerWidget {
                     const SizedBox(height: 2),
                     Text(
                       supplemental
-                          ? '${track.albumTitle} · ${_t(context, 'Supplemental', '補完', zh: '补充', ko: '보완')}'
+                          ? '${track.albumTitle} · ${_t(context, 'Outside library', 'ライブラリ外', zh: '资料库外', ko: '보관함 외')}'
                           : track.albumTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -2328,20 +2349,32 @@ class _GroupTrackRow extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                supplemental
-                    ? _t(
-                        context,
-                        '${_numberFormat(context).format(track.playCount)} minimum',
-                        '${_numberFormat(context).format(track.playCount)}回（最低）',
-                        zh: '${_numberFormat(context).format(track.playCount)}次（最低）',
-                        ko: '${_numberFormat(context).format(track.playCount)}회 (최소)',
-                      )
-                    : _numberFormat(context).format(track.playCount),
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
+              if (supplemental)
+                SizedBox(
+                  width: 140,
+                  child: Text(
+                    _t(
+                      context,
+                      'Confirmed from history: at least ${_numberFormat(context).format(track.playCount)}',
+                      '履歴から確認：${_numberFormat(context).format(track.playCount)}回以上',
+                      zh: '从历史记录确认：至少${_numberFormat(context).format(track.playCount)}次',
+                      ko: '기록에서 확인: ${_numberFormat(context).format(track.playCount)}회 이상',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  _numberFormat(context).format(track.playCount),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
               Icon(
                 supplemental
                     ? Icons.open_in_new_rounded

@@ -5,6 +5,7 @@ import '../../domain/library_overview.dart';
 import '../../domain/library_track.dart';
 import '../../domain/supplemental_listening_history.dart';
 import '../../settings/library_filter_preferences.dart';
+import '../../settings/supplemental_history_preferences.dart';
 import 'home_controller.dart';
 import 'supplemental_history_controller.dart';
 
@@ -21,6 +22,7 @@ final _nativeTrackCatalogProvider = Provider<LibraryTrackCatalog>((ref) {
 /// Only songs absent from the unfiltered library contribute supplemental plays.
 /// Native snapshots and the library's own counts remain authoritative.
 final countedOutsideTracksProvider = Provider<List<LibraryTrack>>((ref) {
+  if (!ref.watch(supplementalHistoryIncludedProvider)) return const [];
   final history = ref.watch(supplementalHistoryProvider);
   final stats = ref.watch(musicStatsControllerProvider).asData?.value;
   final repository = ref.watch(musicStatsRepositoryProvider);
@@ -56,7 +58,7 @@ final supplementalUndatedTrackCountProvider = Provider<int>(
       .length,
 );
 
-/// Undated evidence contributes to lifetime minimums, never to a calendar day.
+/// Real dates and explicitly labelled observation-day minimums for the calendar.
 final countedSupplementalEventsProvider =
     Provider<List<SupplementalListeningEvent>>((ref) {
       final visible = LibraryTrackCatalog()
@@ -64,7 +66,20 @@ final countedSupplementalEventsProvider =
       return List.unmodifiable(
         ref
             .watch(supplementalHistoryProvider)
-            .datedEvents
+            .calendarEvents
             .where((event) => visible.match(event.track) != null),
       );
     });
+
+/// Minimums with neither a playback date nor a retained observation day.
+final calendarUnplacedSupplementalTrackCountProvider = Provider<int>((ref) {
+  final outside = ref.watch(countedOutsideTracksProvider);
+  final calendarCatalog = LibraryTrackCatalog()
+    ..replace(
+      ref
+          .watch(countedSupplementalEventsProvider)
+          .map((event) => event.track)
+          .toList(),
+    );
+  return outside.where((track) => calendarCatalog.match(track) == null).length;
+});

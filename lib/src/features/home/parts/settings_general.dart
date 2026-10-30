@@ -15,6 +15,9 @@ class _SettingsSection extends ConsumerWidget {
     final appLock = ref.watch(appLockControllerProvider);
     final crashReporting = ref.watch(crashReportingControllerProvider);
     final libraryFilters = ref.watch(libraryFilterPreferencesProvider);
+    final supplementalHistoryIncluded = ref.watch(
+      supplementalHistoryIncludedProvider,
+    );
     final temporaryDemoLibraryEnabled = ref.watch(temporaryDemoLibraryProvider);
     final appVersion = ref
         .watch(_appVersionLabelProvider)
@@ -168,6 +171,19 @@ class _SettingsSection extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         _SettingsGroup(
+          title: _t(
+            context,
+            'Listening history',
+            '再生履歴の集計',
+            zh: '聆听历史',
+            ko: '청취 기록',
+          ),
+          child: _SupplementalHistorySetting(
+            enabled: supplementalHistoryIncluded,
+          ),
+        ),
+        const SizedBox(height: 14),
+        _SettingsGroup(
           title: _t(context, 'Export & Exclusions', 'エクスポートと除外'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,6 +290,68 @@ class _SettingsSection extends ConsumerWidget {
         AdBannerSlot(placement: _t(context, 'Settings', '設定')),
       ],
     );
+  }
+}
+
+class _SupplementalHistorySetting extends ConsumerStatefulWidget {
+  const _SupplementalHistorySetting({required this.enabled});
+
+  final bool enabled;
+
+  @override
+  ConsumerState<_SupplementalHistorySetting> createState() =>
+      _SupplementalHistorySettingState();
+}
+
+class _SupplementalHistorySettingState
+    extends ConsumerState<_SupplementalHistorySetting> {
+  bool _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsSwitchCard(
+      icon: Icons.history_rounded,
+      title: _t(
+        context,
+        'Include plays outside your library (recommended)',
+        'ライブラリ外の再生履歴も含める（推奨）',
+        zh: '也包含资料库外的播放记录（推荐）',
+        ko: '보관함 외 재생 기록도 포함(권장)',
+      ),
+      description: _t(
+        context,
+        'Show confirmed plays outside your library in totals and Calendar. Only confirmed plays are counted. When off, saved history stays available, collection continues, and playback controls keep working.',
+        'ライブラリに追加していない曲も、確認できた再生履歴を集計やカレンダーに表示します。再生回数は確認できた分だけを数えます。オフにしても保存済み履歴は残り、収集と再生操作は続きます。',
+        zh: '汇总和日历也会显示未添加到资料库的歌曲中已确认的播放记录。播放次数只统计已确认的部分。关闭后，已保存的记录仍可查看，收集和播放控制也会继续。',
+        ko: '보관함에 추가하지 않은 곡도 확인된 재생 기록을 합계와 캘린더에 표시합니다. 재생 횟수는 확인된 만큼만 계산합니다. 끄면 저장된 기록은 계속 볼 수 있고 수집과 재생 제어도 계속됩니다.',
+      ),
+      value: widget.enabled,
+      onChanged: _saving ? null : _setEnabled,
+    );
+  }
+
+  Future<void> _setEnabled(bool enabled) async {
+    setState(() => _saving = true);
+    final saved = await ref
+        .read(supplementalHistoryIncludedProvider.notifier)
+        .setEnabled(enabled);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (!saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              context,
+              'Could not save this setting.',
+              '設定を保存できませんでした。',
+              zh: '无法保存此设置。',
+              ko: '설정을 저장하지 못했습니다.',
+            ),
+          ),
+        ),
+      );
+    }
   }
 }
 

@@ -329,9 +329,15 @@ class _RankingRow extends ConsumerWidget {
                           const SizedBox(height: 2),
                           Text(
                             showLastPlayedAt && entry.lastPlayedAt != null
-                                ? _dateTimeFormat(
-                                    context,
-                                  ).format(entry.lastPlayedAt!)
+                                ? track?.lastPlayedAtIsObservation == true
+                                      ? _shortPlayedAtLabel(
+                                          context,
+                                          entry.lastPlayedAt,
+                                          isObservation: true,
+                                        )
+                                      : _dateTimeFormat(
+                                          context,
+                                        ).format(entry.lastPlayedAt!.toLocal())
                                 : entry.subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1830,6 +1836,7 @@ class _ActivityHeatmapDay {
     this.trackDeltas = const [],
     this.hasRecord = false,
     this.estimated = false,
+    this.observationPlayCount = 0,
   });
 
   final DateTime date;
@@ -1837,6 +1844,9 @@ class _ActivityHeatmapDay {
   final List<TrackCounterDelta> trackDeltas;
   final bool hasRecord;
   final bool estimated;
+
+  /// Supplemental minimums recorded on this day, whose playback date is unknown.
+  final int observationPlayCount;
 }
 
 class _ActivityCalendarEntry {
@@ -2229,6 +2239,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
   final rawStart = DateTime(today.year, today.month, today.day - 83);
   final start = _mondayOfWeek(rawStart);
   final valuesByDay = <String, int>{};
+  final observationValuesByDay = <String, int>{};
   final trackDeltasByDay = <String, List<TrackCounterDelta>>{};
 
   if (history.snapshots.length >= 2) {
@@ -2278,19 +2289,29 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
     }
   }
 
-  // Supplemental events keep their real playback date and never enter native
-  // snapshots. Undated minimums are intentionally excluded from the calendar.
+  // Supplemental events never enter native snapshots. Observation events
+  // contribute a confirmed minimum on the observation date, not an exact
+  // playback date.
   for (final event in supplementalEvents) {
-    final key = snapshotDateKey(event.playedAt);
+    final key = snapshotDateKey(event.playedAt.toLocal());
     valuesByDay[key] = (valuesByDay[key] ?? 0) + 1;
-    trackDeltasByDay.putIfAbsent(key, () => <TrackCounterDelta>[]).add(
-      TrackCounterDelta(
-        id: event.track.id, title: event.track.title,
-        artist: event.track.artist, albumTitle: event.track.albumTitle,
-        albumArtist: event.track.albumArtist, playDelta: 1,
-        skipDelta: 0, listeningSecondsDelta: 0,
-      ),
-    );
+    if (event.isObservation) {
+      observationValuesByDay[key] = (observationValuesByDay[key] ?? 0) + 1;
+    }
+    trackDeltasByDay
+        .putIfAbsent(key, () => <TrackCounterDelta>[])
+        .add(
+          TrackCounterDelta(
+            id: event.track.id,
+            title: event.track.title,
+            artist: event.track.artist,
+            albumTitle: event.track.albumTitle,
+            albumArtist: event.track.albumArtist,
+            playDelta: 1,
+            skipDelta: 0,
+            listeningSecondsDelta: 0,
+          ),
+        );
   }
   final days = <_ActivityHeatmapDay>[];
   for (
@@ -2307,6 +2328,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
         trackDeltas: _mergedActivityTrackDeltas(trackDeltas),
         hasRecord: valuesByDay.containsKey(key),
         estimated: overview.isDemo && history.snapshots.length < 2,
+        observationPlayCount: observationValuesByDay[key] ?? 0,
       ),
     );
   }

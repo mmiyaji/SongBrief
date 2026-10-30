@@ -128,10 +128,10 @@ class _LibrarySectionState extends State<_LibrarySection> {
           Text(
             _t(
               context,
-              '${overview.totalTracks} library tracks · ${widget.supplementalTrackIds.length} supplemental history tracks. Songs include supplemental history; categories use library tracks.',
-              '登録曲${overview.totalTracks}曲・補完履歴${widget.supplementalTrackIds.length}曲。曲一覧には補完履歴も表示します。分類は登録曲が対象です。',
-              zh: '${overview.totalTracks} 首曲库歌曲 · ${widget.supplementalTrackIds.length} 首补充历史歌曲。歌曲列表包含补充历史；分类仅使用曲库歌曲。',
-              ko: '보관함 곡 ${overview.totalTracks}개 · 보완 기록 곡 ${widget.supplementalTrackIds.length}개. 곡 목록에는 보완 기록이 포함되며 분류는 보관함 곡을 기준으로 합니다.',
+              '${overview.totalTracks} library tracks · ${widget.supplementalTrackIds.length} outside-library history tracks. Songs include this history; categories use library tracks.',
+              '登録曲${overview.totalTracks}曲・ライブラリ外の履歴${widget.supplementalTrackIds.length}曲。曲一覧には履歴も表示します。分類は登録曲が対象です。',
+              zh: '${overview.totalTracks} 首资料库歌曲 · ${widget.supplementalTrackIds.length} 首资料库外历史歌曲。歌曲列表包含这些记录；分类仅使用资料库歌曲。',
+              ko: '보관함 곡 ${overview.totalTracks}개 · 보관함 외 기록 곡 ${widget.supplementalTrackIds.length}개. 곡 목록에는 이 기록이 포함되며 분류는 보관함 곡을 기준으로 합니다.',
             ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -499,10 +499,10 @@ class _LibraryTrackRow extends ConsumerWidget {
                             icon: Icons.info_outline_rounded,
                             value: _t(
                               context,
-                              'Supplemental · ${_playCountLabel(context, track.playCount)} (minimum)',
-                              '補完 · ${_playCountLabel(context, track.playCount)}（最低）',
-                              zh: '补充 · ${_playCountLabel(context, track.playCount)}（最低）',
-                              ko: '보완 · ${_playCountLabel(context, track.playCount)} (최소)',
+                              'Confirmed from history: at least ${_numberFormat(context).format(track.playCount)}',
+                              '履歴から確認：${_numberFormat(context).format(track.playCount)}回以上',
+                              zh: '从历史记录确认：至少${_numberFormat(context).format(track.playCount)}次',
+                              ko: '기록에서 확인: ${_numberFormat(context).format(track.playCount)}회 이상',
                             ),
                           )
                         else ...[

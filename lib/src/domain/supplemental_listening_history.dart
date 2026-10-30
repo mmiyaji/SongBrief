@@ -44,7 +44,44 @@ class SupplementalListeningHistory {
     return List.unmodifiable(events);
   }
 
-  SupplementalListeningHistory ingest(Iterable<LibraryTrack> tracks) {
+  /// A single minimum assigned to the day playback was observed. Actual dates,
+  /// when available, replace this fallback rather than adding another play.
+  List<SupplementalListeningEvent> get observedEvents => List.unmodifiable([
+    for (final entry in _entries)
+      if (entry.dates.isEmpty && entry.firstObservedAt != null)
+        SupplementalListeningEvent(
+          track: _withDate(
+            entry.track,
+            entry.firstObservedAt,
+          ).copyWith(playCount: 1, lastPlayedAtIsObservation: true),
+          playedAt: DateTime.fromMicrosecondsSinceEpoch(
+            entry.firstObservedAt!,
+            isUtc: true,
+          ),
+          isObservation: true,
+        ),
+  ]);
+
+  List<SupplementalListeningEvent> get calendarEvents {
+    final events = [...datedEvents, ...observedEvents]
+      ..sort((a, b) => a.playedAt.compareTo(b.playedAt));
+    return List.unmodifiable(events);
+  }
+
+  SupplementalListeningHistory ingest(Iterable<LibraryTrack> tracks) =>
+      _ingest(tracks);
+
+  /// Records proof of playback, not a MusicKit completion timestamp. Repeated
+  /// observations never move the first confirmation or increment the minimum.
+  SupplementalListeningHistory observe(
+    LibraryTrack track, {
+    required DateTime at,
+  }) => _ingest([track], observedAt: at);
+
+  SupplementalListeningHistory _ingest(
+    Iterable<LibraryTrack> tracks, {
+    DateTime? observedAt,
+  }) {
     final entries = [..._entries];
     final byStoreId = <String, int>{};
     final byMetadata = <String, int>{};
@@ -106,12 +143,15 @@ class SupplementalListeningHistory {
                     ? songWithoutStoreId[song]
                     : unknownAlbumWithoutStoreId[song]);
       final previous = index == null ? null : entries[index];
-      final playedAt = track.lastPlayedAt;
+      final playedAt = observedAt == null ? track.lastPlayedAt : null;
       final timestamp = playedAt?.microsecondsSinceEpoch;
       if (previous != null &&
           previous.aliases.contains(metadata) &&
           (storeId == null || storeId == _storeId(previous.track)) &&
-          (timestamp == null || previous.dates.contains(timestamp))) {
+          (timestamp == null || previous.dates.contains(timestamp)) &&
+          (observedAt == null ||
+              previous.firstObservedAt != null ||
+              previous.dates.isNotEmpty)) {
         continue;
       }
       changed = true;
@@ -132,6 +172,8 @@ class SupplementalListeningHistory {
         _withDate(representative, newest),
         Set.unmodifiable(dates),
         Set.unmodifiable({...?previous?.aliases, metadata}),
+        firstObservedAt:
+            previous?.firstObservedAt ?? observedAt?.microsecondsSinceEpoch,
       );
       if (index == null) {
         entries.add(entry);
@@ -155,6 +197,8 @@ class SupplementalListeningHistory {
               'track': _trackMap(entry.track),
               'dates': entry.dates.toList()..sort(),
               'aliases': entry.aliases.toList()..sort(),
+              if (entry.firstObservedAt != null)
+                'firstObservedAt': entry.firstObservedAt,
             },
           )
           .toList(),
@@ -182,6 +226,9 @@ class SupplementalListeningHistory {
             _withDate(track, newest),
             Set.unmodifiable(dates),
             Set.unmodifiable((item['aliases'] as List<dynamic>).cast<String>()),
+            firstObservedAt: item['firstObservedAt'] is int
+                ? item['firstObservedAt'] as int
+                : null,
           ),
         );
       }
@@ -196,17 +243,25 @@ class SupplementalListeningEvent {
   const SupplementalListeningEvent({
     required this.track,
     required this.playedAt,
+    this.isObservation = false,
   });
 
   final LibraryTrack track;
   final DateTime playedAt;
+  final bool isObservation;
 }
 
 class _HistoryEntry {
-  const _HistoryEntry(this.track, this.dates, this.aliases);
+  const _HistoryEntry(
+    this.track,
+    this.dates,
+    this.aliases, {
+    this.firstObservedAt,
+  });
   final LibraryTrack track;
   final Set<int> dates;
   final Set<String> aliases;
+  final int? firstObservedAt;
   int get count => dates.isEmpty ? 1 : dates.length;
 }
 
