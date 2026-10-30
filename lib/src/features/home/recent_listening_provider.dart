@@ -7,6 +7,7 @@ import '../../domain/library_track.dart';
 import '../../domain/supplemental_listening_history.dart';
 import '../../settings/library_filter_preferences.dart';
 import 'home_controller.dart';
+import 'counted_listening_provider.dart';
 import 'supplemental_history_controller.dart';
 
 /// One cached projection shared by the library and Playing views. It never
@@ -42,6 +43,34 @@ final libraryRecentOverviewProvider = Provider<LibraryOverview>(
 final recentListeningTracksProvider = Provider<List<LibraryTrack>>(
   (ref) => ref.watch(_recentListeningEvidenceProvider).tracks,
 );
+
+/// Library browsing may include confirmed outside-library history, but it does
+/// not change membership, native counters or persisted daily snapshots.
+final librarySupplementalTracksProvider = Provider<List<LibraryTrack>>((ref) {
+  final counted = ref.watch(countedOutsideTracksProvider);
+  if (counted.isEmpty) return const [];
+  final catalog = LibraryTrackCatalog()..replace(counted);
+  final byId = {for (final track in counted) track.id: track};
+  for (final recent in ref.watch(recentListeningTracksProvider)) {
+    final match = catalog.match(recent);
+    if (match == null || recent.lastPlayedAt == null) continue;
+    final current = byId[match.id]!;
+    final date = current.lastPlayedAt;
+    if (date == null || !recent.lastPlayedAt!.isBefore(date)) {
+      byId[match.id] = current.copyWith(
+        lastPlayedAt: recent.lastPlayedAt,
+        lastPlayedAtIsObservation: recent.lastPlayedAtIsObservation,
+      );
+    }
+  }
+  return List.unmodifiable(byId.values);
+});
+
+final libraryBrowsingOverviewProvider = Provider<LibraryOverview>((ref) {
+  return ref
+      .watch(libraryRecentOverviewProvider)
+      .withSupplementalTracks(ref.watch(librarySupplementalTracksProvider));
+});
 
 class RecentListeningEvidence {
   RecentListeningEvidence(this._nativeOverview, this.tracks)

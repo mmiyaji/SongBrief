@@ -16,7 +16,6 @@ class _OverviewSection extends ConsumerWidget {
         stats: stats,
         countedOverview: ref.watch(countedListeningOverviewProvider),
         supplementalTracks: ref.watch(countedOutsideTracksProvider),
-        undatedTrackCount: ref.watch(supplementalUndatedTrackCountProvider),
         syncState: syncState,
         cloudSyncEnabled: cloudSyncEnabled,
       ),
@@ -44,7 +43,6 @@ class _OverviewSliverSection extends ConsumerWidget {
       stats: stats,
       countedOverview: ref.watch(countedListeningOverviewProvider),
       supplementalTracks: ref.watch(countedOutsideTracksProvider),
-      undatedTrackCount: ref.watch(supplementalUndatedTrackCountProvider),
       syncState: syncState,
       cloudSyncEnabled: cloudSyncEnabled,
     );
@@ -69,7 +67,6 @@ List<Widget> _overviewPanelItems(
   required MusicStatsState stats,
   required LibraryOverview countedOverview,
   required List<LibraryTrack> supplementalTracks,
-  required int undatedTrackCount,
   required SnapshotSyncState syncState,
   required bool cloudSyncEnabled,
 }) {
@@ -93,13 +90,15 @@ List<Widget> _overviewPanelItems(
   }
   add(
     _OverviewPanel(
-      overview: overview,
-      totalPlays: countedOverview.totalPlayCount,
+      overview: countedOverview,
+      nativeOverview: overview,
       supplementalPlayCount: supplementalTracks.fold<int>(
         0,
         (sum, track) => sum + track.playCount,
       ),
-      undatedTrackCount: undatedTrackCount,
+      undatedTrackCount: supplementalTracks
+          .where((track) => track.lastPlayedAt == null)
+          .length,
     ),
   );
   if (stats.snapshotRecordingEnabled) {
@@ -119,7 +118,12 @@ List<Widget> _overviewPanelItems(
       ),
     );
   }
-  add(_SummaryGrid(overview: overview));
+  add(
+    _SummaryGrid(
+      overview: countedOverview,
+      includesSupplemental: supplementalTracks.isNotEmpty,
+    ),
+  );
   add(
     _OverviewAnalyticsPanel(
       overview: overview,
@@ -138,9 +142,16 @@ List<Widget> _overviewPanelItems(
       history: stats.snapshotHistory,
     ),
   );
-  add(_OverviewInsightPanel(overview: overview));
+  add(
+    _OverviewInsightPanel(overview: countedOverview, nativeOverview: overview),
+  );
   add(_SmartListsPanel(overview: overview));
-  add(_OverviewBreakdownPanel(overview: overview));
+  add(
+    _OverviewBreakdownPanel(
+      overview: countedOverview,
+      nativeOverview: overview,
+    ),
+  );
   add(
     AdBannerSlot(
       key: const ValueKey('overview-ad-slot'),
@@ -154,13 +165,13 @@ List<Widget> _overviewPanelItems(
 class _OverviewPanel extends StatelessWidget {
   const _OverviewPanel({
     required this.overview,
-    this.totalPlays,
+    required this.nativeOverview,
     this.supplementalPlayCount = 0,
     this.undatedTrackCount = 0,
   });
 
   final LibraryOverview overview;
-  final int? totalPlays;
+  final LibraryOverview nativeOverview;
   final int supplementalPlayCount;
   final int undatedTrackCount;
 
@@ -170,9 +181,9 @@ class _OverviewPanel extends StatelessWidget {
     final topTrack = overview.topTracks.isEmpty
         ? null
         : overview.topTracks.first;
-    final skipRate = overview.totalPlayCount == 0
+    final skipRate = nativeOverview.totalPlayCount == 0
         ? 0.0
-        : overview.totalSkipCount / overview.totalPlayCount * 100;
+        : nativeOverview.totalSkipCount / nativeOverview.totalPlayCount * 100;
 
     return GlassSurface(
       padding: const EdgeInsets.all(20),
@@ -184,7 +195,7 @@ class _OverviewPanel extends StatelessWidget {
         builder: (context, constraints) {
           final signalTiles = _OverviewSignals(
             hours: _hoursLabel(overview.totalListeningSeconds),
-            skips: number.format(overview.totalSkipCount),
+            skips: number.format(nativeOverview.totalSkipCount),
             skipRate: '${skipRate.toStringAsFixed(1)}%',
           );
 
@@ -199,7 +210,6 @@ class _OverviewPanel extends StatelessWidget {
                   child: _OverviewMain(
                     overview: overview,
                     topTrack: topTrack,
-                    totalPlays: totalPlays,
                     supplementalPlayCount: supplementalPlayCount,
                     undatedTrackCount: undatedTrackCount,
                   ),
@@ -216,7 +226,6 @@ class _OverviewPanel extends StatelessWidget {
               _OverviewMain(
                 overview: overview,
                 topTrack: topTrack,
-                totalPlays: totalPlays,
                 supplementalPlayCount: supplementalPlayCount,
                 undatedTrackCount: undatedTrackCount,
               ),
@@ -234,13 +243,11 @@ class _OverviewMain extends StatelessWidget {
   const _OverviewMain({
     required this.overview,
     required this.topTrack,
-    this.totalPlays,
     this.supplementalPlayCount = 0,
     this.undatedTrackCount = 0,
   });
 
   final LibraryOverview overview;
-  final int? totalPlays;
   final int supplementalPlayCount;
   final int undatedTrackCount;
   final RankingEntry? topTrack;
@@ -265,7 +272,7 @@ class _OverviewMain extends StatelessWidget {
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
           child: Text(
-            number.format(totalPlays ?? overview.totalPlayCount),
+            number.format(overview.totalPlayCount),
             key: const ValueKey('overview-total-play-count'),
             style: theme.textTheme.headlineLarge?.copyWith(
               fontSize: 64,
@@ -286,7 +293,7 @@ class _OverviewMain extends StatelessWidget {
         ),
         if (supplementalPlayCount > 0) ...[
           const SizedBox(height: 8),
-          _SupplementalCountCaption(
+          _LifetimeScopeCaption(
             playCount: supplementalPlayCount,
             undatedTrackCount: undatedTrackCount,
           ),
@@ -1177,9 +1184,13 @@ class _SnapshotDeltaRow extends StatelessWidget {
 }
 
 class _SummaryGrid extends StatelessWidget {
-  const _SummaryGrid({required this.overview});
+  const _SummaryGrid({
+    required this.overview,
+    this.includesSupplemental = false,
+  });
 
   final LibraryOverview overview;
+  final bool includesSupplemental;
 
   @override
   Widget build(BuildContext context) {
@@ -1194,11 +1205,19 @@ class _SummaryGrid extends StatelessWidget {
             : () => _showLibraryGroupListSheet(
                 context,
                 title: _t(context, 'Artists', 'アーティスト'),
-                subtitle: _t(
-                  context,
-                  'All artist groups in the current library',
-                  '現在のライブラリ内のアーティスト一覧',
-                ),
+                subtitle: includesSupplemental
+                    ? _t(
+                        context,
+                        'Included artists',
+                        '含まれるアーティスト',
+                        zh: '包含的艺人',
+                        ko: '포함된 아티스트',
+                      )
+                    : _t(
+                        context,
+                        'All artist groups in the current library',
+                        '現在のライブラリ内のアーティスト一覧',
+                      ),
                 icon: Icons.person_rounded,
                 groups: _libraryGroupsForMode(
                   context,
@@ -1217,11 +1236,19 @@ class _SummaryGrid extends StatelessWidget {
             : () => _showLibraryGroupListSheet(
                 context,
                 title: _t(context, 'Albums', 'アルバム'),
-                subtitle: _t(
-                  context,
-                  'All album groups in the current library',
-                  '現在のライブラリ内のアルバム一覧',
-                ),
+                subtitle: includesSupplemental
+                    ? _t(
+                        context,
+                        'Included albums',
+                        '含まれるアルバム',
+                        zh: '包含的专辑',
+                        ko: '포함된 앨범',
+                      )
+                    : _t(
+                        context,
+                        'All album groups in the current library',
+                        '現在のライブラリ内のアルバム一覧',
+                      ),
                 icon: Icons.album_rounded,
                 groups: _libraryGroupsForMode(
                   context,
@@ -1240,7 +1267,15 @@ class _SummaryGrid extends StatelessWidget {
             : () => _showTrackGroupSheet(
                 context,
                 title: _t(context, 'All songs', 'すべての曲'),
-                subtitle: _t(context, 'Library tracks', 'ライブラリ内の曲'),
+                subtitle: includesSupplemental
+                    ? _t(
+                        context,
+                        'Included songs',
+                        '含まれる曲',
+                        zh: '包含的歌曲',
+                        ko: '포함된 곡',
+                      )
+                    : _t(context, 'Library tracks', 'ライブラリ内の曲'),
                 icon: Icons.music_note_rounded,
                 tracks: _sortLibraryTracks(
                   overview.tracks,
@@ -1365,13 +1400,51 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _SupplementalCountCaption extends StatelessWidget {
-  const _SupplementalCountCaption({
+class _LifetimeScopeCaption extends StatelessWidget {
+  const _LifetimeScopeCaption({
     required this.playCount,
     required this.undatedTrackCount,
   });
   final int playCount;
   final int undatedTrackCount;
+  @override
+  Widget build(BuildContext context) {
+    final count = _numberFormat(context).format(playCount);
+    final undated = _numberFormat(context).format(undatedTrackCount);
+    return Text(
+      [
+        _t(
+          context,
+          'Includes $count confirmed supplemental plays (minimum); listening time is estimated from song duration. Skip metrics use registered library only.',
+          '確認済みの補完再生$count回（最低回数）を含みます。再生時間は曲の長さから推定し、スキップ指標は登録済みライブラリのみです。',
+          zh: '包含$count次已确认的补充播放（最低次数）；聆听时长按歌曲时长估算。跳过指标仅统计已登记曲库。',
+          ko: '확인된 보완 재생 $count회(최소 횟수)를 포함합니다. 감상 시간은 곡 길이로 추정하며 건너뛰기 지표는 등록된 보관함만 집계합니다.',
+        ),
+        if (undatedTrackCount > 0)
+          _t(
+            context,
+            '$undated supplemental ${undatedTrackCount == 1 ? 'track has' : 'tracks have'} unknown play times',
+            '補完$undated曲の再生日時は不明',
+            zh: '$undated首补充歌曲的播放时间未知',
+            ko: '보완 곡 $undated곡의 재생 시각 알 수 없음',
+          ),
+      ].join(' · '),
+      key: const ValueKey('supplemental-count-caption'),
+      style: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+    );
+  }
+}
+
+class _SupplementalCountCaption extends StatelessWidget {
+  const _SupplementalCountCaption({
+    required this.playCount,
+    required this.undatedTrackCount,
+  });
+
+  final int playCount;
+  final int undatedTrackCount;
+
   @override
   Widget build(BuildContext context) {
     final count = _numberFormat(context).format(playCount);

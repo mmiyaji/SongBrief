@@ -1,13 +1,15 @@
 part of '../home_screen.dart';
 
 class _OverviewInsightPanel extends StatelessWidget {
-  const _OverviewInsightPanel({required this.overview});
+  const _OverviewInsightPanel({required this.overview, this.nativeOverview});
 
   final LibraryOverview overview;
+  final LibraryOverview? nativeOverview;
 
   @override
   Widget build(BuildContext context) {
     final number = _numberFormat(context);
+    final library = nativeOverview ?? overview;
     final topArtist = overview.topArtists.isEmpty
         ? null
         : overview.topArtists.first;
@@ -26,9 +28,9 @@ class _OverviewInsightPanel extends StatelessWidget {
       const Duration(days: 30),
     );
     final recentTrackCount = recentTracks.length;
-    final unplayedTracks = _unplayedTracks(overview.tracks);
+    final unplayedTracks = _unplayedTracks(library.tracks);
     final unplayedTrackCount = unplayedTracks.length;
-    final cloudTracks = _tracksByCloudStatus(overview.tracks, isCloud: true);
+    final cloudTracks = _tracksByCloudStatus(library.tracks, isCloud: true);
     final cloudTrackCount = cloudTracks.length;
     final averagePlays = overview.totalTracks == 0
         ? 0.0
@@ -111,7 +113,7 @@ class _OverviewInsightPanel extends StatelessWidget {
         detail: _percentageDetail(
           context,
           unplayedTrackCount,
-          overview.totalTracks,
+          library.totalTracks,
         ),
         onTap: unplayedTracks.isEmpty
             ? null
@@ -149,7 +151,7 @@ class _OverviewInsightPanel extends StatelessWidget {
         detail: _percentageDetail(
           context,
           cloudTrackCount,
-          overview.totalTracks,
+          library.totalTracks,
         ),
         onTap: cloudTracks.isEmpty
             ? null
@@ -182,8 +184,10 @@ class _OverviewInsightPanel extends StatelessWidget {
             title: _t(context, 'Listening insights', 'リスニング洞察'),
             subtitle: _t(
               context,
-              'Different views of the current library',
-              '現在のライブラリを複数の視点で表示',
+              'Lifetime listening trends; unplayed and cloud counts use library tracks.',
+              '累計の聴取傾向を表示します。未再生・クラウド項目は登録曲が対象です。',
+              zh: '显示累计收听趋势；未播放和云端项目仅统计媒体库歌曲。',
+              ko: '누적 청취 경향을 표시합니다. 미재생 및 클라우드 항목은 보관함 곡을 집계합니다.',
             ),
           ),
           const SizedBox(height: 14),
@@ -221,9 +225,10 @@ class _OverviewInsightPanel extends StatelessWidget {
 }
 
 class _OverviewBreakdownPanel extends StatelessWidget {
-  const _OverviewBreakdownPanel({required this.overview});
+  const _OverviewBreakdownPanel({required this.overview, this.nativeOverview});
 
   final LibraryOverview overview;
+  final LibraryOverview? nativeOverview;
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +240,11 @@ class _OverviewBreakdownPanel extends StatelessWidget {
       theme.colorScheme.primary,
     );
     final genreRows = _genreBreakdownRows(context, overview.tracks, theme);
-    final sourceRows = _sourceBreakdownRows(context, overview, theme);
+    final sourceRows = _sourceBreakdownRows(
+      context,
+      nativeOverview ?? overview,
+      theme,
+    );
 
     return GlassSurface(
       padding: const EdgeInsets.all(18),
@@ -278,7 +287,13 @@ class _OverviewBreakdownPanel extends StatelessWidget {
                   rows: genreRows,
                 ),
                 _BreakdownSection(
-                  title: _t(context, 'Source', 'ソース'),
+                  title: _t(
+                    context,
+                    'Source (library)',
+                    'ソース（登録曲）',
+                    zh: '来源（媒体库）',
+                    ko: '소스 (보관함)',
+                  ),
                   emptyLabel: _t(
                     context,
                     'No source data yet.',
@@ -482,8 +497,10 @@ class _SmartListsPanel extends StatelessWidget {
             title: _t(context, 'Smart lists', 'スマートリスト'),
             subtitle: _t(
               context,
-              'Auto-generated views from play counts and metadata',
-              '再生回数とメタデータから自動で作る切り口',
+              'Auto-generated views from library play counts and metadata',
+              '登録曲の再生回数とメタデータから自動で作る切り口',
+              zh: '根据媒体库歌曲的播放次数和元数据自动生成',
+              ko: '보관함 곡의 재생 횟수와 메타데이터로 자동 생성합니다.',
             ),
           ),
           const SizedBox(height: 14),

@@ -48,7 +48,7 @@ void main() {
             .data,
         '13',
       );
-      expect(find.text('1 track ・ 1 artist ・ 1 album'), findsOneWidget);
+      expect(find.text('2 tracks ・ 2 artists ・ 2 albums'), findsOneWidget);
       expect(
         find.textContaining(
           'Includes 3 confirmed supplemental plays (minimum)',
@@ -80,7 +80,7 @@ void main() {
           .read(homeSectionProvider.notifier)
           .setSection(HomeSection.library);
       await tester.pumpAndSettle();
-      expect(find.text('Outside Song'), findsNothing);
+      expect(find.text('Outside Song'), findsOneWidget);
       expect(find.text('Native Song'), findsWidgets);
     },
   );

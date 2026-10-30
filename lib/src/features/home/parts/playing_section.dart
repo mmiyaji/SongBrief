@@ -1975,6 +1975,16 @@ class _TrackGroupSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final native = ref
+        .watch(musicStatsControllerProvider)
+        .asData
+        ?.value
+        .overview;
+    final supplemental = native == null || native.isDemo
+        ? const <LibraryTrack>[]
+        : tracks
+              .where((track) => _isOutsideLibrary(native, track))
+              .toList(growable: false);
     final totalPlayCount = tracks.fold<int>(
       0,
       (total, track) => total + track.playCount,
@@ -2058,6 +2068,18 @@ class _TrackGroupSheet extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: 14),
+            if (supplemental.isNotEmpty) ...[
+              _SupplementalCountCaption(
+                playCount: supplemental.fold<int>(
+                  0,
+                  (sum, track) => sum + track.playCount,
+                ),
+                undatedTrackCount: supplemental
+                    .where((track) => track.lastPlayedAt == null)
+                    .length,
+              ),
+              const SizedBox(height: 8),
+            ],
             _TrackGroupSummary(
               trackCount: tracks.length,
               totalPlayCount: totalPlayCount,
@@ -2065,6 +2087,7 @@ class _TrackGroupSheet extends ConsumerWidget {
               totalListeningSeconds: totalListeningSeconds,
               topTrack: topTrack,
               latestTrack: latestTrack,
+              includesSupplemental: supplemental.isNotEmpty,
             ),
             const SizedBox(height: 14),
             for (final indexed in tracks.indexed) ...[
@@ -2094,6 +2117,7 @@ class _TrackGroupSummary extends StatelessWidget {
     required this.totalListeningSeconds,
     required this.topTrack,
     required this.latestTrack,
+    this.includesSupplemental = false,
   });
 
   final int trackCount;
@@ -2102,6 +2126,7 @@ class _TrackGroupSummary extends StatelessWidget {
   final int totalListeningSeconds;
   final LibraryTrack? topTrack;
   final LibraryTrack? latestTrack;
+  final bool includesSupplemental;
 
   @override
   Widget build(BuildContext context) {
@@ -2118,7 +2143,15 @@ class _TrackGroupSummary extends StatelessWidget {
       ),
       _GroupSummaryValue(
         icon: Icons.fast_forward_rounded,
-        label: _t(context, 'Skips', 'スキップ'),
+        label: includesSupplemental
+            ? _t(
+                context,
+                'Skips (library)',
+                'スキップ（登録曲）',
+                zh: '跳过（媒体库）',
+                ko: '건너뛰기 (보관함)',
+              )
+            : _t(context, 'Skips', 'スキップ'),
         value: _numberFormat(context).format(totalSkipCount),
       ),
       _GroupSummaryValue(
@@ -2230,12 +2263,21 @@ class _GroupTrackRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final artwork = ref.watch(trackArtworkProvider(track.id));
+    final native = ref.watch(
+      musicStatsControllerProvider.select(
+        (value) => value.asData?.value.overview,
+      ),
+    );
+    final supplemental =
+        native != null && !native.isDemo && _isOutsideLibrary(native, track);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _showTrackDetailSheet(context, track),
+        onTap: () => supplemental
+            ? _openAppleMusicTrack(context, track)
+            : _showTrackDetailSheet(context, track),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           child: Row(
@@ -2272,7 +2314,9 @@ class _GroupTrackRow extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      track.albumTitle,
+                      supplemental
+                          ? '${track.albumTitle} · ${_t(context, 'Supplemental', '補完', zh: '补充', ko: '보완')}'
+                          : track.albumTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -2285,13 +2329,23 @@ class _GroupTrackRow extends ConsumerWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                _numberFormat(context).format(track.playCount),
+                supplemental
+                    ? _t(
+                        context,
+                        '${_numberFormat(context).format(track.playCount)} minimum',
+                        '${_numberFormat(context).format(track.playCount)}回（最低）',
+                        zh: '${_numberFormat(context).format(track.playCount)}次（最低）',
+                        ko: '${_numberFormat(context).format(track.playCount)}회 (최소)',
+                      )
+                    : _numberFormat(context).format(track.playCount),
                 style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
               ),
               Icon(
-                Icons.chevron_right_rounded,
+                supplemental
+                    ? Icons.open_in_new_rounded
+                    : Icons.chevron_right_rounded,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ],

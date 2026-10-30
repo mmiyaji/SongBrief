@@ -1115,6 +1115,11 @@ class _SectionBody extends ConsumerWidget {
       HomeSection.rankings => _buildRankings(context, ref),
       HomeSection.library => _LibrarySection(
         overview: ref.watch(libraryRecentOverviewProvider),
+        songsOverview: ref.watch(libraryBrowsingOverviewProvider),
+        supplementalTrackIds: {
+          for (final track in ref.watch(librarySupplementalTracksProvider))
+            track.id,
+        },
       ),
       HomeSection.settings => _SettingsSection(stats: stats),
     };

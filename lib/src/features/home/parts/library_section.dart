@@ -1,9 +1,15 @@
 part of '../home_screen.dart';
 
 class _LibrarySection extends StatefulWidget {
-  const _LibrarySection({required this.overview});
+  const _LibrarySection({
+    required this.overview,
+    this.songsOverview,
+    this.supplementalTrackIds = const <String>{},
+  });
 
   final LibraryOverview overview;
+  final LibraryOverview? songsOverview;
+  final Set<String> supplementalTrackIds;
 
   @override
   State<_LibrarySection> createState() => _LibrarySectionState();
@@ -28,8 +34,10 @@ class _LibrarySectionState extends State<_LibrarySection> {
   @override
   void didUpdateWidget(covariant _LibrarySection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.overview != widget.overview) {
-      final totalCount = _currentResultCount(widget.overview);
+    if (oldWidget.overview != widget.overview ||
+        oldWidget.songsOverview != widget.songsOverview ||
+        oldWidget.supplementalTrackIds != widget.supplementalTrackIds) {
+      final totalCount = _currentResultCount(_activeOverview);
       _visibleCount = _clampInt(
         _visibleCount,
         _initialVisibleCount,
@@ -37,6 +45,10 @@ class _LibrarySectionState extends State<_LibrarySection> {
       );
     }
   }
+
+  LibraryOverview get _activeOverview => _mode == _LibraryBrowseMode.songs
+      ? widget.songsOverview ?? widget.overview
+      : widget.overview;
 
   void _setQuery(String value) {
     setState(() {
@@ -69,7 +81,7 @@ class _LibrarySectionState extends State<_LibrarySection> {
       _visibleCount = _clampInt(
         _visibleCount + _loadMoreCount,
         _initialVisibleCount,
-        _currentResultCount(widget.overview),
+        _currentResultCount(_activeOverview),
       );
     });
   }
@@ -85,12 +97,18 @@ class _LibrarySectionState extends State<_LibrarySection> {
   @override
   Widget build(BuildContext context) {
     final overview = widget.overview;
-    if (!overview.hasTracks) {
+    final songsOverview = widget.songsOverview ?? overview;
+    if (!overview.hasTracks && !songsOverview.hasTracks) {
       return const _EmptyLibraryPanel();
     }
 
+    final songTracks = songsOverview.filteredTracks(_query);
+    final sortedTracks = _libraryTracksForSort(
+      songsOverview,
+      songTracks,
+      _sort,
+    );
     final filteredTracks = overview.filteredTracks(_query);
-    final sortedTracks = _libraryTracksForSort(overview, filteredTracks, _sort);
     final groups = _mode == _LibraryBrowseMode.songs
         ? const <_LibraryGroupEntry>[]
         : _libraryGroupsForMode(context, _mode, filteredTracks, _sort);
@@ -106,6 +124,22 @@ class _LibrarySectionState extends State<_LibrarySection> {
       children: [
         _LibraryStatsPanel(overview: overview),
         const SizedBox(height: 14),
+        if (widget.supplementalTrackIds.isNotEmpty) ...[
+          Text(
+            _t(
+              context,
+              '${overview.totalTracks} library tracks · ${widget.supplementalTrackIds.length} supplemental history tracks. Songs include supplemental history; categories use library tracks.',
+              '登録曲${overview.totalTracks}曲・補完履歴${widget.supplementalTrackIds.length}曲。曲一覧には補完履歴も表示します。分類は登録曲が対象です。',
+              zh: '${overview.totalTracks} 首曲库歌曲 · ${widget.supplementalTrackIds.length} 首补充历史歌曲。歌曲列表包含补充历史；分类仅使用曲库歌曲。',
+              ko: '보관함 곡 ${overview.totalTracks}개 · 보완 기록 곡 ${widget.supplementalTrackIds.length}개. 곡 목록에는 보완 기록이 포함되며 분류는 보관함 곡을 기준으로 합니다.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
         _LibrarySearchPanel(
           controller: _searchController,
           query: _query,
@@ -121,6 +155,7 @@ class _LibrarySectionState extends State<_LibrarySection> {
         if (_mode == _LibraryBrowseMode.songs)
           _LibraryTrackPanel(
             tracks: visibleTracks,
+            supplementalTrackIds: widget.supplementalTrackIds,
             totalCount: totalCount,
             nextCount: _loadMoreCount,
             onLoadMore: _loadMore,
@@ -330,12 +365,14 @@ class _LibrarySearchPanel extends StatelessWidget {
 class _LibraryTrackPanel extends StatelessWidget {
   const _LibraryTrackPanel({
     required this.tracks,
+    required this.supplementalTrackIds,
     required this.totalCount,
     required this.nextCount,
     required this.onLoadMore,
   });
 
   final List<LibraryTrack> tracks;
+  final Set<String> supplementalTrackIds;
   final int totalCount;
   final int nextCount;
   final VoidCallback onLoadMore;
@@ -374,7 +411,12 @@ class _LibraryTrackPanel extends StatelessWidget {
               ),
             )
           else ...[
-            ...tracks.map((track) => _LibraryTrackRow(track: track)),
+            ...tracks.map(
+              (track) => _LibraryTrackRow(
+                track: track,
+                isSupplemental: supplementalTrackIds.contains(track.id),
+              ),
+            ),
             if (tracks.length < totalCount) ...[
               const SizedBox(height: 10),
               _LoadMoreButton(
@@ -392,9 +434,10 @@ class _LibraryTrackPanel extends StatelessWidget {
 }
 
 class _LibraryTrackRow extends ConsumerWidget {
-  const _LibraryTrackRow({required this.track});
+  const _LibraryTrackRow({required this.track, this.isSupplemental = false});
 
   final LibraryTrack track;
+  final bool isSupplemental;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -409,7 +452,9 @@ class _LibraryTrackRow extends ConsumerWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => _showTrackDetailSheet(context, track),
+        onTap: () => isSupplemental
+            ? _openAppleMusicTrack(context, track)
+            : _showTrackDetailSheet(context, track),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
@@ -449,21 +494,43 @@ class _LibraryTrackRow extends ConsumerWidget {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
-                        _MiniStatLabel(
-                          icon: Icons.play_arrow_rounded,
-                          value: number.format(track.playCount),
-                        ),
-                        _MiniStatLabel(
-                          icon: Icons.fast_forward_rounded,
-                          value: number.format(track.skipCount),
-                        ),
+                        if (isSupplemental)
+                          _MiniStatLabel(
+                            icon: Icons.info_outline_rounded,
+                            value: _t(
+                              context,
+                              'Supplemental · ${_playCountLabel(context, track.playCount)} (minimum)',
+                              '補完 · ${_playCountLabel(context, track.playCount)}（最低）',
+                              zh: '补充 · ${_playCountLabel(context, track.playCount)}（最低）',
+                              ko: '보완 · ${_playCountLabel(context, track.playCount)} (최소)',
+                            ),
+                          )
+                        else ...[
+                          _MiniStatLabel(
+                            icon: Icons.play_arrow_rounded,
+                            value: number.format(track.playCount),
+                          ),
+                          _MiniStatLabel(
+                            icon: Icons.fast_forward_rounded,
+                            value: number.format(track.skipCount),
+                          ),
+                        ],
                         _MiniStatLabel(
                           icon: Icons.schedule_rounded,
-                          value: _shortPlayedAtLabel(
-                            context,
-                            track.lastPlayedAt,
-                            isObservation: track.lastPlayedAtIsObservation,
-                          ),
+                          value: isSupplemental && track.lastPlayedAt == null
+                              ? _t(
+                                  context,
+                                  'Time unavailable',
+                                  '再生日時不明',
+                                  zh: '时间不可用',
+                                  ko: '시간 정보 없음',
+                                )
+                              : _shortPlayedAtLabel(
+                                  context,
+                                  track.lastPlayedAt,
+                                  isObservation:
+                                      track.lastPlayedAtIsObservation,
+                                ),
                         ),
                       ],
                     ),
@@ -471,21 +538,34 @@ class _LibraryTrackRow extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton.filledTonal(
-                onPressed: busy
-                    ? null
-                    : () {
-                        ref
-                            .read(playbackControllerProvider.notifier)
-                            .toggleTrack(track.id);
-                      },
-                tooltip: isPlaying
-                    ? _t(context, 'Pause', '一時停止')
-                    : _t(context, 'Play', '再生'),
-                icon: Icon(
-                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              if (isSupplemental)
+                IconButton.filledTonal(
+                  onPressed: () => _openAppleMusicTrack(context, track),
+                  tooltip: _t(
+                    context,
+                    'Open or search in Apple Music',
+                    'Apple Musicで開く／検索',
+                    zh: '在 Apple Music 中打开或搜索',
+                    ko: 'Apple Music에서 열기 또는 검색',
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded),
+                )
+              else
+                IconButton.filledTonal(
+                  onPressed: busy
+                      ? null
+                      : () {
+                          ref
+                              .read(playbackControllerProvider.notifier)
+                              .toggleTrack(track.id);
+                        },
+                  tooltip: isPlaying
+                      ? _t(context, 'Pause', '一時停止')
+                      : _t(context, 'Play', '再生'),
+                  icon: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
