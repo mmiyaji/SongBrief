@@ -1,8 +1,59 @@
 import Foundation
+import MusicKit
 import XCTest
 @testable import Runner
 
 final class RunnerTests: XCTestCase {
+  func testRecentlyPlayedMappingPreservesActualLastPlayedDateWithoutInventingCounts() {
+    let track = MusicLibraryBridge.recentlyPlayedTrackMap(
+      catalogID: "12345", title: " Song ", artist: " Artist ",
+      albumTitle: " Album ", duration: 180.6, genre: " Pop ",
+      lastPlayedDate: Date(timeIntervalSince1970: 1_800_000_000)
+    )
+
+    XCTAssertEqual(track["id"] as? String, "musickit:12345")
+    XCTAssertEqual(track["appleMusicStoreId"] as? String, "12345")
+    XCTAssertEqual(track["title"] as? String, "Song")
+    XCTAssertEqual(track["artist"] as? String, "Artist")
+    XCTAssertEqual(track["albumTitle"] as? String, "Album")
+    XCTAssertEqual(track["genre"] as? String, "Pop")
+    XCTAssertEqual(track["durationSeconds"] as? Int, 181)
+    XCTAssertEqual(track["lastPlayedAtMillis"] as? Int, 1_800_000_000_000)
+    XCTAssertEqual(track["playCount"] as? Int, 0)
+    XCTAssertEqual(track["skipCount"] as? Int, 0)
+    XCTAssertEqual(track["isCloudItem"] as? Bool, true)
+  }
+
+  func testRecentlyPlayedMappingLeavesUnknownTimestampAbsent() {
+    let track = MusicLibraryBridge.recentlyPlayedTrackMap(
+      catalogID: "12345", title: "", artist: " ",
+      albumTitle: nil, duration: nil, genre: nil, lastPlayedDate: nil
+    )
+
+    XCTAssertNil(track["lastPlayedAtMillis"])
+    XCTAssertNil(track["genre"])
+    XCTAssertNil(track["albumArtist"])
+    XCTAssertEqual(track["title"] as? String, "Untitled")
+    XCTAssertEqual(track["artist"] as? String, "Unknown Artist")
+    XCTAssertEqual(track["albumTitle"] as? String, "Unknown Album")
+    XCTAssertEqual(track["durationSeconds"] as? Int, 0)
+  }
+
+  func testRecentlyPlayedAccessReportsUnsupportedAndUnauthorizedSeparately() {
+    XCTAssertEqual(MusicLibraryBridge.recentlyPlayedAccessError(
+      isSupported: false, authorizationStatus: .authorized
+    )?.code, "music_recently_played_unsupported")
+    let statuses: [MusicAuthorization.Status] = [.notDetermined, .denied, .restricted]
+    for status in statuses {
+      XCTAssertEqual(MusicLibraryBridge.recentlyPlayedAccessError(
+        isSupported: true, authorizationStatus: status
+      )?.code, "music_recently_played_not_authorized")
+    }
+    XCTAssertNil(MusicLibraryBridge.recentlyPlayedAccessError(
+      isSupported: true, authorizationStatus: .authorized
+    ))
+  }
+
   func testFailedMusicQueryIsNotTreatedAsAnEmptyLibrary() throws {
     let unavailable: [Int]? = nil
     XCTAssertThrowsError(try MusicLibraryBridge.requireQueryResult(unavailable))

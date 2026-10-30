@@ -31,7 +31,6 @@ enum SongBriefSnapshotRefresh {
     "flutter.songbrief_excluded_genres_v1"
   private static let excludedKeywordsPreferenceKey =
     "flutter.songbrief_excluded_keywords_v1"
-  private static let maxSnapshotTracks = 500
   private static let refreshIntervalHours = 6
   private static let pendingRequestToleranceMinutes = 5
   private static let cloudUploadWaitSeconds: TimeInterval = 10
@@ -501,57 +500,11 @@ enum SongBriefSnapshotRefresh {
   }
 
   private static func compactTrackSnapshots(from items: [MPMediaItem]) -> [[String: Any]] {
+    // Capture every eligible track so later plays have a per-track baseline.
     var selected: [UInt64: MPMediaItem] = [:]
-
-    func add(_ candidates: [MPMediaItem], limit: Int) {
-      var added = 0
-      for item in candidates {
-        selected[item.persistentID] = selected[item.persistentID] ?? item
-        added += 1
-        if added >= limit || selected.count >= maxSnapshotTracks {
-          return
-        }
-      }
+    for item in items {
+      selected[item.persistentID] = selected[item.persistentID] ?? item
     }
-
-    add(
-      items.sorted {
-        if $0.playCount != $1.playCount {
-          return $0.playCount > $1.playCount
-        }
-        return ($0.title ?? "").localizedCaseInsensitiveCompare($1.title ?? "") == .orderedAscending
-      },
-      limit: 260
-    )
-    add(
-      items.sorted {
-        let lhs = $0.lastPlayedDate ?? Date.distantPast
-        let rhs = $1.lastPlayedDate ?? Date.distantPast
-        if lhs != rhs {
-          return lhs > rhs
-        }
-        return ($0.title ?? "").localizedCaseInsensitiveCompare($1.title ?? "") == .orderedAscending
-      },
-      limit: 160
-    )
-    add(
-      items.sorted {
-        if $0.skipCount != $1.skipCount {
-          return $0.skipCount > $1.skipCount
-        }
-        return ($0.title ?? "").localizedCaseInsensitiveCompare($1.title ?? "") == .orderedAscending
-      },
-      limit: 80
-    )
-    if selected.count < maxSnapshotTracks {
-      add(
-        items.sorted {
-          ($0.title ?? "").localizedCaseInsensitiveCompare($1.title ?? "") == .orderedAscending
-        },
-        limit: maxSnapshotTracks
-      )
-    }
-
     return selected.values
       .sorted { $0.persistentID < $1.persistentID }
       .map(trackSnapshot)

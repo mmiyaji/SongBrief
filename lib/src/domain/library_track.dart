@@ -165,3 +165,21 @@ class LibraryTrack {
     return List.unmodifiable(sorted);
   }
 }
+
+/// Catalog and player IDs differ; compare metadata without merging distinct albums.
+bool sameHistoryTrack(LibraryTrack a, LibraryTrack b) {
+  if (a.id == b.id) return true;
+  String normalized(String value) =>
+      value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  if (normalized(a.title) != normalized(b.title) ||
+      normalized(a.artist) != normalized(b.artist)) {
+    return false;
+  }
+  final aAlbum = normalized(a.albumTitle);
+  final bAlbum = normalized(b.albumTitle);
+  return aAlbum.isEmpty ||
+      bAlbum.isEmpty ||
+      aAlbum == 'unknown album' ||
+      bAlbum == 'unknown album' ||
+      aAlbum == bAlbum;
+}

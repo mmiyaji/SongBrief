@@ -329,14 +329,15 @@ void main() {
       totalPlayCount: older.totalPlayCount + 1,
       totalSkipCount: older.totalSkipCount,
       totalListeningSeconds: older.totalListeningSeconds + 180,
-      tracks: [...older.tracks.take(maxSnapshotTrackCounters - 1), recent],
+      tracks: [...older.tracks.take(1199), recent],
     );
     await store.writeSnapshot(older);
     await store.writeSnapshot(newer);
     // A delayed earlier write must not evict the latest scan's recent song either.
     await store.writeSnapshot(older);
     final persisted = (await store.loadHistory()).latest!;
-    expect(persisted.tracks, hasLength(maxSnapshotTrackCounters));
+    expect(persisted.tracks, hasLength(1201));
+    expect(persisted.tracks.map((track) => track.id), contains('track-1199'));
     expect(persisted.tracks.map((track) => track.id), contains(recent.id));
     expect(persisted.totalPlayCount, newer.totalPlayCount);
   });
@@ -540,13 +541,13 @@ DailyLibrarySnapshot _largeSnapshot(int index) {
     dateKey: snapshotDateKey(capturedAt),
     capturedAt: capturedAt,
     source: 'foreground',
-    trackCount: maxSnapshotTrackCounters + 200,
+    trackCount: 1400,
     totalPlayCount: 100000 + index,
     totalSkipCount: 5000 + index,
     totalListeningSeconds: 300000 + index,
     tracks: List.unmodifiable(
       List.generate(
-        maxSnapshotTrackCounters,
+        1200,
         (trackIndex) => TrackCounterSnapshot(
           id: 'track-${trackIndex.toString().padLeft(4, '0')}',
           title:

@@ -110,10 +110,10 @@ void main() {
     expect(delta?.trackDeltas, hasLength(2));
   });
 
-  test('limits stored track counters for large libraries', () {
+  test('stores every track counter for large libraries', () {
     final overview = LibraryOverview.fromTracks(
       List.generate(
-        maxSnapshotTrackCounters + 100,
+        1200,
         (index) => LibraryTrack(
           id: 'track-${index.toString().padLeft(4, '0')}',
           title: 'Snapshot Song $index',
@@ -131,8 +131,43 @@ void main() {
 
     final snapshot = DailyLibrarySnapshot.fromOverview(overview);
 
-    expect(snapshot.trackCount, maxSnapshotTrackCounters + 100);
-    expect(snapshot.tracks, hasLength(maxSnapshotTrackCounters));
+    expect(snapshot.trackCount, 1200);
+    expect(snapshot.tracks, hasLength(1200));
+    expect(snapshot.tracks.last.id, 'track-1199');
+    expect(
+      DailyLibrarySnapshot.fromJson(snapshot.toJson()).tracks,
+      hasLength(1200),
+    );
+  });
+
+  test('compares low-play tracks beyond the former snapshot limit', () {
+    List<TrackCounterSnapshot> counters(int tailPlays) => List.generate(
+      1200,
+      (index) => TrackCounterSnapshot(
+        id: 'track-${index.toString().padLeft(4, '0')}',
+        title: 'Song $index',
+        artist: 'Artist',
+        albumTitle: 'Album',
+        playCount: index == 1199 ? tailPlays : 0,
+        skipCount: 0,
+        listeningSeconds: tailPlays * 180,
+      ),
+    );
+
+    final previous = _snapshotWithTracks(
+      date: DateTime(2026, 7, 1),
+      tracks: counters(2),
+    );
+    final current = _snapshotWithTracks(
+      date: DateTime(2026, 7, 2),
+      tracks: counters(3),
+    );
+
+    final delta = SnapshotDelta.compare(previous: previous, current: current);
+
+    expect(delta?.trackDeltas, hasLength(1));
+    expect(delta?.trackDeltas.single.id, 'track-1199');
+    expect(delta?.trackDeltas.single.playDelta, 1);
   });
 
   test('round-trips the library filter signature', () {

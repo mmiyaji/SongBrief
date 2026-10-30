@@ -477,21 +477,29 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   DateTime? _lastResumeRefreshAt;
+  late final ForegroundLibraryRefresh _foregroundRefresh;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _foregroundRefresh = ref.read(foregroundLibraryRefreshProvider);
+    _foregroundRefresh.setForeground(
+      WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
+    );
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _foregroundRefresh.setForeground(false);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foregroundRefresh.setForeground(state == AppLifecycleState.resumed);
     if (state != AppLifecycleState.resumed) {
       return;
     }
@@ -500,7 +508,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final now = DateTime.now();
     final lastRefresh = _lastResumeRefreshAt;
     if (lastRefresh != null &&
-        now.difference(lastRefresh) < const Duration(minutes: 15)) {
+        now.difference(lastRefresh) < const Duration(minutes: 1)) {
       return;
     }
     _lastResumeRefreshAt = now;

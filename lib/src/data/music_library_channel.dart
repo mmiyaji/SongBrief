@@ -45,7 +45,13 @@ abstract class MusicLibraryClient {
   Future<SnapshotSyncResult> deleteCloudSnapshots({String? olderThanDateKey});
 }
 
-class PlatformMusicLibraryClient implements MusicLibraryClient {
+/// Optional capability, so older and test clients remain compatible.
+abstract interface class RecentlyPlayedMusicLibraryClient {
+  Future<List<LibraryTrack>> fetchRecentlyPlayedTracks();
+}
+
+class PlatformMusicLibraryClient
+    implements MusicLibraryClient, RecentlyPlayedMusicLibraryClient {
   const PlatformMusicLibraryClient();
 
   static const MethodChannel _channel = MethodChannel(
@@ -78,6 +84,18 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
     return (rawTracks ?? const <Object?>[])
         .whereType<Map<Object?, Object?>>()
         .map(LibraryTrack.fromPlatformMap)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<LibraryTrack>> fetchRecentlyPlayedTracks() async {
+    final rawTracks = await _channel.invokeMethod<List<Object?>>(
+      'fetchRecentlyPlayedTracks',
+    );
+    return (rawTracks ?? const <Object?>[])
+        .whereType<Map<Object?, Object?>>()
+        .map(LibraryTrack.fromPlatformMap)
+        .map((track) => track.copyWith(playCount: 0, skipCount: 0))
         .toList(growable: false);
   }
 

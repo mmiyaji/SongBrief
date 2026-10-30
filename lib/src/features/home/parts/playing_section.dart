@@ -10,7 +10,11 @@ class _NowPlayingSection extends ConsumerWidget {
     final overview = stats.overview;
     final playback = ref.watch(playbackControllerProvider);
     final activeTrack = _playbackTrack(overview, playback);
-    final track = activeTrack ?? overview.latestTrack;
+    final outsideLibraryPlays = overview.isDemo
+        ? const <LibraryTrack>[]
+        : ref.watch(visibleOutsideLibraryPlaysProvider);
+    final track =
+        activeTrack ?? overview.latestTrack ?? outsideLibraryPlays.firstOrNull;
 
     if (track == null) {
       return Column(
@@ -27,9 +31,6 @@ class _NowPlayingSection extends ConsumerWidget {
 
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final outsideLibrary = _isOutsideLibrary(overview, track);
-    final outsideLibraryPlays = overview.isDemo
-        ? const <LibraryTrack>[]
-        : ref.watch(visibleOutsideLibraryPlaysProvider);
     final recentTracks = outsideLibraryPlays.isEmpty
         ? overview.recentTrackDetails
         : _mergeRecentTracks(overview.recentTrackDetails, outsideLibraryPlays);
@@ -60,7 +61,7 @@ class _NowPlayingSection extends ConsumerWidget {
         ],
         const SizedBox(height: 14),
         _NowPlayingLyricsPanel(track: track),
-        if (recentTracks.length > 1) ...[
+        if (recentTracks.isNotEmpty) ...[
           const SizedBox(height: 14),
           _RecentTracksPanel(
             tracks: recentTracks,
@@ -85,7 +86,13 @@ List<LibraryTrack> _mergeRecentTracks(
       final bTime = b.lastPlayedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       return bTime.compareTo(aTime);
     });
-  return List.unmodifiable(merged);
+  final unique = <LibraryTrack>[];
+  for (final track in merged) {
+    if (!unique.any((existing) => sameHistoryTrack(existing, track))) {
+      unique.add(track);
+    }
+  }
+  return List.unmodifiable(unique);
 }
 
 /// Marks a song the player reports but the Music library query does not
@@ -1526,7 +1533,15 @@ class _RecentTrackRow extends ConsumerWidget {
             const SizedBox(width: 10),
             Flexible(
               child: Text(
-                _shortPlayedAtLabel(context, track.lastPlayedAt),
+                outsideLibrary && track.lastPlayedAt == null
+                    ? _t(
+                        context,
+                        'Time unavailable',
+                        '時刻不明',
+                        zh: '时间未知',
+                        ko: '시간 알 수 없음',
+                      )
+                    : _shortPlayedAtLabel(context, track.lastPlayedAt),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelLarge?.copyWith(

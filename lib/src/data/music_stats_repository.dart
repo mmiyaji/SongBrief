@@ -34,18 +34,28 @@ final libraryTrackCatalogProvider = Provider((ref) => LibraryTrackCatalog());
 
 class LibraryTrackCatalog {
   Map<String, LibraryTrack> _byId = const {};
-  Map<String, LibraryTrack> _byDescription = const {};
+  Map<String, List<LibraryTrack>> _byDescription = const {};
 
   void replace(List<LibraryTrack> tracks) {
     _byId = {for (final track in tracks) track.id: track};
-    _byDescription = {for (final track in tracks) _description(track): track};
+    final grouped = <String, List<LibraryTrack>>{};
+    for (final track in tracks) {
+      (grouped[_description(track)] ??= []).add(track);
+    }
+    _byDescription = grouped;
   }
 
   LibraryTrack? match(LibraryTrack track) =>
-      _byId[track.id] ?? _byDescription[_description(track)];
+      _byId[track.id] ??
+      _byDescription[_description(track)]
+          ?.where((candidate) => sameHistoryTrack(candidate, track))
+          .firstOrNull;
 
-  static String _description(LibraryTrack track) =>
-      '${track.artist.trim().toLowerCase()}\u0000${track.title.trim().toLowerCase()}';
+  static String _description(LibraryTrack track) {
+    String normalized(String value) =>
+        value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    return '${normalized(track.artist)}\u0000${normalized(track.title)}';
+  }
 }
 
 final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
@@ -81,6 +91,17 @@ class MusicStatsRepository {
 
   LibraryTrack? libraryTrackMatching(LibraryTrack track) =>
       libraryCatalog?.match(track);
+
+  Future<List<LibraryTrack>> fetchRecentlyPlayedTracks() async {
+    final client = _client;
+    if (!_isIosMusicRuntime || client is! RecentlyPlayedMusicLibraryClient) {
+      return const [];
+    }
+    return (await (client as RecentlyPlayedMusicLibraryClient)
+            .fetchRecentlyPlayedTracks())
+        .map((track) => track.copyWith(playCount: 0, skipCount: 0))
+        .toList(growable: false);
+  }
 
   Future<void> ensureSnapshotRefreshScheduled() async {
     if (!_isIosMusicRuntime) {

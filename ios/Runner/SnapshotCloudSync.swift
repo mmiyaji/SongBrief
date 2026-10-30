@@ -39,6 +39,9 @@ enum SnapshotCloudSync {
   )
 
   private static let payloadField = "payload"
+  // Leave room for summary fields and CloudKit record overhead below its 1 MB limit.
+  static let maximumInlinePayloadBytes = 750_000
+  private static let compressedPayloadPrefix = "songbrief:zlib:v1:"
   private static let capturedAtField = "capturedAtMillis"
   private static let trackCountField = "trackCount"
   private static let totalPlayField = "totalPlayCount"
@@ -980,15 +983,47 @@ enum SnapshotCloudSync {
     record[filterSignatureField] as? String == deletionRedactionSignature
   }
 
-  private static func snapshot(from record: CKRecord) -> [String: Any]? {
-    guard
-      let payload = record[payloadField] as? String,
-      let data = payload.data(using: .utf8),
-      let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    else {
+  static func snapshot(from record: CKRecord) -> [String: Any]? {
+    guard let payload = record[payloadField] as? String else {
+      return nil
+    }
+    let data: Data
+    if payload.hasPrefix(compressedPayloadPrefix) {
+      let encoded = String(payload.dropFirst(compressedPayloadPrefix.count))
+      guard let compressed = Data(base64Encoded: encoded),
+            let decompressed = try? (compressed as NSData).decompressed(using: .zlib) else {
+        return nil
+      }
+      data = decompressed as Data
+    } else {
+      guard let raw = payload.data(using: .utf8) else {
+        return nil
+      }
+      data = raw
+    }
+    guard let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
       return nil
     }
     return SnapshotMerge.normalized(decoded)
+  }
+
+  static func cloudPayload(for snapshot: [String: Any]) throws -> String {
+    let data = try JSONSerialization.data(withJSONObject: SnapshotMerge.normalized(snapshot))
+    if data.count <= maximumInlinePayloadBytes {
+      return String(decoding: data, as: UTF8.self)
+    }
+    let compressed = try (data as NSData).compressed(using: .zlib) as Data
+    let payload = compressedPayloadPrefix + compressed.base64EncodedString()
+    guard payload.utf8.count <= maximumInlinePayloadBytes else {
+      // Keep the complete local snapshot and pending upload rather than discarding tracks.
+      throw NSError(
+        domain: "SongBriefSnapshotCloudSync",
+        code: 1,
+        userInfo: [NSLocalizedDescriptionKey:
+          "The complete snapshot exceeds the iCloud record size limit even after compression. It remains saved on this device."]
+      )
+    }
+    return payload
   }
 
   private static func apply(snapshot: [String: Any], to record: CKRecord) -> CKRecord {
@@ -1125,6 +1160,22 @@ enum SnapshotCloudSync {
     retryCount: Int,
     completion: @escaping (Int, Error?) -> Void
   ) {
+    // Encode at the operation boundary so every save path, including conflict
+    // retries, respects CloudKit's record limit without changing the schema.
+    do {
+      for record in records where record.recordID.recordName != deletionPolicyRecordName {
+        guard let decoded = snapshot(from: record) else {
+          throw NSError(
+            domain: "SongBriefSnapshotCloudSync", code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "The snapshot payload could not be decoded."]
+          )
+        }
+        record[payloadField] = try cloudPayload(for: decoded) as CKRecordValue
+      }
+    } catch {
+      completion(0, error)
+      return
+    }
     let operation = CKModifyRecordsOperation(recordsToSave: records)
     operation.isAtomic = false
     operation.savePolicy = .ifServerRecordUnchanged
@@ -1447,19 +1498,17 @@ final class SnapshotOperationCoordinator {
 /// both snapshots used the same library-exclusion profile. A changed profile
 /// replaces the prior observation so excluded tracks cannot survive forever.
 enum SnapshotMerge {
-  private static let maxMergedTracks = 500
   private static let counterKeys = [
     "playCount", "skipCount", "listeningSeconds", "lastPlayedAtMillis",
   ]
 
   static func normalized(_ snapshot: [String: Any]) -> [String: Any] {
-    guard let tracks = snapshot["tracks"] as? [[String: Any]],
-          tracks.count > maxMergedTracks else {
+    guard let tracks = snapshot["tracks"] as? [[String: Any]] else {
       return snapshot
     }
-    var compacted = snapshot
-    compacted["tracks"] = compactTracks(tracks)
-    return compacted
+    var normalized = snapshot
+    normalized["tracks"] = compactTracks(tracks)
+    return normalized
   }
 
   static func merge(
@@ -1548,10 +1597,8 @@ enum SnapshotMerge {
     return newer
   }
 
-  /// Keeps the tracks selected by the newer capture. Matching counters are
-  /// max-merged, then unused capacity is filled from the older snapshot.
-  /// This prevents accumulated high-count history from evicting a recently
-  /// played low-count track selected by the current capture.
+  /// Retains the union of both observations, max-merging matching counters.
+  /// Older counters remain useful when a legacy capture contains only a subset.
   private static func mergeTracks(
     older: [[String: Any]],
     newer: [[String: Any]]
@@ -1581,43 +1628,14 @@ enum SnapshotMerge {
       retainedByID[id] = mergedTrack
     }
 
-    if retainedByID.count < maxMergedTracks {
-      let olderRemainder = compactTracks(
-        olderByID.compactMap { id, track in
-          retainedByID[id] == nil ? track : nil
-        }
-      )
-      for track in olderRemainder.prefix(maxMergedTracks - retainedByID.count) {
-        if let id = track["id"] as? String {
-          retainedByID[id] = track
-        }
-      }
+    for (id, track) in olderByID where retainedByID[id] == nil {
+      retainedByID[id] = track
     }
     return compactTracks(Array(retainedByID.values))
   }
 
   private static func compactTracks(_ tracks: [[String: Any]]) -> [[String: Any]] {
-    let ranked = tracks.sorted { lhs, rhs in
-      let lhsPlay = intValue(lhs["playCount"])
-      let rhsPlay = intValue(rhs["playCount"])
-      if lhsPlay != rhsPlay {
-        return lhsPlay > rhsPlay
-      }
-      let lhsSkip = intValue(lhs["skipCount"])
-      let rhsSkip = intValue(rhs["skipCount"])
-      if lhsSkip != rhsSkip {
-        return lhsSkip > rhsSkip
-      }
-      let lhsLastPlayed = intValue(lhs["lastPlayedAtMillis"])
-      let rhsLastPlayed = intValue(rhs["lastPlayedAtMillis"])
-      if lhsLastPlayed != rhsLastPlayed {
-        return lhsLastPlayed > rhsLastPlayed
-      }
-      return trackID(lhs) < trackID(rhs)
-    }
-    return Array(ranked.prefix(maxMergedTracks)).sorted {
-      trackID($0) < trackID($1)
-    }
+    tracks.sorted { trackID($0) < trackID($1) }
   }
 
   private static func intValue(_ value: Any?) -> Int {

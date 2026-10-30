@@ -23,6 +23,95 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  testWidgets('foreground track transitions coalesce library refreshes', (
+    tester,
+  ) async {
+    final repository = _ForegroundRefreshRepository();
+    final playback = _TestPlaybackController();
+    final container = ProviderContainer(
+      overrides: [
+        musicStatsRepositoryProvider.overrideWithValue(repository),
+        playbackControllerProvider.overrideWith(() => playback),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(musicStatsControllerProvider.future);
+    container.read(foregroundLibraryRefreshProvider).setForeground(true);
+
+    playback.emit('a', playing: true);
+    playback.emit('a', playing: false);
+    playback.emit('a', playing: true);
+    await tester.pump(const Duration(seconds: 20));
+    expect(
+      repository.loadCount,
+      1,
+      reason: 'Initial sync and play/pause do not scan',
+    );
+
+    playback.emit('b', playing: true);
+    await tester.pump(const Duration(seconds: 10));
+    playback.emit('c', playing: true);
+    await tester.pump(const Duration(seconds: 5));
+    expect(
+      repository.loadCount,
+      2,
+      reason: 'Rapid changes share the first deadline',
+    );
+    await tester.pump(const Duration(seconds: 20));
+    expect(repository.loadCount, 2);
+
+    playback.emit(null, playing: false);
+    await tester.pump(const Duration(seconds: 15));
+    expect(
+      repository.loadCount,
+      3,
+      reason: 'Stopping after the final track captures its counters',
+    );
+  });
+
+  testWidgets('foreground refresh cancels on background and disposal', (
+    tester,
+  ) async {
+    var refreshes = 0;
+    final refresh = ForegroundLibraryRefresh(() => refreshes++);
+    refresh.setForeground(true);
+    refresh.trackChanged();
+    await tester.pump(const Duration(seconds: 10));
+    refresh.setForeground(false);
+    refresh.trackChanged();
+    await tester.pump(const Duration(seconds: 20));
+    expect(refreshes, 0);
+
+    refresh.setForeground(true);
+    refresh.trackChanged();
+    await tester.pump(const Duration(seconds: 15));
+    expect(refreshes, 1);
+    refresh.trackChanged();
+    refresh.dispose();
+    await tester.pump(const Duration(seconds: 20));
+    expect(refreshes, 1);
+  });
+
+  testWidgets('foreground transitions never refresh a demo library', (
+    tester,
+  ) async {
+    final repository = _ForegroundRefreshRepository()..demo = true;
+    final playback = _TestPlaybackController();
+    final container = ProviderContainer(
+      overrides: [
+        musicStatsRepositoryProvider.overrideWithValue(repository),
+        playbackControllerProvider.overrideWith(() => playback),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(musicStatsControllerProvider.future);
+    container.read(foregroundLibraryRefreshProvider).setForeground(true);
+    playback.emit('a', playing: true);
+    playback.emit('b', playing: true);
+    await tester.pump(const Duration(seconds: 15));
+    expect(repository.loadCount, 1);
+  });
+
   for (final clearAll in [true, false]) {
     test(
       'history ${clearAll ? 'clear' : 'prune'} updates the native widget',
@@ -382,6 +471,26 @@ class _ControlledMusicStatsRepository extends MusicStatsRepository {
   @override
   Future<MusicPlaybackSnapshot?> currentPlayback() {
     return Future.value();
+  }
+}
+
+class _TestPlaybackController extends PlaybackController {
+  @override
+  PlaybackState build() => const PlaybackState();
+
+  @override
+  Future<void> syncWithPlayer() async {}
+
+  void emit(String? id, {required bool playing}) {
+    state = PlaybackState(activeTrackId: id, isPlaying: playing);
+  }
+}
+
+class _ForegroundRefreshRepository extends _WidgetRefreshRepository {
+  @override
+  Future<MusicStatsState> load({bool requestAccess = false}) {
+    loadCount++;
+    return super.load(requestAccess: requestAccess);
   }
 }
 

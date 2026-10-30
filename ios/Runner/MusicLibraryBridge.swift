@@ -1,5 +1,6 @@
 import Flutter
 import MediaPlayer
+import MusicKit
 import UIKit
 
 final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
@@ -9,6 +10,7 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     qos: .utility
   )
   private var eventSink: FlutterEventSink?
+  private var recentlyPlayedArtwork: [String: Artwork] = [:]
   private static let playbackQueueWindowSize = 200
 
   private override init() {
@@ -39,7 +41,11 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       result(Self.authorizationStatusString(MPMediaLibrary.authorizationStatus()))
     case "requestAuthorization":
       MPMediaLibrary.requestAuthorization { status in
-        DispatchQueue.main.async {
+        Task { @MainActor in
+          // Permission prompts belong only to this explicit user action.
+          if status == .authorized, MusicAuthorization.currentStatus == .notDetermined {
+            _ = await MusicAuthorization.request()
+          }
           result(Self.authorizationStatusString(status))
         }
       }
@@ -53,6 +59,8 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       }
     case "fetchTracks":
       fetchTracks(result: result)
+    case "fetchRecentlyPlayedTracks":
+      fetchRecentlyPlayedTracks(result: result)
     case "currentPlayback":
       result(playbackMap())
     case "fetchArtwork":
@@ -245,7 +253,139 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     }
   }
 
+  private func fetchRecentlyPlayedTracks(result: @escaping FlutterResult) {
+    let supported: Bool
+    if #available(iOS 16.0, *) {
+      supported = true
+    } else {
+      supported = false
+    }
+    if let error = Self.recentlyPlayedAccessError(
+      isSupported: supported,
+      authorizationStatus: MusicAuthorization.currentStatus
+    ) {
+      DispatchQueue.main.async { result(error) }
+      return
+    }
+    guard #available(iOS 16.0, *) else { return }
+
+    Task { @MainActor in
+      do {
+        var tracks: [[String: Any]] = []
+        var artwork: [String: Artwork] = [:]
+        var seenIDs = Set<String>()
+        // Bound the work while looking beyond only the first page. The API
+        // returns recent resources, not a complete log of individual plays.
+        for page in 0..<4 {
+          var request = MusicRecentlyPlayedRequest<Song>()
+          request.limit = 30
+          request.offset = page * 30
+          let response = try await request.response()
+          for song in response.items {
+            let id = "musickit:\(song.id.rawValue)"
+            guard seenIDs.insert(id).inserted else { continue }
+            tracks.append(Self.recentlyPlayedTrackMap(
+              catalogID: song.id.rawValue,
+              title: song.title,
+              artist: song.artistName,
+              albumTitle: song.albumTitle,
+              duration: song.duration,
+              genre: song.genreNames.first,
+              lastPlayedDate: song.lastPlayedDate
+            ))
+            artwork[id] = song.artwork
+          }
+          if !response.items.hasNextBatch { break }
+        }
+        self.recentlyPlayedArtwork = artwork
+        result(tracks)
+      } catch {
+        let nativeError = error as NSError
+        result(FlutterError(
+          code: "music_recently_played_unavailable",
+          message: "Recently played Apple Music songs could not be read. Check your connection, Apple Music account, and MusicKit configuration.",
+          details: ["domain": nativeError.domain, "code": nativeError.code]
+        ))
+      }
+    }
+  }
+
+  static func recentlyPlayedAccessError(
+    isSupported: Bool,
+    authorizationStatus: MusicAuthorization.Status
+  ) -> FlutterError? {
+    guard isSupported else {
+      return FlutterError(
+        code: "music_recently_played_unsupported",
+        message: "Recently played Apple Music songs require iOS 16 or later.",
+        details: nil
+      )
+    }
+    guard authorizationStatus == .authorized else {
+      return FlutterError(
+        code: "music_recently_played_not_authorized",
+        message: "Apple Music access has not been authorized. Grant access from the app's authorization action or Settings.",
+        details: nil
+      )
+    }
+    return nil
+  }
+
+  // Keep transport mapping testable without a network request or a MusicKit
+  // Song initializer. A missing last-played date must stay missing.
+  static func recentlyPlayedTrackMap(
+    catalogID: String,
+    title: String,
+    artist: String,
+    albumTitle: String?,
+    duration: TimeInterval?,
+    genre: String?,
+    lastPlayedDate: Date?
+  ) -> [String: Any] {
+    let seconds = duration.flatMap { $0.isFinite ? max(0, $0) : nil } ?? 0
+    var track: [String: Any] = [
+      "id": "musickit:\(catalogID)",
+      "appleMusicStoreId": catalogID,
+      "title": nonEmpty(title) ?? "Untitled",
+      "artist": nonEmpty(artist) ?? "Unknown Artist",
+      "albumTitle": nonEmpty(albumTitle) ?? "Unknown Album",
+      "durationSeconds": Int(seconds.rounded()),
+      "playCount": 0,
+      "skipCount": 0,
+      "isCloudItem": true
+    ]
+    if let genre = nonEmpty(genre) { track["genre"] = genre }
+    if let lastPlayedDate {
+      track["lastPlayedAtMillis"] = Int(lastPlayedDate.timeIntervalSince1970 * 1000)
+    }
+    return track
+  }
+
   private func fetchArtwork(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    if let arguments = call.arguments as? [String: Any],
+       let id = arguments["id"] as? String, id.hasPrefix("musickit:") {
+      let size = max(80, min(arguments["size"] as? Int ?? 640, 1200))
+      guard let url = recentlyPlayedArtwork[id]?.url(width: size, height: size) else {
+        result(nil)
+        return
+      }
+      Task { @MainActor in
+        do {
+          let (data, response) = try await URLSession.shared.data(from: url)
+          guard let response = response as? HTTPURLResponse,
+                (200..<300).contains(response.statusCode),
+                let image = UIImage(data: data),
+                let jpeg = image.jpegData(compressionQuality: 0.88) else {
+            result(nil)
+            return
+          }
+          result(FlutterStandardTypedData(bytes: jpeg))
+        } catch {
+          result(nil)
+        }
+      }
+      return
+    }
     guard MPMediaLibrary.authorizationStatus() == .authorized else {
       result(FlutterError(
         code: "music_library_not_authorized",
@@ -360,6 +500,12 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
   }
 
   private func fetchLyrics(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    if let arguments = call.arguments as? [String: Any],
+       let id = arguments["id"] as? String, id.hasPrefix("musickit:") {
+      // MusicKit does not expose catalog lyrics as text.
+      result(nil)
+      return
+    }
     guard MPMediaLibrary.authorizationStatus() == .authorized else {
       result(FlutterError(
         code: "music_library_not_authorized",
