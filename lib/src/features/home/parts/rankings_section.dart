@@ -3,11 +3,13 @@ part of '../home_screen.dart';
 class _RankingPanel extends ConsumerWidget {
   const _RankingPanel({
     required this.overview,
+    required this.snapshotOverview,
     required this.history,
     required this.snapshotRecordingEnabled,
   });
 
   final LibraryOverview overview;
+  final LibraryOverview snapshotOverview;
   final SnapshotHistory history;
   final bool snapshotRecordingEnabled;
 
@@ -150,6 +152,7 @@ class _RankingPanel extends ConsumerWidget {
           const SizedBox(height: 22),
           _RankingExtensions(
             overview: overview,
+            snapshotOverview: snapshotOverview,
             history: history,
             snapshotRecordingEnabled: snapshotRecordingEnabled,
           ),
@@ -164,11 +167,13 @@ class _RankingPanel extends ConsumerWidget {
 class _RankingExtensions extends StatelessWidget {
   const _RankingExtensions({
     required this.overview,
+    required this.snapshotOverview,
     required this.history,
     required this.snapshotRecordingEnabled,
   });
 
   final LibraryOverview overview;
+  final LibraryOverview snapshotOverview;
   final SnapshotHistory history;
   final bool snapshotRecordingEnabled;
 
@@ -218,11 +223,11 @@ class _RankingExtensions extends StatelessWidget {
         ),
         if (showSnapshotSections) ...[
           const SizedBox(height: 16),
-          _PeriodRankingSection(overview: overview, history: history),
+          _PeriodRankingSection(overview: snapshotOverview, history: history),
           const SizedBox(height: 18),
-          _RisingRankingSection(overview: overview, history: history),
+          _RisingRankingSection(overview: snapshotOverview, history: history),
           const SizedBox(height: 18),
-          _RankMovementSection(overview: overview, history: history),
+          _RankMovementSection(overview: snapshotOverview, history: history),
         ] else if (showSnapshotHint) ...[
           const SizedBox(height: 16),
           _RankingInsightEmpty(

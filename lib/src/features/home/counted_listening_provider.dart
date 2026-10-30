@@ -8,6 +8,16 @@ import '../../settings/library_filter_preferences.dart';
 import 'home_controller.dart';
 import 'supplemental_history_controller.dart';
 
+// A supplemental event must not rebuild the native matching index.
+final _nativeTrackCatalogProvider = Provider<LibraryTrackCatalog>((ref) {
+  final overview = ref.watch(
+    musicStatsControllerProvider.select(
+      (value) => value.asData?.value.overview,
+    ),
+  );
+  return LibraryTrackCatalog()..replace(overview?.tracks ?? const []);
+});
+
 /// Only songs absent from the unfiltered library contribute supplemental plays.
 /// Native snapshots and the library's own counts remain authoritative.
 final countedOutsideTracksProvider = Provider<List<LibraryTrack>>((ref) {
@@ -16,7 +26,7 @@ final countedOutsideTracksProvider = Provider<List<LibraryTrack>>((ref) {
   final repository = ref.watch(musicStatsRepositoryProvider);
   final filters = ref.watch(libraryFilterPreferencesProvider);
   if (stats == null || stats.isDemo) return const [];
-  final native = LibraryTrackCatalog()..replace(stats.overview.tracks);
+  final native = ref.watch(_nativeTrackCatalogProvider);
   return List.unmodifiable(
     history.tracks.where(
       (track) =>
@@ -28,14 +38,15 @@ final countedOutsideTracksProvider = Provider<List<LibraryTrack>>((ref) {
 });
 
 final countedListeningOverviewProvider = Provider<LibraryOverview>((ref) {
-  final native = ref.watch(musicStatsControllerProvider).asData?.value.overview;
+  final native = ref.watch(
+    musicStatsControllerProvider.select(
+      (value) => value.asData?.value.overview,
+    ),
+  );
   final supplemental = ref.watch(countedOutsideTracksProvider);
   if (native == null) return LibraryOverview.empty(isDemo: false);
   if (supplemental.isEmpty) return native;
-  return LibraryOverview.fromTracks([
-    ...native.tracks,
-    ...supplemental,
-  ], isDemo: false);
+  return native.withSupplementalTracks(supplemental);
 });
 
 final supplementalUndatedTrackCountProvider = Provider<int>(

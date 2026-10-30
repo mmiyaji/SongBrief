@@ -14,6 +14,7 @@ class LibraryTrack {
     this.appleMusicStoreId,
     this.releaseDate,
     this.lastPlayedAt,
+    this.lastPlayedAtIsObservation = false,
     this.lyrics,
     this.playlistNames = const <String>[],
   });
@@ -31,6 +32,8 @@ class LibraryTrack {
   final int playCount;
   final int skipCount;
   final DateTime? lastPlayedAt;
+  /// Display-only evidence date from an observation, not an exact playback time.
+  final bool lastPlayedAtIsObservation;
   final bool isCloudItem;
   final String? lyrics;
   final List<String> playlistNames;
@@ -41,6 +44,7 @@ class LibraryTrack {
     int? playCount,
     int? skipCount,
     DateTime? lastPlayedAt,
+    bool? lastPlayedAtIsObservation,
   }) {
     return LibraryTrack(
       id: id,
@@ -56,6 +60,8 @@ class LibraryTrack {
       playCount: playCount ?? this.playCount,
       skipCount: skipCount ?? this.skipCount,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+      lastPlayedAtIsObservation:
+          lastPlayedAtIsObservation ?? this.lastPlayedAtIsObservation,
       isCloudItem: isCloudItem,
       lyrics: lyrics,
       playlistNames: playlistNames,

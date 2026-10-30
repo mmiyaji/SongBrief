@@ -33,6 +33,7 @@ import '../../settings/snapshot_preferences.dart';
 import '../../theme/app_theme.dart';
 import 'home_controller.dart';
 import 'counted_listening_provider.dart';
+import 'recent_listening_provider.dart';
 import 'widgets/glass_surface.dart';
 
 part 'parts/playing_section.dart';
@@ -1108,43 +1109,56 @@ class _SectionBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final overview = stats.overview;
-    final countedOverview = ref.watch(countedListeningOverviewProvider);
-    final supplementalTracks = ref.watch(countedOutsideTracksProvider);
-
     return switch (selectedSection) {
       HomeSection.playing => _NowPlayingSection(stats: stats),
       HomeSection.overview => _OverviewSection(stats: stats),
-      HomeSection.rankings =>
-        countedOverview.hasTracks
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (supplementalTracks.isNotEmpty) ...[
-                    _SupplementalCountCaption(
-                      playCount: supplementalTracks.fold<int>(
-                        0,
-                        (sum, track) => sum + track.playCount,
-                      ),
-                      undatedTrackCount: ref.watch(
-                        supplementalUndatedTrackCountProvider,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  _RankingPanel(
-                    overview: countedOverview,
-                    history: stats.snapshotHistory,
-                    snapshotRecordingEnabled:
-                        stats.snapshotRecordingEnabled &&
-                        supplementalTracks.isEmpty,
-                  ),
-                ],
-              )
-            : const _EmptyLibraryPanel(),
-      HomeSection.library => _LibrarySection(overview: overview),
+      HomeSection.rankings => _buildRankings(context, ref),
+      HomeSection.library => _LibrarySection(
+        overview: ref.watch(libraryRecentOverviewProvider),
+      ),
       HomeSection.settings => _SettingsSection(stats: stats),
     };
+  }
+
+  Widget _buildRankings(BuildContext context, WidgetRef ref) {
+    final countedOverview = ref.watch(countedListeningOverviewProvider);
+    final supplementalTracks = ref.watch(countedOutsideTracksProvider);
+    if (!countedOverview.hasTracks) return const _EmptyLibraryPanel();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (supplementalTracks.isNotEmpty) ...[
+          _SupplementalCountCaption(
+            playCount: supplementalTracks.fold<int>(
+              0,
+              (sum, track) => sum + track.playCount,
+            ),
+            undatedTrackCount: ref.watch(supplementalUndatedTrackCountProvider),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _t(
+              context,
+              'Lifetime totals include supplemental plays; period rankings use library records only.',
+              '累計には補完再生を含みます。期間別ランキングはライブラリの記録のみです。',
+              zh: '累计播放包含补充记录；期间排名仅使用媒体库记录。',
+              ko: '누적에는 보완 재생이 포함되며, 기간별 순위는 보관함 기록만 사용합니다.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        _RankingPanel(
+          overview: countedOverview,
+          snapshotOverview: stats.overview,
+          history: stats.snapshotHistory,
+          snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
+        ),
+      ],
+    );
   }
 }
 

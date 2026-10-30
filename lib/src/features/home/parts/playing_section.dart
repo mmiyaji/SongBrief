@@ -42,9 +42,7 @@ class _NowPlayingSection extends ConsumerWidget {
 
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final outsideLibrary = _isOutsideLibrary(overview, track);
-    final recentTracks = outsideLibraryPlays.isEmpty
-        ? overview.recentTrackDetails
-        : _mergeRecentTracks(overview.recentTrackDetails, outsideLibraryPlays);
+    final recentTracks = ref.watch(recentListeningTracksProvider);
     final playRankIndex = overview.topTracks.indexWhere(
       (entry) => entry.representativeTrackId == track.id,
     );
@@ -84,20 +82,6 @@ class _NowPlayingSection extends ConsumerWidget {
       ],
     );
   }
-}
-
-/// Library history and songs seen playing outside the library, newest first.
-List<LibraryTrack> _mergeRecentTracks(
-  List<LibraryTrack> library,
-  List<LibraryTrack> outsideLibrary,
-) {
-  final merged = [...library, ...outsideLibrary]
-    ..sort((a, b) {
-      final aTime = a.lastPlayedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bTime = b.lastPlayedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return bTime.compareTo(aTime);
-    });
-  return uniqueHistoryTracks(merged);
 }
 
 /// Marks a song the player reports but the Music library query does not
@@ -1590,7 +1574,11 @@ class _RecentTrackRow extends ConsumerWidget {
                         zh: '时间未知',
                         ko: '시간 알 수 없음',
                       )
-                    : _shortPlayedAtLabel(context, track.lastPlayedAt),
+                    : _shortPlayedAtLabel(
+                        context,
+                        track.lastPlayedAt,
+                        isObservation: track.lastPlayedAtIsObservation,
+                      ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelLarge?.copyWith(

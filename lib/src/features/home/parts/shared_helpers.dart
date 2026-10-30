@@ -2021,9 +2021,24 @@ String _playedAtLabel(BuildContext context, DateTime? dateTime) {
   return _dateTimeFormat(context).format(dateTime);
 }
 
-String _shortPlayedAtLabel(BuildContext context, DateTime? dateTime) {
+String _shortPlayedAtLabel(
+  BuildContext context,
+  DateTime? dateTime, {
+  bool isObservation = false,
+}) {
   if (dateTime == null) {
     return _t(context, 'None', 'なし');
+  }
+  dateTime = dateTime.toLocal();
+  if (isObservation) {
+    final date = DateFormat('M/d').format(dateTime);
+    return _t(
+      context,
+      '$date Observed',
+      '$date 記録確認',
+      zh: '$date 记录确认',
+      ko: '$date 기록 확인',
+    );
   }
   final now = DateTime.now();
   if (dateTime.year == now.year &&

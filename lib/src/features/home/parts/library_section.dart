@@ -462,6 +462,7 @@ class _LibraryTrackRow extends ConsumerWidget {
                           value: _shortPlayedAtLabel(
                             context,
                             track.lastPlayedAt,
+                            isObservation: track.lastPlayedAtIsObservation,
                           ),
                         ),
                       ],
