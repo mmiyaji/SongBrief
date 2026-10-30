@@ -14,6 +14,9 @@ class _OverviewSection extends ConsumerWidget {
       children: _overviewPanelItems(
         context,
         stats: stats,
+        countedOverview: ref.watch(countedListeningOverviewProvider),
+        supplementalTracks: ref.watch(countedOutsideTracksProvider),
+        undatedTrackCount: ref.watch(supplementalUndatedTrackCountProvider),
         syncState: syncState,
         cloudSyncEnabled: cloudSyncEnabled,
       ),
@@ -39,6 +42,9 @@ class _OverviewSliverSection extends ConsumerWidget {
     final items = _overviewPanelItems(
       context,
       stats: stats,
+      countedOverview: ref.watch(countedListeningOverviewProvider),
+      supplementalTracks: ref.watch(countedOutsideTracksProvider),
+      undatedTrackCount: ref.watch(supplementalUndatedTrackCountProvider),
       syncState: syncState,
       cloudSyncEnabled: cloudSyncEnabled,
     );
@@ -61,6 +67,9 @@ class _OverviewSliverSection extends ConsumerWidget {
 List<Widget> _overviewPanelItems(
   BuildContext context, {
   required MusicStatsState stats,
+  required LibraryOverview countedOverview,
+  required List<LibraryTrack> supplementalTracks,
+  required int undatedTrackCount,
   required SnapshotSyncState syncState,
   required bool cloudSyncEnabled,
 }) {
@@ -82,7 +91,17 @@ List<Widget> _overviewPanelItems(
   if (_labelsDemo(overview)) {
     add(const _DemoBanner(), spaceAfter: 16);
   }
-  add(_OverviewPanel(overview: overview));
+  add(
+    _OverviewPanel(
+      overview: overview,
+      totalPlays: countedOverview.totalPlayCount,
+      supplementalPlayCount: supplementalTracks.fold<int>(
+        0,
+        (sum, track) => sum + track.playCount,
+      ),
+      undatedTrackCount: undatedTrackCount,
+    ),
+  );
   if (stats.snapshotRecordingEnabled) {
     add(
       _SnapshotStatusPanel(
@@ -93,9 +112,10 @@ List<Widget> _overviewPanelItems(
         cloudSyncEnabled: cloudSyncEnabled,
         onSync: overview.isDemo || syncState.isSyncing
             ? null
-            : () => ProviderScope.containerOf(context)
-                  .read(musicStatsControllerProvider.notifier)
-                  .syncCloudSnapshots(),
+            : () =>
+                  ProviderScope.containerOf(context)
+                      .read(musicStatsControllerProvider.notifier)
+                      .syncCloudSnapshots(),
       ),
     );
   }
@@ -132,9 +152,17 @@ List<Widget> _overviewPanelItems(
 }
 
 class _OverviewPanel extends StatelessWidget {
-  const _OverviewPanel({required this.overview});
+  const _OverviewPanel({
+    required this.overview,
+    this.totalPlays,
+    this.supplementalPlayCount = 0,
+    this.undatedTrackCount = 0,
+  });
 
   final LibraryOverview overview;
+  final int? totalPlays;
+  final int supplementalPlayCount;
+  final int undatedTrackCount;
 
   @override
   Widget build(BuildContext context) {
@@ -168,7 +196,13 @@ class _OverviewPanel extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
-                  child: _OverviewMain(overview: overview, topTrack: topTrack),
+                  child: _OverviewMain(
+                    overview: overview,
+                    topTrack: topTrack,
+                    totalPlays: totalPlays,
+                    supplementalPlayCount: supplementalPlayCount,
+                    undatedTrackCount: undatedTrackCount,
+                  ),
                 ),
                 const SizedBox(width: 20),
                 SizedBox(width: signalWidth, child: signalTiles),
@@ -179,7 +213,13 @@ class _OverviewPanel extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _OverviewMain(overview: overview, topTrack: topTrack),
+              _OverviewMain(
+                overview: overview,
+                topTrack: topTrack,
+                totalPlays: totalPlays,
+                supplementalPlayCount: supplementalPlayCount,
+                undatedTrackCount: undatedTrackCount,
+              ),
               const SizedBox(height: 18),
               signalTiles,
             ],
@@ -191,9 +231,18 @@ class _OverviewPanel extends StatelessWidget {
 }
 
 class _OverviewMain extends StatelessWidget {
-  const _OverviewMain({required this.overview, required this.topTrack});
+  const _OverviewMain({
+    required this.overview,
+    required this.topTrack,
+    this.totalPlays,
+    this.supplementalPlayCount = 0,
+    this.undatedTrackCount = 0,
+  });
 
   final LibraryOverview overview;
+  final int? totalPlays;
+  final int supplementalPlayCount;
+  final int undatedTrackCount;
   final RankingEntry? topTrack;
 
   @override
@@ -216,7 +265,8 @@ class _OverviewMain extends StatelessWidget {
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
           child: Text(
-            number.format(overview.totalPlayCount),
+            number.format(totalPlays ?? overview.totalPlayCount),
+            key: const ValueKey('overview-total-play-count'),
             style: theme.textTheme.headlineLarge?.copyWith(
               fontSize: 64,
               height: 0.94,
@@ -234,6 +284,13 @@ class _OverviewMain extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+        if (supplementalPlayCount > 0) ...[
+          const SizedBox(height: 8),
+          _SupplementalCountCaption(
+            playCount: supplementalPlayCount,
+            undatedTrackCount: undatedTrackCount,
+          ),
+        ],
         if (topTrack != null) ...[
           const SizedBox(height: 18),
           _TopTrackLine(entry: topTrack!),
@@ -1304,6 +1361,50 @@ class _SummaryCard extends StatelessWidget {
       color: Colors.transparent,
       borderRadius: radius,
       child: InkWell(borderRadius: radius, onTap: value.onTap, child: content),
+    );
+  }
+}
+
+class _SupplementalCountCaption extends StatelessWidget {
+  const _SupplementalCountCaption({
+    required this.playCount,
+    required this.undatedTrackCount,
+  });
+  final int playCount;
+  final int undatedTrackCount;
+  @override
+  Widget build(BuildContext context) {
+    final count = _numberFormat(context).format(playCount);
+    final undated = _numberFormat(context).format(undatedTrackCount);
+    return Text(
+      [
+        _t(
+          context,
+          'Includes $count confirmed supplemental plays (minimum)',
+          '確認済みの補完再生$count回を含む（最低回数）',
+          zh: '包含$count次已确认的补充播放（最低次数）',
+          ko: '확인된 보완 재생 $count회 포함 (최소 횟수)',
+        ),
+        if (playCount > undatedTrackCount)
+          _t(
+            context,
+            'Dated supplemental plays are included in the calendar',
+            '日時が確認できる補完再生はカレンダーに含みます',
+            zh: '已知时间的补充播放已计入日历',
+            ko: '시각이 확인된 보완 재생은 캘린더에 포함됩니다',
+          ),
+        if (undatedTrackCount > 0)
+          _t(
+            context,
+            '$undated supplemental ${undatedTrackCount == 1 ? 'track has' : 'tracks have'} unknown play times',
+            '補完$undated曲の再生日時は不明',
+            zh: '$undated首补充歌曲的播放时间未知',
+            ko: '보완 곡 $undated곡의 재생 시각 알 수 없음',
+          ),
+      ].join(' · '),
+      key: const ValueKey('supplemental-count-caption'),
+      style: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
     );
   }
 }

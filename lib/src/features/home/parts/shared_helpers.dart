@@ -255,7 +255,15 @@ class _RankingRow extends ConsumerWidget {
     final artwork = track == null
         ? const AsyncData<Uint8List?>(null)
         : ref.watch(trackArtworkProvider(track.id));
-    final onTap = _rankingEntryTapHandler(context, overview, entry, track);
+    final nativeOverview = ref
+        .watch(musicStatsControllerProvider)
+        .asData
+        ?.value
+        .overview;
+    final nativeTrack = nativeOverview?.trackById(entry.representativeTrackId);
+    final onTap = nativeOverview == null
+        ? null
+        : _rankingEntryTapHandler(context, nativeOverview, entry, nativeTrack);
 
     return Padding(
       key: rowKey,
@@ -2200,6 +2208,7 @@ List<Color> _analysisPalette(ThemeData theme) {
 List<_ActivityHeatmapDay> _activityHeatmapDays({
   required LibraryOverview overview,
   required SnapshotHistory history,
+  List<SupplementalListeningEvent> supplementalEvents = const [],
 }) {
   final today = _localDateOnly(DateTime.now());
   final rawStart = DateTime(today.year, today.month, today.day - 83);
@@ -2254,6 +2263,20 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
     }
   }
 
+  // Supplemental events keep their real playback date and never enter native
+  // snapshots. Undated minimums are intentionally excluded from the calendar.
+  for (final event in supplementalEvents) {
+    final key = snapshotDateKey(event.playedAt);
+    valuesByDay[key] = (valuesByDay[key] ?? 0) + 1;
+    trackDeltasByDay.putIfAbsent(key, () => <TrackCounterDelta>[]).add(
+      TrackCounterDelta(
+        id: event.track.id, title: event.track.title,
+        artist: event.track.artist, albumTitle: event.track.albumTitle,
+        albumArtist: event.track.albumArtist, playDelta: 1,
+        skipDelta: 0, listeningSecondsDelta: 0,
+      ),
+    );
+  }
   final days = <_ActivityHeatmapDay>[];
   for (
     var day = start;

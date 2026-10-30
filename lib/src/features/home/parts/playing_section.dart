@@ -13,8 +13,19 @@ class _NowPlayingSection extends ConsumerWidget {
     final outsideLibraryPlays = overview.isDemo
         ? const <LibraryTrack>[]
         : ref.watch(visibleOutsideLibraryPlaysProvider);
-    final track =
+    final displayedTrack =
         activeTrack ?? overview.latestTrack ?? outsideLibraryPlays.firstOrNull;
+    final supplementalTrack = displayedTrack == null
+        ? null
+        : outsideLibraryPlays
+              .where((candidate) => sameHistoryTrack(candidate, displayedTrack))
+              .firstOrNull;
+    final track =
+        displayedTrack != null &&
+            _isOutsideLibrary(overview, displayedTrack) &&
+            supplementalTrack != null
+        ? displayedTrack.copyWith(playCount: supplementalTrack.playCount)
+        : displayedTrack;
 
     if (track == null) {
       return Column(
@@ -47,7 +58,7 @@ class _NowPlayingSection extends ConsumerWidget {
           const SizedBox(height: 14),
         ],
         if (outsideLibrary) ...[
-          const _OutsideLibraryNotice(),
+          _OutsideLibraryNotice(playCount: track.playCount),
           const SizedBox(height: 8),
         ],
         _HeroTrackPanel(track: track, artwork: artwork, playRank: playRank),
@@ -91,9 +102,11 @@ List<LibraryTrack> _mergeRecentTracks(
 
 /// Marks a song the player reports but the Music library query does not
 /// include (for example, streamed from an Apple Music playlist without being
-/// added), so it has no play count. The reason is a tap away, not a banner.
+/// added). Supplemental counts represent confirmed minimum plays.
 class _OutsideLibraryNotice extends StatelessWidget {
-  const _OutsideLibraryNotice();
+  const _OutsideLibraryNotice({required this.playCount});
+
+  final int playCount;
 
   @override
   Widget build(BuildContext context) {
@@ -106,10 +119,10 @@ class _OutsideLibraryNotice extends StatelessWidget {
         showDuration: const Duration(seconds: 4),
         message: _t(
           context,
-          'Play counts are not available for songs outside your library.',
-          'ライブラリにない曲は再生回数を取得できません',
-          zh: '无法获取资料库以外歌曲的播放次数',
-          ko: '보관함에 없는 곡은 재생 횟수를 가져올 수 없습니다',
+          'Confirmed supplemental plays (minimum): ${_numberFormat(context).format(playCount)}',
+          '確認済みの補完再生（最低回数）: ${_numberFormat(context).format(playCount)}回',
+          zh: '已确认的补充播放（最低次数）：${_numberFormat(context).format(playCount)}',
+          ko: '확인된 보완 재생 (최소 횟수): ${_numberFormat(context).format(playCount)}회',
         ),
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -130,13 +143,7 @@ class _OutsideLibraryNotice extends StatelessWidget {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  _t(
-                    context,
-                    'Not in library',
-                    'ライブラリ外',
-                    zh: '不在资料库',
-                    ko: '보관함 외',
-                  ),
+                  _t(context, 'Supplemental', '補完', zh: '补充', ko: '보완'),
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
@@ -1560,7 +1567,7 @@ class _RecentTrackRow extends ConsumerWidget {
                   const SizedBox(height: 3),
                   Text(
                     outsideLibrary
-                        ? '${track.artist} · ${_t(context, 'Not in library', 'ライブラリ外', zh: '不在资料库', ko: '보관함 외')}'
+                        ? '${track.artist} · ${_t(context, 'Supplemental', '補完', zh: '补充', ko: '보완')} · ${_playCountLabel(context, track.playCount)} (${_t(context, 'minimum', '最低', zh: '最低', ko: '최소')})'
                         : track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

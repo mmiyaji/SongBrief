@@ -169,6 +169,13 @@ class LibraryTrack {
 /// Catalog and player IDs differ; compare metadata without merging distinct albums.
 bool sameHistoryTrack(LibraryTrack a, LibraryTrack b) {
   if (a.id == b.id) return true;
+  final storeId = a.appleMusicStoreId?.trim();
+  if (storeId != null &&
+      storeId.isNotEmpty &&
+      storeId != '0' &&
+      storeId == b.appleMusicStoreId?.trim()) {
+    return true;
+  }
   String normalized(String value) =>
       value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   if (normalized(a.title) != normalized(b.title) ||
@@ -190,10 +197,17 @@ List<LibraryTrack> uniqueHistoryTracks(Iterable<LibraryTrack> tracks) {
   String normalize(String value) =>
       value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   final ids = <String>{};
+  final storeIds = <String>{};
   final albumsBySong = <(String, String), Set<String>>{};
   final result = <LibraryTrack>[];
   for (final track in tracks) {
     if (ids.contains(track.id)) continue;
+    final rawStoreId = track.appleMusicStoreId?.trim();
+    final storeId =
+        rawStoreId == null || rawStoreId.isEmpty || rawStoreId == '0'
+        ? null
+        : rawStoreId;
+    if (storeId != null && storeIds.contains(storeId)) continue;
     final key = (normalize(track.artist), normalize(track.title));
     final rawAlbum = normalize(track.albumTitle);
     final album = rawAlbum == 'unknown album' ? '' : rawAlbum;
@@ -203,6 +217,7 @@ List<LibraryTrack> uniqueHistoryTracks(Iterable<LibraryTrack> tracks) {
       continue;
     }
     ids.add(track.id);
+    if (storeId != null) storeIds.add(storeId);
     albumsBySong.putIfAbsent(key, () => <String>{}).add(album);
     result.add(track);
   }

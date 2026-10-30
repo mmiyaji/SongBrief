@@ -18,6 +18,7 @@ import '../../domain/library_snapshot.dart';
 import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
+import '../../domain/supplemental_listening_history.dart';
 import '../../analytics/crash_reporting.dart';
 import '../../data/music_library_channel.dart';
 import '../../export/library_exporter.dart';
@@ -31,6 +32,7 @@ import '../../settings/library_filter_preferences.dart';
 import '../../settings/snapshot_preferences.dart';
 import '../../theme/app_theme.dart';
 import 'home_controller.dart';
+import 'counted_listening_provider.dart';
 import 'widgets/glass_surface.dart';
 
 part 'parts/playing_section.dart';
@@ -1098,25 +1100,46 @@ class _StatsContent extends ConsumerWidget {
   }
 }
 
-class _SectionBody extends StatelessWidget {
+class _SectionBody extends ConsumerWidget {
   const _SectionBody({required this.stats, required this.selectedSection});
 
   final MusicStatsState stats;
   final HomeSection selectedSection;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final overview = stats.overview;
+    final countedOverview = ref.watch(countedListeningOverviewProvider);
+    final supplementalTracks = ref.watch(countedOutsideTracksProvider);
 
     return switch (selectedSection) {
       HomeSection.playing => _NowPlayingSection(stats: stats),
       HomeSection.overview => _OverviewSection(stats: stats),
       HomeSection.rankings =>
-        overview.hasTracks
-            ? _RankingPanel(
-                overview: overview,
-                history: stats.snapshotHistory,
-                snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
+        countedOverview.hasTracks
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (supplementalTracks.isNotEmpty) ...[
+                    _SupplementalCountCaption(
+                      playCount: supplementalTracks.fold<int>(
+                        0,
+                        (sum, track) => sum + track.playCount,
+                      ),
+                      undatedTrackCount: ref.watch(
+                        supplementalUndatedTrackCountProvider,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  _RankingPanel(
+                    overview: countedOverview,
+                    history: stats.snapshotHistory,
+                    snapshotRecordingEnabled:
+                        stats.snapshotRecordingEnabled &&
+                        supplementalTracks.isEmpty,
+                  ),
+                ],
               )
             : const _EmptyLibraryPanel(),
       HomeSection.library => _LibrarySection(overview: overview),

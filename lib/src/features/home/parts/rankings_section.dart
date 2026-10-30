@@ -658,13 +658,19 @@ class _RankingInsightRow extends ConsumerWidget {
       ),
     );
 
-    if (track == null) {
+    final nativeTrack = ref
+        .watch(musicStatsControllerProvider)
+        .asData
+        ?.value
+        .overview
+        .trackById(item.trackId);
+    if (nativeTrack == null) {
       return content;
     }
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
-      onTap: () => _showTrackDetailSheet(context, track),
+      onTap: () => _showTrackDetailSheet(context, nativeTrack),
       child: content,
     );
   }

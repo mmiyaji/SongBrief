@@ -34,22 +34,33 @@ final libraryTrackCatalogProvider = Provider((ref) => LibraryTrackCatalog());
 
 class LibraryTrackCatalog {
   Map<String, LibraryTrack> _byId = const {};
+  Map<String, LibraryTrack> _byAppleMusicStoreId = const {};
   Map<String, List<LibraryTrack>> _byDescription = const {};
 
   void replace(List<LibraryTrack> tracks) {
     _byId = {for (final track in tracks) track.id: track};
+    final byStoreId = <String, LibraryTrack>{};
     final grouped = <String, List<LibraryTrack>>{};
     for (final track in tracks) {
+      final storeId = _validStoreId(track.appleMusicStoreId);
+      if (storeId != null) byStoreId.putIfAbsent(storeId, () => track);
       (grouped[_description(track)] ??= []).add(track);
     }
+    _byAppleMusicStoreId = byStoreId;
     _byDescription = grouped;
   }
 
   LibraryTrack? match(LibraryTrack track) =>
       _byId[track.id] ??
+      _byAppleMusicStoreId[_validStoreId(track.appleMusicStoreId)] ??
       _byDescription[_description(track)]
           ?.where((candidate) => sameHistoryTrack(candidate, track))
           .firstOrNull;
+
+  static String? _validStoreId(String? value) {
+    final id = value?.trim();
+    return id == null || id.isEmpty || id == '0' ? null : id;
+  }
 
   static String _description(LibraryTrack track) {
     String normalized(String value) =>

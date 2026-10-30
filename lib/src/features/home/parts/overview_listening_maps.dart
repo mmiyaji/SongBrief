@@ -783,7 +783,7 @@ FlTitlesData _releaseYearTitlesData({
 
 enum _ActivityHeatmapView { calendar, weekdays, highlights }
 
-class _ActivityHeatmapCard extends StatefulWidget {
+class _ActivityHeatmapCard extends ConsumerStatefulWidget {
   const _ActivityHeatmapCard({
     required this.overview,
     required this.history,
@@ -801,10 +801,10 @@ class _ActivityHeatmapCard extends StatefulWidget {
   final _ActivityCalendarMode initialMode;
 
   @override
-  State<_ActivityHeatmapCard> createState() => _ActivityHeatmapCardState();
+  ConsumerState<_ActivityHeatmapCard> createState() => _ActivityHeatmapCardState();
 }
 
-class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
+class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
   _ActivityHeatmapDay? _selectedDay;
   _ActivityHeatmapView _view = _ActivityHeatmapView.calendar;
   DateTime? _visibleMonth;
@@ -830,6 +830,8 @@ class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
     final days = _activityHeatmapDays(
       overview: widget.overview,
       history: widget.history,
+      supplementalEvents: widget.overview.isDemo
+          ? const [] : ref.watch(countedSupplementalEventsProvider),
     );
     final summary = _activityHeatmapSummary(days);
     final sourceLabel = widget.history.snapshotCount >= 2

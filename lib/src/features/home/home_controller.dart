@@ -15,6 +15,7 @@ import '../../settings/music_data_preferences.dart';
 import '../../settings/library_filter_preferences.dart';
 import '../../settings/music_data_preferences_storage.dart';
 import '../../widgets/home_widget_bridge.dart';
+import 'supplemental_history_controller.dart';
 
 enum TrendRange { week, month, year }
 
@@ -604,9 +605,9 @@ final outsideLibraryPlaysProvider =
 final visibleOutsideLibraryPlaysProvider = Provider<List<LibraryTrack>>((ref) {
   final observed = ref.watch(outsideLibraryPlaysProvider);
   final recent = ref.watch(recentAppleMusicPlaysProvider);
-  final plays = <LibraryTrack>[];
+  final countedTracks = ref.watch(supplementalHistoryProvider).tracks;
   // Prefer the latest real timestamp; undated service rows retain API order.
-  final candidates = [...observed, ...recent].indexed.toList()
+  final candidates = [...observed, ...recent, ...countedTracks].indexed.toList()
     ..sort((a, b) {
       final aTime = a.$2.lastPlayedAt;
       final bTime = b.$2.lastPlayedAt;
@@ -616,13 +617,11 @@ final visibleOutsideLibraryPlaysProvider = Provider<List<LibraryTrack>>((ref) {
       final comparison = bTime.compareTo(aTime);
       return comparison == 0 ? a.$1.compareTo(b.$1) : comparison;
     });
-  for (final (_, track) in candidates) {
-    if (!plays.any((existing) => sameHistoryTrack(existing, track))) {
-      plays.add(track);
-    }
-  }
+  final plays = uniqueHistoryTracks(candidates.map((entry) => entry.$2));
   final filters = ref.watch(libraryFilterPreferencesProvider);
   final repository = ref.watch(musicStatsRepositoryProvider);
+  final counted = LibraryTrackCatalog()
+    ..replace(countedTracks);
   // Re-evaluate cached membership after a library refresh, too.
   ref.watch(musicStatsControllerProvider);
   return List.unmodifiable(
@@ -630,7 +629,10 @@ final visibleOutsideLibraryPlaysProvider = Provider<List<LibraryTrack>>((ref) {
       (track) =>
           repository.libraryTrackMatching(track) == null &&
           !filters.excludes(track),
-    ),
+    ).map((track) {
+      final count = counted.match(track)?.playCount ?? 0;
+      return track.copyWith(playCount: count);
+    }),
   );
 });
 
@@ -684,6 +686,7 @@ class RecentAppleMusicPlaysController extends Notifier<List<LibraryTrack>> {
         if (!ref.mounted) return;
         lastError = null;
         state = _dedupe(tracks);
+        ref.read(supplementalHistoryProvider.notifier).ingest(state);
         await ref
             .read(musicDataSharedPreferencesProvider)
             ?.setString(
@@ -751,6 +754,17 @@ class OutsideLibraryPlaysController extends Notifier<List<LibraryTrack>> {
   /// Records [track] as played now; a repeat of the latest entry only moves
   /// its time forward.
   void record(LibraryTrack track, {DateTime? at}) {
+    // Seeing a song proves a minimum of one play, not a distinct MusicKit
+    // timestamped event. Polls and pause/resume must not add playback events.
+    ref.read(supplementalHistoryProvider.notifier).ingest([
+      LibraryTrack(
+        id: track.id, title: track.title, artist: track.artist,
+        albumTitle: track.albumTitle, albumArtist: track.albumArtist,
+        appleMusicStoreId: track.appleMusicStoreId, genre: track.genre,
+        playlistNames: track.playlistNames, duration: track.duration,
+        playCount: 0, skipCount: 0, isCloudItem: true,
+      ),
+    ]);
     final playedAt = at ?? DateTime.now();
     final entry = track.copyWith(lastPlayedAt: playedAt);
     final rest = state.isNotEmpty && state.first.id == track.id
@@ -773,6 +787,7 @@ class OutsideLibraryPlaysController extends Notifier<List<LibraryTrack>> {
     'title': track.title,
     'artist': track.artist,
     'albumTitle': track.albumTitle,
+    'appleMusicStoreId': track.appleMusicStoreId,
     'genre': track.genre,
     'playlistNames': track.playlistNames,
     'durationSeconds': track.duration.inSeconds,
@@ -792,6 +807,8 @@ class OutsideLibraryPlaysController extends Notifier<List<LibraryTrack>> {
       title: title,
       artist: artist is String ? artist : 'Unknown Artist',
       albumTitle: album is String ? album : 'Unknown Album',
+      appleMusicStoreId: json['appleMusicStoreId'] is String
+          ? json['appleMusicStoreId'] as String : null,
       genre: json['genre'] is String ? json['genre'] as String : null,
       playlistNames:
           (json['playlistNames'] as List?)?.whereType<String>().toList() ??
