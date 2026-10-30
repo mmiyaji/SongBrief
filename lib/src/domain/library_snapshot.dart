@@ -429,6 +429,7 @@ class TrackCounterDelta {
     required this.title,
     required this.artist,
     required this.albumTitle,
+    this.albumArtist,
     required this.playDelta,
     required this.skipDelta,
     required this.listeningSecondsDelta,
@@ -438,6 +439,7 @@ class TrackCounterDelta {
   final String title;
   final String artist;
   final String albumTitle;
+  final String? albumArtist;
   final int playDelta;
   final int skipDelta;
   final int listeningSecondsDelta;
@@ -451,6 +453,7 @@ class TrackCounterDelta {
       title: current.title,
       artist: current.artist,
       albumTitle: current.albumTitle,
+      albumArtist: current.albumArtist,
       playDelta: _positiveDelta(current.playCount, previous.playCount),
       skipDelta: _positiveDelta(current.skipCount, previous.skipCount),
       listeningSecondsDelta: _positiveDelta(
@@ -466,6 +469,7 @@ class TrackCounterDelta {
       title: title,
       artist: artist,
       albumTitle: albumTitle,
+      albumArtist: albumArtist ?? other.albumArtist,
       playDelta: playDelta + other.playDelta,
       skipDelta: skipDelta + other.skipDelta,
       listeningSecondsDelta:

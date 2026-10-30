@@ -619,7 +619,7 @@ class _MobilePlaybackChrome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final playback = ref.watch(playbackControllerProvider);
-    final activeTrack = stats.overview.trackById(playback.activeTrackId);
+    final activeTrack = _playbackTrack(stats.overview, playback);
     final track = activeTrack ?? stats.overview.latestTrack;
     final isLight = theme.colorScheme.brightness == Brightness.light;
     return SafeArea(
@@ -685,8 +685,8 @@ class _MiniPlayerBar extends ConsumerWidget {
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final playback = ref.watch(playbackControllerProvider);
     final busy = playback.isBusy;
-    final isActive = playback.isTrackActive(track.id);
-    final isPlaying = playback.isTrackPlaying(track.id);
+    final isActive = playback.isTrackActive(track.id, track: track);
+    final isPlaying = playback.isTrackPlaying(track.id, track: track);
     final isLight = theme.colorScheme.brightness == Brightness.light;
     final barColor = isLight
         ? theme.colorScheme.surfaceContainerHighest
@@ -848,8 +848,7 @@ class _SideTabs extends ConsumerWidget {
     final extended = width >= 980;
     final playback = ref.watch(playbackControllerProvider);
     final track =
-        stats.overview.trackById(playback.activeTrackId) ??
-        stats.overview.latestTrack;
+        _playbackTrack(stats.overview, playback) ?? stats.overview.latestTrack;
     final artwork = track == null
         ? null
         : ref.watch(trackArtworkProvider(track.id));
@@ -898,7 +897,7 @@ class _SideTabs extends ConsumerWidget {
                 track: track,
                 artwork: artwork,
                 extended: extended,
-                isPlaying: playback.isTrackPlaying(track.id),
+                isPlaying: playback.isTrackPlaying(track.id, track: track),
                 onTap: () => ref
                     .read(homeSectionProvider.notifier)
                     .setSection(HomeSection.playing),

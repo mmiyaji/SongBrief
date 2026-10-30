@@ -12,8 +12,122 @@ import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/domain/music_library_authorization.dart';
 import 'package:songbrief/src/domain/music_stats_state.dart';
 import 'package:songbrief/src/features/home/home_controller.dart';
+import 'package:songbrief/src/settings/library_filter_preferences.dart';
+
+const _librarySong = LibraryTrack(
+  id: 'library-1',
+  title: 'Library Song',
+  artist: 'Library Artist',
+  albumTitle: 'Library Album',
+  duration: Duration(minutes: 3),
+  playCount: 4,
+  skipCount: 0,
+  isCloudItem: false,
+  genre: 'Excluded Genre',
+  playlistNames: ['Excluded Playlist'],
+);
 
 void main() {
+  test(
+    'external ID uses library identity and pauses without replacing queue',
+    () async {
+      final repository = _FakeMusicStatsRepository(
+        overview: LibraryOverview.fromTracks([_librarySong], isDemo: false),
+        currentPlaybackOverride: MusicPlaybackSnapshot.fromPlatformValue({
+          'trackId': 'external-99',
+          'isPlaying': true,
+          'title': 'Library Song',
+          'artist': 'Library Artist',
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      await container.read(musicStatsControllerProvider.future);
+      final controller = container.read(playbackControllerProvider.notifier);
+      await controller.syncWithPlayer();
+      final state = container.read(playbackControllerProvider);
+      expect(state.activeTrackId, 'library-1');
+      expect(state.nowPlaying?.playCount, 4);
+      expect(state.isTrackPlaying('library-1'), isTrue);
+      await controller.toggleTrack('library-1');
+      expect(repository.pauseCalls, 1);
+      expect(repository.playTrackCalls, 0);
+      expect(container.read(outsideLibraryPlaysProvider), isEmpty);
+    },
+  );
+
+  for (final excludedId in ['library-1', 'external-99']) {
+    test(
+      'excluded library song $excludedId is not saved as outside history',
+      () async {
+        final catalog = LibraryTrackCatalog()..replace([_librarySong]);
+        final repository = _FakeMusicStatsRepository(
+          libraryCatalog: catalog,
+          overview: LibraryOverview.empty(isDemo: false),
+          currentPlaybackOverride: MusicPlaybackSnapshot.fromPlatformValue({
+            'trackId': excludedId,
+            'isPlaying': true,
+            'title': 'Library Song',
+            'artist': 'Library Artist',
+          }),
+        );
+        final container = ProviderContainer(
+          overrides: [
+            musicStatsRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+        await container.read(musicStatsControllerProvider.future);
+        container
+            .read(libraryFilterPreferencesProvider.notifier)
+            .addExcludedGenre('Excluded Genre');
+        await container
+            .read(playbackControllerProvider.notifier)
+            .syncWithPlayer();
+        expect(container.read(outsideLibraryPlaysProvider), isEmpty);
+        expect(repository.loadCalls, 1);
+      },
+    );
+  }
+
+  test('existing outside history follows current keyword and cached playlist filters', () async {
+    final catalog = LibraryTrackCatalog();
+    final repository = _FakeMusicStatsRepository(
+      libraryCatalog: catalog,
+      overview: LibraryOverview.empty(isDemo: false),
+    );
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+    await container.read(musicStatsControllerProvider.future);
+    final history = container.read(outsideLibraryPlaysProvider.notifier);
+    history.record(_librarySong);
+    expect(container.read(visibleOutsideLibraryPlaysProvider), hasLength(1));
+    container
+        .read(libraryFilterPreferencesProvider.notifier)
+        .addExcludedKeyword('Library Song');
+    expect(container.read(visibleOutsideLibraryPlaysProvider), isEmpty);
+    container.read(libraryFilterPreferencesProvider.notifier).clearAll();
+    expect(container.read(visibleOutsideLibraryPlaysProvider), hasLength(1));
+    container
+        .read(libraryFilterPreferencesProvider.notifier)
+        .addExcludedPlaylist('Excluded Playlist');
+    expect(container.read(visibleOutsideLibraryPlaysProvider), isEmpty);
+    // Previously persisted minimal native metadata still matches the full catalog.
+    final minimal = MusicPlaybackSnapshot.fromPlatformValue({
+      'trackId': 'external-99',
+      'title': 'Library Song',
+      'artist': 'Library Artist',
+    })!.track!;
+    history.record(minimal);
+    catalog.replace([_librarySong]);
+    container.invalidate(visibleOutsideLibraryPlaysProvider);
+    expect(container.read(visibleOutsideLibraryPlaysProvider), isEmpty);
+  });
+
   test('syncs playback state from the native current item', () async {
     final repository = _FakeMusicStatsRepository(
       currentPlaybackOverride: const MusicPlaybackSnapshot(
@@ -51,6 +165,82 @@ void main() {
     final state = container.read(playbackControllerProvider);
     expect(state.activeTrackId, 'track-3');
     expect(state.isPlaying, isTrue);
+  });
+
+  test('reads songs that are playing but not in the library', () {
+    final snapshot = MusicPlaybackSnapshot.fromPlatformValue({
+      'isPlaying': true,
+      'title': 'Streamed Song',
+      'artist': 'Guest Artist',
+      'albumTitle': 'Playlist Album',
+      'durationSeconds': 200,
+    });
+
+    expect(snapshot?.trackId, isNull);
+    expect(snapshot?.track?.title, 'Streamed Song');
+    expect(snapshot?.track?.artist, 'Guest Artist');
+    expect(snapshot?.track?.duration, const Duration(seconds: 200));
+    expect(snapshot?.track?.id, isNotEmpty);
+  });
+
+  test('records only songs played outside the library', () async {
+    final events = StreamController<MusicPlaybackSnapshot>();
+    final repository = _FakeMusicStatsRepository(
+      playbackEvents: events.stream,
+      overview: LibraryOverview.fromTracks(const [
+        LibraryTrack(
+          id: 'library-1',
+          title: 'Library Song',
+          artist: 'Library Artist',
+          albumTitle: 'Library Album',
+          duration: Duration(minutes: 3),
+          playCount: 4,
+          skipCount: 0,
+          isCloudItem: false,
+        ),
+      ], isDemo: false),
+    );
+    final container = ProviderContainer(
+      overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+    addTearDown(events.close);
+
+    await container.read(musicStatsControllerProvider.future);
+    container.read(playbackControllerProvider);
+    events
+      ..add(
+        MusicPlaybackSnapshot.fromPlatformValue({
+          'trackId': 'library-1',
+          'isPlaying': true,
+          'title': 'Library Song',
+          'artist': 'Library Artist',
+        })!,
+      )
+      ..add(
+        MusicPlaybackSnapshot.fromPlatformValue({
+          'trackId': 'streamed-1',
+          'isPlaying': true,
+          'title': 'Streamed Song',
+          'artist': 'Guest Artist',
+        })!,
+      )
+      ..add(
+        MusicPlaybackSnapshot.fromPlatformValue({
+          'trackId': 'streamed-1',
+          'isPlaying': true,
+          'title': 'Streamed Song',
+          'artist': 'Guest Artist',
+        })!,
+      );
+    await Future<void>.delayed(Duration.zero);
+
+    final plays = container.read(outsideLibraryPlaysProvider);
+    expect(plays.map((track) => track.id), ['streamed-1']);
+    expect(plays.single.lastPlayedAt, isNotNull);
+    final state = container.read(playbackControllerProvider);
+    expect(state.activeTrackId, 'streamed-1');
+    expect(state.nowPlaying?.title, 'Streamed Song');
   });
 
   test('skip syncs playback without reloading the library', () async {
@@ -122,12 +312,15 @@ class _FakeMusicStatsRepository extends MusicStatsRepository {
   _FakeMusicStatsRepository({
     this.currentPlaybackOverride,
     Stream<MusicPlaybackSnapshot>? playbackEvents,
+    this.overview,
+    super.libraryCatalog,
   }) : playbackEventsOverride =
            playbackEvents ?? const Stream<MusicPlaybackSnapshot>.empty(),
        super(_NoopMusicLibraryClient(), LibrarySnapshotRepository());
 
   final MusicPlaybackSnapshot? currentPlaybackOverride;
   final Stream<MusicPlaybackSnapshot> playbackEventsOverride;
+  final LibraryOverview? overview;
   var loadCalls = 0;
   var skipToNextCalls = 0;
   var playTrackCalls = 0;
@@ -138,8 +331,10 @@ class _FakeMusicStatsRepository extends MusicStatsRepository {
   Future<MusicStatsState> load({bool requestAccess = false}) async {
     loadCalls += 1;
     return MusicStatsState(
-      authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
-      overview: LibraryOverview.empty(isDemo: true),
+      authorizationStatus: overview == null
+          ? MusicLibraryAuthorizationStatus.unsupported
+          : MusicLibraryAuthorizationStatus.authorized,
+      overview: overview ?? LibraryOverview.empty(isDemo: true),
       snapshotHistory: SnapshotHistory.empty,
     );
   }

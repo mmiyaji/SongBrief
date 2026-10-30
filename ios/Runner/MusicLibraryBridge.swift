@@ -193,8 +193,18 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       "isPlaying": player.playbackState == .playing
     ]
 
-    if let item = player.nowPlayingItem, item.persistentID != 0 {
-      playback["trackId"] = String(item.persistentID)
+    if let item = player.nowPlayingItem {
+      if item.persistentID != 0 {
+        playback["trackId"] = String(item.persistentID)
+      }
+      // Songs streamed from Apple Music without being added to the library
+      // are not in MPMediaQuery, so send enough to show them anyway.
+      if let title = Self.nonEmpty(item.title) {
+        playback["title"] = title
+        playback["artist"] = Self.nonEmpty(item.artist) ?? "Unknown Artist"
+        playback["albumTitle"] = Self.nonEmpty(item.albumTitle) ?? "Unknown Album"
+        playback["durationSeconds"] = Int(item.playbackDuration.rounded())
+      }
     }
 
     return playback
@@ -258,9 +268,12 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     }
 
     let size = max(80, min(arguments["size"] as? Int ?? 640, 1200))
+    // The player must be read on the main thread; its item covers songs that
+    // are playing but not in the library.
+    let nowPlaying = player.nowPlayingItem.flatMap { $0.persistentID == id ? $0 : nil }
     DispatchQueue.global(qos: .userInitiated).async {
       guard
-        let item = Self.mediaItem(withPersistentID: id),
+        let item = Self.mediaItem(withPersistentID: id) ?? nowPlaying,
         let image = item.artwork?.image(at: CGSize(width: size, height: size)),
         let data = image.jpegData(compressionQuality: 0.88)
       else {

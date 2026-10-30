@@ -2082,6 +2082,7 @@ class _ActivityDayDetail extends StatelessWidget {
                           switch (mode) {
                             _ActivityCalendarMode.song => winner.track.artist,
                             _ActivityCalendarMode.album =>
+                              winner.track.albumArtist ??
                               _libraryTracksForDelta(
                                     overview,
                                     winner.track,

@@ -1867,9 +1867,11 @@ _ActivityCalendarEntry? _activityCalendarEntry(
 
   String normalize(String value) =>
       value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
-  // Records keep only the song artist, so compilations are grouped by the
-  // album artist from the current library when the song is still there.
+  // Prefer the album artist recorded with the historical snapshot. Older
+  // snapshots may omit it, so fall back to today's library metadata.
   String albumArtist(TrackCounterDelta track) {
+    final recordedName = track.albumArtist?.trim();
+    if (recordedName != null && recordedName.isNotEmpty) return recordedName;
     final libraryTrack = overview == null
         ? null
         : _libraryTracksForDelta(overview, track).firstOrNull;
@@ -2243,6 +2245,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
               title: track.title,
               artist: track.artist,
               albumTitle: track.albumTitle,
+              albumArtist: track.albumArtist,
               playDelta: estimatedPlays,
               skipDelta: 0,
               listeningSecondsDelta: track.duration.inSeconds * estimatedPlays,
@@ -2964,6 +2967,25 @@ IconData _sectionSelectedIcon(HomeSection section) {
     HomeSection.settings => Icons.tune,
   };
 }
+
+/// The song the player is on: the library copy when there is one, otherwise
+/// the player's own description (songs streamed without being added to the
+/// library never appear in the Music library query).
+LibraryTrack? _playbackTrack(LibraryOverview overview, PlaybackState playback) {
+  final byId = overview.trackById(playback.activeTrackId);
+  if (byId != null) return byId;
+  final nowPlaying = playback.nowPlaying;
+  if (nowPlaying == null) return null;
+  final title = nowPlaying.title.trim().toLowerCase();
+  for (final track in overview.tracksForArtist(nowPlaying.artist)) {
+    if (track.title.trim().toLowerCase() == title) return track;
+  }
+  return nowPlaying;
+}
+
+/// Whether [track] is outside the Music library, so its plays are not counted.
+bool _isOutsideLibrary(LibraryOverview overview, LibraryTrack track) =>
+    !overview.isDemo && overview.trackById(track.id) == null;
 
 /// Whether demo data should be labelled as such in the UI.
 bool _labelsDemo(LibraryOverview overview) =>

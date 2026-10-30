@@ -9,7 +9,7 @@ class _NowPlayingSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = stats.overview;
     final playback = ref.watch(playbackControllerProvider);
-    final activeTrack = overview.trackById(playback.activeTrackId);
+    final activeTrack = _playbackTrack(overview, playback);
     final track = activeTrack ?? overview.latestTrack;
 
     if (track == null) {
@@ -26,7 +26,13 @@ class _NowPlayingSection extends ConsumerWidget {
     }
 
     final artwork = ref.watch(trackArtworkProvider(track.id));
-    final recentTracks = overview.recentTrackDetails;
+    final outsideLibrary = _isOutsideLibrary(overview, track);
+    final outsideLibraryPlays = overview.isDemo
+        ? const <LibraryTrack>[]
+        : ref.watch(visibleOutsideLibraryPlaysProvider);
+    final recentTracks = outsideLibraryPlays.isEmpty
+        ? overview.recentTrackDetails
+        : _mergeRecentTracks(overview.recentTrackDetails, outsideLibraryPlays);
     final playRankIndex = overview.topTracks.indexWhere(
       (entry) => entry.representativeTrackId == track.id,
     );
@@ -39,8 +45,12 @@ class _NowPlayingSection extends ConsumerWidget {
           _AuthorizationPanel(status: stats.authorizationStatus),
           const SizedBox(height: 14),
         ],
+        if (outsideLibrary) ...[
+          const _OutsideLibraryNotice(),
+          const SizedBox(height: 8),
+        ],
         _HeroTrackPanel(track: track, artwork: artwork, playRank: playRank),
-        if (stats.snapshotRecordingEnabled) ...[
+        if (stats.snapshotRecordingEnabled && !outsideLibrary) ...[
           const SizedBox(height: 14),
           _TrendPanel(
             track: track,
@@ -52,9 +62,90 @@ class _NowPlayingSection extends ConsumerWidget {
         _NowPlayingLyricsPanel(track: track),
         if (recentTracks.length > 1) ...[
           const SizedBox(height: 14),
-          _RecentTracksPanel(tracks: recentTracks),
+          _RecentTracksPanel(
+            tracks: recentTracks,
+            outsideLibraryIds: {
+              for (final play in outsideLibraryPlays) play.id,
+            },
+          ),
         ],
       ],
+    );
+  }
+}
+
+/// Library history and songs seen playing outside the library, newest first.
+List<LibraryTrack> _mergeRecentTracks(
+  List<LibraryTrack> library,
+  List<LibraryTrack> outsideLibrary,
+) {
+  final merged = [...library, ...outsideLibrary]
+    ..sort((a, b) {
+      final aTime = a.lastPlayedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.lastPlayedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
+  return List.unmodifiable(merged);
+}
+
+/// Marks a song the player reports but the Music library query does not
+/// include (for example, streamed from an Apple Music playlist without being
+/// added), so it has no play count. The reason is a tap away, not a banner.
+class _OutsideLibraryNotice extends StatelessWidget {
+  const _OutsideLibraryNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Tooltip(
+        key: const ValueKey('outside-library-notice'),
+        triggerMode: TooltipTriggerMode.tap,
+        showDuration: const Duration(seconds: 4),
+        message: _t(
+          context,
+          'Play counts are not available for songs outside your library.',
+          'ライブラリにない曲は再生回数を取得できません',
+          zh: '无法获取资料库以外歌曲的播放次数',
+          ko: '보관함에 없는 곡은 재생 횟수를 가져올 수 없습니다',
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.6,
+            ),
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 15,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  _t(
+                    context,
+                    'Not in library',
+                    'ライブラリ外',
+                    zh: '不在资料库',
+                    ko: '보관함 외',
+                  ),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -129,8 +220,8 @@ class _HeroTrackPanel extends ConsumerWidget {
     final theme = Theme.of(context);
     final playback = ref.watch(playbackControllerProvider);
     final busy = playback.isBusy;
-    final isActive = playback.isTrackActive(track.id);
-    final isPlaying = playback.isTrackPlaying(track.id);
+    final isActive = playback.isTrackActive(track.id, track: track);
+    final isPlaying = playback.isTrackPlaying(track.id, track: track);
     final number = _numberFormat(context);
 
     return GlassSurface(
@@ -849,9 +940,8 @@ class _VerticalDividerLine extends StatelessWidget {
       width: 1,
       height: 54,
       margin: const EdgeInsets.symmetric(horizontal: 10),
-      color: Theme.of(
-        context,
-      ).colorScheme.outlineVariant.withValues(alpha: 0.52),
+      color: Theme.of(context).colorScheme.outlineVariant
+          .withValues(alpha: 0.52),
     );
   }
 }
@@ -1276,9 +1366,13 @@ void _showTrackTrendInfoSheet(BuildContext context) {
 }
 
 class _RecentTracksPanel extends ConsumerStatefulWidget {
-  const _RecentTracksPanel({required this.tracks});
+  const _RecentTracksPanel({
+    required this.tracks,
+    this.outsideLibraryIds = const {},
+  });
 
   final List<LibraryTrack> tracks;
+  final Set<String> outsideLibraryIds;
 
   @override
   ConsumerState<_RecentTracksPanel> createState() => _RecentTracksPanelState();
@@ -1351,7 +1445,12 @@ class _RecentTracksPanelState extends ConsumerState<_RecentTracksPanel> {
             ],
           ),
           const SizedBox(height: 10),
-          ...visibleTracks.map((track) => _RecentTrackRow(track: track)),
+          ...visibleTracks.map(
+            (track) => _RecentTrackRow(
+              track: track,
+              outsideLibrary: widget.outsideLibraryIds.contains(track.id),
+            ),
+          ),
           if (visibleTracks.length < widget.tracks.length) ...[
             const SizedBox(height: 8),
             _LoadMoreButton(
@@ -1368,9 +1467,13 @@ class _RecentTracksPanelState extends ConsumerState<_RecentTracksPanel> {
 }
 
 class _RecentTrackRow extends ConsumerWidget {
-  const _RecentTrackRow({required this.track});
+  const _RecentTrackRow({required this.track, this.outsideLibrary = false});
 
   final LibraryTrack track;
+
+  /// Seen playing in the app but not in the library: it cannot be opened or
+  /// played from the library, so only its name and time are shown.
+  final bool outsideLibrary;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1378,7 +1481,9 @@ class _RecentTrackRow extends ConsumerWidget {
     final artwork = ref.watch(trackArtworkProvider(track.id));
     return InkWell(
       borderRadius: BorderRadius.circular(16),
-      onTap: () => _showTrackDetailSheet(context, track),
+      onTap: outsideLibrary
+          ? null
+          : () => _showTrackDetailSheet(context, track),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 9),
         child: Row(
@@ -1405,7 +1510,9 @@ class _RecentTrackRow extends ConsumerWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    track.artist,
+                    outsideLibrary
+                        ? '${track.artist} · ${_t(context, 'Not in library', 'ライブラリ外', zh: '不在资料库', ko: '보관함 외')}'
+                        : track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -1428,17 +1535,21 @@ class _RecentTrackRow extends ConsumerWidget {
                 ),
               ),
             ),
-            IconButton(
-              onPressed: () {
-                showModalBottomSheet<void>(
-                  context: context,
-                  showDragHandle: true,
-                  builder: (context) => _TrackActionSheet(track: track),
-                );
-              },
-              tooltip: _t(context, 'More', 'その他'),
-              icon: const Icon(Icons.more_vert_rounded),
-            ),
+            if (outsideLibrary)
+              // Keeps the time column aligned with library rows.
+              const SizedBox(width: 48)
+            else
+              IconButton(
+                onPressed: () {
+                  showModalBottomSheet<void>(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (context) => _TrackActionSheet(track: track),
+                  );
+                },
+                tooltip: _t(context, 'More', 'その他'),
+                icon: const Icon(Icons.more_vert_rounded),
+              ),
           ],
         ),
       ),
@@ -1455,7 +1566,7 @@ class _TrackActionSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final playback = ref.watch(playbackControllerProvider);
-    final isPlaying = playback.isTrackPlaying(track.id);
+    final isPlaying = playback.isTrackPlaying(track.id, track: track);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       child: Column(
@@ -1545,7 +1656,7 @@ class _TrackDetailSheetState extends ConsumerState<_TrackDetailSheet> {
     _displayedTrackId = widget.track.id;
     _followsPlayback = ref
         .read(playbackControllerProvider)
-        .isTrackActive(widget.track.id);
+        .isTrackActive(widget.track.id, track: widget.track);
   }
 
   @override
@@ -2438,8 +2549,8 @@ class _PlaybackControls extends ConsumerWidget {
     final theme = Theme.of(context);
     final state = ref.watch(playbackControllerProvider);
     final busy = state.isBusy;
-    final isActive = state.isTrackActive(track.id);
-    final isPlaying = state.isTrackPlaying(track.id);
+    final isActive = state.isTrackActive(track.id, track: track);
+    final isPlaying = state.isTrackPlaying(track.id, track: track);
 
     return Wrap(
       spacing: 10,

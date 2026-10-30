@@ -403,7 +403,7 @@ class _LibraryTrackRow extends ConsumerWidget {
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final playback = ref.watch(playbackControllerProvider);
     final busy = playback.isBusy;
-    final isPlaying = playback.isTrackPlaying(track.id);
+    final isPlaying = playback.isTrackPlaying(track.id, track: track);
 
     return Material(
       color: Colors.transparent,

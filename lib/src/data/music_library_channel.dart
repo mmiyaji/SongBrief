@@ -397,10 +397,18 @@ class SnapshotSyncResult {
 }
 
 class MusicPlaybackSnapshot {
-  const MusicPlaybackSnapshot({this.trackId, required this.isPlaying});
+  const MusicPlaybackSnapshot({
+    this.trackId,
+    required this.isPlaying,
+    this.track,
+  });
 
   final String? trackId;
   final bool isPlaying;
+
+  /// The player's own description of the current song, which also covers
+  /// songs streamed from Apple Music that are not in the library.
+  final LibraryTrack? track;
 
   static MusicPlaybackSnapshot? fromPlatformValue(Object? value) {
     if (value is! Map) {
@@ -411,9 +419,29 @@ class MusicPlaybackSnapshot {
     final trackId = rawTrackId is String && rawTrackId.trim().isNotEmpty
         ? rawTrackId.trim()
         : null;
+    final rawTitle = value['title'];
+    final title = rawTitle is String ? rawTitle.trim() : '';
+    final rawArtist = value['artist'];
+    final artist = rawArtist is String ? rawArtist.trim() : '';
+    final rawAlbum = value['albumTitle'];
+    final rawDuration = value['durationSeconds'];
     return MusicPlaybackSnapshot(
       trackId: trackId,
       isPlaying: value['isPlaying'] == true,
+      track: title.isEmpty
+          ? null
+          : LibraryTrack(
+              id: trackId ?? 'now-playing:$title|$artist',
+              title: title,
+              artist: artist.isEmpty ? 'Unknown Artist' : artist,
+              albumTitle: rawAlbum is String && rawAlbum.trim().isNotEmpty
+                  ? rawAlbum.trim()
+                  : 'Unknown Album',
+              duration: Duration(seconds: rawDuration is int ? rawDuration : 0),
+              playCount: 0,
+              skipCount: 0,
+              isCloudItem: true,
+            ),
     );
   }
 }

@@ -449,7 +449,7 @@ void main() {
     expect(find.text('10 plays'), findsWidgets);
   });
 
-  testWidgets('album mode groups a compilation by its album artist', (
+  testWidgets('album mode keeps compilation grouping after library removal', (
     tester,
   ) async {
     final now = DateTime.now();
@@ -474,9 +474,12 @@ void main() {
       ], isDemo: false),
       capturedAt: now.subtract(const Duration(days: 1)),
     );
-    final overview = LibraryOverview.fromTracks(currentTracks, isDemo: false);
+    final overview = LibraryOverview.fromTracks(
+      [currentTracks.first],
+      isDemo: false,
+    );
     final current = DailyLibrarySnapshot.fromOverview(
-      overview,
+      LibraryOverview.fromTracks(currentTracks, isDemo: false),
       capturedAt: now,
     );
     await _pumpOverview(

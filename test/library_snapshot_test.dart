@@ -67,6 +67,28 @@ void main() {
     expect(delta?.trackDeltas.single.playDelta, 2);
   });
 
+  test('preserves album artist in compared and merged deltas', () {
+    final previous = _snapshotWithTracks(
+      date: DateTime(2026, 7, 11),
+      tracks: [
+        _counter(id: 'local-id', playCount: 3, albumArtist: 'Various Artists'),
+        _counter(id: 'cloud-id', playCount: 5, albumArtist: 'Various Artists'),
+      ],
+    );
+    final current = _snapshotWithTracks(
+      date: DateTime(2026, 7, 12),
+      tracks: [
+        _counter(id: 'local-id', playCount: 4, albumArtist: 'Various Artists'),
+        _counter(id: 'cloud-id', playCount: 6, albumArtist: 'Various Artists'),
+      ],
+    );
+
+    final delta = SnapshotDelta.compare(previous: previous, current: current);
+
+    expect(delta?.trackDeltas.single.albumArtist, 'Various Artists');
+    expect(delta?.trackDeltas.single.playDelta, 2);
+  });
+
   test('keeps same-title tracks on different albums separate', () {
     final previous = _snapshotWithTracks(
       date: DateTime(2026, 7, 11),
@@ -262,12 +284,14 @@ TrackCounterSnapshot _counter({
   required String id,
   required int playCount,
   String albumTitle = 'Synced Album',
+  String? albumArtist,
 }) {
   return TrackCounterSnapshot(
     id: id,
     title: 'Synced Song',
     artist: 'Synced Artist',
     albumTitle: albumTitle,
+    albumArtist: albumArtist,
     playCount: playCount,
     skipCount: 0,
     listeningSeconds: playCount * 180,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,8 +9,10 @@ import '../../data/music_stats_repository.dart';
 import '../../data/music_library_channel.dart';
 import '../../domain/library_overview.dart';
 import '../../domain/library_snapshot.dart';
+import '../../domain/library_track.dart';
 import '../../domain/music_stats_state.dart';
 import '../../settings/music_data_preferences.dart';
+import '../../settings/library_filter_preferences.dart';
 import '../../settings/music_data_preferences_storage.dart';
 import '../../widgets/home_widget_bridge.dart';
 
@@ -242,21 +245,34 @@ final playbackControllerProvider =
 class PlaybackState {
   const PlaybackState({
     this.activeTrackId,
+    this.nowPlaying,
     this.isPlaying = false,
     this.isBusy = false,
     this.errorMessage,
   });
 
   final String? activeTrackId;
+
+  /// The player's description of the current song, used when the song is not
+  /// in the library (for example, streamed from an Apple Music playlist).
+  final LibraryTrack? nowPlaying;
   final bool isPlaying;
   final bool isBusy;
   final String? errorMessage;
 
   bool get hasActiveTrack => activeTrackId != null;
 
-  bool isTrackActive(String trackId) => activeTrackId == trackId;
+  bool isTrackActive(String trackId, {LibraryTrack? track}) =>
+      activeTrackId == trackId ||
+      (track != null &&
+          nowPlaying != null &&
+          track.artist.trim().toLowerCase() ==
+              nowPlaying!.artist.trim().toLowerCase() &&
+          track.title.trim().toLowerCase() ==
+              nowPlaying!.title.trim().toLowerCase());
 
-  bool isTrackPlaying(String trackId) => isPlaying && isTrackActive(trackId);
+  bool isTrackPlaying(String trackId, {LibraryTrack? track}) =>
+      isPlaying && isTrackActive(trackId, track: track);
 
   PlaybackState copyWith({
     String? activeTrackId,
@@ -269,6 +285,7 @@ class PlaybackState {
       activeTrackId: keepActiveTrack
           ? activeTrackId ?? this.activeTrackId
           : activeTrackId,
+      nowPlaying: keepActiveTrack ? nowPlaying : null,
       isPlaying: isPlaying ?? this.isPlaying,
       isBusy: isBusy ?? this.isBusy,
       errorMessage: errorMessage,
@@ -504,6 +521,107 @@ Duration _startupLoadingPreviewDelay() {
   return const Duration(seconds: 4);
 }
 
+const outsideLibraryPlaysPreferenceKey = 'songbrief_outside_library_plays_v1';
+const _maxOutsideLibraryPlays = 50;
+
+final outsideLibraryPlaysProvider =
+    NotifierProvider<OutsideLibraryPlaysController, List<LibraryTrack>>(
+      OutsideLibraryPlaysController.new,
+    );
+
+final visibleOutsideLibraryPlaysProvider = Provider<List<LibraryTrack>>((ref) {
+  final plays = ref.watch(outsideLibraryPlaysProvider);
+  final filters = ref.watch(libraryFilterPreferencesProvider);
+  final repository = ref.watch(musicStatsRepositoryProvider);
+  // Re-evaluate cached membership after a library refresh, too.
+  ref.watch(musicStatsControllerProvider);
+  return List.unmodifiable(
+    plays.where(
+      (track) =>
+          repository.libraryTrackMatching(track) == null &&
+          !filters.excludes(track),
+    ),
+  );
+});
+
+/// Songs seen playing while the app was open that are not in the Music
+/// library. iOS reports no play history for them, so this is the only trace;
+/// plays while the app is closed cannot be observed.
+class OutsideLibraryPlaysController extends Notifier<List<LibraryTrack>> {
+  @override
+  List<LibraryTrack> build() {
+    final raw = ref
+        .read(musicDataSharedPreferencesProvider)
+        ?.getString(outsideLibraryPlaysPreferenceKey);
+    if (raw == null) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return List.unmodifiable(
+        decoded.whereType<Map<String, Object?>>().map(_fromJson).nonNulls,
+      );
+    } on FormatException {
+      return const [];
+    }
+  }
+
+  /// Records [track] as played now; a repeat of the latest entry only moves
+  /// its time forward.
+  void record(LibraryTrack track, {DateTime? at}) {
+    final playedAt = at ?? DateTime.now();
+    final entry = track.copyWith(lastPlayedAt: playedAt);
+    final rest = state.isNotEmpty && state.first.id == track.id
+        ? state.skip(1)
+        : state;
+    state = List.unmodifiable([entry, ...rest].take(_maxOutsideLibraryPlays));
+    unawaited(
+      ref
+              .read(musicDataSharedPreferencesProvider)
+              ?.setString(
+                outsideLibraryPlaysPreferenceKey,
+                jsonEncode(state.map(_toJson).toList()),
+              ) ??
+          Future<bool>.value(false),
+    );
+  }
+
+  static Map<String, Object?> _toJson(LibraryTrack track) => {
+    'id': track.id,
+    'title': track.title,
+    'artist': track.artist,
+    'albumTitle': track.albumTitle,
+    'genre': track.genre,
+    'playlistNames': track.playlistNames,
+    'durationSeconds': track.duration.inSeconds,
+    'playedAtMillis': track.lastPlayedAt?.millisecondsSinceEpoch,
+  };
+
+  static LibraryTrack? _fromJson(Map<String, Object?> json) {
+    final id = json['id'];
+    final title = json['title'];
+    final playedAt = json['playedAtMillis'];
+    if (id is! String || title is! String || playedAt is! int) return null;
+    final artist = json['artist'];
+    final album = json['albumTitle'];
+    final duration = json['durationSeconds'];
+    return LibraryTrack(
+      id: id,
+      title: title,
+      artist: artist is String ? artist : 'Unknown Artist',
+      albumTitle: album is String ? album : 'Unknown Album',
+      genre: json['genre'] is String ? json['genre'] as String : null,
+      playlistNames:
+          (json['playlistNames'] as List?)?.whereType<String>().toList() ??
+          const [],
+      duration: Duration(seconds: duration is int ? duration : 0),
+      playCount: 0,
+      skipCount: 0,
+      isCloudItem: true,
+      lastPlayedAt: DateTime.fromMillisecondsSinceEpoch(playedAt),
+    );
+  }
+}
+
 class PlaybackController extends Notifier<PlaybackState> {
   @override
   PlaybackState build() {
@@ -557,10 +675,14 @@ class PlaybackController extends Notifier<PlaybackState> {
   }
 
   Future<void> toggleTrack(String trackId) {
-    if (state.isTrackPlaying(trackId)) {
+    final overview = ref.exists(musicStatsControllerProvider)
+        ? ref.read(musicStatsControllerProvider).asData?.value.overview
+        : null;
+    final track = overview?.trackById(trackId);
+    if (state.isTrackPlaying(trackId, track: track)) {
       return pause();
     }
-    if (state.isTrackActive(trackId)) {
+    if (state.isTrackActive(trackId, track: track)) {
       return play();
     }
     return playTrack(trackId);
@@ -661,8 +783,35 @@ class PlaybackController extends Notifier<PlaybackState> {
   }
 
   void _applyExternalPlayback(MusicPlaybackSnapshot snapshot) {
+    final track = snapshot.track;
+    final repository = ref.read(musicStatsRepositoryProvider);
+    // Only compare against an already loaded library; never start a load here.
+    final overview = ref.exists(musicStatsControllerProvider)
+        ? ref.read(musicStatsControllerProvider).asData?.value.overview
+        : null;
+    final libraryTrack = track == null
+        ? null
+        : repository.libraryTrackMatching(track) ??
+              overview?.trackById(track.id) ??
+              overview
+                  ?.tracksForArtist(track.artist)
+                  .where(
+                    (candidate) =>
+                        candidate.title.trim().toLowerCase() ==
+                        track.title.trim().toLowerCase(),
+                  )
+                  .firstOrNull;
+    if (track != null &&
+        snapshot.isPlaying &&
+        overview != null &&
+        !overview.isDemo &&
+        libraryTrack == null &&
+        !ref.read(libraryFilterPreferencesProvider).excludes(track)) {
+      ref.read(outsideLibraryPlaysProvider.notifier).record(track);
+    }
     state = PlaybackState(
-      activeTrackId: snapshot.trackId,
+      activeTrackId: libraryTrack?.id ?? snapshot.track?.id ?? snapshot.trackId,
+      nowPlaying: libraryTrack ?? snapshot.track,
       isPlaying: snapshot.isPlaying,
     );
   }

@@ -12,6 +12,7 @@ import 'package:songbrief/src/domain/music_stats_state.dart';
 import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
+import 'package:songbrief/src/settings/library_filter_preferences.dart';
 import 'package:songbrief/src/settings/snapshot_preferences.dart';
 
 void main() {
@@ -316,6 +317,120 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('shows a playing song that is not in the library', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final stats = MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+      overview: LibraryOverview.fromTracks([
+        LibraryTrack(
+          id: 'library-track',
+          title: 'Library Track',
+          artist: 'Test Artist',
+          albumTitle: 'Test Album',
+          duration: const Duration(minutes: 3),
+          playCount: 2,
+          skipCount: 0,
+          isCloudItem: false,
+          lastPlayedAt: DateTime(2026, 10, 1),
+        ),
+      ], isDemo: false),
+      snapshotHistory: SnapshotHistory.empty,
+      snapshotRecordingEnabled: true,
+    );
+
+    await _pumpApp(
+      tester,
+      AppLanguage.english,
+      statsState: stats,
+      playbackControllerBuilder: _StreamedTrackPlaybackController.new,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Streamed Track'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('outside-library-notice')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'aliased native item shows Pause and filters old outside history',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final stats = MusicStatsState(
+        authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+        overview: LibraryOverview.fromTracks([
+          LibraryTrack(
+            id: 'library-track',
+            title: 'Streamed Track',
+            artist: 'Guest Artist',
+            albumTitle: 'Library Album',
+            duration: const Duration(minutes: 3),
+            playCount: 8,
+            skipCount: 0,
+            isCloudItem: false,
+            lastPlayedAt: DateTime(2026, 10, 1),
+          ),
+        ], isDemo: false),
+        snapshotHistory: SnapshotHistory.empty,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          appLanguageProvider.overrideWith(
+            () => _FixedLanguageController(AppLanguage.english),
+          ),
+          musicStatsControllerProvider.overrideWith(
+            () => _FixedMusicStatsController(stats),
+          ),
+          playbackControllerProvider.overrideWith(
+            _StreamedTrackPlaybackController.new,
+          ),
+        ],
+      );
+      final excluded = LibraryTrack(
+        id: 'excluded-stream',
+        title: 'Hidden Song',
+        artist: 'Guest Artist',
+        albumTitle: 'Other Album',
+        duration: const Duration(minutes: 3),
+        playCount: 0,
+        skipCount: 0,
+        isCloudItem: true,
+      );
+      container.read(outsideLibraryPlaysProvider.notifier).record(excluded);
+      container
+          .read(libraryFilterPreferencesProvider.notifier)
+          .addExcludedKeyword('Hidden Song');
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SongBriefApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Hidden Song'), findsNothing);
+      expect(find.byTooltip('Pause'), findsWidgets);
+      expect(find.byTooltip('Play this track'), findsNothing);
+      await tester.tap(find.byTooltip('Pause').first);
+      await tester.pumpAndSettle();
+      expect(container.read(playbackControllerProvider).isPlaying, isFalse);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      container.dispose();
+      await tester.pump(const Duration(seconds: 3));
+    },
+  );
 
   testWidgets('updates open track details when playback skips to next', (
     tester,
@@ -1079,6 +1194,26 @@ Finder _tooltipStartingWith(String prefix) {
   return find.byWidgetPredicate(
     (widget) => widget is Tooltip && widget.message?.startsWith(prefix) == true,
   );
+}
+
+class _StreamedTrackPlaybackController extends PlaybackController {
+  @override
+  PlaybackState build() {
+    return const PlaybackState(
+      activeTrackId: 'streamed-track',
+      isPlaying: true,
+      nowPlaying: LibraryTrack(
+        id: 'streamed-track',
+        title: 'Streamed Track',
+        artist: 'Guest Artist',
+        albumTitle: 'Playlist Album',
+        duration: Duration(minutes: 3),
+        playCount: 0,
+        skipCount: 0,
+        isCloudItem: true,
+      ),
+    );
+  }
 }
 
 class _NextTrackPlaybackController extends PlaybackController {

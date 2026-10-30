@@ -29,6 +29,25 @@ final musicLibraryClientProvider = Provider<MusicLibraryClient>(
   (ref) => const PlatformMusicLibraryClient(),
 );
 
+// Survives repository rebuilds when filter preferences change.
+final libraryTrackCatalogProvider = Provider((ref) => LibraryTrackCatalog());
+
+class LibraryTrackCatalog {
+  Map<String, LibraryTrack> _byId = const {};
+  Map<String, LibraryTrack> _byDescription = const {};
+
+  void replace(List<LibraryTrack> tracks) {
+    _byId = {for (final track in tracks) track.id: track};
+    _byDescription = {for (final track in tracks) _description(track): track};
+  }
+
+  LibraryTrack? match(LibraryTrack track) =>
+      _byId[track.id] ?? _byDescription[_description(track)];
+
+  static String _description(LibraryTrack track) =>
+      '${track.artist.trim().toLowerCase()}\u0000${track.title.trim().toLowerCase()}';
+}
+
 final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
   return MusicStatsRepository(
     ref.watch(musicLibraryClientProvider),
@@ -37,6 +56,7 @@ final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
     cloudSyncEnabled: ref.watch(snapshotCloudSyncProvider),
     temporaryDemoLibraryEnabled: ref.watch(temporaryDemoLibraryProvider),
     libraryFilters: ref.watch(libraryFilterPreferencesProvider),
+    libraryCatalog: ref.watch(libraryTrackCatalogProvider),
   );
 });
 
@@ -48,6 +68,7 @@ class MusicStatsRepository {
     this.cloudSyncEnabled = true,
     this.temporaryDemoLibraryEnabled = false,
     this.libraryFilters,
+    this.libraryCatalog,
   });
 
   final MusicLibraryClient _client;
@@ -56,6 +77,10 @@ class MusicStatsRepository {
   final bool cloudSyncEnabled;
   final bool temporaryDemoLibraryEnabled;
   final LibraryFilterPreferences? libraryFilters;
+  final LibraryTrackCatalog? libraryCatalog;
+
+  LibraryTrack? libraryTrackMatching(LibraryTrack track) =>
+      libraryCatalog?.match(track);
 
   Future<void> ensureSnapshotRefreshScheduled() async {
     if (!_isIosMusicRuntime) {
@@ -107,7 +132,9 @@ class MusicStatsRepository {
       );
     }
 
-    final tracks = _filteredTracks(await _client.fetchTracks());
+    final allTracks = await _client.fetchTracks();
+    libraryCatalog?.replace(allTracks);
+    final tracks = _filteredTracks(allTracks);
     if (tracks.isEmpty && temporaryDemoLibraryEnabled) {
       return _buildDemoState(status);
     }
