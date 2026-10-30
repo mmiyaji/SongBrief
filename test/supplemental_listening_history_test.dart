@@ -24,6 +24,27 @@ LibraryTrack track({
 void main() {
   final date = DateTime.utc(2026, 10, 1);
 
+  test('official song URL survives enrichment, observation and storage', () {
+    const url =
+        'https://music.apple.com/jp/album/snow-drop/1536479227?i=1536479228';
+    var ledger = const SupplementalListeningHistory.empty().ingest([
+      track(storeId: '1536479228', date: date),
+    ]);
+    ledger = ledger.ingest([
+      track(storeId: '1536479228', date: date).copyWith(appleMusicUrl: url),
+    ]);
+    ledger = ledger.observe(track(), at: date.add(const Duration(days: 1)));
+    expect(ledger.totalPlayCount, 1);
+    expect(ledger.tracks.single.appleMusicUrl, url);
+    expect(
+      SupplementalListeningHistory.decode(ledger.encode())
+          .tracks
+          .single
+          .appleMusicUrl,
+      url,
+    );
+  });
+
   test('repeated polls count each actual song and timestamp once', () {
     var ledger = const SupplementalListeningHistory.empty();
     for (var i = 0; i < 10; i++) {

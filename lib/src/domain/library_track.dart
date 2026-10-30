@@ -12,6 +12,7 @@ class LibraryTrack {
     this.genre,
     this.artworkAsset,
     this.appleMusicStoreId,
+    this.appleMusicUrl,
     this.releaseDate,
     this.lastPlayedAt,
     this.lastPlayedAtIsObservation = false,
@@ -27,11 +28,13 @@ class LibraryTrack {
   final String? genre;
   final String? artworkAsset;
   final String? appleMusicStoreId;
+  final String? appleMusicUrl;
   final DateTime? releaseDate;
   final Duration duration;
   final int playCount;
   final int skipCount;
   final DateTime? lastPlayedAt;
+
   /// Display-only evidence date from an observation, not an exact playback time.
   final bool lastPlayedAtIsObservation;
   final bool isCloudItem;
@@ -45,6 +48,7 @@ class LibraryTrack {
     int? skipCount,
     DateTime? lastPlayedAt,
     bool? lastPlayedAtIsObservation,
+    String? appleMusicUrl,
   }) {
     return LibraryTrack(
       id: id,
@@ -55,6 +59,7 @@ class LibraryTrack {
       genre: genre,
       artworkAsset: artworkAsset,
       appleMusicStoreId: appleMusicStoreId,
+      appleMusicUrl: appleMusicUrl ?? this.appleMusicUrl,
       releaseDate: releaseDate,
       duration: duration,
       playCount: playCount ?? this.playCount,
@@ -77,6 +82,7 @@ class LibraryTrack {
       albumArtist: _readNullableString(map, 'albumArtist'),
       genre: _readNullableString(map, 'genre'),
       appleMusicStoreId: _readNullableString(map, 'appleMusicStoreId'),
+      appleMusicUrl: _readNullableString(map, 'appleMusicUrl'),
       releaseDate: _readDateTime(map, 'releaseDateMillis'),
       duration: Duration(seconds: _readInt(map, 'durationSeconds')),
       playCount: _readInt(map, 'playCount'),
@@ -172,14 +178,20 @@ class LibraryTrack {
   }
 }
 
+/// Returns a usable numeric Apple Music catalog ID, excluding player/library IDs.
+String? validAppleMusicCatalogId(String? value) {
+  final id = value?.trim();
+  if (id == null || !RegExp(r'^[0-9]+$').hasMatch(id)) return null;
+  final numeric = BigInt.tryParse(id);
+  return numeric == null || numeric == BigInt.zero ? null : numeric.toString();
+}
+
 /// Catalog and player IDs differ; compare metadata without merging distinct albums.
 bool sameHistoryTrack(LibraryTrack a, LibraryTrack b) {
   if (a.id == b.id) return true;
-  final storeId = a.appleMusicStoreId?.trim();
+  final storeId = validAppleMusicCatalogId(a.appleMusicStoreId);
   if (storeId != null &&
-      storeId.isNotEmpty &&
-      storeId != '0' &&
-      storeId == b.appleMusicStoreId?.trim()) {
+      storeId == validAppleMusicCatalogId(b.appleMusicStoreId)) {
     return true;
   }
   String normalized(String value) =>
@@ -208,11 +220,7 @@ List<LibraryTrack> uniqueHistoryTracks(Iterable<LibraryTrack> tracks) {
   final result = <LibraryTrack>[];
   for (final track in tracks) {
     if (ids.contains(track.id)) continue;
-    final rawStoreId = track.appleMusicStoreId?.trim();
-    final storeId =
-        rawStoreId == null || rawStoreId.isEmpty || rawStoreId == '0'
-        ? null
-        : rawStoreId;
+    final storeId = validAppleMusicCatalogId(track.appleMusicStoreId);
     if (storeId != null && storeIds.contains(storeId)) continue;
     final key = (normalize(track.artist), normalize(track.title));
     final rawAlbum = normalize(track.albumTitle);

@@ -703,6 +703,7 @@ class RecentAppleMusicPlaysController extends Notifier<List<LibraryTrack>> {
                         'albumTitle': track.albumTitle,
                         'genre': track.genre,
                         'appleMusicStoreId': track.appleMusicStoreId,
+                        'appleMusicUrl': track.appleMusicUrl,
                         'durationSeconds': track.duration.inSeconds,
                         'lastPlayedAtMillis':
                             track.lastPlayedAt?.millisecondsSinceEpoch,
@@ -782,6 +783,7 @@ class OutsideLibraryPlaysController extends Notifier<List<LibraryTrack>> {
     'artist': track.artist,
     'albumTitle': track.albumTitle,
     'appleMusicStoreId': track.appleMusicStoreId,
+    'appleMusicUrl': track.appleMusicUrl,
     'genre': track.genre,
     'playlistNames': track.playlistNames,
     'durationSeconds': track.duration.inSeconds,
@@ -803,6 +805,8 @@ class OutsideLibraryPlaysController extends Notifier<List<LibraryTrack>> {
       albumTitle: album is String ? album : 'Unknown Album',
       appleMusicStoreId: json['appleMusicStoreId'] is String
           ? json['appleMusicStoreId'] as String : null,
+      appleMusicUrl: json['appleMusicUrl'] is String
+          ? json['appleMusicUrl'] as String : null,
       genre: json['genre'] is String ? json['genre'] as String : null,
       playlistNames:
           (json['playlistNames'] as List?)?.whereType<String>().toList() ??

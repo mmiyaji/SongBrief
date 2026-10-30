@@ -183,6 +183,95 @@ void main() {
     expect(snapshot?.track?.id, isNotEmpty);
   });
 
+  test(
+    'player passes catalog identity separately from persistent identity',
+    () {
+      final snapshot = MusicPlaybackSnapshot.fromPlatformValue({
+        'trackId': '9876543210987654321',
+        'appleMusicStoreId': ' 1536479228 ',
+        'title': 'snow drop',
+        'artist': "L'Arc-en-Ciel",
+        'isPlaying': true,
+      });
+      expect(snapshot?.trackId, '9876543210987654321');
+      expect(snapshot?.track?.id, '9876543210987654321');
+      expect(snapshot?.track?.appleMusicStoreId, '1536479228');
+      final catalog = LibraryTrackCatalog()
+        ..replace([
+          const LibraryTrack(
+            id: 'native-library-id',
+            title: 'snow drop',
+            artist: 'Different spelling',
+            albumTitle: 'Different edition',
+            duration: Duration(seconds: 275),
+            playCount: 10,
+            skipCount: 0,
+            isCloudItem: true,
+            appleMusicStoreId: '1536479228',
+          ),
+        ]);
+      expect(catalog.match(snapshot!.track!)?.id, 'native-library-id');
+    },
+  );
+
+  test('player never promotes a library ID to a catalog ID', () {
+    final snapshot = MusicPlaybackSnapshot.fromPlatformValue({
+      'trackId': '123456789',
+      'appleMusicStoreId': 'i.private-library-id',
+      'title': 'snow drop',
+      'isPlaying': true,
+    });
+    expect(snapshot?.track?.appleMusicStoreId, isNull);
+    expect(snapshot?.track?.id, '123456789');
+  });
+
+  test(
+    'catalog handoff resolves native playback without outside double count',
+    () async {
+      const native = LibraryTrack(
+        id: 'native-snow-drop',
+        title: 'snow drop',
+        artist: "L’Arc-en-Ciel",
+        albumTitle: 'snow drop',
+        duration: Duration(seconds: 275),
+        playCount: 15,
+        skipCount: 2,
+        isCloudItem: true,
+        appleMusicStoreId: '1536479228',
+      );
+      final catalog = LibraryTrackCatalog()..replace([native]);
+      final repository = _FakeMusicStatsRepository(
+        overview: LibraryOverview.fromTracks([native], isDemo: false),
+        libraryCatalog: catalog,
+        currentPlaybackOverride: MusicPlaybackSnapshot.fromPlatformValue({
+          'trackId': 'different-player-id',
+          'appleMusicStoreId': '1536479228',
+          'title': 'snow drop',
+          'artist': "L'Arc-en-Ciel",
+          'albumTitle': 'snow drop - Single',
+          'isPlaying': true,
+        }),
+      );
+      final container = ProviderContainer(
+        overrides: [musicStatsRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      await container.read(musicStatsControllerProvider.future);
+      await container
+          .read(playbackControllerProvider.notifier)
+          .syncWithPlayer();
+      final playback = container.read(playbackControllerProvider);
+      expect(playback.activeTrackId, native.id);
+      expect(playback.nowPlaying?.playCount, 15);
+      expect(container.read(outsideLibraryPlaysProvider), isEmpty);
+      await container
+          .read(playbackControllerProvider.notifier)
+          .toggleTrack(native.id);
+      expect(repository.pauseCalls, 1);
+      expect(repository.playTrackCalls, 0);
+    },
+  );
+
   test('records only songs played outside the library', () async {
     final events = StreamController<MusicPlaybackSnapshot>();
     final repository = _FakeMusicStatsRepository(

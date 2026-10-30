@@ -25,7 +25,16 @@ void main() {
     );
   });
 
-  for (final invalidId in <String?>[null, '', '   ', '0', ' 0 ']) {
+  for (final invalidId in <String?>[
+    null,
+    '',
+    '   ',
+    '0',
+    ' 0 ',
+    '000',
+    'i.library-song',
+    'musickit:123',
+  ]) {
     test('invalid catalog ID "$invalidId" does not join unrelated songs', () {
       final catalog = LibraryTrackCatalog()
         ..replace([_track('native', storeId: invalidId)]);

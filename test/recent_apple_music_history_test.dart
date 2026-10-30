@@ -87,7 +87,10 @@ void main() {
       expect(identical(first, second), isTrue);
       expect(repository.requests, 1);
       repository.pending.complete([
-        song('musickit:1', count: 99),
+        song(
+          'musickit:1',
+          count: 99,
+        ).copyWith(appleMusicUrl: 'https://music.apple.com/jp/song/12345'),
         song('other-id'),
         song('different-album', album: 'Second Album'),
       ]);
@@ -114,6 +117,10 @@ void main() {
       repository.pending = Completer<List<LibraryTrack>>();
       final restored = reopened.read(recentAppleMusicPlaysProvider.notifier);
       expect(reopened.read(recentAppleMusicPlaysProvider), hasLength(2));
+      expect(
+        reopened.read(recentAppleMusicPlaysProvider).first.appleMusicUrl,
+        'https://music.apple.com/jp/song/12345',
+      );
       final failed = restored.refresh();
       repository.pending.completeError(
         PlatformException(code: 'music_kit_not_configured'),

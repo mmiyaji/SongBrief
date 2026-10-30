@@ -58,8 +58,7 @@ class LibraryTrackCatalog {
           .firstOrNull;
 
   static String? _validStoreId(String? value) {
-    final id = value?.trim();
-    return id == null || id.isEmpty || id == '0' ? null : id;
+    return validAppleMusicCatalogId(value);
   }
 
   static String _description(LibraryTrack track) {

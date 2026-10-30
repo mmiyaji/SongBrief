@@ -197,22 +197,46 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
   }
 
   private func playbackMap() -> [String: Any] {
+    let item = player.nowPlayingItem
+    return Self.playbackMap(
+      isPlaying: player.playbackState == .playing,
+      persistentID: item?.persistentID ?? 0,
+      playbackStoreID: item?.playbackStoreID,
+      title: item?.title,
+      artist: item?.artist,
+      albumTitle: item?.albumTitle,
+      duration: item?.playbackDuration
+    )
+  }
+
+  // Kept pure so identifier handoff can be checked without a live music player.
+  static func playbackMap(
+    isPlaying: Bool = false,
+    persistentID: UInt64,
+    playbackStoreID: String?,
+    title: String?,
+    artist: String?,
+    albumTitle: String?,
+    duration: TimeInterval?
+  ) -> [String: Any] {
     var playback: [String: Any] = [
-      "isPlaying": player.playbackState == .playing
+      "isPlaying": isPlaying
     ]
 
-    if let item = player.nowPlayingItem {
-      if item.persistentID != 0 {
-        playback["trackId"] = String(item.persistentID)
-      }
-      // Songs streamed from Apple Music without being added to the library
-      // are not in MPMediaQuery, so send enough to show them anyway.
-      if let title = Self.nonEmpty(item.title) {
-        playback["title"] = title
-        playback["artist"] = Self.nonEmpty(item.artist) ?? "Unknown Artist"
-        playback["albumTitle"] = Self.nonEmpty(item.albumTitle) ?? "Unknown Album"
-        playback["durationSeconds"] = Int(item.playbackDuration.rounded())
-      }
+    if persistentID != 0 {
+      playback["trackId"] = String(persistentID)
+    }
+    if let storeID = Self.validAppleMusicStoreID(playbackStoreID) {
+      playback["appleMusicStoreId"] = storeID
+    }
+    // Songs streamed from Apple Music without being added to the library
+    // are not in MPMediaQuery, so send enough to show them anyway.
+    if let title = Self.nonEmpty(title) {
+      playback["title"] = title
+      playback["artist"] = Self.nonEmpty(artist) ?? "Unknown Artist"
+      playback["albumTitle"] = Self.nonEmpty(albumTitle) ?? "Unknown Album"
+      let seconds = duration.flatMap { $0.isFinite ? max(0, $0) : nil } ?? 0
+      playback["durationSeconds"] = Int(seconds.rounded())
     }
 
     return playback
@@ -285,13 +309,14 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
             let id = "musickit:\(song.id.rawValue)"
             guard seenIDs.insert(id).inserted else { continue }
             tracks.append(Self.recentlyPlayedTrackMap(
-              catalogID: song.id.rawValue,
+              musicItemID: song.id.rawValue,
               title: song.title,
               artist: song.artistName,
               albumTitle: song.albumTitle,
               duration: song.duration,
               genre: song.genreNames.first,
-              lastPlayedDate: song.lastPlayedDate
+              lastPlayedDate: song.lastPlayedDate,
+              appleMusicUrl: song.url
             ))
             artwork[id] = song.artwork
           }
@@ -334,18 +359,18 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
   // Keep transport mapping testable without a network request or a MusicKit
   // Song initializer. A missing last-played date must stay missing.
   static func recentlyPlayedTrackMap(
-    catalogID: String,
+    musicItemID: String,
     title: String,
     artist: String,
     albumTitle: String?,
     duration: TimeInterval?,
     genre: String?,
-    lastPlayedDate: Date?
+    lastPlayedDate: Date?,
+    appleMusicUrl: URL? = nil
   ) -> [String: Any] {
     let seconds = duration.flatMap { $0.isFinite ? max(0, $0) : nil } ?? 0
     var track: [String: Any] = [
-      "id": "musickit:\(catalogID)",
-      "appleMusicStoreId": catalogID,
+      "id": "musickit:\(musicItemID)",
       "title": nonEmpty(title) ?? "Untitled",
       "artist": nonEmpty(artist) ?? "Unknown Artist",
       "albumTitle": nonEmpty(albumTitle) ?? "Unknown Album",
@@ -354,11 +379,38 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       "skipCount": 0,
       "isCloudItem": true
     ]
+    if let storeID = validAppleMusicStoreID(musicItemID) {
+      track["appleMusicStoreId"] = storeID
+    }
+    if let appleMusicUrl = validAppleMusicURL(appleMusicUrl) {
+      track["appleMusicUrl"] = appleMusicUrl.absoluteString
+    }
     if let genre = nonEmpty(genre) { track["genre"] = genre }
     if let lastPlayedDate {
       track["lastPlayedAtMillis"] = Int(lastPlayedDate.timeIntervalSince1970 * 1000)
     }
     return track
+  }
+
+  static func validAppleMusicStoreID(_ candidate: String?) -> String? {
+    guard let candidate = nonEmpty(candidate),
+          candidate.utf8.allSatisfy({ $0 >= 48 && $0 <= 57 }),
+          let value = UInt64(candidate), value > 0 else {
+      return nil
+    }
+    return String(value)
+  }
+
+  static func validAppleMusicURL(_ candidate: URL?) -> URL? {
+    guard let candidate,
+          candidate.scheme?.lowercased() == "https",
+          candidate.host?.lowercased() == "music.apple.com",
+          candidate.user == nil,
+          candidate.password == nil,
+          candidate.port == nil || candidate.port == 443 else {
+      return nil
+    }
+    return candidate
   }
 
   private func fetchArtwork(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -559,8 +611,7 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
     if let genre = nonEmpty(item.genre) {
       track["genre"] = genre
     }
-    if item.playbackStoreID != "0",
-       let appleMusicStoreID = nonEmpty(item.playbackStoreID) {
+    if let appleMusicStoreID = validAppleMusicStoreID(item.playbackStoreID) {
       track["appleMusicStoreId"] = appleMusicStoreID
     }
     if let releaseDate = item.value(forProperty: MPMediaItemPropertyReleaseDate) as? Date {

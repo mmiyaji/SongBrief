@@ -6,7 +6,7 @@ import XCTest
 final class RunnerTests: XCTestCase {
   func testRecentlyPlayedMappingPreservesActualLastPlayedDateWithoutInventingCounts() {
     let track = MusicLibraryBridge.recentlyPlayedTrackMap(
-      catalogID: "12345", title: " Song ", artist: " Artist ",
+      musicItemID: "12345", title: " Song ", artist: " Artist ",
       albumTitle: " Album ", duration: 180.6, genre: " Pop ",
       lastPlayedDate: Date(timeIntervalSince1970: 1_800_000_000)
     )
@@ -26,7 +26,7 @@ final class RunnerTests: XCTestCase {
 
   func testRecentlyPlayedMappingLeavesUnknownTimestampAbsent() {
     let track = MusicLibraryBridge.recentlyPlayedTrackMap(
-      catalogID: "12345", title: "", artist: " ",
+      musicItemID: "12345", title: "", artist: " ",
       albumTitle: nil, duration: nil, genre: nil, lastPlayedDate: nil
     )
 
@@ -37,6 +37,44 @@ final class RunnerTests: XCTestCase {
     XCTAssertEqual(track["artist"] as? String, "Unknown Artist")
     XCTAssertEqual(track["albumTitle"] as? String, "Unknown Album")
     XCTAssertEqual(track["durationSeconds"] as? Int, 0)
+  }
+
+  func testRecentlyPlayedMappingKeepsOpaqueIdentityWithoutInventingCatalogID() {
+    let track = MusicLibraryBridge.recentlyPlayedTrackMap(
+      musicItemID: "i.opaque-library-id", title: "Song", artist: "Artist",
+      albumTitle: nil, duration: nil, genre: nil, lastPlayedDate: nil,
+      appleMusicUrl: URL(string: "https://music.apple.com/us/song/song/12345")
+    )
+
+    XCTAssertEqual(track["id"] as? String, "musickit:i.opaque-library-id")
+    XCTAssertNil(track["appleMusicStoreId"])
+    XCTAssertEqual(track["appleMusicUrl"] as? String,
+                   "https://music.apple.com/us/song/song/12345")
+  }
+
+  func testStoreIDValidationAcceptsOnlyPositiveDecimalIdentifiers() {
+    XCTAssertEqual(MusicLibraryBridge.validAppleMusicStoreID("12345"), "12345")
+    XCTAssertNil(MusicLibraryBridge.validAppleMusicStoreID("0"))
+    XCTAssertNil(MusicLibraryBridge.validAppleMusicStoreID("not-a-store-id"))
+    XCTAssertNil(MusicLibraryBridge.validAppleMusicStoreID("12x"))
+  }
+
+  func testPlaybackMappingKeepsLibraryAndCatalogIdentifiersDistinct() {
+    let valid = MusicLibraryBridge.playbackMap(
+      persistentID: 77, playbackStoreID: "12345", title: "Song",
+      artist: "Artist", albumTitle: "Album", duration: 120
+    )
+    XCTAssertEqual(valid["trackId"] as? String, "77")
+    XCTAssertEqual(valid["appleMusicStoreId"] as? String, "12345")
+
+    for storeID in ["0", "invalid"] {
+      let invalid = MusicLibraryBridge.playbackMap(
+        persistentID: 77, playbackStoreID: storeID, title: nil,
+        artist: nil, albumTitle: nil, duration: nil
+      )
+      XCTAssertEqual(invalid["trackId"] as? String, "77")
+      XCTAssertNil(invalid["appleMusicStoreId"])
+    }
   }
 
   func testRecentlyPlayedAccessReportsUnsupportedAndUnauthorizedSeparately() {

@@ -450,6 +450,11 @@ class MusicPlaybackSnapshot {
           ? null
           : LibraryTrack(
               id: trackId ?? 'now-playing:$title|$artist',
+              appleMusicStoreId: value['appleMusicStoreId'] is String
+                  ? validAppleMusicCatalogId(
+                      value['appleMusicStoreId'] as String,
+                    )
+                  : null,
               title: title,
               artist: artist.isEmpty ? 'Unknown Artist' : artist,
               albumTitle: rawAlbum is String && rawAlbum.trim().isNotEmpty

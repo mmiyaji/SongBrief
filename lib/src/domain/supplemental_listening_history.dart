@@ -147,6 +147,8 @@ class SupplementalListeningHistory {
       final timestamp = playedAt?.microsecondsSinceEpoch;
       if (previous != null &&
           previous.aliases.contains(metadata) &&
+          (track.appleMusicUrl == null ||
+              track.appleMusicUrl == previous.track.appleMusicUrl) &&
           (storeId == null || storeId == _storeId(previous.track)) &&
           (timestamp == null || previous.dates.contains(timestamp)) &&
           (observedAt == null ||
@@ -167,7 +169,9 @@ class SupplementalListeningHistory {
           (_storeId(previous.track) != null ||
               !_unknownAlbum(previous.track.albumTitle) ||
               hasUnknownAlbum);
-      final representative = keepPrevious ? previous.track : track;
+      final representative = (keepPrevious ? previous.track : track).copyWith(
+        appleMusicUrl: track.appleMusicUrl ?? previous?.track.appleMusicUrl,
+      );
       final entry = _HistoryEntry(
         _withDate(representative, newest),
         Set.unmodifiable(dates),
@@ -266,8 +270,7 @@ class _HistoryEntry {
 }
 
 String? _storeId(LibraryTrack track) {
-  final value = track.appleMusicStoreId?.trim();
-  return value == null || value.isEmpty || value == '0' ? null : value;
+  return validAppleMusicCatalogId(track.appleMusicStoreId);
 }
 
 String _metadata(LibraryTrack track) {
@@ -295,6 +298,7 @@ LibraryTrack _withDate(LibraryTrack track, int? microseconds) => LibraryTrack(
   genre: track.genre,
   artworkAsset: track.artworkAsset,
   appleMusicStoreId: track.appleMusicStoreId,
+  appleMusicUrl: track.appleMusicUrl,
   releaseDate: track.releaseDate,
   duration: track.duration,
   playCount: 0,
@@ -315,6 +319,7 @@ Map<String, Object?> _trackMap(LibraryTrack track) => {
   'albumArtist': track.albumArtist,
   'genre': track.genre,
   'appleMusicStoreId': track.appleMusicStoreId,
+  'appleMusicUrl': track.appleMusicUrl,
   'releaseDateMillis': track.releaseDate?.millisecondsSinceEpoch,
   'durationSeconds': track.duration.inSeconds,
   'isCloudItem': track.isCloudItem,

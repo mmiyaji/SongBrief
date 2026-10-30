@@ -19,8 +19,29 @@ void main() {
     });
 
     expect(track.appleMusicStoreId, '123456789');
+    expect(track.appleMusicUrl, isNull);
     expect(track.releaseDate, DateTime(2020, 1, 2));
     expect(track.lyrics, 'line one\nline two\nline three');
     expect(track.playlistNames, ['Focus', 'Recently Played']);
+  });
+
+  test('reads and preserves Apple Music URL from platform metadata', () {
+    const url = 'https://music.apple.com/us/song/example/123456789';
+    final track = LibraryTrack.fromPlatformMap({
+      'id': '42',
+      'title': 'Song',
+      'artist': 'Artist',
+      'albumTitle': 'Album',
+      'appleMusicUrl': url,
+    });
+
+    expect(track.appleMusicUrl, url);
+    expect(track.copyWith(playCount: 2).appleMusicUrl, url);
+    expect(
+      track
+          .copyWith(appleMusicUrl: 'https://music.apple.com/song/other/2')
+          .appleMusicUrl,
+      'https://music.apple.com/song/other/2',
+    );
   });
 }
