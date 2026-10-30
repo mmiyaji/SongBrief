@@ -373,13 +373,13 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
         do {
           let (data, response) = try await URLSession.shared.data(from: url)
           guard let response = response as? HTTPURLResponse,
-                (200..<300).contains(response.statusCode),
-                let image = UIImage(data: data),
-                let jpeg = image.jpegData(compressionQuality: 0.88) else {
+                (200..<300).contains(response.statusCode), !data.isEmpty else {
             result(nil)
             return
           }
-          result(FlutterStandardTypedData(bytes: jpeg))
+          // Flutter decodes the original image. Avoid decoding and re-encoding
+          // cloud artwork on the main actor while switching player screens.
+          result(FlutterStandardTypedData(bytes: data))
         } catch {
           result(nil)
         }

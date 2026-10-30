@@ -2473,6 +2473,7 @@ List<_TrackTrendValue> _trackTrendValues({
   required SnapshotHistory history,
   DailyLibrarySnapshot? provisionalCurrentSnapshot,
   required TrendRange range,
+  required Map<DailyLibrarySnapshot, TrackCounterSnapshot?> trackCounters,
 }) {
   final buckets = _trackTrendBuckets(context, range);
   final values = List<int>.filled(buckets.length, 0);
@@ -2496,6 +2497,7 @@ List<_TrackTrendValue> _trackTrendValues({
         previous: snapshots[index - 1],
         current: current,
         trackId: trackId,
+        trackCounters: trackCounters,
         bucket: buckets[bucketIndex],
         allowRecentFallback:
             provisionalCurrentSnapshot != null &&
@@ -2509,33 +2511,13 @@ List<_TrackTrendValue> _trackTrendValues({
     buckets: buckets,
     provisionalCurrentSnapshot: provisionalCurrentSnapshot,
     trackId: trackId,
+    trackCounters: trackCounters,
   );
 
   return [
     for (final indexed in buckets.indexed)
       _TrackTrendValue(label: indexed.$2.label, playDelta: values[indexed.$1]),
   ];
-}
-
-TrendRange _initialTrackTrendRange({
-  required BuildContext context,
-  required String trackId,
-  required SnapshotHistory history,
-  required DailyLibrarySnapshot provisionalCurrentSnapshot,
-}) {
-  for (final range in TrendRange.values) {
-    final values = _trackTrendValues(
-      context: context,
-      trackId: trackId,
-      history: history,
-      provisionalCurrentSnapshot: provisionalCurrentSnapshot,
-      range: range,
-    );
-    if (values.any((value) => value.playDelta > 0)) {
-      return range;
-    }
-  }
-  return TrendRange.year;
 }
 
 List<DailyLibrarySnapshot> _snapshotsWithProvisionalCurrent(
@@ -2617,9 +2599,18 @@ int _trackPlayDeltaBetween({
   required String trackId,
   required _TrackTrendBucket bucket,
   required bool allowRecentFallback,
+  required Map<DailyLibrarySnapshot, TrackCounterSnapshot?> trackCounters,
 }) {
-  final previousTrack = _trackSnapshotById(previous, trackId);
-  final currentTrack = _trackSnapshotById(current, trackId);
+  final previousTrack = _trackSnapshotById(
+    previous,
+    trackId,
+    cache: trackCounters,
+  );
+  final currentTrack = _trackSnapshotById(
+    current,
+    trackId,
+    cache: trackCounters,
+  );
   if (currentTrack == null) {
     return 0;
   }
@@ -2653,12 +2644,17 @@ void _applyProvisionalRecentPlayFallback({
   required List<_TrackTrendBucket> buckets,
   required DailyLibrarySnapshot? provisionalCurrentSnapshot,
   required String trackId,
+  required Map<DailyLibrarySnapshot, TrackCounterSnapshot?> trackCounters,
 }) {
   if (provisionalCurrentSnapshot == null || values.any((value) => value > 0)) {
     return;
   }
 
-  final track = _trackSnapshotById(provisionalCurrentSnapshot, trackId);
+  final track = _trackSnapshotById(
+    provisionalCurrentSnapshot,
+    trackId,
+    cache: trackCounters,
+  );
   final lastPlayedAt = track?.lastPlayedAt;
   if (lastPlayedAt == null) {
     return;
@@ -2675,8 +2671,15 @@ void _applyProvisionalRecentPlayFallback({
 
 TrackCounterSnapshot? _trackSnapshotById(
   DailyLibrarySnapshot snapshot,
-  String trackId,
-) {
+  String trackId, {
+  Map<DailyLibrarySnapshot, TrackCounterSnapshot?>? cache,
+}) {
+  if (cache != null) {
+    return cache.putIfAbsent(
+      snapshot,
+      () => _trackSnapshotById(snapshot, trackId),
+    );
+  }
   for (final track in snapshot.tracks) {
     if (track.id == trackId) {
       return track;

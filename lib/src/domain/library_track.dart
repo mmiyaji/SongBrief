@@ -183,3 +183,28 @@ bool sameHistoryTrack(LibraryTrack a, LibraryTrack b) {
       bAlbum == 'unknown album' ||
       aAlbum == bAlbum;
 }
+
+/// Keeps the first (newest) representative without comparing every song with
+/// every preceding song. Unknown albums match any album of the same song.
+List<LibraryTrack> uniqueHistoryTracks(Iterable<LibraryTrack> tracks) {
+  String normalize(String value) =>
+      value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  final ids = <String>{};
+  final albumsBySong = <(String, String), Set<String>>{};
+  final result = <LibraryTrack>[];
+  for (final track in tracks) {
+    if (ids.contains(track.id)) continue;
+    final key = (normalize(track.artist), normalize(track.title));
+    final rawAlbum = normalize(track.albumTitle);
+    final album = rawAlbum == 'unknown album' ? '' : rawAlbum;
+    final albums = albumsBySong[key];
+    if (albums != null &&
+        (album.isEmpty || albums.contains('') || albums.contains(album))) {
+      continue;
+    }
+    ids.add(track.id);
+    albumsBySong.putIfAbsent(key, () => <String>{}).add(album);
+    result.add(track);
+  }
+  return List.unmodifiable(result);
+}

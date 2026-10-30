@@ -86,13 +86,7 @@ List<LibraryTrack> _mergeRecentTracks(
       final bTime = b.lastPlayedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       return bTime.compareTo(aTime);
     });
-  final unique = <LibraryTrack>[];
-  for (final track in merged) {
-    if (!unique.any((existing) => sameHistoryTrack(existing, track))) {
-      unique.add(track);
-    }
-  }
-  return List.unmodifiable(unique);
+  return uniqueHistoryTracks(merged);
 }
 
 /// Marks a song the player reports but the Music library query does not
@@ -1041,6 +1035,14 @@ class _TrendPanel extends StatefulWidget {
 
 class _TrendPanelState extends State<_TrendPanel> {
   TrendRange? _selectedRange;
+  LibraryOverview? _cachedOverview;
+  SnapshotHistory? _cachedHistory;
+  String? _cachedTrackId;
+  String? _cachedDateKey;
+  String? _cachedLocale;
+  final _trackCounters = <DailyLibrarySnapshot, TrackCounterSnapshot?>{};
+  late DailyLibrarySnapshot _currentSnapshot;
+  final _valuesByRange = <TrendRange, List<_TrackTrendValue>>{};
 
   @override
   void didUpdateWidget(covariant _TrendPanel oldWidget) {
@@ -1050,33 +1052,73 @@ class _TrendPanelState extends State<_TrendPanel> {
     }
   }
 
+  void _updateTrendCache(BuildContext context) {
+    final now = DateTime.now();
+    final dateKey = snapshotDateKey(now);
+    final locale = _localeName(context);
+    if (identical(_cachedOverview, widget.overview) &&
+        identical(_cachedHistory, widget.history) &&
+        _cachedTrackId == widget.track.id &&
+        _cachedDateKey == dateKey &&
+        _cachedLocale == locale) {
+      return;
+    }
+    _cachedOverview = widget.overview;
+    _cachedHistory = widget.history;
+    _cachedTrackId = widget.track.id;
+    _cachedDateKey = dateKey;
+    _cachedLocale = locale;
+    _valuesByRange.clear();
+    _trackCounters.clear();
+
+    // A single-song chart only needs that song's counters. Avoid copying and
+    // sorting the whole library for a provisional record on each player event.
+    final overview = widget.overview;
+    final track = overview.trackById(widget.track.id);
+    _currentSnapshot = DailyLibrarySnapshot(
+      dateKey: dateKey,
+      capturedAt: snapshotDateKey(overview.generatedAt) == dateKey
+          ? overview.generatedAt
+          : now,
+      source: 'current',
+      trackCount: overview.totalTracks,
+      totalPlayCount: overview.totalPlayCount,
+      totalSkipCount: overview.totalSkipCount,
+      totalListeningSeconds: overview.totalListeningSeconds,
+      tracks: [if (track != null) TrackCounterSnapshot.fromTrack(track)],
+    );
+  }
+
+  List<_TrackTrendValue> _valuesFor(BuildContext context, TrendRange range) {
+    return _valuesByRange.putIfAbsent(
+      range,
+      () => _trackTrendValues(
+        context: context,
+        trackId: widget.track.id,
+        history: widget.history,
+        trackCounters: _trackCounters,
+        provisionalCurrentSnapshot: _currentSnapshot,
+        range: range,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final provisionalCurrentSnapshot = DailyLibrarySnapshot.fromOverview(
-      widget.overview,
-      capturedAt: DateTime.now(),
-      source: 'current',
-    );
+    _updateTrendCache(context);
     final snapshots = _snapshotsWithProvisionalCurrent(
       widget.history,
-      provisionalCurrentSnapshot,
+      _currentSnapshot,
     );
     final range =
         _selectedRange ??
-        _initialTrackTrendRange(
-          context: context,
-          trackId: widget.track.id,
-          history: widget.history,
-          provisionalCurrentSnapshot: provisionalCurrentSnapshot,
+        TrendRange.values.firstWhere(
+          (range) =>
+              _valuesFor(context, range).any((value) => value.playDelta > 0),
+          orElse: () => TrendRange.year,
         );
-    final values = _trackTrendValues(
-      context: context,
-      trackId: widget.track.id,
-      history: widget.history,
-      provisionalCurrentSnapshot: provisionalCurrentSnapshot,
-      range: range,
-    );
+    final values = _valuesFor(context, range);
     final hasSnapshotData = snapshots.length >= 2;
     return GlassSurface(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),

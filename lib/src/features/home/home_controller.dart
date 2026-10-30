@@ -236,6 +236,18 @@ final trackArtworkProvider = FutureProvider.autoDispose
 // Lyrics are fetched on demand because reading them for the whole library is slow.
 final trackLyricsProvider = FutureProvider.autoDispose
     .family<String?, String>((ref, trackId) {
+      // Cache missing lyrics too: cloud-only songs commonly have no local
+      // lyrics, and returning to the player should not repeat a library query.
+      final cacheLink = ref.keepAlive();
+      Timer? disposeTimer;
+      ref.onCancel(() {
+        disposeTimer = Timer(const Duration(minutes: 2), cacheLink.close);
+      });
+      ref.onResume(() {
+        disposeTimer?.cancel();
+        disposeTimer = null;
+      });
+      ref.onDispose(() => disposeTimer?.cancel());
       return ref.read(musicStatsRepositoryProvider).fetchLyrics(trackId);
     });
 

@@ -361,6 +361,91 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('keeps the recent-play merge responsive on iPad', (tester) async {
+    tester.view.physicalSize = const Size(1180, 820);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final now = DateTime.now();
+    final tracks = List<LibraryTrack>.generate(
+      5500,
+      (index) => LibraryTrack(
+        id: 'ipad-library-$index',
+        title: 'iPad Library Track $index',
+        artist: 'iPad Artist ${index % 50}',
+        albumTitle: 'iPad Album ${index % 100}',
+        duration: const Duration(minutes: 3),
+        playCount: index % 100,
+        skipCount: index % 7,
+        lastPlayedAt: now.subtract(Duration(minutes: index)),
+        isCloudItem: true,
+      ),
+    );
+    final stats = MusicStatsState(
+      authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+      overview: LibraryOverview.fromTracks(tracks, isDemo: false),
+      snapshotHistory: SnapshotHistory.empty,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        appLanguageProvider.overrideWith(
+          () => _FixedLanguageController(AppLanguage.english),
+        ),
+        musicStatsControllerProvider.overrideWith(
+          () => _FixedMusicStatsController(stats),
+        ),
+      ],
+    );
+    container.read(outsideLibraryPlaysProvider.notifier).record(
+      LibraryTrack(
+        id: 'ipad-outside-library',
+        title: 'Supplemental Stream',
+        artist: 'Guest Artist',
+        albumTitle: 'Playlist Album',
+        duration: const Duration(minutes: 3),
+        playCount: 0,
+        skipCount: 0,
+        lastPlayedAt: now.add(const Duration(minutes: 1)),
+        isCloudItem: true,
+      ),
+    );
+
+    try {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const SongBriefApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      container
+          .read(homeSectionProvider.notifier)
+          .setSection(HomeSection.library);
+      await tester.pumpAndSettle();
+      expect(find.text('iPad Library Track 0'), findsAtLeastNWidgets(1));
+
+      container
+          .read(homeSectionProvider.notifier)
+          .setSection(HomeSection.playing);
+      await tester.pumpAndSettle();
+      expect(find.text('Supplemental Stream'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      container
+          .read(homeSectionProvider.notifier)
+          .setSection(HomeSection.library);
+      await tester.pumpAndSettle();
+      expect(find.text('iPad Library Track 0'), findsAtLeastNWidgets(1));
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      container.dispose();
+      await tester.pump(const Duration(seconds: 3));
+    }
+  });
+
   testWidgets(
     'aliased native item shows Pause and filters old outside history',
     (tester) async {
