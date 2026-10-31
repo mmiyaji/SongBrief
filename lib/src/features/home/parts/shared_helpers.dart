@@ -1467,32 +1467,43 @@ String _normalizeSearchText(String value) {
 
 List<_SnapshotTrendValue> _snapshotTrendValues(
   BuildContext context,
-  SnapshotHistory history,
-) {
+  SnapshotHistory history, {
+  List<SupplementalListeningEvent> supplementalEvents = const [],
+}) {
   final snapshots = history.snapshots;
-  if (snapshots.length < 2) {
-    return const [];
-  }
-
-  final start = _clampInt(snapshots.length - 8, 1, snapshots.length - 1);
   final dateFormat = DateFormat.Md(_localeName(context));
-  final values = <_SnapshotTrendValue>[];
+  final valuesByDay = <String, _SnapshotTrendValue>{};
+  final start = snapshots.length < 2
+      ? snapshots.length
+      : _clampInt(snapshots.length - 8, 1, snapshots.length - 1);
   for (var index = start; index < snapshots.length; index++) {
-    final delta = SnapshotDelta.compare(
+    final delta = listeningActivityDelta(
       previous: snapshots[index - 1],
       current: snapshots[index],
     );
     if (delta == null) {
       continue;
     }
-    values.add(
-      _SnapshotTrendValue.fromDelta(
-        label: dateFormat.format(snapshots[index].capturedAt),
-        delta: delta,
-      ),
+    valuesByDay[snapshotDateKey(snapshots[index].capturedAt)] =
+        _SnapshotTrendValue.fromDelta(
+          label: dateFormat.format(snapshots[index].capturedAt),
+          delta: delta,
+        );
+  }
+  for (final event in supplementalEvents) {
+    final date = event.playedAt.toLocal();
+    final key = snapshotDateKey(date);
+    final current = valuesByDay[key];
+    valuesByDay[key] = _SnapshotTrendValue(
+      label: dateFormat.format(date),
+      playDelta: (current?.playDelta ?? 0) + 1,
+      skipDelta: current?.skipDelta ?? 0,
     );
   }
-  return List.unmodifiable(values);
+  final values = valuesByDay.entries.toList()
+    ..sort((a, b) => a.key.compareTo(b.key));
+  final recent = values.reversed.take(8).toList().reversed;
+  return List.unmodifiable(recent.map((entry) => entry.value));
 }
 
 class _SnapshotTrendValue {
@@ -2234,6 +2245,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
   required LibraryOverview overview,
   required SnapshotHistory history,
   List<SupplementalListeningEvent> supplementalEvents = const [],
+  List<ListeningEventRelocation> relocations = const [],
 }) {
   final today = _localDateOnly(DateTime.now());
   final rawStart = DateTime(today.year, today.month, today.day - 83);
@@ -2244,7 +2256,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
 
   if (history.snapshots.length >= 2) {
     for (var index = 1; index < history.snapshots.length; index++) {
-      final delta = SnapshotDelta.compare(
+      final delta = listeningActivityDelta(
         previous: history.snapshots[index - 1],
         current: history.snapshots[index],
       );
@@ -2287,6 +2299,42 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
             ),
           );
     }
+  }
+
+  for (final relocation in relocations) {
+    final sourceKey = snapshotDateKey(relocation.nativeCapturedAt);
+    final nativeTrackDeltas = trackDeltasByDay[sourceKey];
+    if (nativeTrackDeltas == null) continue;
+    final index = nativeTrackDeltas.indexWhere(
+      (delta) => delta.id == relocation.nativeTrackId && delta.playDelta > 0,
+    );
+    if (index < 0) continue;
+    final delta = nativeTrackDeltas[index];
+    valuesByDay[sourceKey] = math.max(0, (valuesByDay[sourceKey] ?? 0) - 1);
+    nativeTrackDeltas[index] = TrackCounterDelta(
+      id: delta.id,
+      title: delta.title,
+      artist: delta.artist,
+      albumTitle: delta.albumTitle,
+      albumArtist: delta.albumArtist,
+      playDelta: delta.playDelta - 1,
+      skipDelta: delta.skipDelta,
+      listeningSecondsDelta: delta.listeningSecondsDelta,
+    );
+    final eventKey = snapshotDateKey(relocation.event.playedAt.toLocal());
+    valuesByDay[eventKey] = (valuesByDay[eventKey] ?? 0) + 1;
+    trackDeltasByDay.putIfAbsent(eventKey, () => <TrackCounterDelta>[]).add(
+      TrackCounterDelta(
+        id: relocation.event.track.id,
+        title: relocation.event.track.title,
+        artist: relocation.event.track.artist,
+        albumTitle: relocation.event.track.albumTitle,
+        albumArtist: relocation.event.track.albumArtist,
+        playDelta: 1,
+        skipDelta: 0,
+        listeningSecondsDelta: 0,
+      ),
+    );
   }
 
   // Supplemental events never enter native snapshots. Observation events

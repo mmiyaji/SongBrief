@@ -828,12 +828,21 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
 
   @override
   Widget build(BuildContext context) {
+    final projection = widget.overview.isDemo
+        ? const ListeningEventProjection(
+            uncoveredEvents: [],
+            relocations: [],
+          )
+        : projectListeningEvents(
+            history: widget.history,
+            events: ref.watch(countedSupplementalEventsProvider),
+            dailyOnly: true,
+          );
     final days = _activityHeatmapDays(
       overview: widget.overview,
       history: widget.history,
-      supplementalEvents: widget.overview.isDemo
-          ? const []
-          : ref.watch(countedSupplementalEventsProvider),
+      supplementalEvents: projection.uncoveredEvents,
+      relocations: projection.relocations,
     );
     final unplacedSupplementalTrackCount = widget.overview.isDemo
         ? 0
@@ -842,10 +851,10 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
     final sourceLabel = widget.history.snapshotCount >= 2
         ? _t(
             context,
-            'Listening record changes',
-            '聴取記録の変化',
-            zh: '收听记录变化',
-            ko: '청취 기록 변화',
+            'Confirmed listening history',
+            '確認済みの聴取履歴',
+            zh: '已确认的收听记录',
+            ko: '확인된 청취 기록',
           )
         : widget.overview.isDemo
         ? _t(

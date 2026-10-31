@@ -484,7 +484,7 @@ class _SignalTile extends StatelessWidget {
   }
 }
 
-class _SnapshotStatusPanel extends StatelessWidget {
+class _SnapshotStatusPanel extends ConsumerWidget {
   const _SnapshotStatusPanel({
     required this.history,
     required this.overview,
@@ -502,55 +502,66 @@ class _SnapshotStatusPanel extends StatelessWidget {
   final VoidCallback? onSync;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final number = _numberFormat(context);
     final latest = history.latest;
     final delta = history.latestDelta;
 
     if (latest == null) {
+      final hasDatedHistory =
+          !isDemo && ref.watch(countedSupplementalEventsProvider).isNotEmpty;
       return GlassSurface(
         padding: const EdgeInsets.all(18),
         radius: 24,
         tint: const Color(0x54FFFFFF),
         borderOpacity: 0.38,
         shadowOpacity: 0.05,
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.calendar_month_outlined,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _t(context, 'Daily listening records', '日々の聴取記録'),
-                    style: theme.textTheme.titleMedium,
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_month_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _t(context, 'Daily listening records', '日々の聴取記録'),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isDemo
+                            ? _t(
+                                context,
+                                'Available after iOS Music access is granted.',
+                                'iOSミュージックへのアクセス許可後に利用できます。',
+                              )
+                            : _t(
+                                context,
+                                'The first listening record will be saved after the next library update.',
+                                '次回のライブラリ更新後に最初の聴取記録を保存します。',
+                              ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    isDemo
-                        ? _t(
-                            context,
-                            'Available after iOS Music access is granted.',
-                            'iOSミュージックへのアクセス許可後に利用できます。',
-                          )
-                        : _t(
-                            context,
-                            'The first listening record will be saved after the next library update.',
-                            '次回のライブラリ更新後に最初の聴取記録を保存します。',
-                          ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
+            if (hasDatedHistory) ...[
+              const SizedBox(height: 12),
+              _SnapshotTrendChart(history: history),
+            ],
           ],
         ),
       );
@@ -940,13 +951,22 @@ class _SnapshotTrendChart extends ConsumerWidget {
         ? null
         : _t(
             context,
-            'As of $capturedAtLabel',
-            '$capturedAtLabel 時点',
-            zh: '截至 $capturedAtLabel',
-            ko: '$capturedAtLabel 기준',
+            'Library records as of $capturedAtLabel',
+            '登録曲の記録: $capturedAtLabel 時点',
+            zh: '资料库记录截至 $capturedAtLabel',
+            ko: '보관함 기록 기준 $capturedAtLabel',
           );
     final number = _numberFormat(context);
-    final values = _snapshotTrendValues(context, history);
+    final supplementalEvents = uncoveredListeningEvents(
+      history: history,
+      events: ref.watch(countedSupplementalEventsProvider),
+      dailyOnly: false,
+    );
+    final values = _snapshotTrendValues(
+      context,
+      history,
+      supplementalEvents: supplementalEvents,
+    );
     final maxPlayDelta = values.fold<int>(
       0,
       (current, value) => value.playDelta > current ? value.playDelta : current,
@@ -1012,6 +1032,23 @@ class _SnapshotTrendChart extends ConsumerWidget {
                   ),
                 ),
               ),
+            if (supplementalEvents.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 26, top: 2),
+                child: Text(
+                  _t(
+                    context,
+                    'Includes confirmed history',
+                    '確認済み履歴を含む',
+                    zh: '包含已确认的播放记录',
+                    ko: '확인된 재생 기록 포함',
+                  ),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             if (values.isEmpty)
               Text(
@@ -1030,6 +1067,7 @@ class _SnapshotTrendChart extends ConsumerWidget {
                 (value) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _SnapshotTrendBar(
+                    key: ValueKey('snapshot-trend-${value.label}'),
                     value: value,
                     maxPlayDelta: maxPlayDelta,
                     trailing: '+${number.format(value.playDelta)}',
@@ -1045,6 +1083,7 @@ class _SnapshotTrendChart extends ConsumerWidget {
 
 class _SnapshotTrendBar extends StatelessWidget {
   const _SnapshotTrendBar({
+    super.key,
     required this.value,
     required this.maxPlayDelta,
     required this.trailing,

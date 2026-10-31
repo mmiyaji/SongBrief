@@ -62,7 +62,9 @@ void main() {
     ]);
     expect(container.read(countedListeningOverviewProvider).totalPlayCount, 11);
     expect(container.read(countedOutsideTracksProvider), hasLength(2));
-    expect(container.read(countedSupplementalEventsProvider), hasLength(2));
+    // Daily evidence is retained even for matched native songs; snapshot
+    // coverage is reconciled by the calendar/trend projection instead.
+    expect(container.read(countedSupplementalEventsProvider), hasLength(3));
     expect(container.read(supplementalUndatedTrackCountProvider), 1);
     final native = container.read(musicStatsControllerProvider).requireValue;
     expect(native.overview.totalPlayCount, 8);
@@ -80,7 +82,13 @@ void main() {
       'Undated',
     );
     expect(container.read(countedListeningOverviewProvider).totalPlayCount, 16);
-    expect(container.read(countedSupplementalEventsProvider), isEmpty);
+    expect(container.read(countedSupplementalEventsProvider), hasLength(3));
+    expect(
+      container
+          .read(countedSupplementalEventsProvider)
+          .where((event) => event.track.id == 'Now in library'),
+      hasLength(2),
+    );
     container
         .read(libraryFilterPreferencesProvider.notifier)
         .addExcludedKeyword('Undated');
