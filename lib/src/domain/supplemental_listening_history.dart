@@ -71,6 +71,97 @@ class SupplementalListeningHistory {
   SupplementalListeningHistory ingest(Iterable<LibraryTrack> tracks) =>
       _ingest(tracks);
 
+  /// Combines independently accumulated device ledgers. Exact timestamps are
+  /// set-unioned; undated observations remain a single minimum until an exact
+  /// timestamp is available. Sorting the input evidence makes the result
+  /// independent of which device is the receiver.
+  SupplementalListeningHistory merge(SupplementalListeningHistory other) {
+    final source = [..._entries, ...other._entries]
+      ..sort((a, b) {
+        final byKey = _key(a.track).compareTo(_key(b.track));
+        if (byKey != 0) return byKey;
+        final byTrack = jsonEncode(_trackMap(a.track))
+            .compareTo(jsonEncode(_trackMap(b.track)));
+        if (byTrack != 0) return byTrack;
+        return jsonEncode(_entryMap(a)).compareTo(jsonEncode(_entryMap(b)));
+      });
+    final datedRows = <LibraryTrack>[];
+    final observedByTime = <int, List<LibraryTrack>>{};
+    final undatedRows = <LibraryTrack>[];
+    for (final entry in source) {
+      final evidenceTracks = <LibraryTrack>[entry.track];
+      final orderedAliases = entry.aliases.toList()..sort();
+      for (final alias in orderedAliases) {
+        final parts = (jsonDecode(alias) as List<dynamic>).cast<String>();
+        if (parts.length == 3) {
+          evidenceTracks.add(_withMetadata(entry.track, parts));
+        }
+      }
+      for (final evidence in evidenceTracks) {
+        if (entry.dates.isNotEmpty) {
+          for (final date in entry.dates) {
+            datedRows.add(_withDate(evidence, date));
+          }
+        } else if (entry.firstObservedAt != null) {
+          observedByTime
+              .putIfAbsent(entry.firstObservedAt!, () => <LibraryTrack>[])
+              .add(evidence);
+        } else {
+          undatedRows.add(evidence);
+        }
+      }
+    }
+    var result = const SupplementalListeningHistory.empty();
+    if (datedRows.isNotEmpty) result = result.ingest(datedRows);
+    if (observedByTime.isNotEmpty) {
+      final observationRows = <LibraryTrack>[];
+      final timesByTrack = <LibraryTrack, int>{};
+      final observationTimes = observedByTime.keys.toList()..sort();
+      for (final time in observationTimes) {
+        for (final track in observedByTime[time]!) {
+          observationRows.add(track);
+          timesByTrack[track] = time;
+        }
+      }
+      result = result._ingest(
+        observationRows,
+        observationTimesByTrack: timesByTrack,
+      );
+    }
+    if (undatedRows.isNotEmpty) result = result.ingest(undatedRows);
+    // Exact-date replay suppresses observation events, but the earliest proof
+    // remains part of the ledger and must survive a merge or round trip.
+    final mergedEntries = [...result._entries];
+    final byCatalogId = <String, int>{};
+    final byMetadata = <String, int>{};
+    for (var index = 0; index < mergedEntries.length; index++) {
+      final entry = mergedEntries[index];
+      final catalogId = _storeId(entry.track);
+      if (catalogId != null) byCatalogId[catalogId] = index;
+      byMetadata[_metadata(entry.track)] = index;
+      for (final alias in entry.aliases) {
+        byMetadata[alias] = index;
+      }
+    }
+    for (final original in source) {
+      final observedAt = original.firstObservedAt;
+      if (observedAt == null) continue;
+      final index =
+          byCatalogId[_storeId(original.track)] ??
+          byMetadata[_metadata(original.track)];
+      if (index == null) continue;
+      final entry = mergedEntries[index];
+      mergedEntries[index] = _HistoryEntry(
+        entry.track,
+        entry.dates,
+        entry.aliases,
+        firstObservedAt: _minNullable(entry.firstObservedAt, observedAt),
+      );
+    }
+    result = SupplementalListeningHistory._(mergedEntries);
+    return result;
+  }
+
   /// Records proof of playback, not a MusicKit completion timestamp. Repeated
   /// observations never move the first confirmation or increment the minimum.
   SupplementalListeningHistory observe(
@@ -81,6 +172,7 @@ class SupplementalListeningHistory {
   SupplementalListeningHistory _ingest(
     Iterable<LibraryTrack> tracks, {
     DateTime? observedAt,
+    Map<LibraryTrack, int>? observationTimesByTrack,
   }) {
     final entries = [..._entries];
     final byStoreId = <String, int>{};
@@ -127,6 +219,8 @@ class SupplementalListeningHistory {
     }
     var changed = false;
     for (final track in tracks) {
+      final observationTime = observationTimesByTrack?[track];
+      final hasObservation = observedAt != null || observationTime != null;
       final storeId = _storeId(track);
       final metadata = _metadata(track);
       final song = jsonEncode([
@@ -143,7 +237,7 @@ class SupplementalListeningHistory {
                     ? songWithoutStoreId[song]
                     : unknownAlbumWithoutStoreId[song]);
       final previous = index == null ? null : entries[index];
-      final playedAt = observedAt == null ? track.lastPlayedAt : null;
+      final playedAt = hasObservation ? null : track.lastPlayedAt;
       final timestamp = playedAt?.microsecondsSinceEpoch;
       if (previous != null &&
           previous.aliases.contains(metadata) &&
@@ -151,7 +245,7 @@ class SupplementalListeningHistory {
               track.appleMusicUrl == previous.track.appleMusicUrl) &&
           (storeId == null || storeId == _storeId(previous.track)) &&
           (timestamp == null || previous.dates.contains(timestamp)) &&
-          (observedAt == null ||
+          (!hasObservation ||
               previous.firstObservedAt != null ||
               previous.dates.isNotEmpty)) {
         continue;
@@ -177,7 +271,9 @@ class SupplementalListeningHistory {
         Set.unmodifiable(dates),
         Set.unmodifiable({...?previous?.aliases, metadata}),
         firstObservedAt:
-            previous?.firstObservedAt ?? observedAt?.microsecondsSinceEpoch,
+            previous?.firstObservedAt ??
+            observationTime ??
+            observedAt?.microsecondsSinceEpoch,
       );
       if (index == null) {
         entries.add(entry);
@@ -197,13 +293,7 @@ class SupplementalListeningHistory {
       'version': 1,
       'entries': entries
           .map(
-            (entry) => {
-              'track': _trackMap(entry.track),
-              'dates': entry.dates.toList()..sort(),
-              'aliases': entry.aliases.toList()..sort(),
-              if (entry.firstObservedAt != null)
-                'firstObservedAt': entry.firstObservedAt,
-            },
+            (entry) => {'track': _trackMap(entry.track), ..._entryMap(entry)},
           )
           .toList(),
     });
@@ -242,6 +332,18 @@ class SupplementalListeningHistory {
     }
   }
 }
+
+Map<String, Object?> _entryMap(_HistoryEntry entry) => {
+  'dates': entry.dates.toList()..sort(),
+  'aliases': entry.aliases.toList()..sort(),
+  if (entry.firstObservedAt != null) 'firstObservedAt': entry.firstObservedAt,
+};
+
+int? _minNullable(int? a, int? b) => a == null
+    ? b
+    : b == null
+    ? a
+    : (a < b ? a : b);
 
 class SupplementalListeningEvent {
   const SupplementalListeningEvent({
@@ -310,6 +412,27 @@ LibraryTrack _withDate(LibraryTrack track, int? microseconds) => LibraryTrack(
   lyrics: track.lyrics,
   playlistNames: track.playlistNames,
 );
+
+LibraryTrack _withMetadata(LibraryTrack track, List<String> metadata) =>
+    LibraryTrack(
+      id: track.id,
+      title: metadata[0],
+      artist: metadata[1],
+      albumTitle: metadata[2],
+      albumArtist: track.albumArtist,
+      genre: track.genre,
+      artworkAsset: track.artworkAsset,
+      appleMusicStoreId: track.appleMusicStoreId,
+      appleMusicUrl: track.appleMusicUrl,
+      releaseDate: track.releaseDate,
+      duration: track.duration,
+      playCount: 0,
+      skipCount: 0,
+      lastPlayedAt: track.lastPlayedAt,
+      isCloudItem: track.isCloudItem,
+      lyrics: track.lyrics,
+      playlistNames: track.playlistNames,
+    );
 
 Map<String, Object?> _trackMap(LibraryTrack track) => {
   'id': track.id,

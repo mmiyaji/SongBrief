@@ -7,7 +7,7 @@ class _OverviewSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final syncState = ref.watch(snapshotSyncStateProvider);
+    final syncState = ref.watch(listeningHistorySyncStateProvider);
     final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -36,7 +36,7 @@ class _OverviewSliverSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final syncState = ref.watch(snapshotSyncStateProvider);
+    final syncState = ref.watch(listeningHistorySyncStateProvider);
     final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
     final items = _overviewPanelItems(
       context,

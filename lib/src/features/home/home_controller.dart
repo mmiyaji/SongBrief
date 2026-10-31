@@ -15,7 +15,10 @@ import '../../settings/music_data_preferences.dart';
 import '../../settings/library_filter_preferences.dart';
 import '../../settings/music_data_preferences_storage.dart';
 import '../../settings/supplemental_history_preferences.dart';
+import '../../settings/snapshot_preferences.dart';
 import '../../widgets/home_widget_bridge.dart';
+import '../../data/supplemental_history_cloud_client.dart';
+import 'supplemental_history_cloud_controller.dart';
 import 'supplemental_history_controller.dart';
 
 enum TrendRange { week, month, year }
@@ -37,9 +40,7 @@ enum HomeSection { playing, overview, rankings, library, settings }
 
 /// CI App Store screenshot builds open on a chosen tab and present the demo
 /// library as a regular Music library; compiled out otherwise.
-const screenshotModeEnabled = bool.fromEnvironment(
-  'SONGBRIEF_SCREENSHOT_MODE',
-);
+const screenshotModeEnabled = bool.fromEnvironment('SONGBRIEF_SCREENSHOT_MODE');
 const screenshotSectionPreferenceKey = 'songbrief_screenshot_section';
 
 final homeSectionProvider =
@@ -118,6 +119,50 @@ class SnapshotSyncState {
   final DateTime? lastAttemptAt;
   final SnapshotSyncResult? result;
 }
+
+/// The status shown to users covers both daily snapshots and outside-library
+/// evidence. A successful snapshot upload alone must not hide a ledger failure.
+final listeningHistorySyncStateProvider = Provider<SnapshotSyncState>((ref) {
+  final snapshots = ref.watch(snapshotSyncStateProvider);
+  if (!ref.watch(supplementalHistoryCloudPlatformSupportedProvider) ||
+      !ref.exists(supplementalHistoryCloudControllerProvider) ||
+      !ref.watch(snapshotCloudSyncProvider)) {
+    return snapshots;
+  }
+  final outside = ref.watch(supplementalHistoryCloudControllerProvider);
+  final result = snapshots.result;
+  if (result == null) return snapshots;
+  final snapshotSuccess =
+      result.status == SnapshotSyncStatus.synced ||
+      result.status == SnapshotSyncStatus.unchanged;
+  final outsideSuccess = outside == SupplementalHistoryCloudStatus.success;
+  final status = result.status == SnapshotSyncStatus.disabled
+      ? switch (outside) {
+          SupplementalHistoryCloudStatus.success => SnapshotSyncStatus.synced,
+          SupplementalHistoryCloudStatus.disabled =>
+            SnapshotSyncStatus.disabled,
+          SupplementalHistoryCloudStatus.unavailable =>
+            SnapshotSyncStatus.unavailable,
+          _ => SnapshotSyncStatus.error,
+        }
+      : outsideSuccess
+      ? snapshotSuccess
+            ? result.status
+            : SnapshotSyncStatus.partial
+      : snapshotSuccess
+      ? SnapshotSyncStatus.partial
+      : result.status;
+  return SnapshotSyncState(
+    isSyncing: snapshots.isSyncing,
+    lastAttemptAt: snapshots.lastAttemptAt,
+    result: SnapshotSyncResult(
+      status: status,
+      downloaded: result.downloaded,
+      uploaded: result.uploaded,
+      deleted: result.deleted,
+    ),
+  );
+});
 
 class SnapshotSyncStateController extends Notifier<SnapshotSyncState> {
   @override
@@ -236,22 +281,24 @@ final trackArtworkProvider = FutureProvider.autoDispose
     });
 
 // Lyrics are fetched on demand because reading them for the whole library is slow.
-final trackLyricsProvider = FutureProvider.autoDispose
-    .family<String?, String>((ref, trackId) {
-      // Cache missing lyrics too: cloud-only songs commonly have no local
-      // lyrics, and returning to the player should not repeat a library query.
-      final cacheLink = ref.keepAlive();
-      Timer? disposeTimer;
-      ref.onCancel(() {
-        disposeTimer = Timer(const Duration(minutes: 2), cacheLink.close);
-      });
-      ref.onResume(() {
-        disposeTimer?.cancel();
-        disposeTimer = null;
-      });
-      ref.onDispose(() => disposeTimer?.cancel());
-      return ref.read(musicStatsRepositoryProvider).fetchLyrics(trackId);
-    });
+final trackLyricsProvider = FutureProvider.autoDispose.family<String?, String>((
+  ref,
+  trackId,
+) {
+  // Cache missing lyrics too: cloud-only songs commonly have no local
+  // lyrics, and returning to the player should not repeat a library query.
+  final cacheLink = ref.keepAlive();
+  Timer? disposeTimer;
+  ref.onCancel(() {
+    disposeTimer = Timer(const Duration(minutes: 2), cacheLink.close);
+  });
+  ref.onResume(() {
+    disposeTimer?.cancel();
+    disposeTimer = null;
+  });
+  ref.onDispose(() => disposeTimer?.cancel());
+  return ref.read(musicStatsRepositoryProvider).fetchLyrics(trackId);
+});
 
 final playbackControllerProvider =
     NotifierProvider<PlaybackController, PlaybackState>(PlaybackController.new);
@@ -391,9 +438,15 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   /// the visible history when other devices contributed records.
   Future<void> syncCloudSnapshots() {
     return _runSnapshotHistoryOperation(() async {
+      if (!ref.mounted) return;
       ref.read(snapshotSyncStateProvider.notifier).begin();
       final repository = ref.read(musicStatsRepositoryProvider);
+      final outsideSync = ref
+          .read(supplementalHistoryCloudControllerProvider.notifier)
+          .syncCloud();
       final result = await repository.syncCloudSnapshots();
+      await outsideSync;
+      if (!ref.mounted) return;
       if (result == null) {
         ref.read(snapshotSyncStateProvider.notifier).unavailable();
         return;
@@ -403,6 +456,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
         return;
       }
       final history = await repository.loadSnapshotHistory();
+      if (!ref.mounted) return;
       _replaceSnapshotHistory(history);
       unawaited(HomeWidgetBridge.update(history));
     });
@@ -622,19 +676,20 @@ final visibleOutsideLibraryPlaysProvider = Provider<List<LibraryTrack>>((ref) {
   final plays = uniqueHistoryTracks(candidates.map((entry) => entry.$2));
   final filters = ref.watch(libraryFilterPreferencesProvider);
   final repository = ref.watch(musicStatsRepositoryProvider);
-  final counted = LibraryTrackCatalog()
-    ..replace(countedTracks);
+  final counted = LibraryTrackCatalog()..replace(countedTracks);
   // Re-evaluate cached membership after a library refresh, too.
   ref.watch(musicStatsControllerProvider);
   return List.unmodifiable(
-    plays.where(
-      (track) =>
-          repository.libraryTrackMatching(track) == null &&
-          !filters.excludes(track),
-    ).map((track) {
-      final count = counted.match(track)?.playCount ?? 0;
-      return track.copyWith(playCount: count);
-    }),
+    plays
+        .where(
+          (track) =>
+              repository.libraryTrackMatching(track) == null &&
+              !filters.excludes(track),
+        )
+        .map((track) {
+          final count = counted.match(track)?.playCount ?? 0;
+          return track.copyWith(playCount: count);
+        }),
   );
 });
 
@@ -804,9 +859,11 @@ class OutsideLibraryPlaysController extends Notifier<List<LibraryTrack>> {
       artist: artist is String ? artist : 'Unknown Artist',
       albumTitle: album is String ? album : 'Unknown Album',
       appleMusicStoreId: json['appleMusicStoreId'] is String
-          ? json['appleMusicStoreId'] as String : null,
+          ? json['appleMusicStoreId'] as String
+          : null,
       appleMusicUrl: json['appleMusicUrl'] is String
-          ? json['appleMusicUrl'] as String : null,
+          ? json['appleMusicUrl'] as String
+          : null,
       genre: json['genre'] is String ? json['genre'] as String : null,
       playlistNames:
           (json['playlistNames'] as List?)?.whereType<String>().toList() ??

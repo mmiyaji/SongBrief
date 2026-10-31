@@ -1,9 +1,38 @@
+import CloudKit
 import Foundation
 import MusicKit
 import XCTest
 @testable import Runner
 
 final class RunnerTests: XCTestCase {
+  func testSupplementalCloudPayloadValidationAndRevisionDecision() {
+    XCTAssertTrue(SnapshotCloudSync.validateSupplementalPayload("{\"version\":1,\"entries\":[]}"))
+    XCTAssertFalse(SnapshotCloudSync.validateSupplementalPayload("{\"version\":2,\"entries\":[]}"))
+    XCTAssertFalse(SnapshotCloudSync.validateSupplementalPayload("{\"version\":1}"))
+    XCTAssertFalse(SnapshotCloudSync.validateSupplementalPayload("not json"))
+    XCTAssertTrue(SnapshotCloudSync.supplementalRevisionMatches(expected: nil, current: nil))
+    XCTAssertTrue(SnapshotCloudSync.supplementalRevisionMatches(expected: "tag", current: "tag"))
+    XCTAssertFalse(SnapshotCloudSync.supplementalRevisionMatches(expected: nil, current: "tag"))
+    XCTAssertFalse(SnapshotCloudSync.supplementalRevisionMatches(expected: "tag", current: nil))
+    XCTAssertFalse(SnapshotCloudSync.supplementalRevisionMatches(expected: "old", current: "new"))
+    let recordID = CKRecord.ID(recordName: SnapshotCloudSync.supplementalHistoryRecordName)
+    let partialConflict = CKError(.partialFailure, userInfo: [
+      CKPartialErrorsByItemIDKey: [recordID: CKError(.serverRecordChanged)],
+    ])
+    XCTAssertTrue(SnapshotCloudSync.isSupplementalSaveConflict(partialConflict, recordID: recordID))
+    XCTAssertFalse(SnapshotCloudSync.isSupplementalSaveConflict(CKError(.networkFailure), recordID: recordID))
+  }
+
+  func testSupplementalCloudPayloadCompressesLargeLedgersAndRejectsInvalidCompression() throws {
+    let rawPayload = "{\"version\":1,\"entries\":[" + String(repeating: " ", count: 800_000) + "]}"
+
+    let storedPayload = try SnapshotCloudSync.cloudSupplementalPayload(for: rawPayload)
+
+    XCTAssertLessThanOrEqual(storedPayload.utf8.count, SnapshotCloudSync.maximumInlinePayloadBytes)
+    XCTAssertNotEqual(storedPayload, rawPayload)
+    XCTAssertEqual(SnapshotCloudSync.supplementalPayload(fromCloud: storedPayload), rawPayload)
+    XCTAssertNil(SnapshotCloudSync.supplementalPayload(fromCloud: "songbrief:supplemental:zlib:v1:not-base64"))
+  }
   func testRecentlyPlayedMappingPreservesActualLastPlayedDateWithoutInventingCounts() {
     let track = MusicLibraryBridge.recentlyPlayedTrackMap(
       musicItemID: "12345", title: " Song ", artist: " Artist ",

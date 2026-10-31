@@ -24,6 +24,9 @@ class SupplementalHistoryController
   final _pending = <_PendingHistoryOperation>[];
   bool _restoring = false;
   bool _disposed = false;
+  final _restored = Completer<void>();
+
+  Future<void> get restored => _restored.future;
 
   @override
   SupplementalListeningHistory build() {
@@ -31,6 +34,8 @@ class SupplementalHistoryController
     ref.onDispose(() => _disposed = true);
     _preferences = ref.watch(musicDataSharedPreferencesProvider);
     if (_preferences != null) {
+      _restoring = false;
+      if (!_restored.isCompleted) _restored.complete();
       // A deferred write can safely access state after build has returned.
       scheduleMicrotask(() {
         if (!_disposed) _save();
@@ -62,6 +67,13 @@ class SupplementalHistoryController
     if (!_restoring) _save();
   }
 
+  /// Merges remote evidence into the newest in-memory ledger and persists it.
+  Future<void> mergeRemote(SupplementalListeningHistory remote) async {
+    final merged = state.merge(remote);
+    if (merged.encode() != state.encode()) state = merged;
+    await _save();
+  }
+
   Future<void> _restore(Future<SharedPreferences?> fallback) async {
     try {
       final preferences = await fallback;
@@ -80,8 +92,9 @@ class SupplementalHistoryController
       if (!_disposed) {
         _restoring = false;
         _pending.clear();
-        _save();
+        await _save();
       }
+      if (!_restored.isCompleted) _restored.complete();
     }
   }
 
@@ -161,9 +174,9 @@ class SupplementalHistoryController
     }
   }
 
-  void _save() {
+  Future<void> _save() {
     final preferences = _preferences;
-    if (preferences == null) return;
+    if (preferences == null) return _writes;
     final encoded = state.encode();
     // Serialize writes so an older observation cannot overwrite a newer one.
     _writes = _writes.then((_) async {
@@ -176,7 +189,7 @@ class SupplementalHistoryController
         // Keep the in-memory ledger when persistence fails.
       }
     });
-    unawaited(_writes);
+    return _writes;
   }
 }
 

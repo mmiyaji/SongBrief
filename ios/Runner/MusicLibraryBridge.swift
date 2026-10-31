@@ -100,6 +100,18 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       SnapshotCloudSync.sync { payload in
         result(payload)
       }
+    case "fetchSupplementalListeningHistory":
+      SnapshotCloudSync.fetchSupplementalListeningHistory { payload in result(payload) }
+    case "saveSupplementalListeningHistory":
+      guard let arguments = call.arguments as? [String: Any],
+            let payload = arguments["payload"] as? String else {
+        result(["status": "error", "revision": NSNull(), "message": "A payload string is required."])
+        return
+      }
+      SnapshotCloudSync.saveSupplementalListeningHistory(
+        payload: payload,
+        revision: arguments["revision"] as? String
+      ) { response in result(response) }
     case "updateHomeWidget":
       let arguments = call.arguments as? [String: Any]
       let summary = arguments?["summary"] as? [String: Any]

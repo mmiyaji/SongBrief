@@ -41,6 +41,8 @@ enum SnapshotCloudSync {
   private static let payloadField = "payload"
   // Leave room for summary fields and CloudKit record overhead below its 1 MB limit.
   static let maximumInlinePayloadBytes = 750_000
+  private static let maximumSupplementalPayloadBytes = 20_000_000
+  private static let supplementalCompressedPayloadPrefix = "songbrief:supplemental:zlib:v1:"
   private static let compressedPayloadPrefix = "songbrief:zlib:v1:"
   private static let capturedAtField = "capturedAtMillis"
   private static let trackCountField = "trackCount"
@@ -50,6 +52,7 @@ enum SnapshotCloudSync {
   private static let filterSignatureField = "filterSignature"
   private static let deletionPolicyRecordName = "_songbrief_deletion_policy_v1"
   private static let deletionPolicyKind = "songbriefDeletionPolicy"
+  static let supplementalHistoryRecordName = "_songbrief_supplemental_history_v1"
   private static let deletionRedactionSignature = "songbriefDeletionRedactionV1"
   private static let summaryFields = [
     capturedAtField, trackCountField, totalPlayField, totalSkipField,
@@ -62,6 +65,246 @@ enum SnapshotCloudSync {
       return true
     }
     return defaults.bool(forKey: cloudSyncEnabledPreferenceKey)
+  }
+
+  static func validateSupplementalPayload(_ payload: String) -> Bool {
+    guard payload.utf8.count <= maximumSupplementalPayloadBytes,
+          let data = payload.data(using: .utf8),
+          let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+          let version = object["version"] as? NSNumber,
+          version.intValue == 1,
+          object["entries"] is [Any] else {
+      return false
+    }
+    return true
+  }
+
+  static func supplementalPayload(fromCloud storedPayload: String) -> String? {
+    let rawPayload: String
+    if storedPayload.hasPrefix(supplementalCompressedPayloadPrefix) {
+      let encoded = String(storedPayload.dropFirst(supplementalCompressedPayloadPrefix.count))
+      guard let compressed = Data(base64Encoded: encoded),
+            let decompressed = try? (compressed as NSData).decompressed(using: .zlib),
+            decompressed.length <= maximumSupplementalPayloadBytes else {
+        return nil
+      }
+      rawPayload = String(decoding: decompressed as Data, as: UTF8.self)
+    } else {
+      rawPayload = storedPayload
+    }
+    return validateSupplementalPayload(rawPayload) ? rawPayload : nil
+  }
+
+  static func cloudSupplementalPayload(for rawPayload: String) throws -> String {
+    guard validateSupplementalPayload(rawPayload) else {
+      throw supplementalPayloadError("Invalid or oversized supplemental history payload.")
+    }
+    if rawPayload.utf8.count <= maximumInlinePayloadBytes {
+      return rawPayload
+    }
+    let data = Data(rawPayload.utf8)
+    let compressed = try (data as NSData).compressed(using: .zlib) as Data
+    let storedPayload = supplementalCompressedPayloadPrefix + compressed.base64EncodedString()
+    guard storedPayload.utf8.count <= maximumInlinePayloadBytes else {
+      throw supplementalPayloadError(
+        "Supplemental history exceeds the iCloud record size limit after compression. It remains saved on this device."
+      )
+    }
+    return storedPayload
+  }
+
+  private static func supplementalPayloadError(_ message: String) -> NSError {
+    NSError(
+      domain: "SongBriefSupplementalCloudSync",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: message]
+    )
+  }
+
+  static func supplementalRevisionMatches(expected: String?, current: String?) -> Bool {
+    expected == current
+  }
+
+  static func isSupplementalSaveConflict(_ error: Error, recordID: CKRecord.ID) -> Bool {
+    let recordError = itemError(for: recordID, in: error) ?? error
+    return isServerRecordChangedError(recordError)
+  }
+
+  static func fetchSupplementalListeningHistory(
+    completion: @escaping ([String: Any]) -> Void
+  ) {
+    guard isEnabled else {
+      completion(["status": "disabled", "payload": NSNull(), "revision": NSNull()])
+      return
+    }
+    CKContainer(identifier: containerIdentifier).accountStatus { status, error in
+      guard error == nil, status == .available else {
+        cloudWorkQueue.async {
+          completion([
+            "status": error == nil ? "unavailable" : "error",
+            "payload": NSNull(),
+            "revision": NSNull(),
+          ])
+        }
+        return
+      }
+      let id = CKRecord.ID(recordName: supplementalHistoryRecordName)
+      let operation = CKFetchRecordsOperation(recordIDs: [id])
+      operation.qualityOfService = .utility
+      operation.fetchRecordsCompletionBlock = { records, fetchError in
+        cloudWorkQueue.async {
+          if let fetchError, !isMissingItemError(fetchError) {
+            completion([
+              "status": "error",
+              "payload": NSNull(),
+              "revision": NSNull(),
+              "message": fetchError.localizedDescription,
+            ])
+          } else if let record = records?[id] {
+            guard let storedPayload = record[payloadField] as? String,
+                  let payload = supplementalPayload(fromCloud: storedPayload) else {
+              completion([
+                "status": "error",
+                "payload": NSNull(),
+                "revision": record.recordChangeTag as Any? ?? NSNull(),
+                "message": "The cloud supplemental history payload is invalid.",
+              ])
+              return
+            }
+            completion([
+              "status": "success",
+              "payload": payload,
+              "revision": record.recordChangeTag as Any? ?? NSNull(),
+            ])
+          } else {
+            completion([
+              "status": "success",
+              "payload": NSNull(),
+              "revision": NSNull(),
+            ])
+          }
+        }
+      }
+      database.add(operation)
+    }
+  }
+
+  static func saveSupplementalListeningHistory(
+    payload: String,
+    revision: String?,
+    completion: @escaping ([String: Any]) -> Void
+  ) {
+    // JSON validation and compression can grow with the retained ledger.
+    // Keep that work off Flutter's platform/UI thread.
+    cloudWorkQueue.async {
+      performSupplementalListeningHistorySave(
+        payload: payload,
+        revision: revision,
+        completion: completion
+      )
+    }
+  }
+
+  private static func performSupplementalListeningHistorySave(
+    payload: String,
+    revision: String?,
+    completion: @escaping ([String: Any]) -> Void
+  ) {
+    guard isEnabled else {
+      completion(["status": "disabled", "revision": NSNull()])
+      return
+    }
+    guard validateSupplementalPayload(payload) else {
+      completion([
+        "status": "error",
+        "revision": NSNull(),
+        "message": "Invalid or oversized supplemental history payload.",
+      ])
+      return
+    }
+    let storedPayload: String
+    do {
+      storedPayload = try cloudSupplementalPayload(for: payload)
+    } catch {
+      completion(["status": "error", "revision": NSNull(), "message": error.localizedDescription])
+      return
+    }
+    CKContainer(identifier: containerIdentifier).accountStatus { status, error in
+      guard error == nil, status == .available else {
+        cloudWorkQueue.async {
+          completion([
+            "status": error == nil ? "unavailable" : "error",
+            "revision": NSNull(),
+            "message": error?.localizedDescription ?? "CloudKit account is unavailable.",
+          ])
+        }
+        return
+      }
+      let id = CKRecord.ID(recordName: supplementalHistoryRecordName)
+      database.fetch(withRecordID: id) { record, fetchError in
+        cloudWorkQueue.async {
+          if let fetchError, !isMissingItemError(fetchError) {
+            completion([
+              "status": "error",
+              "revision": NSNull(),
+              "message": fetchError.localizedDescription,
+            ])
+            return
+          }
+          if let record {
+            guard let storedPayload = record[payloadField] as? String,
+                  supplementalPayload(fromCloud: storedPayload) != nil else {
+              completion([
+                "status": "error",
+                "revision": record.recordChangeTag as Any? ?? NSNull(),
+                "message": "The cloud supplemental history payload is invalid.",
+              ])
+              return
+            }
+          }
+          let revisionMatches = record == nil
+            ? revision == nil
+            : (revision != nil && record?.recordChangeTag != nil
+              && supplementalRevisionMatches(expected: revision, current: record?.recordChangeTag))
+          guard revisionMatches else {
+            completion([
+              "status": "conflict",
+              "revision": record?.recordChangeTag as Any? ?? NSNull(),
+            ])
+            return
+          }
+          let target = record ?? CKRecord(recordType: recordType, recordID: id)
+          target[payloadField] = storedPayload as CKRecordValue
+          let save = CKModifyRecordsOperation(recordsToSave: [target], recordIDsToDelete: nil)
+          save.savePolicy = .ifServerRecordUnchanged
+          save.isAtomic = false
+          save.qualityOfService = .utility
+          save.modifyRecordsCompletionBlock = { saved, _, saveError in
+            cloudWorkQueue.async {
+              if let saveError {
+                let recordError = itemError(for: id, in: saveError) ?? saveError
+                let isConflict = isSupplementalSaveConflict(saveError, recordID: id)
+                completion([
+                  "status": isConflict ? "conflict" : "error",
+                  "revision": NSNull(),
+                  "message": recordError.localizedDescription,
+                ])
+              } else {
+                completion([
+                  "status": "success",
+                  "revision": saved?.first?.recordChangeTag as Any? ?? NSNull(),
+                ])
+              }
+            }
+          }
+          guard isEnabled else {
+            completion(["status": "disabled", "revision": NSNull()])
+            return
+          }
+          database.add(save)
+        }
+      }
+    }
   }
 
   private static var database: CKDatabase {
@@ -832,7 +1075,9 @@ enum SnapshotCloudSync {
         )
       )
     }
-    return dateKeys.sorted().map { CKRecord.ID(recordName: $0) }
+    return dateKeys.sorted().filter {
+      $0 != deletionPolicyRecordName && $0 != supplementalHistoryRecordName
+    }.map { CKRecord.ID(recordName: $0) }
   }
 
   private static func snapshotsByDateKey(
@@ -1222,6 +1467,10 @@ enum SnapshotCloudSync {
       return nil
     }
     return partialErrors[recordID]
+  }
+
+  private static func isServerRecordChangedError(_ error: Error) -> Bool {
+    (error as? CKError)?.code == .serverRecordChanged
   }
 
   private static func serverRecordChanged(in error: Error) -> CKRecord? {
