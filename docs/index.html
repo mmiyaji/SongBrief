@@ -17,36 +17,42 @@
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     >
-    <link rel="stylesheet" href="./assets/styles.css?v=release-20260712">
+    <link rel="stylesheet" href="./assets/home.css?v=20261106-template">
+    <meta name="color-scheme" content="dark light">
+    <script src="./assets/home-theme.js"></script>
     <script src="./assets/site.js?v=language-links-20260706" defer></script>
+    <script src="./assets/home-ui.js" defer></script>
   </head>
-  <body>
-    <header class="site-header">
-      <div class="header-inner">
-        <a class="brand" href="./">SongBrief</a>
-        <div class="header-actions">
-          <nav class="nav" aria-label="Site navigation">
-            <a href="#features" data-i18n-ja="機能" data-i18n-en="Features">機能</a>
-            <a href="#history" data-i18n-ja="聴取記録" data-i18n-en="History">聴取記録</a>
-            <a href="#screens" data-i18n-ja="画面" data-i18n-en="Screens">画面</a>
-            <a href="#faq" data-i18n-ja="FAQ" data-i18n-en="FAQ">FAQ</a>
-            <a href="./privacy/" data-i18n-ja="プライバシー" data-i18n-en="Privacy Policy">プライバシー</a>
-            <a href="./terms/" data-i18n-ja="利用規約" data-i18n-en="Terms of Use">利用規約</a>
-          </nav>
-          <div class="language-switch" role="group" aria-label="Language">
-            <button type="button" data-lang-choice="ja" aria-pressed="true">日本語</button>
-            <button type="button" data-lang-choice="en" aria-pressed="false">English</button>
-          </div>
-        </div>
-      </div>
-    </header>
+  <body class="guide-site">
+    <a class="skip" href="#overview" data-i18n-ja="本文へ移動" data-i18n-en="Skip to content">本文へ移動</a>
+<div class="tools"><div class="langmenu">
+<button id="lang" class="tool lang" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="lang-list" aria-label="Language: 日本語" title="Language / 言語">
+<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="10" cy="10" r="7.6"/><path d="M2.4 10h15.2M10 2.4c2.1 2.2 3.1 4.7 3.1 7.6s-1 5.4-3.1 7.6c-2.1-2.2-3.1-4.7-3.1-7.6s1-5.4 3.1-7.6z"/></svg>
+<span id="lang-label" lang="ja">日本語</span>
+<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg>
+</button>
+<ul id="lang-list" class="lang-list" hidden><li><a href="./" hreflang="ja" lang="ja" data-lang="ja">日本語</a></li><li><a href="?lang=en" hreflang="en" lang="en" data-lang="en">English</a></li></ul></div>
+<button id="theme" class="tool theme" type="button" aria-label="表示モードを切り替え">
+<svg class="sun" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="3.6"/><path d="M10 1.8v2M10 16.2v2M1.8 10h2M16.2 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"/></svg>
+<svg class="moon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M16.6 12.4A7 7 0 0 1 7.6 3.4a7 7 0 1 0 9 9z"/></svg>
+</button></div>
+<div class="shell"><aside aria-label="Site navigation">
+<div class="brand"><img src="./assets/songbrief-icon.png" alt="" width="20" height="20">SongBrief</div>
+<div class="grp" data-i18n-ja="ガイド" data-i18n-en="Guide">ガイド</div>
+<a href="#overview" class="on" data-i18n-ja="概要" data-i18n-en="Overview">概要</a>
+<a href="#features" data-i18n-ja="機能" data-i18n-en="Features">機能</a>
+<a href="#history" data-i18n-ja="聴取記録" data-i18n-en="History">聴取記録</a>
+<a href="#screens" data-i18n-ja="画面" data-i18n-en="Screens">画面</a>
+<div class="grp" data-i18n-ja="参考" data-i18n-en="Reference">参考</div>
+<a href="#faq" data-i18n-ja="よくある質問" data-i18n-en="FAQ">よくある質問</a>
+<a href="#data" data-i18n-ja="データの取り扱い" data-i18n-en="Data handling">データの取り扱い</a>
+</aside>
 
     <main class="main landing">
-      <section class="hero hero-app">
+      <section id="overview" class="hero hero-app">
         <div class="hero-copy">
-          <img class="app-icon" src="./assets/songbrief-icon.png" alt="SongBrief app icon">
           <div class="eyebrow" data-i18n-ja="音楽ライブラリ統計" data-i18n-en="Music Library Statistics">音楽ライブラリ統計</div>
-          <h1 data-i18n-ja="音楽ライブラリの再生傾向を、静かに整理する。" data-i18n-en="A quiet way to read your music library.">音楽ライブラリの再生傾向を、静かに整理する。</h1>
+          <h1 data-i18n-ja="SongBrief" data-i18n-en="SongBrief">SongBrief</h1>
           <p class="lead" data-lang-panel="ja">SongBriefは、iOSのミュージックライブラリから再生回数、スキップ回数、最後に再生した日などを読み取り、ランキング、日次記録、リキャップとして見やすくまとめるアプリです。</p>
           <p class="lead" data-lang-panel="en">
             SongBrief turns your local iOS music library metadata into rankings,
@@ -141,7 +147,7 @@
           <span data-i18n-ja="月間・年間の聴き方を一枚のサマリーに集約" data-i18n-en="Summarize monthly and yearly listening in one view">月間・年間の聴き方を一枚のサマリーに集約</span>
         </div>
         <div class="metric-card">
-          <strong data-i18n-ja="ローカル重視" data-i18n-en="Local First">ローカル重視</strong>
+          <strong data-i18n-ja="端末内で処理" data-i18n-en="On-device processing">端末内で処理</strong>
           <span data-i18n-ja="音楽ライブラリの詳細は主に端末内で処理" data-i18n-en="Detailed library data is primarily handled on device">音楽ライブラリの詳細は主に端末内で処理</span>
         </div>
       </section>
@@ -150,7 +156,7 @@
         <div class="section-heading">
           <div>
             <div class="eyebrow" data-i18n-ja="機能" data-i18n-en="Features">機能</div>
-            <h2 data-i18n-ja="再生回数だけで終わらない統計" data-i18n-en="Statistics beyond play counts">再生回数だけで終わらない統計</h2>
+            <h2 data-i18n-ja="機能一覧" data-i18n-en="Features">機能一覧</h2>
           </div>
           <p data-i18n-ja="SongBriefは、iOSが提供する音楽ライブラリのカウンターとアプリ内の記録を組み合わせ、普段の聴き方を複数の角度で確認できます。" data-i18n-en="SongBrief combines iOS music library counters with local records so you can review your listening from several angles.">SongBriefは、iOSが提供する音楽ライブラリのカウンターとアプリ内の記録を組み合わせ、普段の聴き方を複数の角度で確認できます。</p>
         </div>
@@ -161,8 +167,8 @@
             <p data-i18n-ja="ジャケット、曲情報、再生回数、スキップ回数、登録プレイリスト、歌詞などをひとつの画面で確認できます。" data-i18n-en="Review artwork, metadata, play counts, skip counts, playlists, and lyrics on one screen.">ジャケット、曲情報、再生回数、スキップ回数、登録プレイリスト、歌詞などをひとつの画面で確認できます。</p>
           </article>
           <article class="feature-card">
-            <h3 data-i18n-ja="ランキングの深掘り" data-i18n-en="Ranking Deep Dives">ランキングの深掘り</h3>
-            <p data-i18n-ja="トップ曲を主線に、期間切り替え、急上昇、再発見、順位変動などを追加して、聴き方の変化を追えます。" data-i18n-en="Track changes with periods, rising songs, rediscovery lists, and ranking movement.">トップ曲を主線に、期間切り替え、急上昇、再発見、順位変動などを追加して、聴き方の変化を追えます。</p>
+            <h3 data-i18n-ja="再生回数・ランキング" data-i18n-en="Play counts and rankings">再生回数・ランキング</h3>
+            <p data-i18n-ja="期間別のランキング、急上昇した曲、しばらく聴いていない曲、順位の変化を確認できます。" data-i18n-en="Track changes with periods, rising songs, rediscovery lists, and ranking movement.">期間別のランキング、急上昇した曲、しばらく聴いていない曲、順位の変化を確認できます。</p>
           </article>
           <article class="feature-card">
             <h3 data-i18n-ja="リスニングマップ" data-i18n-en="Listening Map">リスニングマップ</h3>
@@ -198,9 +204,9 @@
         <div class="section-heading">
           <div>
             <div class="eyebrow" data-i18n-ja="聴取記録" data-i18n-en="Listening History">聴取記録</div>
-            <h2 data-i18n-ja="日々の変化から、聴き方を読み解く" data-i18n-en="Read your listening through daily changes">日々の変化から、聴き方を読み解く</h2>
+            <h2 data-i18n-ja="日次記録と集計" data-i18n-en="Daily records and summaries">日次記録と集計</h2>
           </div>
-          <p data-i18n-ja="SongBriefは、アプリが記録できた日のライブラリ状態を比べて、前回から増えた再生、曜日ごとの偏り、発売年ごとの集中度などを表示します。単なる累計ではなく、最近どう変わったかを確認できます。" data-i18n-en="SongBrief compares the library states it can record and shows what changed since the previous record, including recent play increases, weekday patterns, and release-year concentration. It is not just a lifetime total; it helps you see what changed recently.">SongBriefは、アプリが記録できた日のライブラリ状態を比べて、前回から増えた再生、曜日ごとの偏り、発売年ごとの集中度などを表示します。単なる累計ではなく、最近どう変わったかを確認できます。</p>
+          <p data-i18n-ja="記録したライブラリの状態を比較し、前回から増えた再生回数、曜日別の再生活動、発売年別の集計を表示します。" data-i18n-en="SongBrief compares recorded library states to show play-count increases, activity by weekday, and totals by release year.">記録したライブラリの状態を比較し、前回から増えた再生回数、曜日別の再生活動、発売年別の集計を表示します。</p>
         </div>
 
         <div class="history-stack" aria-label="Listening history screenshots">
@@ -274,7 +280,7 @@
         <div class="section-heading">
           <div>
             <div class="eyebrow" data-i18n-ja="画面" data-i18n-en="Screens">画面</div>
-            <h2 data-i18n-ja="iPhoneとiPadで同じデータを扱いやすく" data-i18n-en="Designed for both iPhone and iPad">iPhoneとiPadで同じデータを扱いやすく</h2>
+            <h2 data-i18n-ja="iPhone・iPadの画面" data-i18n-en="iPhone and iPad screens">iPhone・iPadの画面</h2>
           </div>
           <p data-i18n-ja="スマートフォンではタブ中心、タブレットではサイドバー中心に切り替え、ランキングやライブラリを広い画面で見渡せるようにしています。" data-i18n-en="The app uses tabs on phones and a sidebar on tablets so rankings and library views stay easy to scan.">スマートフォンではタブ中心、タブレットではサイドバー中心に切り替え、ランキングやライブラリを広い画面で見渡せるようにしています。</p>
         </div>
@@ -346,7 +352,7 @@
             <div class="eyebrow">FAQ</div>
             <h2 data-i18n-ja="よくある質問" data-i18n-en="Frequently asked questions">よくある質問</h2>
           </div>
-          <p data-i18n-ja="SongBriefのデータ取得、聴取記録、プライバシー、対応範囲について、公開前によく確認される点をまとめています。" data-i18n-en="Answers to common questions about SongBrief's data sources, listening records, privacy, and supported use cases.">SongBriefのデータ取得、聴取記録、プライバシー、対応範囲について、公開前によく確認される点をまとめています。</p>
+          <p data-i18n-ja="データの取得元、記録の保存、プライバシー、対応端末について説明します。" data-i18n-en="Answers to common questions about SongBrief's data sources, listening records, privacy, and supported use cases.">データの取得元、記録の保存、プライバシー、対応端末について説明します。</p>
         </div>
 
         <div class="faq-list">
@@ -400,10 +406,10 @@
         </div>
       </section>
 
-      <section class="section legal-note">
+      <section id="data" class="section legal-note">
         <div>
           <div class="eyebrow" data-i18n-ja="プライバシー" data-i18n-en="Privacy">プライバシー</div>
-          <h2 data-i18n-ja="音楽ライブラリの詳細は広告・解析イベントに含めません" data-i18n-en="Detailed music library data stays out of ads and analytics events">音楽ライブラリの詳細は広告・解析イベントに含めません</h2>
+          <h2 data-i18n-ja="データの取り扱い" data-i18n-en="Data handling">データの取り扱い</h2>
           <p data-i18n-ja="SongBriefは、曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、再生履歴などを広告リクエストや解析イベントに含めない方針です。詳細はプライバシーポリシーをご確認ください。" data-i18n-en="SongBrief does not include track titles, artist names, album names, lyrics, playlist names, or listening history in ad requests or analytics events. See the privacy policy for details.">SongBriefは、曲名、アーティスト名、アルバム名、歌詞、プレイリスト名、再生履歴などを広告リクエストや解析イベントに含めない方針です。詳細はプライバシーポリシーをご確認ください。</p>
         </div>
         <div class="legal-actions">
@@ -411,13 +417,13 @@
           <a class="button-link secondary" href="./terms/" data-i18n-ja="利用規約" data-i18n-en="Terms of Use">利用規約</a>
         </div>
       </section>
-    </main>
-
     <footer class="site-footer">
+      <p class="footer-links"><a href="https://github.com/mmiyaji/SongBrief">GitHub</a> · <a href="https://github.com/mmiyaji/SongBrief/releases" data-i18n-ja="リリース一覧" data-i18n-en="Releases">リリース一覧</a> · <a href="./privacy/" data-i18n-ja="プライバシーポリシー" data-i18n-en="Privacy Policy">プライバシーポリシー</a> · <a href="./terms/" data-i18n-ja="利用規約" data-i18n-en="Terms of Use">利用規約</a> · <a href="https://ruhenheim.org/">ruhenheim.org</a></p>
       <p>&copy; 2026 SongBrief. All rights reserved.</p>
       <p class="apple-credit" data-lang-panel="ja">Apple、Appleのロゴ、App Store、iPhone、およびiPadは、米国およびその他の国で登録されたApple Inc.の商標です。</p>
       <p class="apple-credit" data-lang-panel="en">Apple, the Apple logo, App Store, iPhone, and iPad are trademarks of Apple Inc., registered in the U.S. and other countries and regions.</p>
     </footer>
+    </main></div>
     <script
       src="https://cdn.jsdelivr.net/npm/glightbox@3.3.1/dist/js/glightbox.min.js"
       integrity="sha384-MZZbZ6RXJudK43v1qY1zOWKOU2yfeBPatuFoKyHAaAgHTUZhwblRTc9CphTt4IGQ"
