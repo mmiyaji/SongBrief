@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
   // Sidebar: mark the section being read, and the link just clicked.
-  var navLinks = Array.prototype.slice.call(document.querySelectorAll('aside a[href^="#"]'));
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('aside nav a[href^="#"]'));
   var sections = navLinks.map(function (link) { return document.getElementById(link.getAttribute('href').slice(1)); })
     .filter(function (section) { return section; });
   function markSection(id) {
