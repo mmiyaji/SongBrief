@@ -46,3 +46,73 @@
 final result: passed
 
 この判定はカレンダー部分のデザイン・Flutter描画の確認に限定し、iOSリリース検証や権利クリアランスの完了を意味しない。
+
+---
+
+# 紹介ページ — 2案目の実装確認（2026-11-15）
+
+- source visual truth: `docs/design/homepage/selected-mock.jpg`（会話で2番目に表示された生成モック）
+- implementation screenshot: `docs/design/homepage/desktop-dark.jpg`
+- full-view comparison evidence: `docs/design/homepage/comparison.jpg`（左: モック、右: 実装）
+- focused comparison evidence: `docs/design/homepage/comparison-detail.jpg`（2画面と外枠）
+- viewport: 1488 × 1058 CSS px、devicePixelRatio 1。ソース1487 × 1058px、ブラウザーの撮影結果1473 × 1047px。撮影APIによる約1%の差と右スクロールバーは欠陥判定から除外し、配置・比率・可読性を比較。画像の縦横比は変更していない。
+- state: 日本語、ダーク、先頭、FAQ閉。390 × 844（日本語/英語）、320 × 720、768 × 1024も確認。
+
+## 指摘・修正履歴
+
+1. [P2・解消] 外枠なしの実装に対し、ユーザーからiPhone風外枠の追加指定。Product Design同梱のラスターベゼルを `docs/assets/iphone-bezel.png` として利用。スクリーンショットの比率を維持し、カメラが見出しに重ならないセーフエリアを設定。`desktop-dark.jpg` と `comparison-detail.jpg` で外枠と内容を確認。
+2. [P2・解消] 320px幅の見出しが「計」だけの行になった。日本語の見出しを意味のまとまりで分割して折り返すよう変更。修正後の `mobile-320.jpg` では「音楽ライブラリの」「再生統計」の2行。横はみ出しなし。
+3. 最終全体比較を `comparison.jpg` に再保存し、実画面を確認。未解消のP0/P1/P2なし。
+
+## 必須観点
+
+- **文字**: 既存のシステムフォント系を使用。見出し・本文・ナビの階層を維持。説明は短い機能の事実に限定。320px幅は見出しを単語のまとまりで改行。
+- **配置**: 左232pxの固定ナビ、左側の機能説明、右側の2画面を踏襲。860px以下は上部ナビに切り替え。320/390/768px幅で横はみ出しなし。詳細は拡大可能。
+- **色**: 背景 #050b0b、ミント #53dfb5、控えめな緑の罫線。ユーザー指定に合わせ初期表示はダーク。保存済みライト設定と切り替えは維持。`desktop-light.jpg` も撮影。
+- **画像**: 実際の日本語・英語スクリーンショット、既存の正式アイコンとApp Storeバッジを使用。ベゼルは同梱PNG、CSSで描き直していない。object-fit:containで画面を歪めず、カメラ部分と分離。画像寸法を明示してレイアウト移動を抑制。
+- **内容**: 紹介ページのため架空のライブ統計は追加しない。日々の記録は記録間の差分であることと、毎日のバックグラウンド取得を保証しない点を保持。プライバシー・利用規約・GitHub・リリースのリンクを保持。
+
+## 意図したモックとの差分
+
+- 生成ロゴとミント色のApp Storeボタンは、既存の正式ブランド画像・公式ダウンロードバッジを使用。
+- ナビは装飾アイコンを省きテキスト中心。説明文字は実用的な16px基準。
+- 架空の抜粋統計カードは作らず、記録セクションには既存のiPad画面を使用。
+- iPhone画像のステータス情報やホームインジケーターは架空に描き足さず、元画面とベゼルのみ表示。
+
+## 検証
+
+- IAB実ブラウザー: 日本語→英語のメニュー操作、翻訳・画像・App Store URLの切り替え、ライト→ダーク、スクリーンショット拡大と閉じる、FAQの開閉、ナビ移動と選択表示を確認。
+- コンソールのwarning/error: なし。日本語・英語の画像読込失敗: なし。
+- `node --check docs/assets/home-ui.js`、`node --check docs/assets/site.js`: passed。
+- HTMLのローカル参照、セクション参照、ID重複チェック: passed。
+- `git diff --check`: passed。
+- スキルによる別担当の読み取り専用レビュー実施。初期ダーク表示はユーザー指定に沿う意図した変更として確認。
+- Flutter/実機/リリースチェックは未実施: 静的な紹介ページのみの変更で、アプリコードには触れていない。公開・コミットはしていない。
+
+## Follow-up Polish
+
+- 別OSの日本語フォントでの行幅差はシステムフォントに依存。
+- 小画面では詳細な統計は画面をタップして拡大する構成。
+
+final result: passed
+
+## 主要機能の追記（2026-11-15）
+
+- 対象: 採用済みデザインを維持し、`#more-features` に4項目とiCloudのFAQを追記。
+- 根拠: `overview_recaps.dart`（週・月・年の集計とPNG保存/共有）、`library_section.dart`（検索）、`settings_filters.dart`（CSV/JSON）、`playing_section.dart`（再生中情報）、`SongBriefWidget.swift`（ウィジェット）、`settings_snapshots.dart`（同じApple IDでのiCloud同期）。別担当の読み取り専用レビューでも確認。
+- リキャップ・ウィジェットは保存記録に基づくこと、歌詞は取得できるものを表示することを明記。細かな設定、分析指標、個別のフィルターは掲載しない。
+- implementation evidence: `docs/design/homepage/features-desktop.jpg`（1488×1058 CSS px、日本語、ダーク）および `features-mobile-en.jpg`（390×844 CSS px、英語、ダーク）。どちらもdevicePixelRatio 1。既存の撮影APIの縮小とスクロールバーを含む。新規テキストセクションは生成モック外の意図した追加。
+- 文字: 既存のシステムフォント、17pxの項目名と14pxの説明。配置: PCは2列、600px以下は1列。色: 既存トークンのみ。画像: 新規画像を増やさず、ヒーローと既存画像を維持。内容: 全4項目の翻訳を確認。
+- ブラウザーで追加セクション、英語切り替え、iCloud FAQ開閉を確認。390px幅で横はみ出しなし。console warning/errorなし。
+- セクション参照・ID重複・日英テキスト対応チェックと `git diff --check` が通過。静的な説明追加のためFlutterテスト・実機テストは対象外。
+- 未解消のP0/P1/P2なし。細かな機能を列挙しない範囲で、主要機能の全体像を補完。
+
+final result: passed
+
+## コミット前レビュー（2026-11-15）
+
+- Web差分のみを再レビュー。JavaScript構文（home-ui/site/home-theme）、HTMLタグ構造・ID・アンカー・ローカル参照・画像破損・日英属性・差分空白チェックが通過。
+- スクリーンショットのリンクには翻訳済みの説明があるため、内側の画像altを空にして日本語の重複読み上げを解消。本文スキップ・asideラベルも翻訳対象に統一。
+- 秘密情報のパターンチェックと別担当レビューで該当なし。キャプチャはデモライブラリのデータ。アプリの未コミット差分・ローカル作業ファイルはステージ対象外。
+
+final result: passed
