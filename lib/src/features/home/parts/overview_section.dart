@@ -1381,49 +1381,61 @@ class _SummaryCard extends StatelessWidget {
       radius: 18,
       tint: const Color(0x55FFFFFF),
       shadowOpacity: 0.035,
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(value.icon, color: theme.colorScheme.primary, size: 21),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _AdaptiveValueText(
-                  value: value.value,
-                  tooltipMessage: '${value.label}: ${value.value}',
-                  triggerMode: TooltipTriggerMode.longPress,
-                  style: theme.textTheme.titleMedium,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Two-column phone cards are too narrow for labels such as
+          // "アーティスト" next to a full-size icon, so tighten the icon slot.
+          final compact = constraints.maxWidth < 160;
+          final iconBox = compact ? 32.0 : 38.0;
+          return Row(
+            children: [
+              Container(
+                width: iconBox,
+                height: iconBox,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                _EllipsisTextWithTooltip(
-                  value.label,
-                  triggerMode: TooltipTriggerMode.longPress,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Icon(
+                  value.icon,
+                  color: theme.colorScheme.primary,
+                  size: 21,
+                ),
+              ),
+              SizedBox(width: compact ? 8 : 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _AdaptiveValueText(
+                      value: value.value,
+                      tooltipMessage: '${value.label}: ${value.value}',
+                      triggerMode: TooltipTriggerMode.longPress,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    _EllipsisTextWithTooltip(
+                      value.label,
+                      triggerMode: TooltipTriggerMode.longPress,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (value.onTap != null) ...[
+                SizedBox(width: compact ? 2 : 6),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
-            ),
-          ),
-          if (value.onTap != null) ...[
-            const SizedBox(width: 6),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ],
+            ],
+          );
+        },
       ),
     );
 
