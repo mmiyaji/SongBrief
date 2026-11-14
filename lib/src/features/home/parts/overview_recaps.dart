@@ -88,8 +88,10 @@ class _TasteAndCollectionPanel extends ConsumerWidget {
             title: _t(context, 'Taste and collection', '好みとコレクション'),
             subtitle: _t(
               context,
-              'Rediscovery, listening range, and album completion',
-              '再発見・聴取幅・アルバム制覇率を表示',
+              'Rediscovery, listening range, and album completion for library tracks',
+              '登録曲の再発見・聴取幅・アルバム制覇率を表示',
+              zh: '显示媒体库歌曲的再发现、收听范围和专辑完成率',
+              ko: '보관함 곡의 재발견, 청취 범위 및 앨범 완주율을 표시합니다.',
             ),
           ),
           const SizedBox(height: 14),

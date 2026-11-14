@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'demo_library_preferences.dart';
 import 'library_filter_preferences.dart';
 import 'snapshot_preferences.dart';
+import 'supplemental_history_preferences.dart';
 
 final musicDataPreferencesReadyProvider = FutureProvider<void>((ref) async {
   await Future.wait([
@@ -27,6 +28,11 @@ final musicDataPreferencesReadyProvider = FutureProvider<void>((ref) async {
       initialize: () => ref.read(libraryFilterPreferencesProvider),
       restored: () =>
           ref.read(libraryFilterPreferencesProvider.notifier).restored,
+    ),
+    _waitForPreferenceRestore(
+      initialize: () => ref.read(supplementalHistoryIncludedProvider),
+      restored: () =>
+          ref.read(supplementalHistoryIncludedProvider.notifier).restored,
     ),
   ]);
 });

@@ -30,6 +30,7 @@ class _AppLockSetting extends ConsumerWidget {
               secondary: Icon(
                 enabled ? Icons.lock_rounded : Icons.lock_open_rounded,
                 color: theme.colorScheme.primary,
+                size: 20,
               ),
               title: Text(
                 _t(context, 'App Lock', 'アプリロック'),
@@ -125,6 +126,7 @@ class _CrashReportingSetting extends ConsumerWidget {
       contentPadding: EdgeInsets.zero,
       secondary: Icon(
         Icons.bug_report_outlined,
+        size: 20,
         color: state.available
             ? theme.colorScheme.primary
             : theme.colorScheme.onSurfaceVariant,

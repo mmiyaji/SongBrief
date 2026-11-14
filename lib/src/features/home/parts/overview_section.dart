@@ -7,13 +7,15 @@ class _OverviewSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final syncState = ref.watch(snapshotSyncStateProvider);
+    final syncState = ref.watch(listeningHistorySyncStateProvider);
     final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: _overviewPanelItems(
         context,
         stats: stats,
+        countedOverview: ref.watch(countedListeningOverviewProvider),
+        supplementalTracks: ref.watch(countedOutsideTracksProvider),
         syncState: syncState,
         cloudSyncEnabled: cloudSyncEnabled,
       ),
@@ -34,11 +36,13 @@ class _OverviewSliverSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final syncState = ref.watch(snapshotSyncStateProvider);
+    final syncState = ref.watch(listeningHistorySyncStateProvider);
     final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
     final items = _overviewPanelItems(
       context,
       stats: stats,
+      countedOverview: ref.watch(countedListeningOverviewProvider),
+      supplementalTracks: ref.watch(countedOutsideTracksProvider),
       syncState: syncState,
       cloudSyncEnabled: cloudSyncEnabled,
     );
@@ -61,6 +65,8 @@ class _OverviewSliverSection extends ConsumerWidget {
 List<Widget> _overviewPanelItems(
   BuildContext context, {
   required MusicStatsState stats,
+  required LibraryOverview countedOverview,
+  required List<LibraryTrack> supplementalTracks,
   required SnapshotSyncState syncState,
   required bool cloudSyncEnabled,
 }) {
@@ -82,7 +88,19 @@ List<Widget> _overviewPanelItems(
   if (_labelsDemo(overview)) {
     add(const _DemoBanner(), spaceAfter: 16);
   }
-  add(_OverviewPanel(overview: overview));
+  add(
+    _OverviewPanel(
+      overview: countedOverview,
+      nativeOverview: overview,
+      supplementalPlayCount: supplementalTracks.fold<int>(
+        0,
+        (sum, track) => sum + track.playCount,
+      ),
+      undatedTrackCount: supplementalTracks
+          .where((track) => track.lastPlayedAt == null)
+          .length,
+    ),
+  );
   if (stats.snapshotRecordingEnabled) {
     add(
       _SnapshotStatusPanel(
@@ -93,13 +111,19 @@ List<Widget> _overviewPanelItems(
         cloudSyncEnabled: cloudSyncEnabled,
         onSync: overview.isDemo || syncState.isSyncing
             ? null
-            : () => ProviderScope.containerOf(context)
-                  .read(musicStatsControllerProvider.notifier)
-                  .syncCloudSnapshots(),
+            : () =>
+                  ProviderScope.containerOf(context)
+                      .read(musicStatsControllerProvider.notifier)
+                      .syncCloudSnapshots(),
       ),
     );
   }
-  add(_SummaryGrid(overview: overview));
+  add(
+    _SummaryGrid(
+      overview: countedOverview,
+      includesSupplemental: supplementalTracks.isNotEmpty,
+    ),
+  );
   add(
     _OverviewAnalyticsPanel(
       overview: overview,
@@ -118,9 +142,16 @@ List<Widget> _overviewPanelItems(
       history: stats.snapshotHistory,
     ),
   );
-  add(_OverviewInsightPanel(overview: overview));
+  add(
+    _OverviewInsightPanel(overview: countedOverview, nativeOverview: overview),
+  );
   add(_SmartListsPanel(overview: overview));
-  add(_OverviewBreakdownPanel(overview: overview));
+  add(
+    _OverviewBreakdownPanel(
+      overview: countedOverview,
+      nativeOverview: overview,
+    ),
+  );
   add(
     AdBannerSlot(
       key: const ValueKey('overview-ad-slot'),
@@ -132,9 +163,17 @@ List<Widget> _overviewPanelItems(
 }
 
 class _OverviewPanel extends StatelessWidget {
-  const _OverviewPanel({required this.overview});
+  const _OverviewPanel({
+    required this.overview,
+    required this.nativeOverview,
+    this.supplementalPlayCount = 0,
+    this.undatedTrackCount = 0,
+  });
 
   final LibraryOverview overview;
+  final LibraryOverview nativeOverview;
+  final int supplementalPlayCount;
+  final int undatedTrackCount;
 
   @override
   Widget build(BuildContext context) {
@@ -142,9 +181,9 @@ class _OverviewPanel extends StatelessWidget {
     final topTrack = overview.topTracks.isEmpty
         ? null
         : overview.topTracks.first;
-    final skipRate = overview.totalPlayCount == 0
+    final skipRate = nativeOverview.totalPlayCount == 0
         ? 0.0
-        : overview.totalSkipCount / overview.totalPlayCount * 100;
+        : nativeOverview.totalSkipCount / nativeOverview.totalPlayCount * 100;
 
     return GlassSurface(
       padding: const EdgeInsets.all(20),
@@ -156,7 +195,7 @@ class _OverviewPanel extends StatelessWidget {
         builder: (context, constraints) {
           final signalTiles = _OverviewSignals(
             hours: _hoursLabel(overview.totalListeningSeconds),
-            skips: number.format(overview.totalSkipCount),
+            skips: number.format(nativeOverview.totalSkipCount),
             skipRate: '${skipRate.toStringAsFixed(1)}%',
           );
 
@@ -168,7 +207,12 @@ class _OverviewPanel extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
-                  child: _OverviewMain(overview: overview, topTrack: topTrack),
+                  child: _OverviewMain(
+                    overview: overview,
+                    topTrack: topTrack,
+                    supplementalPlayCount: supplementalPlayCount,
+                    undatedTrackCount: undatedTrackCount,
+                  ),
                 ),
                 const SizedBox(width: 20),
                 SizedBox(width: signalWidth, child: signalTiles),
@@ -179,7 +223,12 @@ class _OverviewPanel extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _OverviewMain(overview: overview, topTrack: topTrack),
+              _OverviewMain(
+                overview: overview,
+                topTrack: topTrack,
+                supplementalPlayCount: supplementalPlayCount,
+                undatedTrackCount: undatedTrackCount,
+              ),
               const SizedBox(height: 18),
               signalTiles,
             ],
@@ -191,9 +240,16 @@ class _OverviewPanel extends StatelessWidget {
 }
 
 class _OverviewMain extends StatelessWidget {
-  const _OverviewMain({required this.overview, required this.topTrack});
+  const _OverviewMain({
+    required this.overview,
+    required this.topTrack,
+    this.supplementalPlayCount = 0,
+    this.undatedTrackCount = 0,
+  });
 
   final LibraryOverview overview;
+  final int supplementalPlayCount;
+  final int undatedTrackCount;
   final RankingEntry? topTrack;
 
   @override
@@ -217,6 +273,7 @@ class _OverviewMain extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: Text(
             number.format(overview.totalPlayCount),
+            key: const ValueKey('overview-total-play-count'),
             style: theme.textTheme.headlineLarge?.copyWith(
               fontSize: 64,
               height: 0.94,
@@ -234,6 +291,13 @@ class _OverviewMain extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+        if (supplementalPlayCount > 0) ...[
+          const SizedBox(height: 8),
+          _LifetimeScopeCaption(
+            playCount: supplementalPlayCount,
+            undatedTrackCount: undatedTrackCount,
+          ),
+        ],
         if (topTrack != null) ...[
           const SizedBox(height: 18),
           _TopTrackLine(entry: topTrack!),
@@ -420,7 +484,7 @@ class _SignalTile extends StatelessWidget {
   }
 }
 
-class _SnapshotStatusPanel extends StatelessWidget {
+class _SnapshotStatusPanel extends ConsumerWidget {
   const _SnapshotStatusPanel({
     required this.history,
     required this.overview,
@@ -438,55 +502,66 @@ class _SnapshotStatusPanel extends StatelessWidget {
   final VoidCallback? onSync;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final number = _numberFormat(context);
     final latest = history.latest;
     final delta = history.latestDelta;
 
     if (latest == null) {
+      final hasDatedHistory =
+          !isDemo && ref.watch(countedSupplementalEventsProvider).isNotEmpty;
       return GlassSurface(
         padding: const EdgeInsets.all(18),
         radius: 24,
         tint: const Color(0x54FFFFFF),
         borderOpacity: 0.38,
         shadowOpacity: 0.05,
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.calendar_month_outlined,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _t(context, 'Daily listening records', '日々の聴取記録'),
-                    style: theme.textTheme.titleMedium,
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_month_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _t(context, 'Daily listening records', '日々の聴取記録'),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isDemo
+                            ? _t(
+                                context,
+                                'Available after iOS Music access is granted.',
+                                'iOSミュージックへのアクセス許可後に利用できます。',
+                              )
+                            : _t(
+                                context,
+                                'The first listening record will be saved after the next library update.',
+                                '次回のライブラリ更新後に最初の聴取記録を保存します。',
+                              ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    isDemo
-                        ? _t(
-                            context,
-                            'Available after iOS Music access is granted.',
-                            'iOSミュージックへのアクセス許可後に利用できます。',
-                          )
-                        : _t(
-                            context,
-                            'The first listening record will be saved after the next library update.',
-                            '次回のライブラリ更新後に最初の聴取記録を保存します。',
-                          ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
+            if (hasDatedHistory) ...[
+              const SizedBox(height: 12),
+              _SnapshotTrendChart(history: history),
+            ],
           ],
         ),
       );
@@ -876,13 +951,22 @@ class _SnapshotTrendChart extends ConsumerWidget {
         ? null
         : _t(
             context,
-            'As of $capturedAtLabel',
-            '$capturedAtLabel 時点',
-            zh: '截至 $capturedAtLabel',
-            ko: '$capturedAtLabel 기준',
+            'Library records as of $capturedAtLabel',
+            '登録曲の記録: $capturedAtLabel 時点',
+            zh: '资料库记录截至 $capturedAtLabel',
+            ko: '보관함 기록 기준 $capturedAtLabel',
           );
     final number = _numberFormat(context);
-    final values = _snapshotTrendValues(context, history);
+    final supplementalEvents = uncoveredListeningEvents(
+      history: history,
+      events: ref.watch(countedSupplementalEventsProvider),
+      dailyOnly: false,
+    );
+    final values = _snapshotTrendValues(
+      context,
+      history,
+      supplementalEvents: supplementalEvents,
+    );
     final maxPlayDelta = values.fold<int>(
       0,
       (current, value) => value.playDelta > current ? value.playDelta : current,
@@ -948,6 +1032,23 @@ class _SnapshotTrendChart extends ConsumerWidget {
                   ),
                 ),
               ),
+            if (supplementalEvents.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 26, top: 2),
+                child: Text(
+                  _t(
+                    context,
+                    'Includes confirmed history',
+                    '確認済み履歴を含む',
+                    zh: '包含已确认的播放记录',
+                    ko: '확인된 재생 기록 포함',
+                  ),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             if (values.isEmpty)
               Text(
@@ -966,6 +1067,7 @@ class _SnapshotTrendChart extends ConsumerWidget {
                 (value) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _SnapshotTrendBar(
+                    key: ValueKey('snapshot-trend-${value.label}'),
                     value: value,
                     maxPlayDelta: maxPlayDelta,
                     trailing: '+${number.format(value.playDelta)}',
@@ -981,6 +1083,7 @@ class _SnapshotTrendChart extends ConsumerWidget {
 
 class _SnapshotTrendBar extends StatelessWidget {
   const _SnapshotTrendBar({
+    super.key,
     required this.value,
     required this.maxPlayDelta,
     required this.trailing,
@@ -1120,9 +1223,13 @@ class _SnapshotDeltaRow extends StatelessWidget {
 }
 
 class _SummaryGrid extends StatelessWidget {
-  const _SummaryGrid({required this.overview});
+  const _SummaryGrid({
+    required this.overview,
+    this.includesSupplemental = false,
+  });
 
   final LibraryOverview overview;
+  final bool includesSupplemental;
 
   @override
   Widget build(BuildContext context) {
@@ -1137,11 +1244,19 @@ class _SummaryGrid extends StatelessWidget {
             : () => _showLibraryGroupListSheet(
                 context,
                 title: _t(context, 'Artists', 'アーティスト'),
-                subtitle: _t(
-                  context,
-                  'All artist groups in the current library',
-                  '現在のライブラリ内のアーティスト一覧',
-                ),
+                subtitle: includesSupplemental
+                    ? _t(
+                        context,
+                        'Included artists',
+                        '含まれるアーティスト',
+                        zh: '包含的艺人',
+                        ko: '포함된 아티스트',
+                      )
+                    : _t(
+                        context,
+                        'All artist groups in the current library',
+                        '現在のライブラリ内のアーティスト一覧',
+                      ),
                 icon: Icons.person_rounded,
                 groups: _libraryGroupsForMode(
                   context,
@@ -1160,11 +1275,19 @@ class _SummaryGrid extends StatelessWidget {
             : () => _showLibraryGroupListSheet(
                 context,
                 title: _t(context, 'Albums', 'アルバム'),
-                subtitle: _t(
-                  context,
-                  'All album groups in the current library',
-                  '現在のライブラリ内のアルバム一覧',
-                ),
+                subtitle: includesSupplemental
+                    ? _t(
+                        context,
+                        'Included albums',
+                        '含まれるアルバム',
+                        zh: '包含的专辑',
+                        ko: '포함된 앨범',
+                      )
+                    : _t(
+                        context,
+                        'All album groups in the current library',
+                        '現在のライブラリ内のアルバム一覧',
+                      ),
                 icon: Icons.album_rounded,
                 groups: _libraryGroupsForMode(
                   context,
@@ -1183,7 +1306,15 @@ class _SummaryGrid extends StatelessWidget {
             : () => _showTrackGroupSheet(
                 context,
                 title: _t(context, 'All songs', 'すべての曲'),
-                subtitle: _t(context, 'Library tracks', 'ライブラリ内の曲'),
+                subtitle: includesSupplemental
+                    ? _t(
+                        context,
+                        'Included songs',
+                        '含まれる曲',
+                        zh: '包含的歌曲',
+                        ko: '포함된 곡',
+                      )
+                    : _t(context, 'Library tracks', 'ライブラリ内の曲'),
                 icon: Icons.music_note_rounded,
                 tracks: _sortLibraryTracks(
                   overview.tracks,
@@ -1304,6 +1435,88 @@ class _SummaryCard extends StatelessWidget {
       color: Colors.transparent,
       borderRadius: radius,
       child: InkWell(borderRadius: radius, onTap: value.onTap, child: content),
+    );
+  }
+}
+
+class _LifetimeScopeCaption extends StatelessWidget {
+  const _LifetimeScopeCaption({
+    required this.playCount,
+    required this.undatedTrackCount,
+  });
+  final int playCount;
+  final int undatedTrackCount;
+  @override
+  Widget build(BuildContext context) {
+    final count = _numberFormat(context).format(playCount);
+    final undated = _numberFormat(context).format(undatedTrackCount);
+    return Text(
+      [
+        _t(
+          context,
+          'Includes at least $count plays confirmed from history; listening time is estimated from song duration. Skip metrics use registered library only.',
+          '履歴から確認できた再生$count回以上を含みます。再生時間は曲の長さから推定し、スキップ指標は登録済みライブラリのみです。',
+          zh: '包含从历史记录确认的至少$count次播放；聆听时长按歌曲时长估算。跳过指标仅统计已登记曲库。',
+          ko: '기록에서 확인된 재생을 최소 $count회 포함합니다. 감상 시간은 곡 길이로 추정하며 건너뛰기 지표는 등록된 보관함만 집계합니다.',
+        ),
+        if (undatedTrackCount > 0)
+          _t(
+            context,
+            '$undated outside-library ${undatedTrackCount == 1 ? 'track has' : 'tracks have'} unknown play times',
+            'ライブラリ外の$undated曲は再生日不明',
+            zh: '$undated首资料库外歌曲的播放时间未知',
+            ko: '보관함 외 곡 $undated곡의 재생 시각을 알 수 없습니다',
+          ),
+      ].join(' · '),
+      key: const ValueKey('supplemental-count-caption'),
+      style: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+    );
+  }
+}
+
+class _SupplementalCountCaption extends StatelessWidget {
+  const _SupplementalCountCaption({
+    required this.playCount,
+    required this.undatedTrackCount,
+  });
+
+  final int playCount;
+  final int undatedTrackCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = _numberFormat(context).format(playCount);
+    final undated = _numberFormat(context).format(undatedTrackCount);
+    return Text(
+      [
+        _t(
+          context,
+          'Includes at least $count plays confirmed from history',
+          '履歴から確認できた再生$count回以上を含む',
+          zh: '包含从历史记录确认的至少$count次播放',
+          ko: '기록에서 확인된 재생 최소 $count회 포함',
+        ),
+        if (playCount > undatedTrackCount)
+          _t(
+            context,
+            'Dated outside-library plays are included in the calendar',
+            '日時を確認できたライブラリ外の再生履歴はカレンダーに含みます',
+            zh: '日期已确认的资料库外播放记录已计入日历',
+            ko: '날짜를 확인한 보관함 외 재생 기록은 캘린더에 포함됩니다',
+          ),
+        if (undatedTrackCount > 0)
+          _t(
+            context,
+            '$undated outside-library ${undatedTrackCount == 1 ? 'track has' : 'tracks have'} unknown play times',
+            'ライブラリ外の$undated曲は再生日不明',
+            zh: '$undated首资料库外歌曲的播放时间未知',
+            ko: '보관함 외 곡 $undated곡의 재생 시각을 알 수 없습니다',
+          ),
+      ].join(' · '),
+      key: const ValueKey('supplemental-count-caption'),
+      style: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
     );
   }
 }

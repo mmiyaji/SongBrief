@@ -27,7 +27,6 @@ class _DataManagementSetting extends ConsumerWidget {
         const SizedBox(height: 10),
         _SnapshotCloudSyncSetting(
           enabled: ref.watch(snapshotCloudSyncProvider),
-          recordingEnabled: snapshotRecordingEnabled,
         ),
         const SizedBox(height: 10),
         _SnapshotBackgroundRefreshSetting(
@@ -78,17 +77,13 @@ class _DataManagementSetting extends ConsumerWidget {
 }
 
 class _SnapshotCloudSyncSetting extends ConsumerWidget {
-  const _SnapshotCloudSyncSetting({
-    required this.enabled,
-    required this.recordingEnabled,
-  });
+  const _SnapshotCloudSyncSetting({required this.enabled});
 
   final bool enabled;
-  final bool recordingEnabled;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final active = enabled && recordingEnabled;
+    final active = enabled;
     return _SettingsSwitchCard(
       icon: Icons.cloud_sync_rounded,
       title: _t(
@@ -101,10 +96,10 @@ class _SnapshotCloudSyncSetting extends ConsumerWidget {
       description: active
           ? _t(
               context,
-              'Daily records merge across devices on the same Apple ID.',
-              '同じApple IDの端末間で日々の記録を統合します。',
-              zh: '在使用同一Apple ID的设备之间合并每日记录。',
-              ko: '동일한 Apple ID의 기기 간에 일일 기록을 병합합니다.',
+              'Listening records, including confirmed plays outside your library, merge across devices on the same Apple ID.',
+              'ライブラリ外で確認した再生履歴も含め、同じApple IDの端末間で聴取記録を統合します。',
+              zh: '在使用同一Apple ID的设备之间合并聆听记录，包括资料库外已确认的播放记录。',
+              ko: '보관함 외에서 확인된 재생 기록도 포함하여 동일한 Apple ID의 기기 간에 청취 기록을 병합합니다.',
             )
           : _t(
               context,
@@ -114,11 +109,9 @@ class _SnapshotCloudSyncSetting extends ConsumerWidget {
               ko: '기록은 이 기기에만 저장됩니다.',
             ),
       value: enabled,
-      onChanged: recordingEnabled
-          ? (value) {
-              ref.read(snapshotCloudSyncProvider.notifier).setEnabled(value);
-            }
-          : null,
+      onChanged: (value) {
+        ref.read(snapshotCloudSyncProvider.notifier).setEnabled(value);
+      },
     );
   }
 }
@@ -506,9 +499,8 @@ String _snapshotBackgroundSummaryLabel(
           ko: '아직 백그라운드 기록 없음',
         );
       }
-      final lastSuccess = _dateTimeFormat(
-        context,
-      ).format(value.lastSuccessfulCaptureAt!.toLocal());
+      final lastSuccess = _dateTimeFormat(context)
+          .format(value.lastSuccessfulCaptureAt!.toLocal());
       return _t(
         context,
         'Last recorded $lastSuccess',

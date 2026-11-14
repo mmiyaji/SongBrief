@@ -718,11 +718,8 @@ List<TrackCounterSnapshot> _mergeTrackCounters(
       }
       return a.id.compareTo(b.id);
     });
-  final compacted = ranked.length > maxSnapshotTrackCounters
-      ? ranked.sublist(0, maxSnapshotTrackCounters)
-      : ranked;
-  compacted.sort((a, b) => a.id.compareTo(b.id));
-  return compacted;
+  ranked.sort((a, b) => a.id.compareTo(b.id));
+  return ranked;
 }
 
 DateTime? _latestDate(DateTime? a, DateTime? b) {

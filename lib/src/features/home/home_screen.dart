@@ -15,9 +15,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../domain/apple_music_link.dart';
 import '../../domain/library_overview.dart';
 import '../../domain/library_snapshot.dart';
+import '../../domain/listening_activity.dart';
 import '../../domain/library_track.dart';
 import '../../domain/music_library_authorization.dart';
 import '../../domain/music_stats_state.dart';
+import '../../domain/supplemental_listening_history.dart';
 import '../../analytics/crash_reporting.dart';
 import '../../data/music_library_channel.dart';
 import '../../export/library_exporter.dart';
@@ -29,8 +31,11 @@ import '../../settings/app_preferences.dart';
 import '../../settings/demo_library_preferences.dart';
 import '../../settings/library_filter_preferences.dart';
 import '../../settings/snapshot_preferences.dart';
+import '../../settings/supplemental_history_preferences.dart';
 import '../../theme/app_theme.dart';
 import 'home_controller.dart';
+import 'counted_listening_provider.dart';
+import 'recent_listening_provider.dart';
 import 'widgets/glass_surface.dart';
 
 part 'parts/playing_section.dart';
@@ -477,21 +482,29 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   DateTime? _lastResumeRefreshAt;
+  late final ForegroundLibraryRefresh _foregroundRefresh;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _foregroundRefresh = ref.read(foregroundLibraryRefreshProvider);
+    _foregroundRefresh.setForeground(
+      WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
+    );
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _foregroundRefresh.setForeground(false);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foregroundRefresh.setForeground(state == AppLifecycleState.resumed);
     if (state != AppLifecycleState.resumed) {
       return;
     }
@@ -500,7 +513,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final now = DateTime.now();
     final lastRefresh = _lastResumeRefreshAt;
     if (lastRefresh != null &&
-        now.difference(lastRefresh) < const Duration(minutes: 15)) {
+        now.difference(lastRefresh) < const Duration(minutes: 1)) {
       return;
     }
     _lastResumeRefreshAt = now;
@@ -619,7 +632,7 @@ class _MobilePlaybackChrome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final playback = ref.watch(playbackControllerProvider);
-    final activeTrack = stats.overview.trackById(playback.activeTrackId);
+    final activeTrack = _playbackTrack(stats.overview, playback);
     final track = activeTrack ?? stats.overview.latestTrack;
     final isLight = theme.colorScheme.brightness == Brightness.light;
     return SafeArea(
@@ -685,8 +698,8 @@ class _MiniPlayerBar extends ConsumerWidget {
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final playback = ref.watch(playbackControllerProvider);
     final busy = playback.isBusy;
-    final isActive = playback.isTrackActive(track.id);
-    final isPlaying = playback.isTrackPlaying(track.id);
+    final isActive = playback.isTrackActive(track.id, track: track);
+    final isPlaying = playback.isTrackPlaying(track.id, track: track);
     final isLight = theme.colorScheme.brightness == Brightness.light;
     final barColor = isLight
         ? theme.colorScheme.surfaceContainerHighest
@@ -848,8 +861,7 @@ class _SideTabs extends ConsumerWidget {
     final extended = width >= 980;
     final playback = ref.watch(playbackControllerProvider);
     final track =
-        stats.overview.trackById(playback.activeTrackId) ??
-        stats.overview.latestTrack;
+        _playbackTrack(stats.overview, playback) ?? stats.overview.latestTrack;
     final artwork = track == null
         ? null
         : ref.watch(trackArtworkProvider(track.id));
@@ -898,7 +910,7 @@ class _SideTabs extends ConsumerWidget {
                 track: track,
                 artwork: artwork,
                 extended: extended,
-                isPlaying: playback.isTrackPlaying(track.id),
+                isPlaying: playback.isTrackPlaying(track.id, track: track),
                 onTap: () => ref
                     .read(homeSectionProvider.notifier)
                     .setSection(HomeSection.playing),
@@ -1091,30 +1103,77 @@ class _StatsContent extends ConsumerWidget {
   }
 }
 
-class _SectionBody extends StatelessWidget {
+class _SectionBody extends ConsumerWidget {
   const _SectionBody({required this.stats, required this.selectedSection});
 
   final MusicStatsState stats;
   final HomeSection selectedSection;
 
   @override
-  Widget build(BuildContext context) {
-    final overview = stats.overview;
-
+  Widget build(BuildContext context, WidgetRef ref) {
     return switch (selectedSection) {
       HomeSection.playing => _NowPlayingSection(stats: stats),
       HomeSection.overview => _OverviewSection(stats: stats),
-      HomeSection.rankings =>
-        overview.hasTracks
-            ? _RankingPanel(
-                overview: overview,
-                history: stats.snapshotHistory,
-                snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
-              )
-            : const _EmptyLibraryPanel(),
-      HomeSection.library => _LibrarySection(overview: overview),
-      HomeSection.settings => _SettingsSection(stats: stats),
+      HomeSection.rankings => _buildRankings(context, ref),
+      HomeSection.library => _LibrarySection(
+        overview: ref.watch(libraryRecentOverviewProvider),
+        songsOverview: ref.watch(libraryBrowsingOverviewProvider),
+        supplementalTrackIds: {
+          for (final track in ref.watch(librarySupplementalTracksProvider))
+            track.id,
+        },
+      ),
+      // Lets the 20px icons of plain switch rows keep their text on the same
+      // column as _SettingsRow instead of the default 24px leading slot.
+      HomeSection.settings => ListTileTheme.merge(
+        minLeadingWidth: 20,
+        child: _SettingsSection(stats: stats),
+      ),
     };
+  }
+
+  Widget _buildRankings(BuildContext context, WidgetRef ref) {
+    final countedOverview =
+        ref.watch(rankingScopeProvider) == RankingScope.recent
+        ? ref.watch(libraryBrowsingOverviewProvider)
+        : ref.watch(countedListeningOverviewProvider);
+    final supplementalTracks = ref.watch(countedOutsideTracksProvider);
+    if (!countedOverview.hasTracks) return const _EmptyLibraryPanel();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (supplementalTracks.isNotEmpty) ...[
+          _SupplementalCountCaption(
+            playCount: supplementalTracks.fold<int>(
+              0,
+              (sum, track) => sum + track.playCount,
+            ),
+            undatedTrackCount: ref.watch(supplementalUndatedTrackCountProvider),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _t(
+              context,
+              'Lifetime totals include supplemental plays; period rankings use library records only.',
+              '累計には補完再生を含みます。期間別ランキングはライブラリの記録のみです。',
+              zh: '累计播放包含补充记录；期间排名仅使用媒体库记录。',
+              ko: '누적에는 보완 재생이 포함되며, 기간별 순위는 보관함 기록만 사용합니다.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        _RankingPanel(
+          overview: countedOverview,
+          snapshotOverview: stats.overview,
+          history: stats.snapshotHistory,
+          snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
+        ),
+      ],
+    );
   }
 }
 

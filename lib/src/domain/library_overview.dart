@@ -294,6 +294,157 @@ class LibraryOverview {
     );
   }
 
+  /// Adds outside-library counts while retaining native search text, ranking
+  /// entries and unaffected group indexes. Only supplemental songs are indexed
+  /// and sorted from scratch; sorted native lists are merged in linear time.
+  LibraryOverview withSupplementalTracks(List<LibraryTrack> supplemental) {
+    final seen = <String>{};
+    final additions = [
+      for (final track in supplemental)
+        if (!_tracksById.containsKey(track.id) && seen.add(track.id)) track,
+    ];
+    if (additions.isEmpty) return this;
+    final extra = LibraryOverview.fromTracks(additions, isDemo: isDemo);
+    final byId = Map<String, LibraryTrack>.unmodifiable({
+      ..._tracksById,
+      ...extra._tracksById,
+    });
+    final artists = _mergeTrackIndexes(_tracksByArtist, extra._tracksByArtist);
+    final albums = _mergeTrackIndexes(_tracksByAlbum, extra._tracksByAlbum);
+    return LibraryOverview(
+      tracks: List.unmodifiable([...tracks, ...extra.tracks]),
+      topTracks: _mergeSorted(
+        topTracks,
+        extra.topTracks,
+        (a, b) => _rankTracksByPlays(
+          byId[a.representativeTrackId]!,
+          byId[b.representativeTrackId]!,
+        ),
+      ),
+      topArtists: _mergeGroupRankings(
+        topArtists,
+        extra.topArtists,
+        artists,
+        byId,
+      ),
+      topAlbums: _mergeGroupRankings(topAlbums, extra.topAlbums, albums, byId),
+      recentTracks: _mergeSorted(
+        recentTracks,
+        extra.recentTracks,
+        (a, b) => _compareTrackRecentDesc(
+          byId[a.representativeTrackId]!,
+          byId[b.representativeTrackId]!,
+        ),
+      ),
+      recentTrackDetails: _mergeSorted(
+        recentTrackDetails,
+        extra.recentTrackDetails,
+        _compareTrackRecentDesc,
+      ),
+      totalPlayCount: totalPlayCount + extra.totalPlayCount,
+      totalSkipCount: totalSkipCount + extra.totalSkipCount,
+      totalListeningSeconds:
+          totalListeningSeconds + extra.totalListeningSeconds,
+      totalArtists: artists.length,
+      totalAlbums: albums.length,
+      generatedAt: DateTime.now(),
+      isDemo: isDemo,
+      tracksById: byId,
+      tracksByArtist: artists,
+      tracksByAlbumArtist: _mergeTrackIndexes(
+        _tracksByAlbumArtist,
+        extra._tracksByAlbumArtist,
+      ),
+      tracksByAlbum: albums,
+      tracksByGenre: _mergeTrackIndexes(_tracksByGenre, extra._tracksByGenre),
+      tracksByPlaylist: _mergeTrackIndexes(
+        _tracksByPlaylist,
+        extra._tracksByPlaylist,
+      ),
+      searchTexts: List.unmodifiable([..._searchTexts, ...extra._searchTexts]),
+      tracksByRecent: _mergeSorted(
+        tracksByRecent,
+        extra.tracksByRecent,
+        _compareTrackRecentDesc,
+      ),
+      tracksByPlayCount: _mergeSorted(
+        tracksByPlayCount,
+        extra.tracksByPlayCount,
+        _rankTracksByPlays,
+      ),
+      tracksBySkipCount: _mergeSorted(
+        tracksBySkipCount,
+        extra.tracksBySkipCount,
+        _rankTracksBySkips,
+      ),
+      tracksByTitle: _mergeSorted(
+        tracksByTitle,
+        extra.tracksByTitle,
+        _compareTrackTitle,
+      ),
+    );
+  }
+
+  static Map<String, List<LibraryTrack>> _mergeTrackIndexes(
+    Map<String, List<LibraryTrack>> native,
+    Map<String, List<LibraryTrack>> extra,
+  ) {
+    final result = {...native};
+    for (final entry in extra.entries) {
+      final original = native[entry.key];
+      result[entry.key] = original == null
+          ? entry.value
+          : _mergeSorted(original, entry.value, _rankTracksByPlays);
+    }
+    return Map.unmodifiable(result);
+  }
+
+  static List<RankingEntry> _mergeGroupRankings(
+    List<RankingEntry> native,
+    List<RankingEntry> extra,
+    Map<String, List<LibraryTrack>> groups,
+    Map<String, LibraryTrack> byId,
+  ) {
+    final pending = {for (final entry in extra) entry.title: entry};
+    final unchanged = <RankingEntry>[];
+    final changed = <RankingEntry>[];
+    for (final original in native) {
+      final addition = pending.remove(original.title);
+      if (addition == null) {
+        unchanged.add(original);
+        continue;
+      }
+      final originalTrack = byId[original.representativeTrackId]!;
+      final extraTrack = byId[addition.representativeTrackId]!;
+      final useExtra =
+          extraTrack.playCount > originalTrack.playCount ||
+          (extraTrack.playCount == originalTrack.playCount &&
+              extraTrack.listeningSeconds > originalTrack.listeningSeconds);
+      final oldDate = original.lastPlayedAt;
+      final extraDate = addition.lastPlayedAt;
+      changed.add(
+        RankingEntry(
+          title: original.title,
+          subtitle: '${groups[original.title]!.length} tracks',
+          playCount: original.playCount + addition.playCount,
+          skipCount: original.skipCount + addition.skipCount,
+          listeningSeconds:
+              original.listeningSeconds + addition.listeningSeconds,
+          kind: original.kind,
+          representativeTrackId: useExtra ? extraTrack.id : originalTrack.id,
+          lastPlayedAt:
+              oldDate == null ||
+                  (extraDate != null && extraDate.isAfter(oldDate))
+              ? extraDate
+              : oldDate,
+        ),
+      );
+    }
+    changed.addAll(pending.values);
+    changed.sort(_rankByPlays);
+    return _mergeSorted(unchanged, changed, _rankByPlays);
+  }
+
   static int _rankByPlays(RankingEntry a, RankingEntry b) {
     final byPlays = b.playCount.compareTo(a.playCount);
     if (byPlays != 0) {
@@ -334,6 +485,24 @@ class LibraryOverview {
         ),
     });
   }
+}
+
+List<T> _mergeSorted<T>(List<T> native, List<T> extra, Comparator<T> compare) {
+  if (extra.isEmpty) return List.unmodifiable(native);
+  if (native.isEmpty) return List.unmodifiable(extra);
+  final result = <T>[];
+  var left = 0;
+  var right = 0;
+  while (left < native.length && right < extra.length) {
+    if (compare(native[left], extra[right]) <= 0) {
+      result.add(native[left++]);
+    } else {
+      result.add(extra[right++]);
+    }
+  }
+  result.addAll(native.getRange(left, native.length));
+  result.addAll(extra.getRange(right, extra.length));
+  return List.unmodifiable(result);
 }
 
 String _trackSearchText(LibraryTrack track) {

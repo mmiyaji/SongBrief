@@ -45,7 +45,13 @@ abstract class MusicLibraryClient {
   Future<SnapshotSyncResult> deleteCloudSnapshots({String? olderThanDateKey});
 }
 
-class PlatformMusicLibraryClient implements MusicLibraryClient {
+/// Optional capability, so older and test clients remain compatible.
+abstract interface class RecentlyPlayedMusicLibraryClient {
+  Future<List<LibraryTrack>> fetchRecentlyPlayedTracks();
+}
+
+class PlatformMusicLibraryClient
+    implements MusicLibraryClient, RecentlyPlayedMusicLibraryClient {
   const PlatformMusicLibraryClient();
 
   static const MethodChannel _channel = MethodChannel(
@@ -78,6 +84,18 @@ class PlatformMusicLibraryClient implements MusicLibraryClient {
     return (rawTracks ?? const <Object?>[])
         .whereType<Map<Object?, Object?>>()
         .map(LibraryTrack.fromPlatformMap)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<LibraryTrack>> fetchRecentlyPlayedTracks() async {
+    final rawTracks = await _channel.invokeMethod<List<Object?>>(
+      'fetchRecentlyPlayedTracks',
+    );
+    return (rawTracks ?? const <Object?>[])
+        .whereType<Map<Object?, Object?>>()
+        .map(LibraryTrack.fromPlatformMap)
+        .map((track) => track.copyWith(playCount: 0, skipCount: 0))
         .toList(growable: false);
   }
 
@@ -397,10 +415,18 @@ class SnapshotSyncResult {
 }
 
 class MusicPlaybackSnapshot {
-  const MusicPlaybackSnapshot({this.trackId, required this.isPlaying});
+  const MusicPlaybackSnapshot({
+    this.trackId,
+    required this.isPlaying,
+    this.track,
+  });
 
   final String? trackId;
   final bool isPlaying;
+
+  /// The player's own description of the current song, which also covers
+  /// songs streamed from Apple Music that are not in the library.
+  final LibraryTrack? track;
 
   static MusicPlaybackSnapshot? fromPlatformValue(Object? value) {
     if (value is! Map) {
@@ -411,9 +437,34 @@ class MusicPlaybackSnapshot {
     final trackId = rawTrackId is String && rawTrackId.trim().isNotEmpty
         ? rawTrackId.trim()
         : null;
+    final rawTitle = value['title'];
+    final title = rawTitle is String ? rawTitle.trim() : '';
+    final rawArtist = value['artist'];
+    final artist = rawArtist is String ? rawArtist.trim() : '';
+    final rawAlbum = value['albumTitle'];
+    final rawDuration = value['durationSeconds'];
     return MusicPlaybackSnapshot(
       trackId: trackId,
       isPlaying: value['isPlaying'] == true,
+      track: title.isEmpty
+          ? null
+          : LibraryTrack(
+              id: trackId ?? 'now-playing:$title|$artist',
+              appleMusicStoreId: value['appleMusicStoreId'] is String
+                  ? validAppleMusicCatalogId(
+                      value['appleMusicStoreId'] as String,
+                    )
+                  : null,
+              title: title,
+              artist: artist.isEmpty ? 'Unknown Artist' : artist,
+              albumTitle: rawAlbum is String && rawAlbum.trim().isNotEmpty
+                  ? rawAlbum.trim()
+                  : 'Unknown Album',
+              duration: Duration(seconds: rawDuration is int ? rawDuration : 0),
+              playCount: 0,
+              skipCount: 0,
+              isCloudItem: true,
+            ),
     );
   }
 }

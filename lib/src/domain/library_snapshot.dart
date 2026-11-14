@@ -7,7 +7,6 @@ const legacyLibrarySnapshotPreferencesKeys = [
   'songbrief_daily_snapshots_v1',
   'songbrief_daily_snapshots_v2',
 ];
-const maxSnapshotTrackCounters = 500;
 const detailedSnapshotHistoryEntries = 400;
 
 class TrackCounterSnapshot {
@@ -288,23 +287,8 @@ class SnapshotHistory {
 
 List<TrackCounterSnapshot> _snapshotTrackCounters(LibraryOverview overview) {
   final selected = <String, LibraryTrack>{};
-
-  void addTracks(Iterable<LibraryTrack> tracks, int limit) {
-    var added = 0;
-    for (final track in tracks) {
-      selected.putIfAbsent(track.id, () => track);
-      added += 1;
-      if (added >= limit || selected.length >= maxSnapshotTrackCounters) {
-        return;
-      }
-    }
-  }
-
-  addTracks(overview.tracksByPlayCount, 260);
-  addTracks(overview.recentTrackDetails, 160);
-  addTracks(overview.tracksBySkipCount, 80);
-  if (selected.length < maxSnapshotTrackCounters) {
-    addTracks(overview.tracksByTitle, maxSnapshotTrackCounters);
+  for (final track in overview.tracks) {
+    selected.putIfAbsent(track.id, () => track);
   }
 
   final tracks =
@@ -330,7 +314,11 @@ List<TrackCounterSnapshot> _compactTrackCounters(
       }
       return a.id.compareTo(b.id);
     });
-  final compacted = sorted.take(maxSnapshotTrackCounters).toList()
+  final byId = <String, TrackCounterSnapshot>{};
+  for (final track in sorted) {
+    byId.putIfAbsent(track.id, () => track);
+  }
+  final compacted = byId.values.toList()
     ..sort((a, b) => a.id.compareTo(b.id));
   return compacted;
 }
@@ -429,6 +417,7 @@ class TrackCounterDelta {
     required this.title,
     required this.artist,
     required this.albumTitle,
+    this.albumArtist,
     required this.playDelta,
     required this.skipDelta,
     required this.listeningSecondsDelta,
@@ -438,6 +427,7 @@ class TrackCounterDelta {
   final String title;
   final String artist;
   final String albumTitle;
+  final String? albumArtist;
   final int playDelta;
   final int skipDelta;
   final int listeningSecondsDelta;
@@ -451,6 +441,7 @@ class TrackCounterDelta {
       title: current.title,
       artist: current.artist,
       albumTitle: current.albumTitle,
+      albumArtist: current.albumArtist,
       playDelta: _positiveDelta(current.playCount, previous.playCount),
       skipDelta: _positiveDelta(current.skipCount, previous.skipCount),
       listeningSecondsDelta: _positiveDelta(
@@ -466,6 +457,7 @@ class TrackCounterDelta {
       title: title,
       artist: artist,
       albumTitle: albumTitle,
+      albumArtist: albumArtist ?? other.albumArtist,
       playDelta: playDelta + other.playDelta,
       skipDelta: skipDelta + other.skipDelta,
       listeningSecondsDelta:

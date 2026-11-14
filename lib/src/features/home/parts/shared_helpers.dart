@@ -255,7 +255,15 @@ class _RankingRow extends ConsumerWidget {
     final artwork = track == null
         ? const AsyncData<Uint8List?>(null)
         : ref.watch(trackArtworkProvider(track.id));
-    final onTap = _rankingEntryTapHandler(context, overview, entry, track);
+    final nativeOverview = ref
+        .watch(musicStatsControllerProvider)
+        .asData
+        ?.value
+        .overview;
+    final nativeTrack = nativeOverview?.trackById(entry.representativeTrackId);
+    final onTap = nativeOverview == null
+        ? null
+        : _rankingEntryTapHandler(context, nativeOverview, entry, nativeTrack);
 
     return Padding(
       key: rowKey,
@@ -321,9 +329,15 @@ class _RankingRow extends ConsumerWidget {
                           const SizedBox(height: 2),
                           Text(
                             showLastPlayedAt && entry.lastPlayedAt != null
-                                ? _dateTimeFormat(
-                                    context,
-                                  ).format(entry.lastPlayedAt!)
+                                ? track?.lastPlayedAtIsObservation == true
+                                      ? _shortPlayedAtLabel(
+                                          context,
+                                          entry.lastPlayedAt,
+                                          isObservation: true,
+                                        )
+                                      : _dateTimeFormat(
+                                          context,
+                                        ).format(entry.lastPlayedAt!.toLocal())
                                 : entry.subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1453,32 +1467,43 @@ String _normalizeSearchText(String value) {
 
 List<_SnapshotTrendValue> _snapshotTrendValues(
   BuildContext context,
-  SnapshotHistory history,
-) {
+  SnapshotHistory history, {
+  List<SupplementalListeningEvent> supplementalEvents = const [],
+}) {
   final snapshots = history.snapshots;
-  if (snapshots.length < 2) {
-    return const [];
-  }
-
-  final start = _clampInt(snapshots.length - 8, 1, snapshots.length - 1);
   final dateFormat = DateFormat.Md(_localeName(context));
-  final values = <_SnapshotTrendValue>[];
+  final valuesByDay = <String, _SnapshotTrendValue>{};
+  final start = snapshots.length < 2
+      ? snapshots.length
+      : _clampInt(snapshots.length - 8, 1, snapshots.length - 1);
   for (var index = start; index < snapshots.length; index++) {
-    final delta = SnapshotDelta.compare(
+    final delta = listeningActivityDelta(
       previous: snapshots[index - 1],
       current: snapshots[index],
     );
     if (delta == null) {
       continue;
     }
-    values.add(
-      _SnapshotTrendValue.fromDelta(
-        label: dateFormat.format(snapshots[index].capturedAt),
-        delta: delta,
-      ),
+    valuesByDay[snapshotDateKey(snapshots[index].capturedAt)] =
+        _SnapshotTrendValue.fromDelta(
+          label: dateFormat.format(snapshots[index].capturedAt),
+          delta: delta,
+        );
+  }
+  for (final event in supplementalEvents) {
+    final date = event.playedAt.toLocal();
+    final key = snapshotDateKey(date);
+    final current = valuesByDay[key];
+    valuesByDay[key] = _SnapshotTrendValue(
+      label: dateFormat.format(date),
+      playDelta: (current?.playDelta ?? 0) + 1,
+      skipDelta: current?.skipDelta ?? 0,
     );
   }
-  return List.unmodifiable(values);
+  final values = valuesByDay.entries.toList()
+    ..sort((a, b) => a.key.compareTo(b.key));
+  final recent = values.reversed.take(8).toList().reversed;
+  return List.unmodifiable(recent.map((entry) => entry.value));
 }
 
 class _SnapshotTrendValue {
@@ -1820,11 +1845,95 @@ class _ActivityHeatmapDay {
     required this.date,
     required this.playCount,
     this.trackDeltas = const [],
+    this.hasRecord = false,
+    this.estimated = false,
+    this.observationPlayCount = 0,
   });
 
   final DateTime date;
   final int playCount;
   final List<TrackCounterDelta> trackDeltas;
+  final bool hasRecord;
+  final bool estimated;
+
+  /// Supplemental minimums recorded on this day, whose playback date is unknown.
+  final int observationPlayCount;
+}
+
+class _ActivityCalendarEntry {
+  const _ActivityCalendarEntry({
+    required this.track,
+    required this.label,
+    required this.playCount,
+  });
+
+  final TrackCounterDelta track;
+  final String label;
+  final int playCount;
+}
+
+/// What a listening calendar day is ranked by; each shows the cover of the
+/// most-played song within the winning group.
+enum _ActivityCalendarMode { song, album, artist }
+
+_ActivityCalendarEntry? _activityCalendarEntry(
+  _ActivityHeatmapDay day, {
+  required _ActivityCalendarMode mode,
+  LibraryOverview? overview,
+}) {
+  if (!day.hasRecord) return null;
+  // Already merged per track and sorted by _activityHeatmapDays.
+  final tracks = day.trackDeltas;
+  if (tracks.isEmpty) return null;
+  if (mode == _ActivityCalendarMode.song) {
+    final track = tracks.first;
+    return _ActivityCalendarEntry(
+      track: track,
+      label: track.title,
+      playCount: track.playDelta,
+    );
+  }
+
+  String normalize(String value) =>
+      value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+  // Prefer the album artist recorded with the historical snapshot. Older
+  // snapshots may omit it, so fall back to today's library metadata.
+  String albumArtist(TrackCounterDelta track) {
+    final recordedName = track.albumArtist?.trim();
+    if (recordedName != null && recordedName.isNotEmpty) return recordedName;
+    final libraryTrack = overview == null
+        ? null
+        : _libraryTracksForDelta(overview, track).firstOrNull;
+    final name = libraryTrack?.albumArtist?.trim();
+    return name == null || name.isEmpty ? track.artist : name;
+  }
+
+  // Aggregate before choosing a winner: a group's many less-played songs can
+  // exceed the group of the most-played individual track.
+  final groups = <String, List<TrackCounterDelta>>{};
+  for (final track in tracks) {
+    final key = mode == _ActivityCalendarMode.artist
+        ? normalize(track.artist)
+        : '${normalize(track.albumTitle)}\u{1f}${normalize(albumArtist(track))}';
+    groups.putIfAbsent(key, () => []).add(track);
+  }
+  final entries =
+      groups.values.map((songs) {
+        final representative = songs.first;
+        return _ActivityCalendarEntry(
+          track: representative,
+          label: mode == _ActivityCalendarMode.artist
+              ? representative.artist
+              : representative.albumTitle,
+          playCount: songs.fold<int>(0, (sum, song) => sum + song.playDelta),
+        );
+      }).toList()..sort((a, b) {
+        final byPlays = b.playCount.compareTo(a.playCount);
+        if (byPlays != 0) return byPlays;
+        final byName = a.label.toLowerCase().compareTo(b.label.toLowerCase());
+        return byName != 0 ? byName : a.track.id.compareTo(b.track.id);
+      });
+  return entries.first;
 }
 
 class _ActivityHeatmapSummary {
@@ -1933,9 +2042,24 @@ String _playedAtLabel(BuildContext context, DateTime? dateTime) {
   return _dateTimeFormat(context).format(dateTime);
 }
 
-String _shortPlayedAtLabel(BuildContext context, DateTime? dateTime) {
+String _shortPlayedAtLabel(
+  BuildContext context,
+  DateTime? dateTime, {
+  bool isObservation = false,
+}) {
   if (dateTime == null) {
     return _t(context, 'None', 'なし');
+  }
+  dateTime = dateTime.toLocal();
+  if (isObservation) {
+    final date = DateFormat('M/d').format(dateTime);
+    return _t(
+      context,
+      '$date Observed',
+      '$date 記録確認',
+      zh: '$date 记录确认',
+      ko: '$date 기록 확인',
+    );
   }
   final now = DateTime.now();
   if (dateTime.year == now.year &&
@@ -2120,16 +2244,19 @@ List<Color> _analysisPalette(ThemeData theme) {
 List<_ActivityHeatmapDay> _activityHeatmapDays({
   required LibraryOverview overview,
   required SnapshotHistory history,
+  List<SupplementalListeningEvent> supplementalEvents = const [],
+  List<ListeningEventRelocation> relocations = const [],
 }) {
   final today = _localDateOnly(DateTime.now());
-  final rawStart = today.subtract(const Duration(days: 83));
+  final rawStart = DateTime(today.year, today.month, today.day - 83);
   final start = _mondayOfWeek(rawStart);
   final valuesByDay = <String, int>{};
+  final observationValuesByDay = <String, int>{};
   final trackDeltasByDay = <String, List<TrackCounterDelta>>{};
 
   if (history.snapshots.length >= 2) {
     for (var index = 1; index < history.snapshots.length; index++) {
-      final delta = SnapshotDelta.compare(
+      final delta = listeningActivityDelta(
         previous: history.snapshots[index - 1],
         current: history.snapshots[index],
       );
@@ -2144,7 +2271,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
             .addAll(delta.trackDeltas);
       }
     }
-  } else {
+  } else if (overview.isDemo) {
     for (final track in overview.tracks) {
       final playedAt = track.lastPlayedAt;
       if (playedAt == null) {
@@ -2165,6 +2292,7 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
               title: track.title,
               artist: track.artist,
               albumTitle: track.albumTitle,
+              albumArtist: track.albumArtist,
               playDelta: estimatedPlays,
               skipDelta: 0,
               listeningSecondsDelta: track.duration.inSeconds * estimatedPlays,
@@ -2173,11 +2301,71 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
     }
   }
 
+  for (final relocation in relocations) {
+    final sourceKey = snapshotDateKey(relocation.nativeCapturedAt);
+    final nativeTrackDeltas = trackDeltasByDay[sourceKey];
+    if (nativeTrackDeltas == null) continue;
+    final index = nativeTrackDeltas.indexWhere(
+      (delta) => delta.id == relocation.nativeTrackId && delta.playDelta > 0,
+    );
+    if (index < 0) continue;
+    final delta = nativeTrackDeltas[index];
+    valuesByDay[sourceKey] = math.max(0, (valuesByDay[sourceKey] ?? 0) - 1);
+    nativeTrackDeltas[index] = TrackCounterDelta(
+      id: delta.id,
+      title: delta.title,
+      artist: delta.artist,
+      albumTitle: delta.albumTitle,
+      albumArtist: delta.albumArtist,
+      playDelta: delta.playDelta - 1,
+      skipDelta: delta.skipDelta,
+      listeningSecondsDelta: delta.listeningSecondsDelta,
+    );
+    final eventKey = snapshotDateKey(relocation.event.playedAt.toLocal());
+    valuesByDay[eventKey] = (valuesByDay[eventKey] ?? 0) + 1;
+    trackDeltasByDay.putIfAbsent(eventKey, () => <TrackCounterDelta>[]).add(
+      TrackCounterDelta(
+        id: relocation.event.track.id,
+        title: relocation.event.track.title,
+        artist: relocation.event.track.artist,
+        albumTitle: relocation.event.track.albumTitle,
+        albumArtist: relocation.event.track.albumArtist,
+        playDelta: 1,
+        skipDelta: 0,
+        listeningSecondsDelta: 0,
+      ),
+    );
+  }
+
+  // Supplemental events never enter native snapshots. Observation events
+  // contribute a confirmed minimum on the observation date, not an exact
+  // playback date.
+  for (final event in supplementalEvents) {
+    final key = snapshotDateKey(event.playedAt.toLocal());
+    valuesByDay[key] = (valuesByDay[key] ?? 0) + 1;
+    if (event.isObservation) {
+      observationValuesByDay[key] = (observationValuesByDay[key] ?? 0) + 1;
+    }
+    trackDeltasByDay
+        .putIfAbsent(key, () => <TrackCounterDelta>[])
+        .add(
+          TrackCounterDelta(
+            id: event.track.id,
+            title: event.track.title,
+            artist: event.track.artist,
+            albumTitle: event.track.albumTitle,
+            albumArtist: event.track.albumArtist,
+            playDelta: 1,
+            skipDelta: 0,
+            listeningSecondsDelta: 0,
+          ),
+        );
+  }
   final days = <_ActivityHeatmapDay>[];
   for (
     var day = start;
     !day.isAfter(today);
-    day = day.add(const Duration(days: 1))
+    day = DateTime(day.year, day.month, day.day + 1)
   ) {
     final key = snapshotDateKey(day);
     final trackDeltas = trackDeltasByDay[key] ?? const <TrackCounterDelta>[];
@@ -2185,17 +2373,26 @@ List<_ActivityHeatmapDay> _activityHeatmapDays({
       _ActivityHeatmapDay(
         date: day,
         playCount: valuesByDay[key] ?? 0,
-        trackDeltas: _topActivityTrackDeltas(trackDeltas),
+        trackDeltas: _mergedActivityTrackDeltas(trackDeltas),
+        hasRecord: valuesByDay.containsKey(key),
+        estimated: overview.isDemo && history.snapshots.length < 2,
+        observationPlayCount: observationValuesByDay[key] ?? 0,
       ),
     );
   }
   return List.unmodifiable(days);
 }
 
-List<TrackCounterDelta> _topActivityTrackDeltas(
+List<TrackCounterDelta> _mergedActivityTrackDeltas(
   Iterable<TrackCounterDelta> deltas,
 ) {
-  final sorted = deltas.toList(growable: false)
+  final byId = <String, TrackCounterDelta>{};
+  for (final delta in deltas) {
+    if (delta.playDelta <= 0) continue;
+    final previous = byId[delta.id];
+    byId[delta.id] = previous == null ? delta : previous.merge(delta);
+  }
+  final sorted = byId.values.toList(growable: false)
     ..sort((a, b) {
       final byPlays = b.playDelta.compareTo(a.playDelta);
       if (byPlays != 0) {
@@ -2207,30 +2404,10 @@ List<TrackCounterDelta> _topActivityTrackDeltas(
       if (bySeconds != 0) {
         return bySeconds;
       }
-      return a.title.compareTo(b.title);
+      final byTitle = a.title.compareTo(b.title);
+      return byTitle != 0 ? byTitle : a.id.compareTo(b.id);
     });
-  return List.unmodifiable(sorted.take(5));
-}
-
-List<List<_ActivityHeatmapDay>> _activityHeatmapWeeks(
-  List<_ActivityHeatmapDay> days,
-) {
-  final weeks = <List<_ActivityHeatmapDay>>[];
-  for (var index = 0; index < days.length; index += 7) {
-    weeks.add(
-      List.unmodifiable(days.skip(index).take(7).toList(growable: false)),
-    );
-  }
-  return List.unmodifiable(weeks);
-}
-
-Color _activityHeatmapColor(ThemeData theme, int value, int maxValue) {
-  if (value <= 0 || maxValue <= 0) {
-    return theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.48);
-  }
-  final normalized = (value / maxValue).clamp(0.0, 1.0);
-  final base = theme.colorScheme.primary.withValues(alpha: 0.28);
-  return Color.lerp(base, theme.colorScheme.primary, 0.32 + normalized * 0.68)!;
+  return List.unmodifiable(sorted);
 }
 
 _ActivityHeatmapSummary _activityHeatmapSummary(
@@ -2369,16 +2546,6 @@ String _activityHeatmapViewLabel(
   };
 }
 
-const _calendarWeekdayOrder = <int>[
-  DateTime.monday,
-  DateTime.tuesday,
-  DateTime.wednesday,
-  DateTime.thursday,
-  DateTime.friday,
-  DateTime.saturday,
-  DateTime.sunday,
-];
-
 String _weekdayLabel(BuildContext context, int weekday) {
   final monday = DateTime(2026, 1, 5);
   final date = monday.add(Duration(days: weekday - 1));
@@ -2414,6 +2581,7 @@ List<_TrackTrendValue> _trackTrendValues({
   required SnapshotHistory history,
   DailyLibrarySnapshot? provisionalCurrentSnapshot,
   required TrendRange range,
+  required Map<DailyLibrarySnapshot, TrackCounterSnapshot?> trackCounters,
 }) {
   final buckets = _trackTrendBuckets(context, range);
   final values = List<int>.filled(buckets.length, 0);
@@ -2437,6 +2605,7 @@ List<_TrackTrendValue> _trackTrendValues({
         previous: snapshots[index - 1],
         current: current,
         trackId: trackId,
+        trackCounters: trackCounters,
         bucket: buckets[bucketIndex],
         allowRecentFallback:
             provisionalCurrentSnapshot != null &&
@@ -2450,33 +2619,13 @@ List<_TrackTrendValue> _trackTrendValues({
     buckets: buckets,
     provisionalCurrentSnapshot: provisionalCurrentSnapshot,
     trackId: trackId,
+    trackCounters: trackCounters,
   );
 
   return [
     for (final indexed in buckets.indexed)
       _TrackTrendValue(label: indexed.$2.label, playDelta: values[indexed.$1]),
   ];
-}
-
-TrendRange _initialTrackTrendRange({
-  required BuildContext context,
-  required String trackId,
-  required SnapshotHistory history,
-  required DailyLibrarySnapshot provisionalCurrentSnapshot,
-}) {
-  for (final range in TrendRange.values) {
-    final values = _trackTrendValues(
-      context: context,
-      trackId: trackId,
-      history: history,
-      provisionalCurrentSnapshot: provisionalCurrentSnapshot,
-      range: range,
-    );
-    if (values.any((value) => value.playDelta > 0)) {
-      return range;
-    }
-  }
-  return TrendRange.year;
 }
 
 List<DailyLibrarySnapshot> _snapshotsWithProvisionalCurrent(
@@ -2558,9 +2707,18 @@ int _trackPlayDeltaBetween({
   required String trackId,
   required _TrackTrendBucket bucket,
   required bool allowRecentFallback,
+  required Map<DailyLibrarySnapshot, TrackCounterSnapshot?> trackCounters,
 }) {
-  final previousTrack = _trackSnapshotById(previous, trackId);
-  final currentTrack = _trackSnapshotById(current, trackId);
+  final previousTrack = _trackSnapshotById(
+    previous,
+    trackId,
+    cache: trackCounters,
+  );
+  final currentTrack = _trackSnapshotById(
+    current,
+    trackId,
+    cache: trackCounters,
+  );
   if (currentTrack == null) {
     return 0;
   }
@@ -2594,12 +2752,17 @@ void _applyProvisionalRecentPlayFallback({
   required List<_TrackTrendBucket> buckets,
   required DailyLibrarySnapshot? provisionalCurrentSnapshot,
   required String trackId,
+  required Map<DailyLibrarySnapshot, TrackCounterSnapshot?> trackCounters,
 }) {
   if (provisionalCurrentSnapshot == null || values.any((value) => value > 0)) {
     return;
   }
 
-  final track = _trackSnapshotById(provisionalCurrentSnapshot, trackId);
+  final track = _trackSnapshotById(
+    provisionalCurrentSnapshot,
+    trackId,
+    cache: trackCounters,
+  );
   final lastPlayedAt = track?.lastPlayedAt;
   if (lastPlayedAt == null) {
     return;
@@ -2616,8 +2779,15 @@ void _applyProvisionalRecentPlayFallback({
 
 TrackCounterSnapshot? _trackSnapshotById(
   DailyLibrarySnapshot snapshot,
-  String trackId,
-) {
+  String trackId, {
+  Map<DailyLibrarySnapshot, TrackCounterSnapshot?>? cache,
+}) {
+  if (cache != null) {
+    return cache.putIfAbsent(
+      snapshot,
+      () => _trackSnapshotById(snapshot, trackId),
+    );
+  }
   for (final track in snapshot.tracks) {
     if (track.id == trackId) {
       return track;
@@ -2908,6 +3078,25 @@ IconData _sectionSelectedIcon(HomeSection section) {
     HomeSection.settings => Icons.tune,
   };
 }
+
+/// The song the player is on: the library copy when there is one, otherwise
+/// the player's own description (songs streamed without being added to the
+/// library never appear in the Music library query).
+LibraryTrack? _playbackTrack(LibraryOverview overview, PlaybackState playback) {
+  final byId = overview.trackById(playback.activeTrackId);
+  if (byId != null) return byId;
+  final nowPlaying = playback.nowPlaying;
+  if (nowPlaying == null) return null;
+  final title = nowPlaying.title.trim().toLowerCase();
+  for (final track in overview.tracksForArtist(nowPlaying.artist)) {
+    if (track.title.trim().toLowerCase() == title) return track;
+  }
+  return nowPlaying;
+}
+
+/// Whether [track] is outside the Music library, so its plays are not counted.
+bool _isOutsideLibrary(LibraryOverview overview, LibraryTrack track) =>
+    !overview.isDemo && overview.trackById(track.id) == null;
 
 /// Whether demo data should be labelled as such in the UI.
 bool _labelsDemo(LibraryOverview overview) =>

@@ -29,6 +29,45 @@ final musicLibraryClientProvider = Provider<MusicLibraryClient>(
   (ref) => const PlatformMusicLibraryClient(),
 );
 
+// Survives repository rebuilds when filter preferences change.
+final libraryTrackCatalogProvider = Provider((ref) => LibraryTrackCatalog());
+
+class LibraryTrackCatalog {
+  Map<String, LibraryTrack> _byId = const {};
+  Map<String, LibraryTrack> _byAppleMusicStoreId = const {};
+  Map<String, List<LibraryTrack>> _byDescription = const {};
+
+  void replace(List<LibraryTrack> tracks) {
+    _byId = {for (final track in tracks) track.id: track};
+    final byStoreId = <String, LibraryTrack>{};
+    final grouped = <String, List<LibraryTrack>>{};
+    for (final track in tracks) {
+      final storeId = _validStoreId(track.appleMusicStoreId);
+      if (storeId != null) byStoreId.putIfAbsent(storeId, () => track);
+      (grouped[_description(track)] ??= []).add(track);
+    }
+    _byAppleMusicStoreId = byStoreId;
+    _byDescription = grouped;
+  }
+
+  LibraryTrack? match(LibraryTrack track) =>
+      _byId[track.id] ??
+      _byAppleMusicStoreId[_validStoreId(track.appleMusicStoreId)] ??
+      _byDescription[_description(track)]
+          ?.where((candidate) => sameHistoryTrack(candidate, track))
+          .firstOrNull;
+
+  static String? _validStoreId(String? value) {
+    return validAppleMusicCatalogId(value);
+  }
+
+  static String _description(LibraryTrack track) {
+    String normalized(String value) =>
+        value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    return '${normalized(track.artist)}\u0000${normalized(track.title)}';
+  }
+}
+
 final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
   return MusicStatsRepository(
     ref.watch(musicLibraryClientProvider),
@@ -37,6 +76,7 @@ final musicStatsRepositoryProvider = Provider<MusicStatsRepository>((ref) {
     cloudSyncEnabled: ref.watch(snapshotCloudSyncProvider),
     temporaryDemoLibraryEnabled: ref.watch(temporaryDemoLibraryProvider),
     libraryFilters: ref.watch(libraryFilterPreferencesProvider),
+    libraryCatalog: ref.watch(libraryTrackCatalogProvider),
   );
 });
 
@@ -48,6 +88,7 @@ class MusicStatsRepository {
     this.cloudSyncEnabled = true,
     this.temporaryDemoLibraryEnabled = false,
     this.libraryFilters,
+    this.libraryCatalog,
   });
 
   final MusicLibraryClient _client;
@@ -56,6 +97,21 @@ class MusicStatsRepository {
   final bool cloudSyncEnabled;
   final bool temporaryDemoLibraryEnabled;
   final LibraryFilterPreferences? libraryFilters;
+  final LibraryTrackCatalog? libraryCatalog;
+
+  LibraryTrack? libraryTrackMatching(LibraryTrack track) =>
+      libraryCatalog?.match(track);
+
+  Future<List<LibraryTrack>> fetchRecentlyPlayedTracks() async {
+    final client = _client;
+    if (!_isIosMusicRuntime || client is! RecentlyPlayedMusicLibraryClient) {
+      return const [];
+    }
+    return (await (client as RecentlyPlayedMusicLibraryClient)
+            .fetchRecentlyPlayedTracks())
+        .map((track) => track.copyWith(playCount: 0, skipCount: 0))
+        .toList(growable: false);
+  }
 
   Future<void> ensureSnapshotRefreshScheduled() async {
     if (!_isIosMusicRuntime) {
@@ -107,7 +163,9 @@ class MusicStatsRepository {
       );
     }
 
-    final tracks = _filteredTracks(await _client.fetchTracks());
+    final allTracks = await _client.fetchTracks();
+    libraryCatalog?.replace(allTracks);
+    final tracks = _filteredTracks(allTracks);
     if (tracks.isEmpty && temporaryDemoLibraryEnabled) {
       return _buildDemoState(status);
     }

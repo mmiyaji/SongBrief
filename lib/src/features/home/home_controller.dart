@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,10 +9,17 @@ import '../../data/music_stats_repository.dart';
 import '../../data/music_library_channel.dart';
 import '../../domain/library_overview.dart';
 import '../../domain/library_snapshot.dart';
+import '../../domain/library_track.dart';
 import '../../domain/music_stats_state.dart';
 import '../../settings/music_data_preferences.dart';
+import '../../settings/library_filter_preferences.dart';
 import '../../settings/music_data_preferences_storage.dart';
+import '../../settings/supplemental_history_preferences.dart';
+import '../../settings/snapshot_preferences.dart';
 import '../../widgets/home_widget_bridge.dart';
+import '../../data/supplemental_history_cloud_client.dart';
+import 'supplemental_history_cloud_controller.dart';
+import 'supplemental_history_controller.dart';
 
 enum TrendRange { week, month, year }
 
@@ -32,9 +40,7 @@ enum HomeSection { playing, overview, rankings, library, settings }
 
 /// CI App Store screenshot builds open on a chosen tab and present the demo
 /// library as a regular Music library; compiled out otherwise.
-const screenshotModeEnabled = bool.fromEnvironment(
-  'SONGBRIEF_SCREENSHOT_MODE',
-);
+const screenshotModeEnabled = bool.fromEnvironment('SONGBRIEF_SCREENSHOT_MODE');
 const screenshotSectionPreferenceKey = 'songbrief_screenshot_section';
 
 final homeSectionProvider =
@@ -113,6 +119,50 @@ class SnapshotSyncState {
   final DateTime? lastAttemptAt;
   final SnapshotSyncResult? result;
 }
+
+/// The status shown to users covers both daily snapshots and outside-library
+/// evidence. A successful snapshot upload alone must not hide a ledger failure.
+final listeningHistorySyncStateProvider = Provider<SnapshotSyncState>((ref) {
+  final snapshots = ref.watch(snapshotSyncStateProvider);
+  if (!ref.watch(supplementalHistoryCloudPlatformSupportedProvider) ||
+      !ref.exists(supplementalHistoryCloudControllerProvider) ||
+      !ref.watch(snapshotCloudSyncProvider)) {
+    return snapshots;
+  }
+  final outside = ref.watch(supplementalHistoryCloudControllerProvider);
+  final result = snapshots.result;
+  if (result == null) return snapshots;
+  final snapshotSuccess =
+      result.status == SnapshotSyncStatus.synced ||
+      result.status == SnapshotSyncStatus.unchanged;
+  final outsideSuccess = outside == SupplementalHistoryCloudStatus.success;
+  final status = result.status == SnapshotSyncStatus.disabled
+      ? switch (outside) {
+          SupplementalHistoryCloudStatus.success => SnapshotSyncStatus.synced,
+          SupplementalHistoryCloudStatus.disabled =>
+            SnapshotSyncStatus.disabled,
+          SupplementalHistoryCloudStatus.unavailable =>
+            SnapshotSyncStatus.unavailable,
+          _ => SnapshotSyncStatus.error,
+        }
+      : outsideSuccess
+      ? snapshotSuccess
+            ? result.status
+            : SnapshotSyncStatus.partial
+      : snapshotSuccess
+      ? SnapshotSyncStatus.partial
+      : result.status;
+  return SnapshotSyncState(
+    isSyncing: snapshots.isSyncing,
+    lastAttemptAt: snapshots.lastAttemptAt,
+    result: SnapshotSyncResult(
+      status: status,
+      downloaded: result.downloaded,
+      uploaded: result.uploaded,
+      deleted: result.deleted,
+    ),
+  );
+});
 
 class SnapshotSyncStateController extends Notifier<SnapshotSyncState> {
   @override
@@ -231,32 +281,110 @@ final trackArtworkProvider = FutureProvider.autoDispose
     });
 
 // Lyrics are fetched on demand because reading them for the whole library is slow.
-final trackLyricsProvider = FutureProvider.autoDispose
-    .family<String?, String>((ref, trackId) {
-      return ref.read(musicStatsRepositoryProvider).fetchLyrics(trackId);
-    });
+final trackLyricsProvider = FutureProvider.autoDispose.family<String?, String>((
+  ref,
+  trackId,
+) {
+  // Cache missing lyrics too: cloud-only songs commonly have no local
+  // lyrics, and returning to the player should not repeat a library query.
+  final cacheLink = ref.keepAlive();
+  Timer? disposeTimer;
+  ref.onCancel(() {
+    disposeTimer = Timer(const Duration(minutes: 2), cacheLink.close);
+  });
+  ref.onResume(() {
+    disposeTimer?.cancel();
+    disposeTimer = null;
+  });
+  ref.onDispose(() => disposeTimer?.cancel());
+  return ref.read(musicStatsRepositoryProvider).fetchLyrics(trackId);
+});
 
 final playbackControllerProvider =
     NotifierProvider<PlaybackController, PlaybackState>(PlaybackController.new);
 
+/// Playback notifications carry no updated library counters. Give Music time
+/// to persist them, then read the library once for a burst of track changes.
+final foregroundLibraryRefreshProvider = Provider<ForegroundLibraryRefresh>((
+  ref,
+) {
+  final refresh = ForegroundLibraryRefresh(() {
+    final stats = ref.read(musicStatsControllerProvider).asData?.value;
+    if (stats == null || stats.isDemo) return;
+    unawaited(
+      ref.read(musicStatsControllerProvider.notifier).refreshStatsSilently(),
+    );
+  });
+  ref.listen(playbackControllerProvider, (previous, next) {
+    if (previous == null ||
+        previous.activeTrackId == null ||
+        previous.activeTrackId == next.activeTrackId) {
+      return;
+    }
+    refresh.trackChanged();
+  });
+  ref.onDispose(refresh.dispose);
+  return refresh;
+});
+
+class ForegroundLibraryRefresh {
+  ForegroundLibraryRefresh(this._refresh);
+
+  final void Function() _refresh;
+  Timer? _timer;
+  bool _foreground = false;
+
+  void setForeground(bool foreground) {
+    _foreground = foreground;
+    if (!foreground) {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  void trackChanged() {
+    if (!_foreground || _timer != null) return;
+    // Keep the first deadline so rapid skipping cannot postpone it forever.
+    _timer = Timer(const Duration(seconds: 15), () {
+      _timer = null;
+      if (_foreground) _refresh();
+    });
+  }
+
+  void dispose() => setForeground(false);
+}
+
 class PlaybackState {
   const PlaybackState({
     this.activeTrackId,
+    this.nowPlaying,
     this.isPlaying = false,
     this.isBusy = false,
     this.errorMessage,
   });
 
   final String? activeTrackId;
+
+  /// The player's description of the current song, used when the song is not
+  /// in the library (for example, streamed from an Apple Music playlist).
+  final LibraryTrack? nowPlaying;
   final bool isPlaying;
   final bool isBusy;
   final String? errorMessage;
 
   bool get hasActiveTrack => activeTrackId != null;
 
-  bool isTrackActive(String trackId) => activeTrackId == trackId;
+  bool isTrackActive(String trackId, {LibraryTrack? track}) =>
+      activeTrackId == trackId ||
+      (track != null &&
+          nowPlaying != null &&
+          track.artist.trim().toLowerCase() ==
+              nowPlaying!.artist.trim().toLowerCase() &&
+          track.title.trim().toLowerCase() ==
+              nowPlaying!.title.trim().toLowerCase());
 
-  bool isTrackPlaying(String trackId) => isPlaying && isTrackActive(trackId);
+  bool isTrackPlaying(String trackId, {LibraryTrack? track}) =>
+      isPlaying && isTrackActive(trackId, track: track);
 
   PlaybackState copyWith({
     String? activeTrackId,
@@ -269,6 +397,7 @@ class PlaybackState {
       activeTrackId: keepActiveTrack
           ? activeTrackId ?? this.activeTrackId
           : activeTrackId,
+      nowPlaying: keepActiveTrack ? nowPlaying : null,
       isPlaying: isPlaying ?? this.isPlaying,
       isBusy: isBusy ?? this.isBusy,
       errorMessage: errorMessage,
@@ -295,16 +424,29 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       unawaited(HomeWidgetBridge.update(next.snapshotHistory));
       unawaited(syncCloudSnapshots());
     }
+    _refreshRecentHistory(next);
     return next;
+  }
+
+  void _refreshRecentHistory(MusicStatsState next) {
+    if (!next.isDemo && next.authorizationStatus.canReadLibrary) {
+      unawaited(ref.read(recentAppleMusicPlaysProvider.notifier).refresh());
+    }
   }
 
   /// Merges the local history with iCloud in the background and refreshes
   /// the visible history when other devices contributed records.
   Future<void> syncCloudSnapshots() {
     return _runSnapshotHistoryOperation(() async {
+      if (!ref.mounted) return;
       ref.read(snapshotSyncStateProvider.notifier).begin();
       final repository = ref.read(musicStatsRepositoryProvider);
+      final outsideSync = ref
+          .read(supplementalHistoryCloudControllerProvider.notifier)
+          .syncCloud();
       final result = await repository.syncCloudSnapshots();
+      await outsideSync;
+      if (!ref.mounted) return;
       if (result == null) {
         ref.read(snapshotSyncStateProvider.notifier).unavailable();
         return;
@@ -314,6 +456,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
         return;
       }
       final history = await repository.loadSnapshotHistory();
+      if (!ref.mounted) return;
       _replaceSnapshotHistory(history);
       unawaited(HomeWidgetBridge.update(history));
     });
@@ -343,6 +486,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       ),
     );
     if (state.hasValue) {
+      _refreshRecentHistory(state.requireValue);
       unawaited(ref.read(appAnalyticsProvider).logEvent('music_access_loaded'));
       if (!state.requireValue.overview.isDemo) {
         unawaited(HomeWidgetBridge.update(state.requireValue.snapshotHistory));
@@ -462,6 +606,7 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
       _ => next,
     };
     if (state.hasValue) {
+      _refreshRecentHistory(state.requireValue);
       final overview = state.requireValue.overview;
       if (!overview.isDemo) {
         unawaited(HomeWidgetBridge.update(state.requireValue.snapshotHistory));
@@ -502,6 +647,234 @@ Duration _startupLoadingPreviewDelay() {
     return Duration.zero;
   }
   return const Duration(seconds: 4);
+}
+
+const outsideLibraryPlaysPreferenceKey = 'songbrief_outside_library_plays_v1';
+const _maxOutsideLibraryPlays = 50;
+
+final outsideLibraryPlaysProvider =
+    NotifierProvider<OutsideLibraryPlaysController, List<LibraryTrack>>(
+      OutsideLibraryPlaysController.new,
+    );
+
+final visibleOutsideLibraryPlaysProvider = Provider<List<LibraryTrack>>((ref) {
+  if (!ref.watch(supplementalHistoryIncludedProvider)) return const [];
+  final observed = ref.watch(outsideLibraryPlaysProvider);
+  final recent = ref.watch(recentAppleMusicPlaysProvider);
+  final countedTracks = ref.watch(supplementalHistoryProvider).tracks;
+  // Prefer the latest real timestamp; undated service rows retain API order.
+  final candidates = [...observed, ...recent, ...countedTracks].indexed.toList()
+    ..sort((a, b) {
+      final aTime = a.$2.lastPlayedAt;
+      final bTime = b.$2.lastPlayedAt;
+      if (aTime == null && bTime == null) return a.$1.compareTo(b.$1);
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+      final comparison = bTime.compareTo(aTime);
+      return comparison == 0 ? a.$1.compareTo(b.$1) : comparison;
+    });
+  final plays = uniqueHistoryTracks(candidates.map((entry) => entry.$2));
+  final filters = ref.watch(libraryFilterPreferencesProvider);
+  final repository = ref.watch(musicStatsRepositoryProvider);
+  final counted = LibraryTrackCatalog()..replace(countedTracks);
+  // Re-evaluate cached membership after a library refresh, too.
+  ref.watch(musicStatsControllerProvider);
+  return List.unmodifiable(
+    plays
+        .where(
+          (track) =>
+              repository.libraryTrackMatching(track) == null &&
+              !filters.excludes(track),
+        )
+        .map((track) {
+          final count = counted.match(track)?.playCount ?? 0;
+          return track.copyWith(playCount: count);
+        }),
+  );
+});
+
+/// Supplemental Apple Music history is isolated from counters and snapshots.
+const recentAppleMusicPlaysPreferenceKey = 'songbrief_apple_music_recent_v1';
+
+final recentAppleMusicPlaysProvider =
+    NotifierProvider<RecentAppleMusicPlaysController, List<LibraryTrack>>(
+      RecentAppleMusicPlaysController.new,
+    );
+
+class RecentAppleMusicPlaysController extends Notifier<List<LibraryTrack>> {
+  Future<void>? _inFlight;
+  DateTime? _lastAttempt;
+
+  /// Diagnostic only; supplemental failures never replace the library state.
+  Object? lastError;
+  DateTime? get lastAttemptAt => _lastAttempt;
+
+  @override
+  List<LibraryTrack> build() {
+    final raw = ref
+        .read(musicDataSharedPreferencesProvider)
+        ?.getString(recentAppleMusicPlaysPreferenceKey);
+    if (raw == null) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return _dedupe(
+        decoded.whereType<Map<String, Object?>>().map(
+          (json) => LibraryTrack.fromPlatformMap(json),
+        ),
+      );
+    } on Object {
+      return const [];
+    }
+  }
+
+  Future<void> refresh() {
+    if (_inFlight case final pending?) return pending;
+    final now = DateTime.now();
+    if (_lastAttempt != null &&
+        now.difference(_lastAttempt!) < const Duration(minutes: 1)) {
+      return Future.value();
+    }
+    _lastAttempt = now;
+    final repository = ref.read(musicStatsRepositoryProvider);
+    return _inFlight = () async {
+      try {
+        final tracks = await repository.fetchRecentlyPlayedTracks();
+        if (!ref.mounted) return;
+        lastError = null;
+        state = _dedupe(tracks);
+        ref.read(supplementalHistoryProvider.notifier).ingest(state);
+        await ref
+            .read(musicDataSharedPreferencesProvider)
+            ?.setString(
+              recentAppleMusicPlaysPreferenceKey,
+              jsonEncode(
+                state
+                    .map(
+                      (track) => {
+                        'id': track.id,
+                        'title': track.title,
+                        'artist': track.artist,
+                        'albumTitle': track.albumTitle,
+                        'genre': track.genre,
+                        'appleMusicStoreId': track.appleMusicStoreId,
+                        'appleMusicUrl': track.appleMusicUrl,
+                        'durationSeconds': track.duration.inSeconds,
+                        'lastPlayedAtMillis':
+                            track.lastPlayedAt?.millisecondsSinceEpoch,
+                        'isCloudItem': true,
+                      },
+                    )
+                    .toList(),
+              ),
+            );
+      } on Object catch (error) {
+        lastError = error;
+        // Offline, denied, or unavailable: preserve independently cached history.
+      } finally {
+        _inFlight = null;
+      }
+    }();
+  }
+
+  static List<LibraryTrack> _dedupe(Iterable<LibraryTrack> tracks) {
+    final result = <LibraryTrack>[];
+    for (final track in tracks) {
+      if (!result.any((existing) => sameHistoryTrack(existing, track))) {
+        result.add(track.copyWith(playCount: 0, skipCount: 0));
+      }
+      if (result.length == 500) break;
+    }
+    return List.unmodifiable(result);
+  }
+}
+
+/// Songs observed playing while the app was open, retained separately from
+/// Apple Music's supplemental history and all library statistics.
+class OutsideLibraryPlaysController extends Notifier<List<LibraryTrack>> {
+  @override
+  List<LibraryTrack> build() {
+    final raw = ref
+        .read(musicDataSharedPreferencesProvider)
+        ?.getString(outsideLibraryPlaysPreferenceKey);
+    if (raw == null) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return List.unmodifiable(
+        decoded.whereType<Map<String, Object?>>().map(_fromJson).nonNulls,
+      );
+    } on FormatException {
+      return const [];
+    }
+  }
+
+  /// Records [track] as played now; a repeat of the latest entry only moves
+  /// its time forward.
+  void record(LibraryTrack track, {DateTime? at}) {
+    final playedAt = at ?? DateTime.now();
+    // Seeing a song proves a minimum of one play, not a distinct MusicKit
+    // timestamped event. Polls and pause/resume must not add playback events.
+    ref.read(supplementalHistoryProvider.notifier).observe(track, at: playedAt);
+    final entry = track.copyWith(lastPlayedAt: playedAt);
+    final rest = state.isNotEmpty && state.first.id == track.id
+        ? state.skip(1)
+        : state;
+    state = List.unmodifiable([entry, ...rest].take(_maxOutsideLibraryPlays));
+    unawaited(
+      ref
+              .read(musicDataSharedPreferencesProvider)
+              ?.setString(
+                outsideLibraryPlaysPreferenceKey,
+                jsonEncode(state.map(_toJson).toList()),
+              ) ??
+          Future<bool>.value(false),
+    );
+  }
+
+  static Map<String, Object?> _toJson(LibraryTrack track) => {
+    'id': track.id,
+    'title': track.title,
+    'artist': track.artist,
+    'albumTitle': track.albumTitle,
+    'appleMusicStoreId': track.appleMusicStoreId,
+    'appleMusicUrl': track.appleMusicUrl,
+    'genre': track.genre,
+    'playlistNames': track.playlistNames,
+    'durationSeconds': track.duration.inSeconds,
+    'playedAtMillis': track.lastPlayedAt?.millisecondsSinceEpoch,
+  };
+
+  static LibraryTrack? _fromJson(Map<String, Object?> json) {
+    final id = json['id'];
+    final title = json['title'];
+    final playedAt = json['playedAtMillis'];
+    if (id is! String || title is! String || playedAt is! int) return null;
+    final artist = json['artist'];
+    final album = json['albumTitle'];
+    final duration = json['durationSeconds'];
+    return LibraryTrack(
+      id: id,
+      title: title,
+      artist: artist is String ? artist : 'Unknown Artist',
+      albumTitle: album is String ? album : 'Unknown Album',
+      appleMusicStoreId: json['appleMusicStoreId'] is String
+          ? json['appleMusicStoreId'] as String
+          : null,
+      appleMusicUrl: json['appleMusicUrl'] is String
+          ? json['appleMusicUrl'] as String
+          : null,
+      genre: json['genre'] is String ? json['genre'] as String : null,
+      playlistNames:
+          (json['playlistNames'] as List?)?.whereType<String>().toList() ??
+          const [],
+      duration: Duration(seconds: duration is int ? duration : 0),
+      playCount: 0,
+      skipCount: 0,
+      isCloudItem: true,
+      lastPlayedAt: DateTime.fromMillisecondsSinceEpoch(playedAt),
+    );
+  }
 }
 
 class PlaybackController extends Notifier<PlaybackState> {
@@ -557,10 +930,14 @@ class PlaybackController extends Notifier<PlaybackState> {
   }
 
   Future<void> toggleTrack(String trackId) {
-    if (state.isTrackPlaying(trackId)) {
+    final overview = ref.exists(musicStatsControllerProvider)
+        ? ref.read(musicStatsControllerProvider).asData?.value.overview
+        : null;
+    final track = overview?.trackById(trackId);
+    if (state.isTrackPlaying(trackId, track: track)) {
       return pause();
     }
-    if (state.isTrackActive(trackId)) {
+    if (state.isTrackActive(trackId, track: track)) {
       return play();
     }
     return playTrack(trackId);
@@ -661,8 +1038,35 @@ class PlaybackController extends Notifier<PlaybackState> {
   }
 
   void _applyExternalPlayback(MusicPlaybackSnapshot snapshot) {
+    final track = snapshot.track;
+    final repository = ref.read(musicStatsRepositoryProvider);
+    // Only compare against an already loaded library; never start a load here.
+    final overview = ref.exists(musicStatsControllerProvider)
+        ? ref.read(musicStatsControllerProvider).asData?.value.overview
+        : null;
+    final libraryTrack = track == null
+        ? null
+        : repository.libraryTrackMatching(track) ??
+              overview?.trackById(track.id) ??
+              overview
+                  ?.tracksForArtist(track.artist)
+                  .where(
+                    (candidate) =>
+                        candidate.title.trim().toLowerCase() ==
+                        track.title.trim().toLowerCase(),
+                  )
+                  .firstOrNull;
+    if (track != null &&
+        snapshot.isPlaying &&
+        overview != null &&
+        !overview.isDemo &&
+        libraryTrack == null &&
+        !ref.read(libraryFilterPreferencesProvider).excludes(track)) {
+      ref.read(outsideLibraryPlaysProvider.notifier).record(track);
+    }
     state = PlaybackState(
-      activeTrackId: snapshot.trackId,
+      activeTrackId: libraryTrack?.id ?? snapshot.track?.id ?? snapshot.trackId,
+      nowPlaying: libraryTrack ?? snapshot.track,
       isPlaying: snapshot.isPlaying,
     );
   }

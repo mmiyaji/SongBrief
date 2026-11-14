@@ -282,7 +282,7 @@ final class SnapshotCloudSyncTests: XCTestCase {
     let merged = SnapshotMerge.merge(older, newer)
     let tracks = merged["tracks"] as? [[String: Any]]
 
-    XCTAssertEqual(tracks?.count, 500)
+    XCTAssertEqual(tracks?.count, 501)
     XCTAssertTrue(tracks?.contains { $0["id"] as? String == "new-low-count" } == true)
   }
 
@@ -301,6 +301,83 @@ final class SnapshotCloudSyncTests: XCTestCase {
 
     XCTAssertEqual((track?["playCount"] as? NSNumber)?.intValue, 10)
     XCTAssertEqual((track?["listeningSeconds"] as? NSNumber)?.intValue, 600)
+  }
+
+  func testNormalizationPreservesEveryTrackAndAggregate() throws {
+    let tracks = (0..<1200).map { ["id": "track-\($0)", "playCount": $0] as [String: Any] }
+    let original = librarySnapshot(capturedAtMillis: 100, tracks: tracks)
+    let normalized = SnapshotMerge.normalized(original)
+    let data = try JSONSerialization.data(withJSONObject: normalized)
+    let decoded = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    XCTAssertEqual((decoded["tracks"] as? [[String: Any]])?.count, 1200)
+    XCTAssertEqual((decoded["trackCount"] as? NSNumber)?.intValue, 1200)
+    XCTAssertEqual((decoded["totalPlayCount"] as? NSNumber)?.intValue, 10)
+  }
+
+  func testLargeMergeRetainsUnionAndUsesNewMetadataWithMaximumCounters() throws {
+    let olderTracks = (0..<800).map {
+      ["id": String(format: "%04d", $0), "playCount": 20, "title": "Old"] as [String: Any]
+    }
+    let newerTracks = (400..<1200).map {
+      ["id": String(format: "%04d", $0), "playCount": 3, "title": "New"] as [String: Any]
+    }
+    let older = librarySnapshot(capturedAtMillis: 100, tracks: olderTracks)
+    let newer = librarySnapshot(capturedAtMillis: 200, tracks: newerTracks)
+    let merged = SnapshotMerge.merge(older, newer)
+    let tracks = try XCTUnwrap(merged["tracks"] as? [[String: Any]])
+    XCTAssertEqual(tracks.count, 1200)
+    XCTAssertEqual(tracks.compactMap { $0["id"] as? String }, (0..<1200).map { String(format: "%04d", $0) })
+    XCTAssertEqual(tracks[500]["title"] as? String, "New")
+    XCTAssertEqual((tracks[500]["playCount"] as? NSNumber)?.intValue, 20)
+    XCTAssertEqual((tracks[1000]["playCount"] as? NSNumber)?.intValue, 3)
+    let reversed = SnapshotMerge.merge(newer, older)
+    XCTAssertTrue(NSDictionary(dictionary: merged).isEqual(to: reversed))
+  }
+
+  func testCloudPayloadPreservesLargeSnapshotUsingCompression() throws {
+    let tracks = (0..<12000).map {
+      ["id": "track-\($0)", "playCount": $0, "title": String(repeating: "Long title ", count: 10)] as [String: Any]
+    }
+    let original = librarySnapshot(capturedAtMillis: 100, tracks: tracks)
+    let payload = try SnapshotCloudSync.cloudPayload(for: original)
+    XCTAssertTrue(payload.hasPrefix("songbrief:zlib:v1:"))
+    XCTAssertLessThanOrEqual(payload.utf8.count, SnapshotCloudSync.maximumInlinePayloadBytes)
+    let record = cloudRecord(snapshot: original)
+    record["payload"] = payload as CKRecordValue
+    let decoded = try XCTUnwrap(SnapshotCloudSync.snapshot(from: record))
+    XCTAssertEqual((decoded["tracks"] as? [[String: Any]])?.count, 12000)
+    XCTAssertEqual((decoded["trackCount"] as? NSNumber)?.intValue, 12000)
+    XCTAssertTrue(NSDictionary(dictionary: SnapshotMerge.normalized(original)).isEqual(to: decoded))
+  }
+
+  func testCloudPayloadKeepsSmallSnapshotsAsLegacyJSON() throws {
+    let original = cloudSnapshot(capturedAtMillis: 100, plays: 20)
+    let payload = try SnapshotCloudSync.cloudPayload(for: original)
+    XCTAssertNotNil(payload.data(using: .utf8).flatMap {
+      try? JSONSerialization.jsonObject(with: $0)
+    })
+    XCTAssertNotNil(SnapshotCloudSync.snapshot(from: cloudRecord(snapshot: original)))
+  }
+
+  func testMalformedCompressedCloudPayloadIsRejected() {
+    let record = cloudRecord(snapshot: cloudSnapshot(capturedAtMillis: 100, plays: 20))
+    record["payload"] = "songbrief:zlib:v1:invalid-base64" as CKRecordValue
+    XCTAssertNil(SnapshotCloudSync.snapshot(from: record))
+    record["payload"] = ("songbrief:zlib:v1:" + Data("invalid zlib".utf8).base64EncodedString()) as CKRecordValue
+    XCTAssertNil(SnapshotCloudSync.snapshot(from: record))
+  }
+
+  func testCloudPayloadReportsOversizeInsteadOfDroppingTracks() {
+    // Random UUIDs remain large after compression, unlike repeated titles.
+    let title = (0..<40000).map { _ in UUID().uuidString }.joined()
+    let original = librarySnapshot(
+      capturedAtMillis: 100, tracks: [["id": "one", "title": title]]
+    )
+    XCTAssertThrowsError(try SnapshotCloudSync.cloudPayload(for: original)) { error in
+      XCTAssertEqual((error as NSError).domain, "SongBriefSnapshotCloudSync")
+      XCTAssertEqual((error as NSError).code, 1)
+    }
+    XCTAssertEqual((original["tracks"] as? [[String: Any]])?.count, 1)
   }
 
   private func snapshot(dateKey: String, capturedAtMillis: Int64) -> [String: Any] {

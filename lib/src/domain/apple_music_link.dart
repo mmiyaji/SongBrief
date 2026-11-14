@@ -1,10 +1,13 @@
 import 'library_track.dart';
 
 bool hasAppleMusicSongLink(LibraryTrack track) {
-  return _appleMusicCatalogId(track) != null;
+  return _officialTrackUrl(track.appleMusicUrl) != null ||
+      _appleMusicCatalogId(track) != null;
 }
 
 Uri appleMusicUrlForTrack(LibraryTrack track) {
+  final officialUrl = _officialTrackUrl(track.appleMusicUrl);
+  if (officialUrl != null) return officialUrl;
   final catalogId = _appleMusicCatalogId(track);
   if (catalogId != null) {
     return Uri.https(
@@ -22,11 +25,35 @@ Uri appleMusicUrlForTrack(LibraryTrack track) {
 }
 
 String? _appleMusicCatalogId(LibraryTrack track) {
-  final id = track.appleMusicStoreId?.trim();
-  if (id == null || id.isEmpty || id == '0') {
+  return validAppleMusicCatalogId(track.appleMusicStoreId);
+}
+
+Uri? _officialTrackUrl(String? value) {
+  final raw = value?.trim();
+  if (raw == null || raw.isEmpty) return null;
+  final uri = Uri.tryParse(raw);
+  if (uri == null ||
+      uri.scheme != 'https' ||
+      uri.host.toLowerCase() != 'music.apple.com' ||
+      uri.userInfo.isNotEmpty ||
+      uri.hasPort && uri.port != 443 ||
+      uri.hasFragment) {
     return null;
   }
-  return id;
+  final segments = uri.pathSegments;
+  final songIndex = segments.indexOf('song');
+  final songRouteLength = segments.length - songIndex;
+  final isSongRoute =
+      songIndex >= 0 &&
+      (songRouteLength == 2 || songRouteLength == 3) &&
+      validAppleMusicCatalogId(segments.last) != null;
+  final albumIndex = segments.indexOf('album');
+  final isAlbumTrackRoute =
+      albumIndex >= 0 &&
+      segments.length - albumIndex >= 3 &&
+      validAppleMusicCatalogId(uri.queryParameters['i']) != null;
+  if (!isSongRoute && !isAlbumTrackRoute) return null;
+  return uri;
 }
 
 String _appleMusicSlug(String title) {

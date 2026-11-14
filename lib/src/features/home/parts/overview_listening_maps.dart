@@ -170,17 +170,9 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
                 return releaseCard;
               }
 
-              if (constraints.maxWidth >= 760) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: releaseCard),
-                    const SizedBox(width: 14),
-                    Expanded(child: heatmapCard),
-                  ],
-                );
-              }
-
+              // The calendar is much taller than the release-year chart, so
+              // they stack even on wide screens; the calendar card lays its
+              // grid and day details side by side instead.
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -791,154 +783,332 @@ FlTitlesData _releaseYearTitlesData({
 
 enum _ActivityHeatmapView { calendar, weekdays, highlights }
 
-class _ActivityHeatmapCard extends StatefulWidget {
+class _ActivityHeatmapCard extends ConsumerStatefulWidget {
   const _ActivityHeatmapCard({
     required this.overview,
     required this.history,
     this.expanded = false,
+    this.initialDay,
+    this.initialMonth,
+    this.initialMode = _ActivityCalendarMode.song,
   });
 
   final LibraryOverview overview;
   final SnapshotHistory history;
   final bool expanded;
+  final _ActivityHeatmapDay? initialDay;
+  final DateTime? initialMonth;
+  final _ActivityCalendarMode initialMode;
 
   @override
-  State<_ActivityHeatmapCard> createState() => _ActivityHeatmapCardState();
+  ConsumerState<_ActivityHeatmapCard> createState() =>
+      _ActivityHeatmapCardState();
 }
 
-class _ActivityHeatmapCardState extends State<_ActivityHeatmapCard> {
+class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
   _ActivityHeatmapDay? _selectedDay;
   _ActivityHeatmapView _view = _ActivityHeatmapView.calendar;
+  DateTime? _visibleMonth;
+  _ActivityCalendarMode _mode = _ActivityCalendarMode.song;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDay = widget.initialDay;
+    _visibleMonth = widget.initialMonth;
+    _mode = widget.initialMode;
+  }
+
+  void _selectDay(_ActivityHeatmapDay day) {
+    setState(() {
+      _selectedDay = day;
+      _visibleMonth = DateTime(day.date.year, day.date.month);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final projection = widget.overview.isDemo
+        ? const ListeningEventProjection(
+            uncoveredEvents: [],
+            relocations: [],
+          )
+        : projectListeningEvents(
+            history: widget.history,
+            events: ref.watch(countedSupplementalEventsProvider),
+            dailyOnly: true,
+          );
     final days = _activityHeatmapDays(
       overview: widget.overview,
       history: widget.history,
+      supplementalEvents: projection.uncoveredEvents,
+      relocations: projection.relocations,
     );
-    final maxValue = days.fold<int>(
-      0,
-      (current, day) => math.max(current, day.playCount),
-    );
+    final unplacedSupplementalTrackCount = widget.overview.isDemo
+        ? 0
+        : ref.watch(calendarUnplacedSupplementalTrackCountProvider);
     final summary = _activityHeatmapSummary(days);
     final sourceLabel = widget.history.snapshotCount >= 2
-        ? _t(context, 'Listening record changes', '聴取記録の変化')
-        : _t(context, 'Recent-track estimate', '最近再生からの推定');
+        ? _t(
+            context,
+            'Confirmed listening history',
+            '確認済みの聴取履歴',
+            zh: '已确认的收听记录',
+            ko: '확인된 청취 기록',
+          )
+        : widget.overview.isDemo
+        ? _t(
+            context,
+            'Recent-track estimate',
+            '最近再生からの推定',
+            zh: '最近播放估算',
+            ko: '최근 재생 추정',
+          )
+        : days.any((day) => day.playCount > 0)
+        ? _t(
+            context,
+            'Listening history from outside your library',
+            'ライブラリ外の再生履歴',
+            zh: '资料库外的播放记录',
+            ko: '보관함 외 재생 기록',
+          )
+        : _t(
+            context,
+            'Daily records unavailable',
+            '日別記録はまだありません',
+            zh: '暂无每日记录',
+            ko: '일별 기록이 없습니다',
+          );
     final selectedDay =
         _validSelectedActivityDay(days, _selectedDay) ??
         _defaultSelectedActivityDay(days);
+    final requestedMonth =
+        _visibleMonth ?? DateTime(days.last.date.year, days.last.date.month);
+    final minMonth = DateTime(days.first.date.year, days.first.date.month);
+    final maxMonth = DateTime(days.last.date.year, days.last.date.month);
+    final visibleMonth = requestedMonth.isBefore(minMonth)
+        ? minMonth
+        : requestedMonth.isAfter(maxMonth)
+        ? maxMonth
+        : requestedMonth;
+    final calendarVisible =
+        !widget.expanded || _view == _ActivityHeatmapView.calendar;
 
     return _OverviewAnalysisCard(
       icon: Icons.grid_on_rounded,
-      title: _t(context, 'Activity heatmap', '再生ヒートマップ'),
+      title: _t(
+        context,
+        'Listening calendar',
+        'リスニングカレンダー',
+        zh: '收听日历',
+        ko: '청취 달력',
+      ),
       subtitle: sourceLabel,
-      child: maxValue == 0
-          ? _AnalyticsEmptyState(
-              label: _t(
+      trailing: widget.expanded
+          ? null
+          : IconButton(
+              key: const ValueKey('activity-calendar-expand'),
+              tooltip: _t(
                 context,
-                'Activity appears after daily listening records are available.',
-                '日々の聴取記録がたまると活動量を表示します。',
+                'Expand calendar',
+                'カレンダーを拡大',
+                zh: '展开日历',
+                ko: '달력 확대',
               ),
-            )
-          : Column(
+              icon: const Icon(Icons.open_in_full_rounded),
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                showDragHandle: true,
+                builder: (context) => SafeArea(
+                  top: false,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+                    ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: IconButton(
+                              onPressed: () => Navigator.of(context).maybePop(),
+                              tooltip: MaterialLocalizations.of(context)
+                                  .closeButtonLabel,
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ),
+                          _ActivityHeatmapCard(
+                            overview: widget.overview,
+                            history: widget.history,
+                            expanded: true,
+                            initialDay: selectedDay,
+                            initialMonth: visibleMonth,
+                            initialMode: _mode,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final chips = <Widget>[
+            if (widget.expanded) ...[
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final view in _ActivityHeatmapView.values)
+                    ChoiceChip(
+                      label: Text(_activityHeatmapViewLabel(context, view)),
+                      selected: _view == view,
+                      showCheckmark: false,
+                      onSelected: (_) => setState(() => _view = view),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          ];
+          final view = AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: switch (widget.expanded
+                ? _view
+                : _ActivityHeatmapView.calendar) {
+              _ActivityHeatmapView.calendar => _ActivityHeatmapCalendar(
+                key: const ValueKey('activity-calendar'),
+                days: days,
+                overview: widget.overview,
+                visibleMonth: visibleMonth,
+                mode: _mode,
+                onModeChanged: (value) => setState(() => _mode = value),
+                onMonthChanged: (month) {
+                  setState(() {
+                    _visibleMonth = month;
+                    final inMonth = days
+                        .where(
+                          (day) =>
+                              day.date.year == month.year &&
+                              day.date.month == month.month,
+                        )
+                        .toList();
+                    if (inMonth.isNotEmpty) {
+                      _selectedDay = _defaultSelectedActivityDay(inMonth);
+                    }
+                  });
+                },
+                selectedDay: selectedDay,
+                onSelectDay: _selectDay,
+              ),
+              _ActivityHeatmapView.weekdays => _ActivityWeekdayRhythm(
+                key: const ValueKey('activity-weekdays'),
+                days: days,
+              ),
+              _ActivityHeatmapView.highlights => _ActivityHighlights(
+                key: const ValueKey('activity-highlights'),
+                summary: summary,
+                days: days,
+              ),
+            },
+          );
+          final dayDetails = <Widget>[
+            if (unplacedSupplementalTrackCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  _t(
+                    context,
+                    '$unplacedSupplementalTrackCount outside-library ${unplacedSupplementalTrackCount == 1 ? 'track has' : 'tracks have'} no known playback/observation date and ${unplacedSupplementalTrackCount == 1 ? 'is' : 'are'} excluded from daily totals.',
+                    '再生日または確認日が不明なライブラリ外の曲が$unplacedSupplementalTrackCount曲あり、日別合計には含まれていません。',
+                    zh: '$unplacedSupplementalTrackCount 首资料库外歌曲没有已知的播放或确认日期，因此不计入每日总数。',
+                    ko: '재생일 또는 확인일을 알 수 없는 보관함 외 곡 $unplacedSupplementalTrackCount곡은 일별 합계에서 제외됩니다.',
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            if (calendarVisible) ...[
+              _ActivityDaySelector(
+                days: days,
+                selectedDay: selectedDay,
+                onSelectDay: _selectDay,
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (selectedDay != null)
+              _ActivityDayDetail(
+                day: selectedDay,
+                sourceLabel: sourceLabel,
+                overview: widget.overview,
+                mode: _mode,
+              ),
+            if (!calendarVisible) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _AnalysisPill(
+                    label: _t(context, 'Active days', '再生日'),
+                    value: _numberFormat(context).format(summary.activeDays),
+                  ),
+                  _AnalysisPill(
+                    label: _t(context, 'Longest streak', '最長連続'),
+                    value: _dayCountLabel(context, summary.longestStreak),
+                  ),
+                  if (summary.bestWeekday != null)
+                    _AnalysisPill(
+                      label: _t(context, 'Best weekday', 'よく聴く曜日'),
+                      value: _weekdayLabel(context, summary.bestWeekday!),
+                    ),
+                ],
+              ),
+            ],
+          ];
+          // Wide screens put the grid and the selected day side by side so the
+          // card is not one tall column with an empty half beside it.
+          if (calendarVisible && constraints.maxWidth >= 640) {
+            return Column(
+              key: const ValueKey('activity-card-content'),
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (widget.expanded) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<_ActivityHeatmapView>(
-                      showSelectedIcon: false,
-                      segments: _ActivityHeatmapView.values
-                          .map(
-                            (view) => ButtonSegment<_ActivityHeatmapView>(
-                              value: view,
-                              label: Text(
-                                _activityHeatmapViewLabel(context, view),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      selected: {_view},
-                      onSelectionChanged: (selection) {
-                        setState(() {
-                          _view = selection.first;
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (!widget.expanded ||
-                    _view == _ActivityHeatmapView.calendar) ...[
-                  _ActivityDaySelector(
-                    days: days,
-                    selectedDay: selectedDay,
-                    onSelectDay: (day) {
-                      setState(() {
-                        _selectedDay = day;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: switch (widget.expanded
-                      ? _view
-                      : _ActivityHeatmapView.calendar) {
-                    _ActivityHeatmapView.calendar => _ActivityHeatmapCalendar(
-                      key: const ValueKey('activity-calendar'),
-                      days: days,
-                      maxValue: maxValue,
-                      selectedDay: selectedDay,
-                      expanded: widget.expanded,
-                      onSelectDay: (day) {
-                        setState(() {
-                          _selectedDay = day;
-                        });
-                      },
-                    ),
-                    _ActivityHeatmapView.weekdays => _ActivityWeekdayRhythm(
-                      key: const ValueKey('activity-weekdays'),
-                      days: days,
-                    ),
-                    _ActivityHeatmapView.highlights => _ActivityHighlights(
-                      key: const ValueKey('activity-highlights'),
-                      summary: summary,
-                      days: days,
-                    ),
-                  },
-                ),
-                const SizedBox(height: 12),
-                if (selectedDay != null)
-                  _ActivityDayDetail(
-                    day: selectedDay,
-                    sourceLabel: sourceLabel,
-                  ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                ...chips,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _AnalysisPill(
-                      label: _t(context, 'Active days', '再生日'),
-                      value: _numberFormat(context).format(summary.activeDays),
-                    ),
-                    _AnalysisPill(
-                      label: _t(context, 'Longest streak', '最長連続'),
-                      value: _dayCountLabel(context, summary.longestStreak),
-                    ),
-                    if (summary.bestWeekday != null)
-                      _AnalysisPill(
-                        label: _t(context, 'Best weekday', 'よく聴く曜日'),
-                        value: _weekdayLabel(context, summary.bestWeekday!),
+                    Expanded(flex: 3, child: view),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: dayDetails,
                       ),
-                    const _ActivityHeatmapLegend(),
+                    ),
                   ],
                 ),
               ],
-            ),
+            );
+          }
+          return Column(
+            key: const ValueKey('activity-card-content'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ...chips,
+              view,
+              const SizedBox(height: 12),
+              ...dayDetails,
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -947,94 +1117,681 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
   const _ActivityHeatmapCalendar({
     super.key,
     required this.days,
-    required this.maxValue,
+    required this.overview,
+    required this.visibleMonth,
+    required this.mode,
+    required this.onModeChanged,
+    required this.onMonthChanged,
     required this.selectedDay,
-    required this.expanded,
     required this.onSelectDay,
   });
 
   final List<_ActivityHeatmapDay> days;
-  final int maxValue;
+  final LibraryOverview overview;
+  final DateTime visibleMonth;
+  final _ActivityCalendarMode mode;
+  final ValueChanged<_ActivityCalendarMode> onModeChanged;
+  final ValueChanged<DateTime> onMonthChanged;
   final _ActivityHeatmapDay? selectedDay;
-  final bool expanded;
   final ValueChanged<_ActivityHeatmapDay> onSelectDay;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final weeks = _activityHeatmapWeeks(days);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cellSize = expanded
-            ? constraints.maxWidth >= 520
-                  ? 18.0
-                  : 14.0
-            : constraints.maxWidth >= 360
-            ? 14.0
-            : 12.0;
-        final rowHeight = cellSize + 4;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final today = _localDateOnly(DateTime.now());
+    final first = DateTime(visibleMonth.year, visibleMonth.month);
+    final last = DateTime(first.year, first.month + 1, 0);
+    final previous = DateTime(first.year, first.month - 1);
+    final next = DateTime(first.year, first.month + 1);
+    final firstAvailable = DateTime(
+      days.first.date.year,
+      days.first.date.month,
+    );
+    final lastAvailable = DateTime(days.last.date.year, days.last.date.month);
+    final byDate = {for (final day in days) snapshotDateKey(day.date): day};
+    final offset = first.weekday % 7;
+    final rowCount = ((offset + last.day) / 7).ceil();
+    final weeks = List.generate(
+      rowCount,
+      (week) => List<DateTime?>.generate(7, (column) {
+        final day = week * 7 + column - offset + 1;
+        return day < 1 || day > last.day
+            ? null
+            : DateTime(first.year, first.month, day);
+      }),
+    );
+    // Week totals cover all seven days, including those that spill into the
+    // neighbouring months, so partial rows at month edges stay comparable.
+    final fullWeeks = List.generate(
+      rowCount,
+      (week) => List<DateTime>.generate(
+        7,
+        (column) =>
+            DateTime(first.year, first.month, week * 7 + column - offset + 1),
+      ),
+    );
+    final totals = fullWeeks
+        .map(
+          (week) => week.fold<int>(
+            0,
+            (total, date) =>
+                total + (byDate[snapshotDateKey(date)]?.playCount ?? 0),
+          ),
+        )
+        .toList();
+    final maxTotal = totals.fold<int>(0, math.max);
+    final hasAnyRecord = weeks
+        .expand((week) => week)
+        .whereType<DateTime>()
+        .any((date) => byDate[snapshotDateKey(date)]?.hasRecord ?? false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
+            for (final (index, option) in _ActivityCalendarMode.values.indexed)
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(left: index == 0 ? 0 : 6),
+                  child: _ActivityCalendarModeButton(
+                    key: ValueKey('activity-calendar-mode-${option.name}'),
+                    label: switch (option) {
+                      _ActivityCalendarMode.song => _t(
+                        context,
+                        'Song',
+                        '曲',
+                        zh: '歌曲',
+                        ko: '곡',
+                      ),
+                      _ActivityCalendarMode.album => _t(
+                        context,
+                        'Album',
+                        'アルバム',
+                        zh: '专辑',
+                        ko: '앨범',
+                      ),
+                      _ActivityCalendarMode.artist => _t(
+                        context,
+                        'Artist',
+                        'アーティスト',
+                        zh: '艺人',
+                        ko: '아티스트',
+                      ),
+                    },
+                    selected: mode == option,
+                    onPressed: () => onModeChanged(option),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        // Always one line, so switching modes never shifts the calendar.
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            switch (mode) {
+              _ActivityCalendarMode.song => _t(
+                context,
+                'Cover of the most-played song each day',
+                'その日いちばん聴いた曲',
+                zh: '当天播放最多的歌曲',
+                ko: '그날 가장 많이 들은 곡',
+              ),
+              _ActivityCalendarMode.album => _t(
+                context,
+                'Cover of the most-played album each day',
+                'その日いちばん聴いたアルバム',
+                zh: '当天播放最多的专辑',
+                ko: '그날 가장 많이 들은 앨범',
+              ),
+              _ActivityCalendarMode.artist => _t(
+                context,
+                'Top song of the most-played artist each day',
+                'その日いちばん聴いたアーティストの代表曲',
+                zh: '当天播放最多的艺人的代表歌曲',
+                ko: '그날 가장 많이 들은 아티스트의 대표 곡',
+              ),
+            },
+            key: const ValueKey('activity-calendar-mode-caption'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final inlineToday =
+                constraints.maxWidth >= 260 &&
+                MediaQuery.textScalerOf(context).scale(1) < 1.5;
+            // The arrows sit at both ends, matching the day selector below,
+            // and Today travels with the month label in the centre.
+            const arrowConstraints = BoxConstraints.tightFor(
+              width: kMinInteractiveDimension,
+              height: kMinInteractiveDimension,
+            );
+            final todayButton = TextButton(
+              key: const ValueKey('activity-calendar-today'),
+              onPressed: () => onSelectDay(days.last),
+              child: Text(_t(context, 'Today', '今日', zh: '今天', ko: '오늘')),
+            );
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      key: const ValueKey('activity-calendar-previous-month'),
+                      constraints: arrowConstraints,
+                      tooltip: _t(
+                        context,
+                        'Previous month',
+                        '前の月',
+                        zh: '上个月',
+                        ko: '이전 달',
+                      ),
+                      onPressed: first.isAfter(firstAvailable)
+                          ? () => onMonthChanged(previous)
+                          : null,
+                      icon: const Icon(Icons.chevron_left_rounded),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                DateFormat.yMMMM(_localeName(context))
+                                    .format(first),
+                                key: const ValueKey(
+                                  'activity-calendar-month-label',
+                                ),
+                                maxLines: 1,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (inlineToday) ...[
+                            const SizedBox(width: 6),
+                            todayButton,
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      key: const ValueKey('activity-calendar-next-month'),
+                      constraints: arrowConstraints,
+                      tooltip: _t(
+                        context,
+                        'Next month',
+                        '次の月',
+                        zh: '下个月',
+                        ko: '다음 달',
+                      ),
+                      onPressed: first.isBefore(lastAvailable)
+                          ? () => onMonthChanged(next)
+                          : null,
+                      icon: const Icon(Icons.chevron_right_rounded),
+                    ),
+                  ],
+                ),
+                if (!inlineToday)
+                  Align(alignment: Alignment.centerRight, child: todayButton),
+              ],
+            );
+          },
+        ),
+        Row(
+          children: [
+            for (final weekday in [
+              DateTime.sunday,
+              DateTime.monday,
+              DateTime.tuesday,
+              DateTime.wednesday,
+              DateTime.thursday,
+              DateTime.friday,
+              DateTime.saturday,
+            ])
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _weekdayShortLabel(context, weekday),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: _isWeekend(weekday)
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        for (var weekIndex = 0; weekIndex < weeks.length; weekIndex++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              key: ValueKey('activity-calendar-week-$weekIndex'),
+              padding: const EdgeInsets.fromLTRB(5, 6, 5, 7),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.24),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.35,
+                  ),
+                ),
+              ),
               child: Column(
                 children: [
-                  for (final weekday in _calendarWeekdayOrder)
-                    SizedBox(
-                      height: rowHeight,
-                      width: expanded ? 28 : 22,
-                      child: Align(
-                        alignment: Alignment.centerRight,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final date in weeks[weekIndex])
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: date == null
+                                ? const SizedBox.shrink()
+                                : _ActivityCalendarDayCell(
+                                    date: date,
+                                    day: byDate[snapshotDateKey(date)],
+                                    overview: overview,
+                                    mode: mode,
+                                    selected:
+                                        selectedDay != null &&
+                                        _sameLocalDate(date, selectedDay!.date),
+                                    future: date.isAfter(today),
+                                    onTap:
+                                        byDate.containsKey(
+                                              snapshotDateKey(date),
+                                            ) &&
+                                            !date.isAfter(today)
+                                        ? () => onSelectDay(
+                                            byDate[snapshotDateKey(date)]!,
+                                          )
+                                        : null,
+                                  ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _ActivityCalendarWeekTotal(
+                    total: totals[weekIndex],
+                    maxTotal: maxTotal,
+                    hasRecord: fullWeeks[weekIndex].any(
+                      (date) =>
+                          byDate[snapshotDateKey(date)]?.hasRecord ?? false,
+                    ),
+                    // Only a week that has not ended yet is partial; past
+                    // days without a record already show as "–".
+                    incomplete: fullWeeks[weekIndex].any(
+                      (date) => !date.isBefore(today),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (!hasAnyRecord)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              _t(
+                context,
+                'No daily records this month. New listening records will appear here.',
+                'この月の日別記録はありません。記録がたまるとここに表示します。',
+                zh: '本月暂无每日记录。新的收听记录将显示在这里。',
+                ko: '이번 달 일별 기록이 없습니다. 새 청취 기록이 여기에 표시됩니다.',
+              ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ActivityCalendarModeButton extends StatelessWidget {
+  const _ActivityCalendarModeButton({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      selected: selected,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: selected
+              ? colors.primaryContainer
+              : colors.surface.withValues(alpha: 0.25),
+          foregroundColor: selected
+              ? colors.onPrimaryContainer
+              : colors.onSurfaceVariant,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          side: BorderSide(
+            color: selected
+                ? colors.primary.withValues(alpha: 0.45)
+                : colors.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        // Scale down rather than wrap so all mode buttons keep one height.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, maxLines: 1, textAlign: TextAlign.center),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityCalendarDayCell extends StatelessWidget {
+  const _ActivityCalendarDayCell({
+    required this.date,
+    required this.day,
+    required this.overview,
+    required this.mode,
+    required this.selected,
+    required this.future,
+    required this.onTap,
+  });
+  final DateTime date;
+  final _ActivityHeatmapDay? day;
+  final LibraryOverview overview;
+  final _ActivityCalendarMode mode;
+  final bool selected;
+  final bool future;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // Days before the ~12-week window have no data at all, which is not the
+    // same as a recorded day without plays.
+    final outsideRange = day == null && !future;
+    final entry = day == null || future
+        ? null
+        : _activityCalendarEntry(day!, mode: mode, overview: overview);
+    final status = future
+        ? _t(context, 'Future day', '未来の日', zh: '未来日期', ko: '미래 날짜')
+        : outsideRange
+        ? _t(
+            context,
+            'Outside the record period',
+            '記録期間外',
+            zh: '不在记录期间内',
+            ko: '기록 기간 외',
+          )
+        : day?.hasRecord == true
+        ? _playCountLabel(context, day!.playCount)
+        : _t(context, 'No record', '記録なし', zh: '无记录', ko: '기록 없음');
+    final label =
+        '${DateFormat.yMMMd(_localeName(context)).format(date)}: $status${entry == null ? '' : ', ${entry.label}, ${_playCountLabel(context, entry.playCount)}'}';
+    return Semantics(
+      key: ValueKey('activity-calendar-day-${snapshotDateKey(date)}'),
+      container: true,
+      button: onTap != null,
+      enabled: onTap != null,
+      selected: selected,
+      label: label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(6),
+            child: Opacity(
+              opacity: future || outsideRange ? 0.35 : 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 24,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
                         child: Text(
-                          _weekdayShortLabel(context, weekday),
+                          '${date.day}',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: _isWeekend(weekday)
+                            fontWeight: FontWeight.w800,
+                            color: selected
                                 ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w900,
+                                : theme.colorScheme.onSurface,
                           ),
                         ),
                       ),
                     ),
+                  ),
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: selected
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outlineVariant.withValues(
+                                  alpha: 0.38,
+                                ),
+                          width: selected ? 2 : 1,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(selected ? 2 : 1),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: entry != null
+                              ? _ActivityCalendarArtwork(
+                                  overview: overview,
+                                  track: entry.track,
+                                )
+                              : ColoredBox(
+                                  color: theme
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                      .withValues(alpha: 0.22),
+                                  child: Center(
+                                    child: Text(
+                                      future || outsideRange
+                                          ? ''
+                                          : day?.hasRecord == true &&
+                                                day!.playCount == 0
+                                          ? '0'
+                                          : '–',
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: weeks
-                      .map(
-                        (week) => Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: Column(
-                            children: week
-                                .map(
-                                  (day) => _ActivityHeatmapCell(
-                                    day: day,
-                                    maxValue: maxValue,
-                                    size: cellSize,
-                                    selected: _sameActivityDate(
-                                      day,
-                                      selectedDay,
-                                    ),
-                                    onTap: () => onSelectDay(day),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityCalendarWeekTotal extends StatelessWidget {
+  const _ActivityCalendarWeekTotal({
+    required this.total,
+    required this.maxTotal,
+    required this.hasRecord,
+    required this.incomplete,
+  });
+  final int total;
+  final int maxTotal;
+  final bool hasRecord;
+  final bool incomplete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = !hasRecord
+        ? _t(context, 'No record', '記録なし', zh: '无记录', ko: '기록 없음')
+        : '${_playCountLabel(context, total)}${incomplete ? _t(context, ' (partial)', '（途中）', zh: '（部分）', ko: ' (일부)') : ''}';
+    final bar = ClipRRect(
+      borderRadius: BorderRadius.circular(99),
+      child: LinearProgressIndicator(
+        value: maxTotal == 0 ? 0 : total / maxTotal,
+        minHeight: 6,
+        color: theme.colorScheme.primary.withValues(
+          alpha: incomplete ? 0.65 : 1,
+        ),
+        backgroundColor: theme.colorScheme.outlineVariant.withValues(
+          alpha: 0.26,
+        ),
+        semanticsLabel: label,
+      ),
+    );
+    final value = Text(
+      label,
+      textAlign: TextAlign.right,
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: incomplete || !hasRecord
+            ? theme.colorScheme.onSurfaceVariant
+            : theme.colorScheme.primary,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked =
+            constraints.maxWidth < 240 ||
+            MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [bar, const SizedBox(height: 4), value],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: bar),
+            const SizedBox(width: 10),
+            SizedBox(width: 88, child: value),
           ],
         );
       },
     );
+  }
+}
+
+/// Library tracks that may hold artwork for a recorded song. Recorded ids can
+/// point at a duplicate without artwork (snapshots merge same-name copies) or
+/// go stale when the Music library reassigns persistent ids, so the same song
+/// by title, artist and album is tried after the recorded id.
+List<LibraryTrack> _libraryTracksForDelta(
+  LibraryOverview overview,
+  TrackCounterDelta delta,
+) {
+  String normalize(String value) => value.trim().toLowerCase();
+  final title = normalize(delta.title);
+  final album = normalize(delta.albumTitle);
+  final byId = overview.trackById(delta.id);
+  return [
+    ?byId,
+    for (final track in overview.tracksForArtist(delta.artist))
+      if (track.id != delta.id &&
+          normalize(track.title) == title &&
+          normalize(track.albumTitle) == album)
+        track,
+  ];
+}
+
+class _ActivityCalendarArtwork extends ConsumerWidget {
+  const _ActivityCalendarArtwork({required this.overview, required this.track});
+  final LibraryOverview overview;
+  final TrackCounterDelta track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final candidates = _libraryTracksForDelta(overview, track);
+    Uint8List? bytes;
+    for (final id in [
+      if (candidates.isEmpty) track.id,
+      for (final candidate in candidates) candidate.id,
+    ]) {
+      final artwork = ref.watch(trackArtworkProvider(id));
+      bytes = artwork.asData?.value;
+      // Move to the next copy only once this one is known to have no artwork.
+      if (bytes != null || artwork.isLoading) break;
+    }
+    final asset = candidates.firstOrNull?.artworkAsset;
+    final colors = Theme.of(context).colorScheme;
+    Widget fallback() => ColoredBox(
+      color: colors.primaryContainer.withValues(alpha: 0.3),
+      child: Center(
+        child: Icon(
+          Icons.album_outlined,
+          color: colors.onSurfaceVariant,
+          size: 20,
+        ),
+      ),
+    );
+    if (bytes != null) {
+      return Image.memory(
+        bytes,
+        cacheWidth: 256,
+        cacheHeight: 256,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => fallback(),
+      );
+    }
+    if (asset != null) {
+      return Image.asset(
+        asset,
+        cacheWidth: 256,
+        cacheHeight: 256,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback(),
+      );
+    }
+    return fallback();
   }
 }
 
@@ -1133,7 +1890,7 @@ String _activityDaySelectorLabel(
   _ActivityHeatmapDay day,
 ) {
   return '${DateFormat.yMMMd(_localeName(context)).format(day.date)} - '
-      '${_playCountLabel(context, day.playCount)}';
+      '${day.hasRecord ? _playCountLabel(context, day.playCount) : _t(context, 'No record', '記録なし', zh: '无记录', ko: '기록 없음')}';
 }
 
 class _ActivityWeekdayHeader extends StatelessWidget {
@@ -1233,15 +1990,34 @@ class _ActivityWeekdayRhythm extends StatelessWidget {
 }
 
 class _ActivityDayDetail extends StatelessWidget {
-  const _ActivityDayDetail({required this.day, required this.sourceLabel});
+  const _ActivityDayDetail({
+    required this.day,
+    required this.sourceLabel,
+    required this.overview,
+    required this.mode,
+  });
 
   final _ActivityHeatmapDay day;
   final String sourceLabel;
+  final LibraryOverview overview;
+  final _ActivityCalendarMode mode;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final topTracks = day.trackDeltas.take(3).toList(growable: false);
+    final winner = _activityCalendarEntry(day, mode: mode, overview: overview);
+    final recordLabel = !day.hasRecord
+        ? _t(context, 'No daily record', '日別記録なし', zh: '无每日记录', ko: '일별 기록 없음')
+        : day.estimated
+        ? _t(
+            context,
+            'Recent-track estimate',
+            '最近再生からの推定',
+            zh: '最近播放估算',
+            ko: '최근 재생 추정',
+          )
+        : sourceLabel;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.primary.withValues(alpha: 0.08),
@@ -1255,25 +2031,33 @@ class _ActivityDayDetail extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Icon(
                   Icons.event_available_rounded,
                   size: 18,
                   color: theme.colorScheme.primary,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _t(context, 'Selected day', '選択中の日'),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w900,
-                    ),
+                Text(
+                  _t(context, 'Selected day', '選択中の日', zh: '所选日期', ko: '선택한 날'),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 Text(
-                  _playCountLabel(context, day.playCount),
+                  day.hasRecord
+                      ? _playCountLabel(context, day.playCount)
+                      : _t(
+                          context,
+                          'No record',
+                          '記録なし',
+                          zh: '无记录',
+                          ko: '기록 없음',
+                        ),
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -1283,12 +2067,115 @@ class _ActivityDayDetail extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               '${DateFormat.yMMMd(_localeName(context)).format(day.date)}'
-              ' (${_weekdayLabel(context, day.date.weekday)}) / $sourceLabel',
+              ' (${_weekdayLabel(context, day.date.weekday)}) / $recordLabel',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (day.observationPlayCount > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                _t(
+                  context,
+                  'Includes at least ${day.observationPlayCount} play(s) confirmed from history on the observation day.',
+                  '確認日に履歴から確認できた再生${day.observationPlayCount}回以上を含みます',
+                  zh: '包含在确认日从历史记录确认的至少 ${day.observationPlayCount} 次播放。',
+                  ko: '확인일에 기록에서 확인된 재생을 최소 ${day.observationPlayCount}회 포함합니다.',
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            if (winner != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox.square(
+                    dimension: 64,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: _ActivityCalendarArtwork(
+                        overview: overview,
+                        track: winner.track,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          switch (mode) {
+                            _ActivityCalendarMode.song => _t(
+                              context,
+                              'Top song',
+                              'トップソング',
+                              zh: '热门歌曲',
+                              ko: '최다 재생 곡',
+                            ),
+                            _ActivityCalendarMode.album => _t(
+                              context,
+                              'Top album',
+                              'トップアルバム',
+                              zh: '热门专辑',
+                              ko: '최다 재생 앨범',
+                            ),
+                            _ActivityCalendarMode.artist => _t(
+                              context,
+                              'Top artist',
+                              'トップアーティスト',
+                              zh: '热门艺人',
+                              ko: '최다 재생 아티스트',
+                            ),
+                          },
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          winner.label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          switch (mode) {
+                            _ActivityCalendarMode.song => winner.track.artist,
+                            _ActivityCalendarMode.album =>
+                              winner.track.albumArtist ??
+                                  _libraryTracksForDelta(
+                                    overview,
+                                    winner.track,
+                                  ).firstOrNull?.albumArtist ??
+                                  winner.track.artist,
+                            _ActivityCalendarMode.artist => winner.track.title,
+                          },
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          _playCountLabel(context, winner.playCount),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (topTracks.isNotEmpty) ...[
               const SizedBox(height: 10),
               for (final track in topTracks)
@@ -1324,6 +2211,8 @@ class _ActivityDayDetail extends StatelessWidget {
                   context,
                   'Song detail is unavailable for this day.',
                   'この日の曲別詳細はありません。',
+                  zh: '这一天没有歌曲详情。',
+                  ko: '이 날의 곡 상세 정보가 없습니다.',
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -1351,7 +2240,9 @@ class _ActivityHighlights extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final peakDay = summary.peakDay;
-    final calmDays = days.where((day) => day.playCount == 0).length;
+    final calmDays = days
+        .where((day) => day.hasRecord && day.playCount == 0)
+        .length;
     return Wrap(
       spacing: 10,
       runSpacing: 10,
@@ -1456,46 +2347,6 @@ class _ActivityMetricTile extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ActivityHeatmapLegend extends StatelessWidget {
-  const _ActivityHeatmapLegend();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          _t(context, 'Less', '少'),
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(width: 6),
-        for (var index = 0; index < 4; index++)
-          Container(
-            width: 11,
-            height: 11,
-            margin: const EdgeInsets.only(right: 3),
-            decoration: BoxDecoration(
-              color: _activityHeatmapColor(theme, index + 1, 4),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-        const SizedBox(width: 3),
-        Text(
-          _t(context, 'More', '多'),
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -2027,105 +2878,20 @@ class _LegendChip extends StatelessWidget {
   }
 }
 
-class _ActivityHeatmapCell extends StatelessWidget {
-  const _ActivityHeatmapCell({
-    required this.day,
-    required this.maxValue,
-    required this.size,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _ActivityHeatmapDay day;
-  final int maxValue;
-  final double size;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = _activityHeatmapColor(theme, day.playCount, maxValue);
-    final ratio = maxValue <= 0 ? 0.0 : (day.playCount / maxValue).clamp(0, 1);
-    final label = _t(
-      context,
-      '${DateFormat.MMMd(_localeName(context)).format(day.date)}: '
-          '${_playCountLabel(context, day.playCount)}',
-      '${DateFormat.MMMd(_localeName(context)).format(day.date)}: '
-          '${_playCountLabel(context, day.playCount)}',
-      zh:
-          '${DateFormat.MMMd(_localeName(context)).format(day.date)}：'
-          '${_playCountLabel(context, day.playCount)}',
-      ko:
-          '${DateFormat.MMMd(_localeName(context)).format(day.date)}: '
-          '${_playCountLabel(context, day.playCount)}',
-    );
-
-    return Semantics(
-      container: true,
-      button: true,
-      selected: selected,
-      label: label,
-      onTap: onTap,
-      excludeSemantics: true,
-      child: Tooltip(
-        message: label,
-        triggerMode: TooltipTriggerMode.tap,
-        showDuration: const Duration(seconds: 3),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: size,
-            height: size,
-            margin: const EdgeInsets.only(bottom: 4),
-            padding: EdgeInsets.all(selected ? 2 : 1.5),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.42,
-              ),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.28),
-                width: selected ? 1.8 : 1,
-              ),
-            ),
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: double.infinity,
-                height: day.playCount <= 0
-                    ? 0
-                    : math.max(3, (size - 4) * ratio),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2.5),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _OverviewAnalysisCard extends StatelessWidget {
   const _OverviewAnalysisCard({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.child,
+    this.trailing,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final Widget child;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -2182,6 +2948,7 @@ class _OverviewAnalysisCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                ?trailing,
               ],
             ),
             const SizedBox(height: 14),

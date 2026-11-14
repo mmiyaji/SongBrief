@@ -1,8 +1,126 @@
+import CloudKit
 import Foundation
+import MusicKit
 import XCTest
 @testable import Runner
 
 final class RunnerTests: XCTestCase {
+  func testSupplementalCloudPayloadValidationAndRevisionDecision() {
+    XCTAssertTrue(SnapshotCloudSync.validateSupplementalPayload("{\"version\":1,\"entries\":[]}"))
+    XCTAssertFalse(SnapshotCloudSync.validateSupplementalPayload("{\"version\":2,\"entries\":[]}"))
+    XCTAssertFalse(SnapshotCloudSync.validateSupplementalPayload("{\"version\":1}"))
+    XCTAssertFalse(SnapshotCloudSync.validateSupplementalPayload("not json"))
+    XCTAssertTrue(SnapshotCloudSync.supplementalRevisionMatches(expected: nil, current: nil))
+    XCTAssertTrue(SnapshotCloudSync.supplementalRevisionMatches(expected: "tag", current: "tag"))
+    XCTAssertFalse(SnapshotCloudSync.supplementalRevisionMatches(expected: nil, current: "tag"))
+    XCTAssertFalse(SnapshotCloudSync.supplementalRevisionMatches(expected: "tag", current: nil))
+    XCTAssertFalse(SnapshotCloudSync.supplementalRevisionMatches(expected: "old", current: "new"))
+    let recordID = CKRecord.ID(recordName: SnapshotCloudSync.supplementalHistoryRecordName)
+    let partialConflict = CKError(.partialFailure, userInfo: [
+      CKPartialErrorsByItemIDKey: [recordID: CKError(.serverRecordChanged)],
+    ])
+    XCTAssertTrue(SnapshotCloudSync.isSupplementalSaveConflict(partialConflict, recordID: recordID))
+    XCTAssertFalse(SnapshotCloudSync.isSupplementalSaveConflict(CKError(.networkFailure), recordID: recordID))
+  }
+
+  func testSupplementalCloudPayloadCompressesLargeLedgersAndRejectsInvalidCompression() throws {
+    let rawPayload = "{\"version\":1,\"entries\":[" + String(repeating: " ", count: 800_000) + "]}"
+
+    let storedPayload = try SnapshotCloudSync.cloudSupplementalPayload(for: rawPayload)
+
+    XCTAssertLessThanOrEqual(storedPayload.utf8.count, SnapshotCloudSync.maximumInlinePayloadBytes)
+    XCTAssertNotEqual(storedPayload, rawPayload)
+    XCTAssertEqual(SnapshotCloudSync.supplementalPayload(fromCloud: storedPayload), rawPayload)
+    XCTAssertNil(SnapshotCloudSync.supplementalPayload(fromCloud: "songbrief:supplemental:zlib:v1:not-base64"))
+  }
+  func testRecentlyPlayedMappingPreservesActualLastPlayedDateWithoutInventingCounts() {
+    let track = MusicLibraryBridge.recentlyPlayedTrackMap(
+      musicItemID: "12345", title: " Song ", artist: " Artist ",
+      albumTitle: " Album ", duration: 180.6, genre: " Pop ",
+      lastPlayedDate: Date(timeIntervalSince1970: 1_800_000_000)
+    )
+
+    XCTAssertEqual(track["id"] as? String, "musickit:12345")
+    XCTAssertEqual(track["appleMusicStoreId"] as? String, "12345")
+    XCTAssertEqual(track["title"] as? String, "Song")
+    XCTAssertEqual(track["artist"] as? String, "Artist")
+    XCTAssertEqual(track["albumTitle"] as? String, "Album")
+    XCTAssertEqual(track["genre"] as? String, "Pop")
+    XCTAssertEqual(track["durationSeconds"] as? Int, 181)
+    XCTAssertEqual(track["lastPlayedAtMillis"] as? Int, 1_800_000_000_000)
+    XCTAssertEqual(track["playCount"] as? Int, 0)
+    XCTAssertEqual(track["skipCount"] as? Int, 0)
+    XCTAssertEqual(track["isCloudItem"] as? Bool, true)
+  }
+
+  func testRecentlyPlayedMappingLeavesUnknownTimestampAbsent() {
+    let track = MusicLibraryBridge.recentlyPlayedTrackMap(
+      musicItemID: "12345", title: "", artist: " ",
+      albumTitle: nil, duration: nil, genre: nil, lastPlayedDate: nil
+    )
+
+    XCTAssertNil(track["lastPlayedAtMillis"])
+    XCTAssertNil(track["genre"])
+    XCTAssertNil(track["albumArtist"])
+    XCTAssertEqual(track["title"] as? String, "Untitled")
+    XCTAssertEqual(track["artist"] as? String, "Unknown Artist")
+    XCTAssertEqual(track["albumTitle"] as? String, "Unknown Album")
+    XCTAssertEqual(track["durationSeconds"] as? Int, 0)
+  }
+
+  func testRecentlyPlayedMappingKeepsOpaqueIdentityWithoutInventingCatalogID() {
+    let track = MusicLibraryBridge.recentlyPlayedTrackMap(
+      musicItemID: "i.opaque-library-id", title: "Song", artist: "Artist",
+      albumTitle: nil, duration: nil, genre: nil, lastPlayedDate: nil,
+      appleMusicUrl: URL(string: "https://music.apple.com/us/song/song/12345")
+    )
+
+    XCTAssertEqual(track["id"] as? String, "musickit:i.opaque-library-id")
+    XCTAssertNil(track["appleMusicStoreId"])
+    XCTAssertEqual(track["appleMusicUrl"] as? String,
+                   "https://music.apple.com/us/song/song/12345")
+  }
+
+  func testStoreIDValidationAcceptsOnlyPositiveDecimalIdentifiers() {
+    XCTAssertEqual(MusicLibraryBridge.validAppleMusicStoreID("12345"), "12345")
+    XCTAssertNil(MusicLibraryBridge.validAppleMusicStoreID("0"))
+    XCTAssertNil(MusicLibraryBridge.validAppleMusicStoreID("not-a-store-id"))
+    XCTAssertNil(MusicLibraryBridge.validAppleMusicStoreID("12x"))
+  }
+
+  func testPlaybackMappingKeepsLibraryAndCatalogIdentifiersDistinct() {
+    let valid = MusicLibraryBridge.playbackMap(
+      persistentID: 77, playbackStoreID: "12345", title: "Song",
+      artist: "Artist", albumTitle: "Album", duration: 120
+    )
+    XCTAssertEqual(valid["trackId"] as? String, "77")
+    XCTAssertEqual(valid["appleMusicStoreId"] as? String, "12345")
+
+    for storeID in ["0", "invalid"] {
+      let invalid = MusicLibraryBridge.playbackMap(
+        persistentID: 77, playbackStoreID: storeID, title: nil,
+        artist: nil, albumTitle: nil, duration: nil
+      )
+      XCTAssertEqual(invalid["trackId"] as? String, "77")
+      XCTAssertNil(invalid["appleMusicStoreId"])
+    }
+  }
+
+  func testRecentlyPlayedAccessReportsUnsupportedAndUnauthorizedSeparately() {
+    XCTAssertEqual(MusicLibraryBridge.recentlyPlayedAccessError(
+      isSupported: false, authorizationStatus: .authorized
+    )?.code, "music_recently_played_unsupported")
+    let statuses: [MusicAuthorization.Status] = [.notDetermined, .denied, .restricted]
+    for status in statuses {
+      XCTAssertEqual(MusicLibraryBridge.recentlyPlayedAccessError(
+        isSupported: true, authorizationStatus: status
+      )?.code, "music_recently_played_not_authorized")
+    }
+    XCTAssertNil(MusicLibraryBridge.recentlyPlayedAccessError(
+      isSupported: true, authorizationStatus: .authorized
+    ))
+  }
+
   func testFailedMusicQueryIsNotTreatedAsAnEmptyLibrary() throws {
     let unavailable: [Int]? = nil
     XCTAssertThrowsError(try MusicLibraryBridge.requireQueryResult(unavailable))

@@ -12,8 +12,10 @@ class LibraryTrack {
     this.genre,
     this.artworkAsset,
     this.appleMusicStoreId,
+    this.appleMusicUrl,
     this.releaseDate,
     this.lastPlayedAt,
+    this.lastPlayedAtIsObservation = false,
     this.lyrics,
     this.playlistNames = const <String>[],
   });
@@ -26,11 +28,15 @@ class LibraryTrack {
   final String? genre;
   final String? artworkAsset;
   final String? appleMusicStoreId;
+  final String? appleMusicUrl;
   final DateTime? releaseDate;
   final Duration duration;
   final int playCount;
   final int skipCount;
   final DateTime? lastPlayedAt;
+
+  /// Display-only evidence date from an observation, not an exact playback time.
+  final bool lastPlayedAtIsObservation;
   final bool isCloudItem;
   final String? lyrics;
   final List<String> playlistNames;
@@ -41,6 +47,8 @@ class LibraryTrack {
     int? playCount,
     int? skipCount,
     DateTime? lastPlayedAt,
+    bool? lastPlayedAtIsObservation,
+    String? appleMusicUrl,
   }) {
     return LibraryTrack(
       id: id,
@@ -51,11 +59,14 @@ class LibraryTrack {
       genre: genre,
       artworkAsset: artworkAsset,
       appleMusicStoreId: appleMusicStoreId,
+      appleMusicUrl: appleMusicUrl ?? this.appleMusicUrl,
       releaseDate: releaseDate,
       duration: duration,
       playCount: playCount ?? this.playCount,
       skipCount: skipCount ?? this.skipCount,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+      lastPlayedAtIsObservation:
+          lastPlayedAtIsObservation ?? this.lastPlayedAtIsObservation,
       isCloudItem: isCloudItem,
       lyrics: lyrics,
       playlistNames: playlistNames,
@@ -71,6 +82,7 @@ class LibraryTrack {
       albumArtist: _readNullableString(map, 'albumArtist'),
       genre: _readNullableString(map, 'genre'),
       appleMusicStoreId: _readNullableString(map, 'appleMusicStoreId'),
+      appleMusicUrl: _readNullableString(map, 'appleMusicUrl'),
       releaseDate: _readDateTime(map, 'releaseDateMillis'),
       duration: Duration(seconds: _readInt(map, 'durationSeconds')),
       playCount: _readInt(map, 'playCount'),
@@ -164,4 +176,64 @@ class LibraryTrack {
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return List.unmodifiable(sorted);
   }
+}
+
+/// Returns a usable numeric Apple Music catalog ID, excluding player/library IDs.
+String? validAppleMusicCatalogId(String? value) {
+  final id = value?.trim();
+  if (id == null || !RegExp(r'^[0-9]+$').hasMatch(id)) return null;
+  final numeric = BigInt.tryParse(id);
+  return numeric == null || numeric == BigInt.zero ? null : numeric.toString();
+}
+
+/// Catalog and player IDs differ; compare metadata without merging distinct albums.
+bool sameHistoryTrack(LibraryTrack a, LibraryTrack b) {
+  if (a.id == b.id) return true;
+  final storeId = validAppleMusicCatalogId(a.appleMusicStoreId);
+  if (storeId != null &&
+      storeId == validAppleMusicCatalogId(b.appleMusicStoreId)) {
+    return true;
+  }
+  String normalized(String value) =>
+      value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  if (normalized(a.title) != normalized(b.title) ||
+      normalized(a.artist) != normalized(b.artist)) {
+    return false;
+  }
+  final aAlbum = normalized(a.albumTitle);
+  final bAlbum = normalized(b.albumTitle);
+  return aAlbum.isEmpty ||
+      bAlbum.isEmpty ||
+      aAlbum == 'unknown album' ||
+      bAlbum == 'unknown album' ||
+      aAlbum == bAlbum;
+}
+
+/// Keeps the first (newest) representative without comparing every song with
+/// every preceding song. Unknown albums match any album of the same song.
+List<LibraryTrack> uniqueHistoryTracks(Iterable<LibraryTrack> tracks) {
+  String normalize(String value) =>
+      value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  final ids = <String>{};
+  final storeIds = <String>{};
+  final albumsBySong = <(String, String), Set<String>>{};
+  final result = <LibraryTrack>[];
+  for (final track in tracks) {
+    if (ids.contains(track.id)) continue;
+    final storeId = validAppleMusicCatalogId(track.appleMusicStoreId);
+    if (storeId != null && storeIds.contains(storeId)) continue;
+    final key = (normalize(track.artist), normalize(track.title));
+    final rawAlbum = normalize(track.albumTitle);
+    final album = rawAlbum == 'unknown album' ? '' : rawAlbum;
+    final albums = albumsBySong[key];
+    if (albums != null &&
+        (album.isEmpty || albums.contains('') || albums.contains(album))) {
+      continue;
+    }
+    ids.add(track.id);
+    if (storeId != null) storeIds.add(storeId);
+    albumsBySong.putIfAbsent(key, () => <String>{}).add(album);
+    result.add(track);
+  }
+  return List.unmodifiable(result);
 }

@@ -237,7 +237,7 @@
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>NSAppleMusicUsageDescription</key>
-		<string>SongBrief reads your Music library play counts, skip counts, and last played dates to build local listening statistics.</string>
+		<string>SongBrief reads your Music library statistics and recently played Apple Music songs to display your listening statistics and history.</string>
 		<key>NSFaceIDUsageDescription</key>
 		<string>SongBrief uses Face ID to unlock the app when App Lock is enabled.</string>
 		<key>ITSAppUsesNonExemptEncryption</key>
