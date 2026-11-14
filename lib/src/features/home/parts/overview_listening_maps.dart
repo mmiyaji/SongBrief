@@ -724,21 +724,20 @@ FlTitlesData _releaseYearTitlesData({
     fontWeight: FontWeight.w800,
   );
   final selectedYear = selectedIndex < 0 ? null : buckets[selectedIndex].year;
-  final yearSpan = maxYear - minYear;
-  final yearStep = yearSpan <= 16 ? 1 : math.max(1, (yearSpan / 8).ceil());
+  Set<int>? visibleYears;
 
   Widget bottomTitle(double value, TitleMeta meta) {
     final year = value.round();
     if ((value - year).abs() > 0.01 || year < minYear || year > maxYear) {
       return const SizedBox.shrink();
     }
-    final shouldShow =
-        yearSpan <= 16 ||
-        year == minYear ||
-        year == maxYear ||
-        year == selectedYear ||
-        (year - minYear) % yearStep == 0;
-    if (!shouldShow) {
+    visibleYears ??= _visibleReleaseYears(
+      minYear: minYear,
+      maxYear: maxYear,
+      selectedYear: selectedYear,
+      axisWidth: meta.parentAxisSize,
+    );
+    if (!visibleYears!.contains(year)) {
       return const SizedBox.shrink();
     }
     return SideTitleWidget(
@@ -779,6 +778,49 @@ FlTitlesData _releaseYearTitlesData({
       ),
     ),
   );
+}
+
+/// Picks the release-year axis labels that fit [axisWidth] without touching.
+///
+/// The first and last years are always shown, the rest follow an even step,
+/// and the selected year replaces any regular label it would collide with.
+Set<int> _visibleReleaseYears({
+  required int minYear,
+  required int maxYear,
+  required int? selectedYear,
+  required double axisWidth,
+}) {
+  // A four-digit labelSmall year needs about 28px plus breathing room.
+  const minLabelSpacing = 40.0;
+  final span = maxYear - minYear;
+  if (span <= 0) {
+    return {minYear};
+  }
+  final pixelsPerYear = axisWidth / span;
+  final minGap = pixelsPerYear <= 0
+      ? span
+      : math.max(1, (minLabelSpacing / pixelsPerYear).ceil());
+  final years = <int>{minYear, maxYear};
+  for (var year = minYear + minGap; maxYear - year >= minGap; year += minGap) {
+    years.add(year);
+  }
+  if (selectedYear != null &&
+      selectedYear >= minYear &&
+      selectedYear <= maxYear &&
+      !years.contains(selectedYear)) {
+    final hitsEdge =
+        selectedYear - minYear < minGap || maxYear - selectedYear < minGap;
+    if (!hitsEdge) {
+      years.removeWhere(
+        (year) =>
+            year != minYear &&
+            year != maxYear &&
+            (year - selectedYear).abs() < minGap,
+      );
+      years.add(selectedYear);
+    }
+  }
+  return years;
 }
 
 enum _ActivityHeatmapView { calendar, weekdays, highlights }
