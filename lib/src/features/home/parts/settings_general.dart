@@ -507,7 +507,7 @@ class _SettingsSwitchCard extends StatelessWidget {
           value: value,
           onChanged: onChanged,
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
+            horizontal: 14,
             vertical: 2,
           ),
           secondary: Icon(icon, color: theme.colorScheme.primary),

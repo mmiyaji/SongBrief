@@ -1268,9 +1268,12 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
             final inlineToday =
                 constraints.maxWidth >= 260 &&
                 MediaQuery.textScalerOf(context).scale(1) < 1.5;
-            // Phones lack room to mirror the Today slot without squeezing the
-            // month, so only wider cards keep the month exactly centred.
-            final mirrorToday = inlineToday && constraints.maxWidth >= 340;
+            // The arrows sit at both ends, matching the day selector below,
+            // and Today travels with the month label in the centre.
+            const arrowConstraints = BoxConstraints.tightFor(
+              width: kMinInteractiveDimension,
+              height: kMinInteractiveDimension,
+            );
             final todayButton = TextButton(
               key: const ValueKey('activity-calendar-today'),
               onPressed: () => onSelectDay(days.last),
@@ -1281,10 +1284,9 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    // Mirror the Today button's slot so the month stays centred.
-                    if (mirrorToday) const SizedBox(width: 60),
                     IconButton(
                       key: const ValueKey('activity-calendar-previous-month'),
+                      constraints: arrowConstraints,
                       tooltip: _t(
                         context,
                         'Previous month',
@@ -1297,22 +1299,39 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
                           : null,
                       icon: const Icon(Icons.chevron_left_rounded),
                     ),
+                    const SizedBox(width: 4),
                     Expanded(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          DateFormat.yMMMM(_localeName(context)).format(first),
-                          key: const ValueKey('activity-calendar-month-label'),
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                DateFormat.yMMMM(_localeName(context))
+                                    .format(first),
+                                key: const ValueKey(
+                                  'activity-calendar-month-label',
+                                ),
+                                maxLines: 1,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                          if (inlineToday) ...[
+                            const SizedBox(width: 6),
+                            todayButton,
+                          ],
+                        ],
                       ),
                     ),
+                    const SizedBox(width: 4),
                     IconButton(
                       key: const ValueKey('activity-calendar-next-month'),
+                      constraints: arrowConstraints,
                       tooltip: _t(
                         context,
                         'Next month',
@@ -1325,14 +1344,6 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
                           : null,
                       icon: const Icon(Icons.chevron_right_rounded),
                     ),
-                    if (inlineToday)
-                      SizedBox(
-                        width: 60,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: todayButton,
-                        ),
-                      ),
                   ],
                 ),
                 if (!inlineToday)

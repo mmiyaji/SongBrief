@@ -1015,17 +1015,19 @@ class _HeroStat extends StatelessWidget {
       ],
     );
 
+    // Pad every stat the same way so tappable and static cells line up.
+    final padded = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+      child: content,
+    );
     if (onTap == null) {
-      return content;
+      return padded;
     }
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
-        child: content,
-      ),
+      child: padded,
     );
   }
 }
@@ -1585,7 +1587,10 @@ class _RecentTrackRow extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 10),
-            Flexible(
+            // A capped width keeps the time and menu pinned to the row's end
+            // instead of drifting with the length of each time label.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 104),
               child: Text(
                 outsideLibrary && track.lastPlayedAt == null
                     ? _t(
@@ -1602,6 +1607,7 @@ class _RecentTrackRow extends ConsumerWidget {
                       ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.w800,

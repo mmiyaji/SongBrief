@@ -1123,7 +1123,12 @@ class _SectionBody extends ConsumerWidget {
             track.id,
         },
       ),
-      HomeSection.settings => _SettingsSection(stats: stats),
+      // Lets the 20px icons of plain switch rows keep their text on the same
+      // column as _SettingsRow instead of the default 24px leading slot.
+      HomeSection.settings => ListTileTheme.merge(
+        minLeadingWidth: 20,
+        child: _SettingsSection(stats: stats),
+      ),
     };
   }
 

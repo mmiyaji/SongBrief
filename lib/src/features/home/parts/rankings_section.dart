@@ -195,31 +195,43 @@ class _RankingExtensions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Same icon size, gap and indented description as
+        // _RankingInsightSection so all section headings share one column.
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.auto_graph_rounded, color: theme.colorScheme.primary),
+            Icon(
+              Icons.auto_graph_rounded,
+              color: theme.colorScheme.primary,
+              size: 20,
+            ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                _t(context, 'More rankings', 'ランキングを深掘り'),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _t(context, 'More rankings', 'ランキングを深掘り'),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _t(
+                      context,
+                      'The main ranking stays above. These views add period, momentum, rediscovery, and movement context.',
+                      '上のメインランキングはそのままに、期間・勢い・再発見・順位変動の視点を追加します。',
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _t(
-            context,
-            'The main ranking stays above. These views add period, momentum, rediscovery, and movement context.',
-            '上のメインランキングはそのままに、期間・勢い・再発見・順位変動の視点を追加します。',
-          ),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
-          ),
         ),
         if (showSnapshotSections) ...[
           const SizedBox(height: 16),
