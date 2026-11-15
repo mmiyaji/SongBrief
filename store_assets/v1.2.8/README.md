@@ -16,3 +16,6 @@ Validate using storeframe's `validate(outputDir, specsDir)` API with this projec
 Apple specification: https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
 
 Only editable draft metadata is changed. Current public resources are protected. All uploaded files must finish processing and match the manifest before review submission.
+
+Release binary: 1.2.8 (2611151724), source c4612f59a6304a01650240543fb411eb8513a7f9. Full release checks and upload: https://github.com/mmiyaji/SongBrief/actions/runs/43740849468
+Screenshot upload verification (36 COMPLETE): https://github.com/mmiyaji/SongBrief/actions/runs/43741061241
