@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' show ImageByteFormat, ImageFilter;
+import 'dart:ui' as ui show TextDirection;
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -533,10 +535,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         return Scaffold(
           extendBody: hasData && !useRail,
           backgroundColor: Theme.of(context).colorScheme.surface,
-          bottomNavigationBar: hasData && !useRail
-              ? _MobilePlaybackChrome(
-                  stats: state.requireValue,
-                  selectedSection: selectedSection,
+          bottomNavigationBar: !useRail
+              ? Offstage(
+                  offstage: !hasData,
+                  child: ExcludeFocus(
+                    excluding: !hasData,
+                    child: _MobilePlaybackChrome(stats: state.asData?.value),
+                  ),
                 )
               : null,
           body: Stack(
@@ -596,12 +601,11 @@ class _AdaptiveShell extends StatelessWidget {
 }
 
 class _BottomTabs extends ConsumerWidget {
-  const _BottomTabs({required this.selectedSection});
-
-  final HomeSection selectedSection;
+  const _BottomTabs();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selectedSection = ref.watch(homeSectionProvider);
     final theme = Theme.of(context);
     final useCompactLabels = MediaQuery.sizeOf(context).width < 360;
     return NavigationBar(
@@ -620,20 +624,19 @@ class _BottomTabs extends ConsumerWidget {
 }
 
 class _MobilePlaybackChrome extends ConsumerWidget {
-  const _MobilePlaybackChrome({
-    required this.stats,
-    required this.selectedSection,
-  });
+  const _MobilePlaybackChrome({required this.stats});
 
-  final MusicStatsState stats;
-  final HomeSection selectedSection;
+  final MusicStatsState? stats;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final playback = ref.watch(playbackControllerProvider);
-    final activeTrack = _playbackTrack(stats.overview, playback);
-    final track = activeTrack ?? stats.overview.latestTrack;
+    final overview = stats?.overview;
+    final activeTrack = overview == null
+        ? null
+        : _playbackTrack(overview, playback);
+    final track = activeTrack ?? overview?.latestTrack;
     final isLight = theme.colorScheme.brightness == Brightness.light;
     return SafeArea(
       key: const ValueKey('mobile-playback-chrome'),
@@ -643,22 +646,25 @@ class _MobilePlaybackChrome extends ConsumerWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.34),
-                blurRadius: 30,
-                offset: const Offset(0, 18),
-              ),
-            ],
+            boxShadow: kIsWeb
+                ? const []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.34),
+                      blurRadius: 30,
+                      offset: const Offset(0, 18),
+                    ),
+                  ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
             child: BackdropFilter(
+              enabled: !kIsWeb,
               filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface.withValues(
-                    alpha: isLight ? 0.97 : 0.86,
+                    alpha: isLight || kIsWeb ? 0.97 : 0.86,
                   ),
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
@@ -674,7 +680,9 @@ class _MobilePlaybackChrome extends ConsumerWidget {
                         _MiniPlayerBar(track: track),
                         const SizedBox(height: 2),
                       ],
-                      _BottomTabs(selectedSection: selectedSection),
+                      // Keep the prepared destinations intact when data arrives.
+                      // Selection updates are observed inside this widget.
+                      const _BottomTabs(),
                     ],
                   ),
                 ),
@@ -832,9 +840,8 @@ class _MiniArtwork extends StatelessWidget {
         child: bytes == null
             ? track.artworkAsset == null
                   ? ColoredBox(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.18),
+                      color: Theme.of(context).colorScheme.primary
+                          .withValues(alpha: 0.18),
                       child: Icon(
                         Icons.album_rounded,
                         color: Theme.of(context).colorScheme.primary,
@@ -856,7 +863,6 @@ class _SideTabs extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final extended = width >= 980;
     final playback = ref.watch(playbackControllerProvider);
@@ -881,12 +887,9 @@ class _SideTabs extends ConsumerWidget {
                 backgroundColor: Colors.transparent,
                 extended: extended,
                 minExtendedWidth: 188,
-                leading: Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Icon(
-                    Icons.graphic_eq,
-                    color: theme.colorScheme.primary,
-                  ),
+                leading: const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: _AppBrandIcon(size: 44),
                 ),
                 destinations: HomeSection.values
                     .map(
@@ -1039,14 +1042,19 @@ class _StatsContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deviceBottomInset = MediaQueryData.fromView(
-      View.of(context),
-    ).viewPadding.bottom;
+    final deviceBottomInset = MediaQueryData.fromView(View.of(context))
+        .viewPadding
+        .bottom;
     final mobileBottomPadding = 172 + deviceBottomInset;
     return RefreshIndicator.adaptive(
       onRefresh: () => _refreshStatsFromPull(ref),
       child: CustomScrollView(
         key: PageStorageKey<HomeSection>(selectedSection),
+        scrollCacheExtent:
+            selectedSection == HomeSection.playing ||
+                selectedSection == HomeSection.overview
+            ? const ScrollCacheExtent.pixels(0)
+            : null,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
@@ -1076,6 +1084,16 @@ class _StatsContent extends ConsumerWidget {
                 right: useRail ? 28 : 20,
               ),
               bottomPadding: useRail ? 28 : mobileBottomPadding,
+            )
+          else if (selectedSection == HomeSection.playing)
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                useRail ? 24 : 20,
+                16,
+                useRail ? 28 : 20,
+                useRail ? 28 : mobileBottomPadding,
+              ),
+              sliver: _NowPlayingSection(stats: stats, asSliver: true),
             )
           else
             SliverPadding(
@@ -1177,6 +1195,25 @@ class _SectionBody extends ConsumerWidget {
   }
 }
 
+class _AppBrandIcon extends StatelessWidget {
+  const _AppBrandIcon({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.22),
+      child: Image.asset(
+        'assets/branding/songbrief_icon_ios.png',
+        width: size,
+        height: size,
+        excludeFromSemantics: true,
+      ),
+    );
+  }
+}
+
 class _Header extends StatelessWidget {
   const _Header({required this.stats, required this.selectedSection});
 
@@ -1194,10 +1231,27 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('SongBrief', style: theme.textTheme.headlineLarge),
+              Row(
+                children: [
+                  if (MediaQuery.sizeOf(context).width < 720) ...[
+                    const _AppBrandIcon(size: 38),
+                    const SizedBox(width: 10),
+                  ],
+                  Flexible(
+                    child: Text(
+                      'SongBrief',
+                      style: theme.textTheme.headlineLarge,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 6),
               Text(
-                _sectionSubtitle(context, selectedSection, _labelsDemo(overview)),
+                _sectionSubtitle(
+                  context,
+                  selectedSection,
+                  _labelsDemo(overview),
+                ),
                 style: theme.textTheme.titleSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
@@ -1326,9 +1380,8 @@ class _StatusPill extends StatelessWidget {
       shadowOpacity: 0.02,
       child: Text(
         label,
-        style: Theme.of(
-          context,
-        ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800),
+        style: Theme.of(context).textTheme.labelMedium
+            ?.copyWith(fontWeight: FontWeight.w800),
       ),
     );
   }

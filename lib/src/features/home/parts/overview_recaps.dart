@@ -355,9 +355,7 @@ class _RecapSummaryCardState extends State<_RecapSummaryCard> {
           return;
         }
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(
-            content: Text(saved ? savedMessage : cancelledMessage),
-          ),
+          SnackBar(content: Text(saved ? savedMessage : cancelledMessage)),
         );
       },
     );
@@ -402,9 +400,8 @@ class _RecapSummaryCardState extends State<_RecapSummaryCard> {
         if (!mounted || result.status != ShareResultStatus.unavailable) {
           return;
         }
-        ScaffoldMessenger.maybeOf(
-          context,
-        )?.showSnackBar(SnackBar(content: Text(unavailableMessage)));
+        ScaffoldMessenger.maybeOf(context)
+            ?.showSnackBar(SnackBar(content: Text(unavailableMessage)));
       },
     );
   }
@@ -497,9 +494,8 @@ class _RecapSummaryCardContent extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  DateFormat.yMMMd(
-                    _localeName(context),
-                  ).format(overview.generatedAt),
+                  DateFormat.yMMMd(_localeName(context))
+                      .format(overview.generatedAt),
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w800,
@@ -959,14 +955,22 @@ class _DiversityScoreCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Text(
-                _t(context, 'Focused', '一途'),
-                style: theme.textTheme.labelSmall,
+              Expanded(
+                child: Text(
+                  _t(context, 'Focused', '一途'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall,
+                ),
               ),
-              const Spacer(),
-              Text(
-                _t(context, 'Explorer', '探検家'),
-                style: theme.textTheme.labelSmall,
+              Expanded(
+                child: Text(
+                  _t(context, 'Explorer', '探検家'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: theme.textTheme.labelSmall,
+                ),
               ),
             ],
           ),
@@ -1639,9 +1643,9 @@ _SnapshotPace? _snapshotPace(SnapshotHistory history) {
   final last = recent.last;
   final days = math.max(
     1,
-    _localDateOnly(
-      last.capturedAt,
-    ).difference(_localDateOnly(first.capturedAt)).inDays,
+    _localDateOnly(last.capturedAt)
+        .difference(_localDateOnly(first.capturedAt))
+        .inDays,
   );
   final playDelta = _positiveOverviewDelta(
     last.totalPlayCount,

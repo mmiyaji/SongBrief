@@ -129,9 +129,23 @@ List<Widget> _overviewPanelItems(
       overview: overview,
       history: stats.snapshotHistory,
       snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
+      includeCalendar: false,
     ),
   );
   if (stats.snapshotRecordingEnabled) {
+    add(
+      GlassSurface(
+        padding: const EdgeInsets.all(18),
+        radius: 24,
+        tint: const Color(0x4FFFFFFF),
+        borderOpacity: 0.34,
+        shadowOpacity: 0.045,
+        child: _ActivityHeatmapCard(
+          overview: overview,
+          history: stats.snapshotHistory,
+        ),
+      ),
+    );
     add(
       _RecapHighlightsPanel(overview: overview, history: stats.snapshotHistory),
     );

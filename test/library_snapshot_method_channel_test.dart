@@ -48,6 +48,56 @@ void main() {
   );
 
   test(
+    'decodes large detailed history off-isolate and preserves its data',
+    () async {
+      final rawSnapshots = <Object?>[
+        for (var index = 79; index >= 0; index--) _detailedSnapshot(index),
+      ];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async => rawSnapshots);
+
+      final history = await store.loadHistory();
+
+      expect(history.snapshotCount, 80);
+      expect(history.snapshots.first.dateKey, snapshotDateKey(DateTime(2026)));
+      expect(
+        history.latest?.dateKey,
+        snapshotDateKey(DateTime(2026).add(const Duration(days: 79))),
+      );
+      expect(history.latest?.tracks.single.title, '夜の音楽 🎵 79');
+      expect(history.latest?.tracks.single.artist, 'アーティスト');
+      expect(history.latest?.tracks.single.playCount, 82);
+      expect(history.latest?.tracks.single.skipCount, 79);
+      expect(
+        history.latest?.tracks.single.lastPlayedAt,
+        DateTime(2026).add(const Duration(days: 79)),
+      );
+      expect(history.latest?.filterSignature, 'profile-日本語');
+    },
+  );
+
+  test('offloads large track detail even with only two snapshots', () async {
+    final rawSnapshots = <Object?>[
+      _snapshotWithManyTracks(0, 350),
+      _snapshotWithManyTracks(1, 350),
+    ];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async => rawSnapshots);
+
+    final history = await store.loadHistory();
+
+    expect(history.snapshotCount, 2);
+    expect(history.snapshots.first.tracks, hasLength(350));
+    expect(history.snapshots.last.tracks, hasLength(350));
+    expect(history.snapshots.last.tracks.first.title, '曲 🎼 0');
+    expect(history.snapshots.last.tracks.first.playCount, 3);
+    expect(
+      history.snapshots.last.tracks.first.lastPlayedAt,
+      DateTime(2026, 7, 3),
+    );
+  });
+
+  test(
     'delegates write, cutoff deletion, and clear to native storage',
     () async {
       final calls = <MethodCall>[];
@@ -98,6 +148,58 @@ void main() {
       ),
     );
   });
+}
+
+Map<String, Object?> _detailedSnapshot(int index) {
+  final capturedAt = DateTime(2026).add(Duration(days: index));
+  return <String, Object?>{
+    'dateKey': snapshotDateKey(capturedAt),
+    'capturedAtMillis': capturedAt.millisecondsSinceEpoch,
+    'source': 'foreground',
+    'trackCount': 1,
+    'totalPlayCount': index + 3,
+    'totalSkipCount': index,
+    'totalListeningSeconds': (index + 3) * 201,
+    'filterSignature': 'profile-日本語',
+    'tracks': <Object?>[
+      <String, Object?>{
+        'id': 'track-$index',
+        'title': '夜の音楽 🎵 $index',
+        'artist': 'アーティスト',
+        'albumTitle': 'Album 漢字',
+        'playCount': index + 3,
+        'skipCount': index,
+        'listeningSeconds': (index + 3) * 201,
+        'lastPlayedAtMillis': capturedAt.millisecondsSinceEpoch,
+      },
+    ],
+  };
+}
+
+Map<String, Object?> _snapshotWithManyTracks(int dayOffset, int trackCount) {
+  final capturedAt = DateTime(2026, 7, 2 + dayOffset);
+  return <String, Object?>{
+    'dateKey': snapshotDateKey(capturedAt),
+    'capturedAtMillis': capturedAt.millisecondsSinceEpoch,
+    'source': 'foreground',
+    'trackCount': trackCount,
+    'totalPlayCount': trackCount * 3,
+    'totalSkipCount': 0,
+    'totalListeningSeconds': trackCount * 540,
+    'tracks': <Object?>[
+      for (var index = 0; index < trackCount; index++)
+        <String, Object?>{
+          'id': 'large-$dayOffset-$index',
+          'title': '曲 🎼 $index',
+          'artist': '歌手',
+          'albumTitle': 'アルバム',
+          'playCount': 3,
+          'skipCount': index,
+          'listeningSeconds': 540,
+          'lastPlayedAtMillis': capturedAt.millisecondsSinceEpoch,
+        },
+    ],
+  };
 }
 
 Map<String, Object?> _snapshotJson({

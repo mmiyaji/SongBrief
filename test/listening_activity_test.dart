@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
@@ -7,6 +9,19 @@ import 'package:songbrief/src/domain/supplemental_listening_history.dart';
 void main() {
   final play = DateTime(2026, 10, 30, 11);
   final captured = DateTime(2026, 10, 30, 12);
+
+  test('empty supplemental evidence never reads historical snapshots', () {
+    final history = SnapshotHistory(snapshots: _UnreadableSnapshots());
+    for (final dailyOnly in [true, false]) {
+      final result = projectListeningEvents(
+        history: history,
+        events: const [],
+        dailyOnly: dailyOnly,
+      );
+      expect(result.uncoveredEvents, isEmpty);
+      expect(result.relocations, isEmpty);
+    }
+  });
 
   DailyLibrarySnapshot snapshot(
     DateTime at,
@@ -330,4 +345,17 @@ void main() {
     expect(recomputed, isNot(same(cached)));
     expect(recomputed!.totalPlayDelta, cached!.totalPlayDelta);
   });
+}
+
+class _UnreadableSnapshots extends ListBase<DailyLibrarySnapshot> {
+  @override
+  int get length => throw StateError('History should not be read');
+  @override
+  set length(int value) => throw UnsupportedError('read only');
+  @override
+  DailyLibrarySnapshot operator [](int index) =>
+      throw StateError('History should not be read');
+  @override
+  void operator []=(int index, DailyLibrarySnapshot value) =>
+      throw UnsupportedError('read only');
 }

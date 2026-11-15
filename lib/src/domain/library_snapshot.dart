@@ -358,6 +358,12 @@ class SnapshotDelta {
       if (baseline == null) {
         continue;
       }
+      // Most daily records leave most songs unchanged. Such rows never
+      // contribute to trackDeltas, even if listening duration changed.
+      if (track.playCount <= baseline.playCount &&
+          track.skipCount <= baseline.skipCount) {
+        continue;
+      }
       final delta = TrackCounterDelta.compare(
         previous: baseline,
         current: track,
@@ -474,8 +480,10 @@ String _trackCounterIdentity(TrackCounterSnapshot track) {
   ].map(_normalizeTrackCounterIdentityPart).join('\u{1f}');
 }
 
+final _trackCounterWhitespace = RegExp(r'\s+');
+
 String _normalizeTrackCounterIdentityPart(String value) {
-  return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  return value.trim().toLowerCase().replaceAll(_trackCounterWhitespace, ' ');
 }
 
 String snapshotDateKey(DateTime date) {
