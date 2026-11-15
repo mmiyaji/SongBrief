@@ -1812,13 +1812,13 @@ class _TrackDetailSheet extends ConsumerStatefulWidget {
 }
 
 class _TrackDetailSheetState extends ConsumerState<_TrackDetailSheet> {
-  late String _displayedTrackId;
+  late LibraryTrack _displayedTrack;
   late bool _followsPlayback;
 
   @override
   void initState() {
     super.initState();
-    _displayedTrackId = widget.track.id;
+    _displayedTrack = widget.track;
     _followsPlayback = ref
         .read(playbackControllerProvider)
         .isTrackActive(widget.track.id, track: widget.track);
@@ -1826,41 +1826,41 @@ class _TrackDetailSheetState extends ConsumerState<_TrackDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<String?>(
-      playbackControllerProvider.select((state) => state.activeTrackId),
-      (previous, next) {
-        if (next == null) {
+    ref.listen<PlaybackState>(playbackControllerProvider, (previous, next) {
+      if (!_followsPlayback) {
+        if (next.isTrackActive(_displayedTrack.id, track: _displayedTrack)) {
+          _followsPlayback = true;
+        } else {
           return;
         }
-        if (!_followsPlayback) {
-          if (next == _displayedTrackId) {
-            _followsPlayback = true;
-          }
-          return;
-        }
-        if (next == _displayedTrackId) {
-          return;
-        }
-        final overview = ref
-            .read(musicStatsControllerProvider)
-            .asData
-            ?.value
-            .overview;
-        if (overview?.trackById(next) == null) {
-          return;
-        }
-        setState(() {
-          _displayedTrackId = next;
-        });
-      },
-    );
+      }
+      final overview = ref
+          .read(musicStatsControllerProvider)
+          .asData
+          ?.value
+          .overview;
+      final track = overview == null
+          ? next.nowPlaying
+          : _playbackTrack(overview, next);
+      if (track == null) {
+        return;
+      }
+      setState(() {
+        _displayedTrack = track;
+      });
+    });
 
     final overview = ref
         .watch(musicStatsControllerProvider)
         .asData
         ?.value
         .overview;
-    final track = overview?.trackById(_displayedTrackId) ?? widget.track;
+    final track =
+        (_followsPlayback && overview != null
+            ? _playbackTrack(overview, ref.read(playbackControllerProvider))
+            : null) ??
+        overview?.trackById(_displayedTrack.id) ??
+        _displayedTrack;
     final theme = Theme.of(context);
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final height = MediaQuery.sizeOf(context).height;
