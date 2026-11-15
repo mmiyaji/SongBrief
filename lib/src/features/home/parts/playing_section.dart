@@ -1,9 +1,48 @@
 part of '../home_screen.dart';
 
 class _NowPlayingSection extends ConsumerWidget {
-  const _NowPlayingSection({required this.stats});
+  const _NowPlayingSection({required this.stats, this.asSliver = false});
 
   final MusicStatsState stats;
+  final bool asSliver;
+
+  Widget _panels(List<Widget> children) {
+    if (!asSliver) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      );
+    }
+    final occurrences = <Type, int>{};
+    final keys = [
+      for (final child in children)
+        ValueKey((
+          child.runtimeType,
+          occurrences.update(
+            child.runtimeType,
+            (n) => n + 1,
+            ifAbsent: () => 0,
+          ),
+        )),
+    ];
+    return SliverList.builder(
+      itemCount: children.length,
+      findChildIndexCallback: (key) {
+        final index = keys.indexWhere((candidate) => candidate == key);
+        return index < 0 ? null : index;
+      },
+      itemBuilder: (context, index) => _RetainedPlayingPanel(
+        key: keys[index],
+        deferFirstFrame: children[index] is _TrendPanel,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: SizedBox(width: double.infinity, child: children[index]),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -28,62 +67,109 @@ class _NowPlayingSection extends ConsumerWidget {
         : displayedTrack;
 
     if (track == null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo)
-            _AuthorizationPanel(status: stats.authorizationStatus),
-          if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo)
-            const SizedBox(height: 14),
-          const _EmptyLibraryPanel(),
-        ],
-      );
+      return _panels([
+        if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo)
+          _AuthorizationPanel(status: stats.authorizationStatus),
+        if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo)
+          const SizedBox(height: 14),
+        const _EmptyLibraryPanel(),
+      ]);
     }
 
     final artwork = ref.watch(trackArtworkProvider(track.id));
     final outsideLibrary = _isOutsideLibrary(overview, track);
-    final recentTracks = ref.watch(recentListeningTracksProvider);
     final playRankIndex = overview.topTracks.indexWhere(
       (entry) => entry.representativeTrackId == track.id,
     );
     final playRank = playRankIndex < 0 ? null : playRankIndex + 1;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo) ...[
-          _AuthorizationPanel(status: stats.authorizationStatus),
-          const SizedBox(height: 14),
-        ],
-        if (outsideLibrary) ...[
-          _OutsideLibraryNotice(
-            playCount: track.playCount,
-            includedInTotals: ref.watch(supplementalHistoryIncludedProvider),
-          ),
-          const SizedBox(height: 8),
-        ],
-        _HeroTrackPanel(track: track, artwork: artwork, playRank: playRank),
-        if (stats.snapshotRecordingEnabled && !outsideLibrary) ...[
-          const SizedBox(height: 14),
-          _TrendPanel(
-            track: track,
-            overview: overview,
-            history: stats.snapshotHistory,
-          ),
-        ],
+    return _panels([
+      if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo) ...[
+        _AuthorizationPanel(status: stats.authorizationStatus),
         const SizedBox(height: 14),
-        _NowPlayingLyricsPanel(track: track),
-        if (recentTracks.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          _RecentTracksPanel(
-            tracks: recentTracks,
-            outsideLibraryIds: {
-              for (final play in outsideLibraryPlays) play.id,
-            },
-          ),
-        ],
       ],
+      if (outsideLibrary) ...[
+        _OutsideLibraryNotice(
+          playCount: track.playCount,
+          includedInTotals: ref.watch(supplementalHistoryIncludedProvider),
+        ),
+        const SizedBox(height: 8),
+      ],
+      _HeroTrackPanel(track: track, artwork: artwork, playRank: playRank),
+      if (stats.snapshotRecordingEnabled && !outsideLibrary) ...[
+        const SizedBox(height: 14),
+        _TrendPanel(
+          track: track,
+          overview: overview,
+          history: stats.snapshotHistory,
+        ),
+      ],
+      const SizedBox(height: 14),
+      _NowPlayingLyricsPanel(track: track),
+      _PlayingRecentHistory(
+        outsideLibraryIds: {for (final play in outsideLibraryPlays) play.id},
+      ),
+    ]);
+  }
+}
+
+// The recent-history projection can merge a large native library. Subscribe
+// only when the sliver reaches this panel, rather than while building the hero.
+class _PlayingRecentHistory extends ConsumerWidget {
+  const _PlayingRecentHistory({required this.outsideLibraryIds});
+  final Set<String> outsideLibraryIds;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tracks = ref.watch(recentListeningTracksProvider);
+    if (tracks.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: _RecentTracksPanel(
+        tracks: tracks,
+        outsideLibraryIds: outsideLibraryIds,
+      ),
     );
+  }
+}
+
+// Keep a visited panel alive when it scrolls out of view. Stable keys in
+// _panels also retain its state when optional notices change position.
+class _RetainedPlayingPanel extends StatefulWidget {
+  const _RetainedPlayingPanel({
+    required this.child,
+    this.deferFirstFrame = false,
+    super.key,
+  });
+  final Widget child;
+  final bool deferFirstFrame;
+  @override
+  State<_RetainedPlayingPanel> createState() => _RetainedPlayingPanelState();
+}
+
+class _RetainedPlayingPanelState extends State<_RetainedPlayingPanel>
+    with AutomaticKeepAliveClientMixin {
+  late bool _ready;
+
+  @override
+  void initState() {
+    super.initState();
+    _ready = !widget.deferFirstFrame;
+    if (!_ready) {
+      // Present the song and transport first, then build the history chart.
+      // Keep its space reserved so lower panels are not eagerly built instead.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _ready = true);
+      });
+    }
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return _ready ? widget.child : const SizedBox(height: 360);
   }
 }
 

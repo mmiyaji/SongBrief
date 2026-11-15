@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'startup_typography.dart';
 
 const _themeStylePreferenceKey = 'songbrief_theme_style_v1';
 const _themeBrightnessPreferenceKey = 'songbrief_theme_brightness_v1';
@@ -166,7 +169,8 @@ ThemeData buildSongBriefTheme({
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
-    fontFamilyFallback: _appFontFallback,
+    fontFamily: kIsWeb ? 'Roboto' : null,
+    fontFamilyFallback: [if (kIsWeb) webAppFontFamily, ..._appFontFallback],
     scaffoldBackgroundColor: scheme.surface,
     textTheme: const TextTheme(
       headlineLarge: TextStyle(fontWeight: FontWeight.w800, height: 1.05),

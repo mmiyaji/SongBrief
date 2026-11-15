@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class GlassSurface extends StatelessWidget {
@@ -32,13 +33,17 @@ class GlassSurface extends StatelessWidget {
             alpha: borderOpacity.clamp(0.06, 0.34),
           ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: shadowOpacity),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        // CanvasKit must prepare blur shaders for each cold Web context.
+        // The existing surface tint and border provide separation without it.
+        boxShadow: kIsWeb
+            ? const []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: shadowOpacity),
+                  blurRadius: 28,
+                  offset: const Offset(0, 14),
+                ),
+              ],
       ),
       child: Material(
         type: MaterialType.transparency,

@@ -114,11 +114,13 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
     required this.overview,
     required this.history,
     required this.snapshotRecordingEnabled,
+    this.includeCalendar = true,
   });
 
   final LibraryOverview overview;
   final SnapshotHistory history;
   final bool snapshotRecordingEnabled;
+  final bool includeCalendar;
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +168,7 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
                 history: history,
               );
 
-              if (!snapshotRecordingEnabled) {
+              if (!snapshotRecordingEnabled || !includeCalendar) {
                 return releaseCard;
               }
 
@@ -670,40 +672,57 @@ class _ReleaseYearDataSelector extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<int>(
-            key: const ValueKey('release-year-data-selector'),
-            value: selectedIndex < 0 ? null : selectedIndex,
-            isExpanded: true,
-            menuMaxHeight: 360,
-            borderRadius: BorderRadius.circular(14),
-            hint: Text(
-              _t(
-                context,
-                'Select year data',
-                '年別データを選択',
-                zh: '选择年份数据',
-                ko: '연도 데이터 선택',
+        child: PopupMenuButton<int>(
+          key: const ValueKey('release-year-data-selector'),
+          tooltip: _t(
+            context,
+            'Select year data',
+            '年別データを選択',
+            zh: '选择年份数据',
+            ko: '연도 데이터 선택',
+          ),
+          initialValue: selectedIndex < 0 ? null : selectedIndex,
+          constraints: const BoxConstraints(
+            maxHeight: 360,
+            minWidth: 220,
+            maxWidth: 360,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          itemBuilder: (context) => [
+            for (final entry in buckets.indexed)
+              PopupMenuItem<int>(
+                value: entry.$1,
+                child: Text(
+                  '${entry.$2.year} - ${_releaseYearMetricDetail(context, metric, entry.$2)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            items: buckets.indexed
-                .map(
-                  (entry) => DropdownMenuItem<int>(
-                    value: entry.$1,
-                    child: Text(
-                      '${entry.$2.year} - '
-                      '${_releaseYearMetricDetail(context, metric, entry.$2)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+          ],
+          onSelected: (index) => onChanged(buckets[index]),
+          child: SizedBox(
+            height: kMinInteractiveDimension,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    selectedBucket == null
+                        ? _t(
+                            context,
+                            'Select year data',
+                            '年別データを選択',
+                            zh: '选择年份数据',
+                            ko: '연도 데이터 선택',
+                          )
+                        : '${selectedBucket!.year} - ${_releaseYearMetricDetail(context, metric, selectedBucket!)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium,
                   ),
-                )
-                .toList(growable: false),
-            onChanged: (index) {
-              if (index != null) {
-                onChanged(buckets[index]);
-              }
-            },
+                ),
+                const Icon(Icons.arrow_drop_down),
+              ],
+            ),
           ),
         ),
       ),
@@ -725,18 +744,26 @@ FlTitlesData _releaseYearTitlesData({
   );
   final selectedYear = selectedIndex < 0 ? null : buckets[selectedIndex].year;
   Set<int>? visibleYears;
+  double? visibleYearsAxisWidth;
 
   Widget bottomTitle(double value, TitleMeta meta) {
     final year = value.round();
     if ((value - year).abs() > 0.01 || year < minYear || year > maxYear) {
       return const SizedBox.shrink();
     }
-    visibleYears ??= _visibleReleaseYears(
-      minYear: minYear,
-      maxYear: maxYear,
-      selectedYear: selectedYear,
-      axisWidth: meta.parentAxisSize,
-    );
+    final axisWidth = meta.parentAxisSize;
+    if (visibleYears == null || visibleYearsAxisWidth != axisWidth) {
+      visibleYearsAxisWidth = axisWidth;
+      visibleYears = _visibleReleaseYears(
+        minYear: minYear,
+        maxYear: maxYear,
+        selectedYear: selectedYear,
+        axisWidth: axisWidth,
+        labelStyle: labelStyle,
+        textScaler: MediaQuery.textScalerOf(context),
+        textDirection: Directionality.of(context),
+      );
+    }
     if (!visibleYears!.contains(year)) {
       return const SizedBox.shrink();
     }
@@ -789,9 +816,23 @@ Set<int> _visibleReleaseYears({
   required int maxYear,
   required int? selectedYear,
   required double axisWidth,
+  required TextStyle? labelStyle,
+  required TextScaler textScaler,
+  required ui.TextDirection textDirection,
 }) {
-  // A four-digit labelSmall year needs about 28px plus breathing room.
-  const minLabelSpacing = 40.0;
+  final labelPainter = TextPainter(
+    text: TextSpan(text: '$minYear', style: labelStyle),
+    textDirection: textDirection,
+    textScaler: textScaler,
+  );
+  var widestLabel = 0.0;
+  for (var year = minYear; year <= maxYear; year++) {
+    labelPainter.text = TextSpan(text: '$year', style: labelStyle);
+    labelPainter.layout();
+    widestLabel = math.max(widestLabel, labelPainter.width);
+  }
+  labelPainter.dispose();
+  final minLabelSpacing = widestLabel + 14;
   final span = maxYear - minYear;
   if (span <= 0) {
     return {minYear};
@@ -824,6 +865,28 @@ Set<int> _visibleReleaseYears({
 }
 
 enum _ActivityHeatmapView { calendar, weekdays, highlights }
+
+// Web shares its event loop with rendering. Populate the weak delta cache in
+// small batches so opening the calendar does not compare an entire history
+// in one synchronous build. Native builds also benefit from yielding here.
+final _calendarHistoryReadyProvider = FutureProvider.autoDispose
+    .family<void, SnapshotHistory>((ref, history) async {
+      var cancelled = false;
+      ref.onDispose(() => cancelled = true);
+      await Future<void>.delayed(Duration.zero);
+      final budget = Stopwatch()..start();
+      for (var i = 1; i < history.snapshots.length; i++) {
+        if (cancelled) return;
+        listeningActivityDelta(
+          previous: history.snapshots[i - 1],
+          current: history.snapshots[i],
+        );
+        if (budget.elapsedMilliseconds >= 4) {
+          await Future<void>.delayed(const Duration(milliseconds: 1));
+          budget.reset();
+        }
+      }
+    });
 
 class _ActivityHeatmapCard extends ConsumerStatefulWidget {
   const _ActivityHeatmapCard({
@@ -870,11 +933,25 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
 
   @override
   Widget build(BuildContext context) {
+    final ready = ref.watch(_calendarHistoryReadyProvider(widget.history));
+    if (ready.isLoading) {
+      return const SizedBox(
+        height: 320,
+        child: Center(child: CircularProgressIndicator.adaptive()),
+      );
+    }
+    if (ready.hasError) {
+      return Center(
+        child: IconButton(
+          tooltip: _t(context, 'Retry', '再試行', zh: '重试', ko: '다시 시도'),
+          icon: const Icon(Icons.refresh_rounded),
+          onPressed: () =>
+              ref.invalidate(_calendarHistoryReadyProvider(widget.history)),
+        ),
+      );
+    }
     final projection = widget.overview.isDemo
-        ? const ListeningEventProjection(
-            uncoveredEvents: [],
-            relocations: [],
-          )
+        ? const ListeningEventProjection(uncoveredEvents: [], relocations: [])
         : projectListeningEvents(
             history: widget.history,
             events: ref.watch(countedSupplementalEventsProvider),
@@ -1441,37 +1518,46 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final date in weeks[weekIndex])
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 2),
-                            child: date == null
-                                ? const SizedBox.shrink()
-                                : _ActivityCalendarDayCell(
-                                    date: date,
-                                    day: byDate[snapshotDateKey(date)],
-                                    overview: overview,
-                                    mode: mode,
-                                    selected:
-                                        selectedDay != null &&
-                                        _sameLocalDate(date, selectedDay!.date),
-                                    future: date.isAfter(today),
-                                    onTap:
-                                        byDate.containsKey(
-                                              snapshotDateKey(date),
-                                            ) &&
-                                            !date.isAfter(today)
-                                        ? () => onSelectDay(
-                                            byDate[snapshotDateKey(date)]!,
-                                          )
-                                        : null,
-                                  ),
+                  _DeferredCalendarWeek(
+                    key: ValueKey((first, weekIndex)),
+                    framesToWait: weekIndex + 1,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final date in weeks[weekIndex])
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                              ),
+                              child: date == null
+                                  ? const SizedBox.shrink()
+                                  : _ActivityCalendarDayCell(
+                                      date: date,
+                                      day: byDate[snapshotDateKey(date)],
+                                      overview: overview,
+                                      mode: mode,
+                                      selected:
+                                          selectedDay != null &&
+                                          _sameLocalDate(
+                                            date,
+                                            selectedDay!.date,
+                                          ),
+                                      future: date.isAfter(today),
+                                      onTap:
+                                          byDate.containsKey(
+                                                snapshotDateKey(date),
+                                              ) &&
+                                              !date.isAfter(today)
+                                          ? () => onSelectDay(
+                                              byDate[snapshotDateKey(date)]!,
+                                            )
+                                          : null,
+                                    ),
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 8),
                   _ActivityCalendarWeekTotal(
@@ -1510,6 +1596,49 @@ class _ActivityHeatmapCalendar extends StatelessWidget {
       ],
     );
   }
+}
+
+// The full month stays the same size while its rows are mounted one per
+// frame. This avoids one frame building all day cells and artwork providers.
+class _DeferredCalendarWeek extends StatefulWidget {
+  const _DeferredCalendarWeek({
+    required this.framesToWait,
+    required this.child,
+    super.key,
+  });
+  final int framesToWait;
+  final Widget child;
+  @override
+  State<_DeferredCalendarWeek> createState() => _DeferredCalendarWeekState();
+}
+
+class _DeferredCalendarWeekState extends State<_DeferredCalendarWeek> {
+  bool _ready = false;
+  @override
+  void initState() {
+    super.initState();
+    _prepare();
+  }
+
+  Future<void> _prepare() async {
+    for (var i = 0; i < widget.framesToWait; i++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+    }
+    setState(() => _ready = true);
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+    // Mounting a week and resolving its artwork must not repaint the other
+    // weeks or the chart above while the user is scrolling.
+    child: _ready
+        ? widget.child
+        : LayoutBuilder(
+            builder: (context, constraints) =>
+                SizedBox(height: 24 + constraints.maxWidth / 7 - 4),
+          ),
+  );
 }
 
 class _ActivityCalendarModeButton extends StatelessWidget {
@@ -1881,30 +2010,60 @@ class _ActivityDaySelector extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<int>(
-                  key: const ValueKey('activity-day-selector'),
-                  value: selectedIndex < 0 ? null : selectedIndex,
-                  isExpanded: true,
-                  menuMaxHeight: 360,
-                  borderRadius: BorderRadius.circular(14),
-                  items: days.indexed
-                      .map(
-                        (entry) => DropdownMenuItem<int>(
-                          value: entry.$1,
-                          child: Text(
-                            _activityDaySelectorLabel(context, entry.$2),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+              child: PopupMenuButton<int>(
+                key: const ValueKey('activity-day-selector'),
+                tooltip: _t(
+                  context,
+                  'Select day',
+                  '日付を選択',
+                  zh: '选择日期',
+                  ko: '날짜 선택',
+                ),
+                initialValue: selectedIndex < 0 ? null : selectedIndex,
+                constraints: const BoxConstraints(
+                  maxHeight: 360,
+                  minWidth: 220,
+                  maxWidth: 360,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                itemBuilder: (context) => [
+                  for (final entry in days.indexed)
+                    PopupMenuItem<int>(
+                      value: entry.$1,
+                      child: Text(
+                        _activityDaySelectorLabel(context, entry.$2),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onSelected: (index) => onSelectDay(days[index]),
+                child: SizedBox(
+                  height: kMinInteractiveDimension,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          selectedDay == null
+                              ? _t(
+                                  context,
+                                  'Select day',
+                                  '日付を選択',
+                                  zh: '选择日期',
+                                  ko: '날짜 선택',
+                                )
+                              : _activityDaySelectorLabel(
+                                  context,
+                                  selectedDay!,
+                                ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
                         ),
-                      )
-                      .toList(growable: false),
-                  onChanged: (index) {
-                    if (index != null) {
-                      onSelectDay(days[index]);
-                    }
-                  },
+                      ),
+                      const Icon(Icons.arrow_drop_down),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -3020,6 +3179,7 @@ class _AnalysisInlineTooltip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final radius = BorderRadius.circular(14);
+    final textScaler = MediaQuery.textScalerOf(context);
     final content = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -3029,39 +3189,79 @@ class _AnalysisInlineTooltip extends StatelessWidget {
           color: theme.colorScheme.primary.withValues(alpha: 0.16),
         ),
       ),
-      child: Row(
-        children: [
-          Icon(icon, size: 17, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w900,
+      child: textScaler.scale(1) > 1.3
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, size: 17, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    if (onTap != null) ...[
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 25, top: 4),
+                  child: Text(
+                    value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Icon(icon, size: 17, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (onTap != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ],
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          if (onTap != null) ...[
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ],
-      ),
     );
 
     final wrapped = onTap == null

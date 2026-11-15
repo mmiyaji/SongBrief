@@ -65,6 +65,11 @@ ListeningEventProjection projectListeningEvents({
   required List<SupplementalListeningEvent> events,
   required bool dailyOnly,
 }) {
+  // No supplemental evidence can be covered or relocated. In particular,
+  // avoid comparing every historical track just to produce an empty result.
+  if (events.isEmpty) {
+    return const ListeningEventProjection(uncoveredEvents: [], relocations: []);
+  }
   final unique = <String, SupplementalListeningEvent>{};
   for (final event in events) {
     final key =
@@ -108,6 +113,7 @@ ListeningEventProjection projectListeningEvents({
         intervalEvents.add(event);
       }
     }
+    if (intervalEvents.isEmpty) continue;
     final byId = <String, List<_TrackBudget>>{};
     final byMetadata = <String, List<_TrackBudget>>{};
     final byTitleArtist = <String, List<_TrackBudget>>{};
@@ -169,8 +175,10 @@ ListeningEventProjection projectListeningEvents({
 String _eventKey(SupplementalListeningEvent event) =>
     '${event.track.id}\u0000${event.playedAt.microsecondsSinceEpoch}';
 
+final _whitespace = RegExp(r'\s+');
+
 String _normalize(String value) =>
-    value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    value.trim().toLowerCase().replaceAll(_whitespace, ' ');
 
 String _metadataKey(String title, String artist, String album) =>
     '${_normalize(title)}\u0000${_normalize(artist)}\u0000${_normalize(album)}';

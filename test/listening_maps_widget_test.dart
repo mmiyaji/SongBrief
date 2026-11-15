@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,35 @@ import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
 
 void main() {
+  testWidgets(
+    'calendar creates day choices only when opened and selects a day',
+    (tester) async {
+      await _pumpOverview(
+        tester,
+        tracks: _heatmapSelectionTracks(),
+        snapshotRecordingEnabled: true,
+      );
+      await tester.pumpAndSettle();
+      final selector = find.byKey(const ValueKey('activity-day-selector'));
+      await _scrollOverviewUntilVisible(tester, selector);
+      expect(find.byType(PopupMenuItem<int>), findsNothing);
+      await tester.tap(selector);
+      await tester.pumpAndSettle();
+      final choices = tester
+          .widgetList<PopupMenuItem<int>>(find.byType(PopupMenuItem<int>))
+          .toList();
+      expect(choices.length, greaterThan(2));
+      final yesterday = choices.last.value! - 1;
+      final item = find.byWidgetPredicate(
+        (widget) => widget is PopupMenuItem<int> && widget.value == yesterday,
+      );
+      await tester.ensureVisible(item);
+      await tester.tap(item);
+      await tester.pumpAndSettle();
+      expect(find.text('Yesterday Peak Track - Peak Artist'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('opens stat-backed track lists from overview cards', (
     tester,
   ) async {
@@ -142,6 +172,7 @@ void main() {
     );
     expect(dataSelector, findsOneWidget);
     expect(find.text('Select year data'), findsOneWidget);
+    expect(find.byType(PopupMenuItem<int>), findsNothing);
 
     await tester.tap(dataSelector);
     await tester.pumpAndSettle();
@@ -149,6 +180,57 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Tap a year point'), findsNothing);
+  });
+
+  testWidgets('release year labels respect enlarged system text', (
+    tester,
+  ) async {
+    final years = [1900, 2020];
+    await _pumpOverview(
+      tester,
+      tracks: [
+        for (final year in years)
+          LibraryTrack(
+            id: 'scaled-year-$year',
+            title: 'Scaled Year $year',
+            artist: 'Accessibility Artist',
+            albumTitle: 'Release Years',
+            playCount: 10,
+            skipCount: 0,
+            duration: const Duration(minutes: 3),
+            isCloudItem: false,
+            releaseDate: DateTime(year, 1, 1),
+          ),
+      ],
+      width: 390,
+      textScaleFactor: 2,
+    );
+    await tester.pumpAndSettle();
+    await _scrollOverviewUntilVisible(tester, find.text('Listening maps'));
+    await tester.pumpAndSettle();
+
+    final chart = find.byType(LineChart).first;
+    final visibleLabels = find
+        .descendant(
+          of: chart,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                RegExp(r'^\d{4}$').hasMatch(widget.data ?? ''),
+          ),
+        )
+        .evaluate()
+        .map(
+          (element) =>
+              find.byElementPredicate((candidate) => candidate == element),
+        )
+        .toList();
+    expect(visibleLabels.length, greaterThanOrEqualTo(2));
+    final rects = visibleLabels.map(tester.getRect).toList()
+      ..sort((a, b) => a.left.compareTo(b.left));
+    for (var index = 1; index < rects.length; index++) {
+      expect(rects[index - 1].right, lessThanOrEqualTo(rects[index].left));
+    }
   });
 
   testWidgets('activity heatmap provides a full-size day selector', (
@@ -221,7 +303,10 @@ void main() {
     );
     if (now.day < DateTime(now.year, now.month + 1, 0).day) {
       expect(futureDay.last, findsOneWidget);
-      expect(tester.widget<Semantics>(futureDay.last).properties.enabled, isFalse);
+      expect(
+        tester.widget<Semantics>(futureDay.last).properties.enabled,
+        isFalse,
+      );
     } else {
       expect(futureDay, findsNothing);
     }
@@ -472,10 +557,9 @@ void main() {
       ], isDemo: false),
       capturedAt: now.subtract(const Duration(days: 1)),
     );
-    final overview = LibraryOverview.fromTracks(
-      [currentTracks.first],
-      isDemo: false,
-    );
+    final overview = LibraryOverview.fromTracks([
+      currentTracks.first,
+    ], isDemo: false);
     final current = DailyLibrarySnapshot.fromOverview(
       LibraryOverview.fromTracks(currentTracks, isDemo: false),
       capturedAt: now,

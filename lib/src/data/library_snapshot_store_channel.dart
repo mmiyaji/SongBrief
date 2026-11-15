@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/library_snapshot.dart';
@@ -18,18 +19,15 @@ class MethodChannelSnapshotStore implements SnapshotStore {
       'loadLocalSnapshotHistory',
       {'detailedLimit': detailedSnapshotHistoryEntries},
     );
-    final snapshots =
-        (rawSnapshots ?? const <Object?>[])
-            .whereType<Map<Object?, Object?>>()
-            .map(
-              (snapshot) => DailyLibrarySnapshot.fromJson(
-                snapshot.cast<String, Object?>(),
-              ),
-            )
-            .where((snapshot) => snapshot.dateKey.isNotEmpty)
-            .toList(growable: false)
-          ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
-    return SnapshotHistory(snapshots: List.unmodifiable(snapshots));
+    final values = rawSnapshots ?? const <Object?>[];
+    if (_shouldDecodeSnapshotHistoryInIsolate(values)) {
+      return compute(
+        _decodeSnapshotHistory,
+        values,
+        debugLabel: 'decode snapshot history',
+      );
+    }
+    return _decodeSnapshotHistory(values);
   }
 
   @override
@@ -63,4 +61,37 @@ class MethodChannelSnapshotStore implements SnapshotStore {
       );
     }
   }
+}
+
+const _snapshotDecodeIsolateThreshold = 64;
+const _snapshotTrackDecodeIsolateThreshold = 700;
+
+bool _shouldDecodeSnapshotHistoryInIsolate(List<Object?> rawSnapshots) {
+  if (rawSnapshots.length >= _snapshotDecodeIsolateThreshold) return true;
+
+  var detailedTrackCount = 0;
+  for (final rawSnapshot in rawSnapshots) {
+    if (rawSnapshot is! Map<Object?, Object?>) continue;
+    final tracks = rawSnapshot['tracks'];
+    if (tracks is! List) continue;
+    detailedTrackCount += tracks.length;
+    if (detailedTrackCount >= _snapshotTrackDecodeIsolateThreshold) {
+      return true;
+    }
+  }
+  return false;
+}
+
+SnapshotHistory _decodeSnapshotHistory(List<Object?> rawSnapshots) {
+  final snapshots =
+      rawSnapshots
+          .whereType<Map<Object?, Object?>>()
+          .map(
+            (snapshot) =>
+                DailyLibrarySnapshot.fromJson(snapshot.cast<String, Object?>()),
+          )
+          .where((snapshot) => snapshot.dateKey.isNotEmpty)
+          .toList(growable: false)
+        ..sort((a, b) => a.dateKey.compareTo(b.dateKey));
+  return SnapshotHistory(snapshots: List.unmodifiable(snapshots));
 }

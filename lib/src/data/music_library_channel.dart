@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/library_track.dart';
@@ -81,10 +82,15 @@ class PlatformMusicLibraryClient
   @override
   Future<List<LibraryTrack>> fetchTracks() async {
     final rawTracks = await _channel.invokeMethod<List<Object?>>('fetchTracks');
-    return (rawTracks ?? const <Object?>[])
-        .whereType<Map<Object?, Object?>>()
-        .map(LibraryTrack.fromPlatformMap)
-        .toList(growable: false);
+    final values = rawTracks ?? const <Object?>[];
+    if (values.length >= _trackDecodeIsolateThreshold) {
+      return compute(
+        _decodePlatformTracks,
+        values,
+        debugLabel: 'decode music library',
+      );
+    }
+    return _decodePlatformTracks(values);
   }
 
   @override
@@ -193,6 +199,15 @@ class PlatformMusicLibraryClient
     );
     return SnapshotSyncResult.fromPlatformValue(payload);
   }
+}
+
+const _trackDecodeIsolateThreshold = 700;
+
+List<LibraryTrack> _decodePlatformTracks(List<Object?> rawTracks) {
+  return rawTracks
+      .whereType<Map<Object?, Object?>>()
+      .map(LibraryTrack.fromPlatformMap)
+      .toList(growable: false);
 }
 
 enum SnapshotBackgroundRefreshAvailability {

@@ -78,6 +78,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // The calendar is a lazy overview panel; reach it before inspecting days.
+    final expand = find.byKey(const ValueKey('activity-calendar-expand'));
+    await tester.scrollUntilVisible(
+      expand,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
     final todayCell = find
         .byKey(ValueKey('activity-calendar-day-${_dateKey(today)}'))
         .last;
@@ -98,7 +107,8 @@ void main() {
       findsWidgets,
     );
 
-    final expand = find.byKey(const ValueKey('activity-calendar-expand'));
+    await tester.ensureVisible(expand);
+    await tester.pumpAndSettle();
     await tester.ensureVisible(expand);
     await tester.pumpAndSettle();
     await tester.tap(expand);

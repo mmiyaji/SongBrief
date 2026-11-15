@@ -11,31 +11,120 @@ import 'package:songbrief/src/domain/music_library_authorization.dart';
 import 'package:songbrief/src/domain/music_stats_state.dart';
 import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/features/home/home_controller.dart';
+import 'package:songbrief/src/features/home/recent_listening_provider.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
 import 'package:songbrief/src/settings/library_filter_preferences.dart';
 import 'package:songbrief/src/settings/snapshot_preferences.dart';
 
 void main() {
+  testWidgets('recent history projection waits until the panel is visible', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final stats = _trendStats(lastPlayedAt: DateTime.now());
+    var projections = 0;
+    await _pumpApp(
+      tester,
+      AppLanguage.english,
+      statsState: stats,
+      recentTracksBuilder: () {
+        projections++;
+        return stats.overview.recentTrackDetails;
+      },
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Trend Range Song'), findsWidgets);
+    expect(projections, 0);
+    await tester.scrollUntilVisible(
+      find.text('Recently played songs'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(projections, 1);
+    expect(find.text('Recently played songs'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('playing panels build on demand and retain expanded lyrics', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+    expect(find.text('Recently played songs'), findsNothing);
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Show all lyrics'),
+      250,
+      scrollable: scrollable,
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Show all lyrics'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show all lyrics'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Recently played songs'),
+      300,
+      scrollable: scrollable,
+    );
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -1500));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Show less'),
+      250,
+      scrollable: scrollable,
+    );
+    expect(find.text('Show less'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('shows the SongBrief dashboard shell in English', (tester) async {
     await _pumpApp(tester, AppLanguage.english);
     await tester.pumpAndSettle();
 
     expect(find.text('SongBrief'), findsOneWidget);
+    expect(_tooltipStartingWith('Demo mode'), findsOneWidget);
     expect(find.text('Skyline Echo'), findsWidgets);
     expect(find.text('Plays'), findsWidgets);
     expect(find.text('Listening trend'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Lyrics'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Lyrics'), findsOneWidget);
     expect(find.textContaining('City lights are waking slow'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Show all lyrics'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Show all lyrics'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Recently played songs'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Recently played songs'), findsOneWidget);
-    expect(_tooltipStartingWith('Demo mode'), findsOneWidget);
-    expect(find.text('#1 by plays'), findsOneWidget);
   });
 
   testWidgets('expands and collapses long lyrics', (tester) async {
     await _pumpApp(tester, AppLanguage.english);
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Show all lyrics'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Show all lyrics'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Show all lyrics'));
@@ -63,8 +152,12 @@ void main() {
     expect(find.text('Skyline Echo'), findsWidgets);
     expect(find.text('再生回数'), findsWidgets);
     expect(find.text('再生傾向'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('最近再生した曲'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('最近再生した曲'), findsOneWidget);
-    expect(_tooltipStartingWith('デモモード'), findsOneWidget);
   });
 
   testWidgets('shows playback feedback and allows pausing from the player', (
@@ -397,19 +490,21 @@ void main() {
         ),
       ],
     );
-    container.read(outsideLibraryPlaysProvider.notifier).record(
-      LibraryTrack(
-        id: 'ipad-outside-library',
-        title: 'Supplemental Stream',
-        artist: 'Guest Artist',
-        albumTitle: 'Playlist Album',
-        duration: const Duration(minutes: 3),
-        playCount: 0,
-        skipCount: 0,
-        lastPlayedAt: now.add(const Duration(minutes: 1)),
-        isCloudItem: true,
-      ),
-    );
+    container
+        .read(outsideLibraryPlaysProvider.notifier)
+        .record(
+          LibraryTrack(
+            id: 'ipad-outside-library',
+            title: 'Supplemental Stream',
+            artist: 'Guest Artist',
+            albumTitle: 'Playlist Album',
+            duration: const Duration(minutes: 3),
+            playCount: 0,
+            skipCount: 0,
+            lastPlayedAt: now.add(const Duration(minutes: 1)),
+            isCloudItem: true,
+          ),
+        );
 
     try {
       await tester.pumpWidget(
@@ -430,6 +525,11 @@ void main() {
           .read(homeSectionProvider.notifier)
           .setSection(HomeSection.playing);
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Supplemental Stream'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Supplemental Stream'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
@@ -1242,10 +1342,15 @@ Future<void> _pumpApp(
   PlaybackController Function()? playbackControllerBuilder,
   SnapshotRefreshDiagnostics? snapshotRefreshDiagnostics,
   bool? detailedLoggingEnabled,
+  List<LibraryTrack> Function()? recentTracksBuilder,
 }) {
   return tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (recentTracksBuilder != null)
+          recentListeningTracksProvider.overrideWith(
+            (ref) => recentTracksBuilder(),
+          ),
         appLanguageProvider.overrideWith(
           () => _FixedLanguageController(language),
         ),

@@ -654,46 +654,47 @@ class _LoadingStateState extends State<_LoadingState>
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final value = reduceMotion ? 0.62 : _controller.value;
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _LoadingPulseLoader(progress: value),
-                  const SizedBox(height: 26),
-                  Text(
-                    _t(
-                      context,
-                      'Reading your library',
-                      'ライブラリを読み込んでいます',
-                      zh: '正在读取音乐库',
-                      ko: '라이브러리를 읽는 중',
-                    ),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) => _LoadingPulseLoader(
+                    progress: reduceMotion ? 0.62 : _controller.value,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _t(
-                      context,
-                      'Preparing play counts, rankings, and listening records.',
-                      '再生回数、ランキング、聴取記録を準備しています。',
-                      zh: '正在准备播放次数、排行榜和聆听记录。',
-                      ko: '재생 횟수, 랭킹, 감상 기록을 준비하고 있습니다.',
-                    ),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+              const SizedBox(height: 26),
+              Text(
+                _t(
+                  context,
+                  'Reading your library',
+                  'ライブラリを読み込んでいます',
+                  zh: '正在读取音乐库',
+                  ko: '라이브러리를 읽는 중',
+                ),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _t(
+                  context,
+                  'Preparing play counts, rankings, and listening records.',
+                  '再生回数、ランキング、聴取記録を準備しています。',
+                  zh: '正在准备播放次数、排行榜和聆听记录。',
+                  ko: '재생 횟수, 랭킹, 감상 기록을 준비하고 있습니다.',
+                ),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -759,8 +760,9 @@ class _LoadingBeatBars extends StatelessWidget {
                 34;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
+          // The shared controller already interpolates the height each frame.
+          // A second implicit animation continually retargets and lags behind.
+          child: Container(
             width: 8,
             height: height,
             decoration: BoxDecoration(

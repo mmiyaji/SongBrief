@@ -530,61 +530,89 @@ class MusicStatsRepository {
     const snapshotDays = 90;
     final today = DateTime.now();
     final todayStart = DateTime(today.year, today.month, today.day, 6);
-    var history = SnapshotHistory.empty;
-
-    for (var snapshotIndex = 0; snapshotIndex < snapshotDays; snapshotIndex++) {
+    // Compute each track's daily counters once. A historical snapshot needs
+    // counters, not a fresh set of rankings, search indexes and playlist maps.
+    final plays = [
+      for (var i = 0; i < overview.tracks.length; i++)
+        _demoCounters(
+          overview.tracks[i].playCount,
+          _demoPlayDeltas(
+            trackIndex: i,
+            current: overview.tracks[i].playCount,
+            days: snapshotDays,
+          ),
+          snapshotDays,
+        ),
+    ];
+    final skips = [
+      for (var i = 0; i < overview.tracks.length; i++)
+        _demoCounters(
+          overview.tracks[i].skipCount,
+          _demoSkipDeltas(
+            trackIndex: i,
+            current: overview.tracks[i].skipCount,
+            days: snapshotDays,
+          ),
+          snapshotDays,
+        ),
+    ];
+    final snapshots = <DailyLibrarySnapshot>[];
+    for (var dayIndex = 0; dayIndex < snapshotDays; dayIndex++) {
       final day = todayStart.subtract(
-        Duration(days: snapshotDays - 1 - snapshotIndex),
+        Duration(days: snapshotDays - 1 - dayIndex),
       );
-      final tracks = List<LibraryTrack>.generate(overview.tracks.length, (
-        trackIndex,
-      ) {
-        final track = overview.tracks[trackIndex];
-        return track.copyWith(
-          playCount: _demoCounterAtSnapshot(
-            current: track.playCount,
-            deltas: _demoPlayDeltas(
-              trackIndex: trackIndex,
-              current: track.playCount,
-              days: snapshotDays,
-            ),
-            snapshotIndex: snapshotIndex,
+      var totalPlays = 0;
+      var totalSkips = 0;
+      var totalSeconds = 0;
+      final counters = <TrackCounterSnapshot>[];
+      for (var i = 0; i < overview.tracks.length; i++) {
+        final track = overview.tracks[i];
+        final playCount = plays[i][dayIndex];
+        final skipCount = skips[i][dayIndex];
+        final seconds = track.duration.inSeconds * playCount;
+        totalPlays += playCount;
+        totalSkips += skipCount;
+        totalSeconds += seconds;
+        counters.add(
+          TrackCounterSnapshot(
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            albumTitle: track.albumTitle,
+            albumArtist: track.albumArtist,
+            genre: track.genre,
+            playCount: playCount,
+            skipCount: skipCount,
+            listeningSeconds: seconds,
+            lastPlayedAt: track.lastPlayedAt,
           ),
-          skipCount: _demoCounterAtSnapshot(
-            current: track.skipCount,
-            deltas: _demoSkipDeltas(
-              trackIndex: trackIndex,
-              current: track.skipCount,
-              days: snapshotDays,
-            ),
-            snapshotIndex: snapshotIndex,
-          ),
-          lastPlayedAt: track.lastPlayedAt,
         );
-      }, growable: false);
-      history = history.withSnapshot(
-        DailyLibrarySnapshot.fromOverview(
-          LibraryOverview.fromTracks(tracks, isDemo: true),
+      }
+      counters.sort((a, b) => a.id.compareTo(b.id));
+      snapshots.add(
+        DailyLibrarySnapshot(
+          dateKey: snapshotDateKey(day),
           capturedAt: day,
           source: 'demo',
+          trackCount: overview.totalTracks,
+          totalPlayCount: totalPlays,
+          totalSkipCount: totalSkips,
+          totalListeningSeconds: totalSeconds,
+          tracks: List.unmodifiable(counters),
         ),
       );
     }
-
-    return history;
+    return SnapshotHistory(snapshots: List.unmodifiable(snapshots));
   }
 
-  int _demoCounterAtSnapshot({
-    required int current,
-    required List<int> deltas,
-    required int snapshotIndex,
-  }) {
-    var remaining = 0;
-    for (var index = snapshotIndex; index < deltas.length; index++) {
-      remaining += deltas[index];
+  List<int> _demoCounters(int current, List<int> deltas, int days) {
+    final counters = List<int>.filled(days, current);
+    var value = current;
+    for (var i = days - 2; i >= 0; i--) {
+      if (i < deltas.length) value -= deltas[i];
+      counters[i] = value < 0 ? 0 : value;
     }
-    final value = current - remaining;
-    return value < 0 ? 0 : value;
+    return counters;
   }
 
   List<int> _demoPlayDeltas({
