@@ -116,3 +116,32 @@ final result: passed
 - 秘密情報のパターンチェックと別担当レビューで該当なし。キャプチャはデモライブラリのデータ。アプリの未コミット差分・ローカル作業ファイルはステージ対象外。
 
 final result: passed
+
+## 最新実装の撮影・ギャラリー更新（2026-11-15）
+
+- source visual truth: 採用済み `docs/design/homepage/selected-mock.jpg`。黒・ミント、サイドナビ、iPhone外枠の構成を維持。新しい画面・データ・ギャラリーは今回のユーザー指定による変更。
+- implementation screenshots: `refreshed-hero.jpg`、`screens-desktop.jpg`（1488×1058 CSS px）、`screens-mobile-en.jpg`（390×844 CSS px）。devicePixelRatio 1。IAB撮影APIの出力はスクロールバー・既存の約1%縮小を含む。
+- full-view comparison: `refreshed-comparison.jpg`（左モック、右最新画像の実装）。重要な画像領域は原寸の `docs/assets/screenshot-iphone-rankings.png`、`screenshot-iphone-calendar.png`、`screenshot-iphone-overview.png`、`screenshot-ipad-library.png` でも個別に開いて確認。
+- 文字/配置/色: 既存のWeb書体・文字階層・余白・黒/ミントのトークンを維持。ギャラリーは4列、狭い幅は2列。説明を増やさず各画面名だけを掲載。390px幅の横はみ出しなし。
+- 画像/内容: 最新の実アプリFlutterウィジェットを撮影。画面内のUI・値・グラフを画像編集で描き足していない。日本語/英語それぞれ電話7画面＋タブレット2画面、合計18枚。電話430×932 CSS相当を2倍の860×1864、タブレット1366×1024を2倍の2732×2048で保存。写真の置き換え以外にアプリUIを別実装していない。
+- 撮影はWindowsのFlutterテスト描画で、読み込んだNoto Sans JPを使用。iOS実機・シミュレーターのOS表示やiOS固有のフォント描画を検証したものではない。Webには「掲載画面はデモデータです」と明記。
+- データ: ツール内だけの40曲・8アーティスト・12アルバム・101日分の架空データ。上位662/489/371回など比例バーの比較が分かる差を付けた。再生・スキップの累積値から日次記録を生成し、最後の記録と概要の値を一致。2026-11-15 11:30以後の記録や未来の日の再生は作っていない。ジャケットは既存demo_art、歌詞はオリジナルの架空文。
+- 再撮影: `flutter test tool/capture_website_test.dart --dart-define=SONGBRIEF_SCREENSHOT_MODE=true --reporter expanded`。別日の再撮影ではツールの撮影日ガードとfixture基準日を更新。撮影用データ・設定・フォント変更はtool内のみで通常利用へ影響しない。
+
+### 修正・比較履歴
+
+1. 型の混同（intlとdart:uiのTextDirection）とテストのisCloudItem指定漏れを修正。既存の未コミット年ラベル実装は維持。
+2. 大きな文字で見つかった分析ラベルと多様性スケールの表示あふれを修正。分析ラベルは1.3倍超で縦配置し、操作可能な場合の矢印を維持。
+3. 最初の撮影のカレンダーの未デコード画像・タブレットの日本語フォント不足を撮影ツールで修正し全18枚を再撮影。カレンダーのジャケット、数字、将来日の空欄を原寸確認。iCloud確認中の一時状態は撮影設定で同期オフにして除外。
+4. 最終サイトをIABで確認。日本語のカレンダー拡大・閉じる、英語への画像・ラベル切り替え、ギャラリー4画像の読込、モバイル幅を検証。console errorなし。
+
+### 検証結果
+
+- `flutter test test/listening_maps_widget_test.dart --reporter expanded`: 22件通過（最終修正後に再実行）。
+- `dart analyze lib/src/features/home/home_screen.dart tool/capture_website_test.dart tool/fixtures/website_demo.dart test/listening_maps_widget_test.dart`: No issues found。
+- 撮影ツール最終実行: 通過。fixture整合性・日時・画像サイズ・描画例外のチェックを含む。
+- Web参照・日英属性・セクションID・PNG18枚の寸法/破損検証、`git diff --check`: 通過。
+- iOS実機テスト・リリースチェック・公開は未実施。今回はローカルでの修正と撮影、紹介ページへの組込み。
+- 未解消のP0/P1/P2なし。
+
+final result: passed
