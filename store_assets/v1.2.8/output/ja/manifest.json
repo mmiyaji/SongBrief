@@ -1,0 +1,1609 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-15T16:56:33.849Z",
+  "requiredTargets": [
+    "app-store/iphone/screenshot",
+    "app-store/ipad/screenshot",
+    "app-store/duo/screenshot"
+  ],
+  "config": {
+    "outputDir": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\output\\ja",
+    "approved": true,
+    "requiredTargets": [
+      "app-store/iphone/screenshot",
+      "app-store/ipad/screenshot",
+      "app-store/duo/screenshot"
+    ],
+    "images": [
+      {
+        "id": "iphone-playing",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-playing.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "再生中の曲と累積再生回数",
+          "action": "再生中画面を開く",
+          "result": "曲の詳細と再生回数を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/playing_section.dart:306",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-playing.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "iphone-overview",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-overview.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリの概要",
+          "action": "概要タブを開く",
+          "result": "総再生時間とスキップ率を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-overview.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "iphone-rankings",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-rankings.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "再生ランキング",
+          "action": "ランキングタブを開く",
+          "result": "再生回数順に曲を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/rankings_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-rankings.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "iphone-library",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-library.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリ検索",
+          "action": "ライブラリを開いて検索",
+          "result": "曲とアルバムを探す",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/library_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-library.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "iphone-calendar",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-calendar.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "リスニングカレンダー",
+          "action": "概要から日付を選ぶ",
+          "result": "確認済みの日別聴取記録を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_listening_maps.dart:891",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-calendar.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      {
+        "id": "iphone-recap",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-recap.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "月間の聴取記録",
+          "action": "リキャップの月間タブを選ぶ",
+          "result": "当月の聴取記録とハイライトを確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_recaps.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-recap.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      {
+        "id": "ipad-playing",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-playing.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "再生中の曲と累積再生回数",
+          "action": "再生中画面を開く",
+          "result": "曲の詳細と再生回数を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/playing_section.dart:306",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-playing.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "ipad-overview",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-overview.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリの概要",
+          "action": "概要タブを開く",
+          "result": "総再生時間とスキップ率を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-overview.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "ipad-rankings",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-rankings.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "再生ランキング",
+          "action": "ランキングタブを開く",
+          "result": "再生回数順に曲を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/rankings_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-rankings.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "ipad-library",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-library.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリ検索",
+          "action": "ライブラリを開いて検索",
+          "result": "曲とアルバムを探す",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/library_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-library.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "ipad-calendar",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-calendar.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "リスニングカレンダー",
+          "action": "概要から日付を選ぶ",
+          "result": "確認済みの日別聴取記録を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_listening_maps.dart:891",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-calendar.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      {
+        "id": "ipad-recap",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-recap.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "月間の聴取記録",
+          "action": "リキャップの月間タブを選ぶ",
+          "result": "当月の聴取記録とハイライトを確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_recaps.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-recap.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      {
+        "id": "duo-playing",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-playing.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "再生中の曲と累積再生回数",
+          "action": "再生中画面を開く",
+          "result": "曲の詳細と再生回数を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/playing_section.dart:306",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-playing.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "duo-overview",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-overview.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリの概要",
+          "action": "概要タブを開く",
+          "result": "総再生時間とスキップ率を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-overview.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "duo-rankings",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-rankings.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "再生ランキング",
+          "action": "ランキングタブを開く",
+          "result": "再生回数順に曲を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/rankings_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-rankings.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "duo-library",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-library.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリ検索",
+          "action": "ライブラリを開いて検索",
+          "result": "曲とアルバムを探す",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/library_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-library.png"
+          ],
+          "priority": "high"
+        }
+      },
+      {
+        "id": "duo-calendar",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-calendar.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "リスニングカレンダー",
+          "action": "概要から日付を選ぶ",
+          "result": "確認済みの日別聴取記録を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_listening_maps.dart:891",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-calendar.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      {
+        "id": "duo-recap",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-recap.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "月間の聴取記録",
+          "action": "リキャップの月間タブを選ぶ",
+          "result": "当月の聴取記録とハイライトを確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_recaps.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-recap.png"
+          ],
+          "priority": "medium"
+        }
+      }
+    ],
+    "fontPath": "D:\\git\\storeframe\\assets\\fonts\\NotoSansJP.ttf"
+  },
+  "reproducibility": {
+    "font": "D:\\git\\storeframe\\assets\\fonts\\NotoSansJP.ttf",
+    "fontSha256": "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f",
+    "browser": "156.0.8078.4",
+    "sharp": {
+      "aom": "3.15.1",
+      "archive": "3.8.9",
+      "cairo": "1.18.6",
+      "cgif": "0.5.4",
+      "exif": "0.6.26",
+      "expat": "2.8.5",
+      "ffi": "3.8.0",
+      "fontconfig": "2.18.3",
+      "freetype": "2.14.3",
+      "fribidi": "1.0.17",
+      "glib": "2.90.0",
+      "harfbuzz": "14.5.0",
+      "heif": "1.23.5",
+      "highway": "1.4.0",
+      "imagequant": "2.4.1",
+      "lcms": "2.19.1",
+      "mozjpeg": "0826579",
+      "pango": "1.58.2",
+      "pixman": "0.46.4",
+      "png": "1.6.58",
+      "proxy-libintl": "0.5",
+      "rsvg": "2.63.2",
+      "tiff": "4.7.2",
+      "uhdr": "2.0.2",
+      "vips": "8.18.7",
+      "webp": "1.6.0",
+      "xml2": "2.15.4",
+      "zlib-ng": "2.3.3",
+      "sharp": "0.35.5"
+    },
+    "warning": "Pixel-identical output across operating systems is not guaranteed."
+  },
+  "sample": false,
+  "images": [
+    {
+      "file": "app-store/iphone/app-store_iphone_01_screenshot.png",
+      "width": 1284,
+      "height": 2778,
+      "store": "app-store",
+      "device": "iphone",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-playing.png",
+          "sha256": "9183c1c3f93a60af0baa87eb8f5de1c9ace1a77672a794f399c59ebd6fde2411"
+        }
+      ],
+      "config": {
+        "id": "iphone-playing",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/iphone-playing.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "再生中の曲と累積再生回数",
+          "action": "再生中画面を開く",
+          "result": "曲の詳細と再生回数を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/playing_section.dart:306",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-playing.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "再生中の曲と累積再生回数",
+          "action": "再生中画面を開く",
+          "result": "曲の詳細と再生回数を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/playing_section.dart:306",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-playing.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/iphone/app-store_iphone_02_screenshot.png",
+      "width": 1284,
+      "height": 2778,
+      "store": "app-store",
+      "device": "iphone",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-overview.png",
+          "sha256": "9ba2c4ecf4ddaaf85304432dacc95bd0e764cb55b89a2b945aa2ddd07b8d9422"
+        }
+      ],
+      "config": {
+        "id": "iphone-overview",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/iphone-overview.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリの概要",
+          "action": "概要タブを開く",
+          "result": "総再生時間とスキップ率を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-overview.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "ライブラリの概要",
+          "action": "概要タブを開く",
+          "result": "総再生時間とスキップ率を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-overview.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/iphone/app-store_iphone_03_screenshot.png",
+      "width": 1284,
+      "height": 2778,
+      "store": "app-store",
+      "device": "iphone",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-rankings.png",
+          "sha256": "ab749543c27986ecfb6bdd8b480be38524c250afb052f8a9725894adea00a7f8"
+        }
+      ],
+      "config": {
+        "id": "iphone-rankings",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/iphone-rankings.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "再生ランキング",
+          "action": "ランキングタブを開く",
+          "result": "再生回数順に曲を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/rankings_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-rankings.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "再生ランキング",
+          "action": "ランキングタブを開く",
+          "result": "再生回数順に曲を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/rankings_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-rankings.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/iphone/app-store_iphone_04_screenshot.png",
+      "width": 1284,
+      "height": 2778,
+      "store": "app-store",
+      "device": "iphone",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-library.png",
+          "sha256": "eee4b385425b12986f191e20da9745737d8f52be6fab8235c74814a5917183c0"
+        }
+      ],
+      "config": {
+        "id": "iphone-library",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/iphone-library.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリ検索",
+          "action": "ライブラリを開いて検索",
+          "result": "曲とアルバムを探す",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/library_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-library.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "ライブラリ検索",
+          "action": "ライブラリを開いて検索",
+          "result": "曲とアルバムを探す",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/library_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-library.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/iphone/app-store_iphone_05_screenshot.png",
+      "width": 1284,
+      "height": 2778,
+      "store": "app-store",
+      "device": "iphone",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-calendar.png",
+          "sha256": "6a376e305818efd0790b9c1987d344ba557093110edf35a5e771a57190185504"
+        }
+      ],
+      "config": {
+        "id": "iphone-calendar",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/iphone-calendar.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "リスニングカレンダー",
+          "action": "概要から日付を選ぶ",
+          "result": "確認済みの日別聴取記録を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_listening_maps.dart:891",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-calendar.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "リスニングカレンダー",
+          "action": "概要から日付を選ぶ",
+          "result": "確認済みの日別聴取記録を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_listening_maps.dart:891",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-calendar.png"
+          ],
+          "priority": "medium"
+        }
+      }
+    },
+    {
+      "file": "app-store/iphone/app-store_iphone_06_screenshot.png",
+      "width": 1284,
+      "height": 2778,
+      "store": "app-store",
+      "device": "iphone",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-recap.png",
+          "sha256": "0c7e05ff36ed632b803b4933b0b6cd3e8d9b1c834c154cf82ffba2101bc35b76"
+        }
+      ],
+      "config": {
+        "id": "iphone-recap",
+        "store": "app-store",
+        "device": "iphone",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/iphone-recap.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 1284,
+        "height": 2778,
+        "format": "png",
+        "feature": {
+          "name": "月間の聴取記録",
+          "action": "リキャップの月間タブを選ぶ",
+          "result": "当月の聴取記録とハイライトを確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_recaps.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-recap.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "月間の聴取記録",
+          "action": "リキャップの月間タブを選ぶ",
+          "result": "当月の聴取記録とハイライトを確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_recaps.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-recap.png"
+          ],
+          "priority": "medium"
+        }
+      }
+    },
+    {
+      "file": "app-store/ipad/app-store_ipad_07_screenshot.png",
+      "width": 2732,
+      "height": 2048,
+      "store": "app-store",
+      "device": "ipad",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-playing.png",
+          "sha256": "5fb9ac9c747051e7490e9149e372109cca05fb9d766261e203fa67f1f6409715"
+        }
+      ],
+      "config": {
+        "id": "ipad-playing",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/ipad-playing.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "再生中の曲と累積再生回数",
+          "action": "再生中画面を開く",
+          "result": "曲の詳細と再生回数を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/playing_section.dart:306",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-playing.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "再生中の曲と累積再生回数",
+          "action": "再生中画面を開く",
+          "result": "曲の詳細と再生回数を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/playing_section.dart:306",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-playing.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/ipad/app-store_ipad_08_screenshot.png",
+      "width": 2732,
+      "height": 2048,
+      "store": "app-store",
+      "device": "ipad",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-overview.png",
+          "sha256": "8f37ee209f7b1b308189bda4c918cce638f5ef7f6bcb02729872e39ebe2813f5"
+        }
+      ],
+      "config": {
+        "id": "ipad-overview",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/ipad-overview.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリの概要",
+          "action": "概要タブを開く",
+          "result": "総再生時間とスキップ率を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-overview.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "ライブラリの概要",
+          "action": "概要タブを開く",
+          "result": "総再生時間とスキップ率を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-overview.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/ipad/app-store_ipad_09_screenshot.png",
+      "width": 2732,
+      "height": 2048,
+      "store": "app-store",
+      "device": "ipad",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-rankings.png",
+          "sha256": "fdf1c8e6b749c0de38d1bb38156a497ddc85f5ca02b4e886ef083e5a642028ea"
+        }
+      ],
+      "config": {
+        "id": "ipad-rankings",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/ipad-rankings.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "再生ランキング",
+          "action": "ランキングタブを開く",
+          "result": "再生回数順に曲を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/rankings_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-rankings.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "再生ランキング",
+          "action": "ランキングタブを開く",
+          "result": "再生回数順に曲を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/rankings_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-rankings.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/ipad/app-store_ipad_10_screenshot.png",
+      "width": 2732,
+      "height": 2048,
+      "store": "app-store",
+      "device": "ipad",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-library.png",
+          "sha256": "8ee55e144f2db42878a6d3333f226ba49d70db4f555d0e73c1e54291dad052bb"
+        }
+      ],
+      "config": {
+        "id": "ipad-library",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/ipad-library.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリ検索",
+          "action": "ライブラリを開いて検索",
+          "result": "曲とアルバムを探す",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/library_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-library.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "ライブラリ検索",
+          "action": "ライブラリを開いて検索",
+          "result": "曲とアルバムを探す",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/library_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-library.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/ipad/app-store_ipad_11_screenshot.png",
+      "width": 2732,
+      "height": 2048,
+      "store": "app-store",
+      "device": "ipad",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-calendar.png",
+          "sha256": "e1eae4e3e60579149acb7e59d815094f000c96f954c6989f92ecff7718e80d7e"
+        }
+      ],
+      "config": {
+        "id": "ipad-calendar",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/ipad-calendar.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "リスニングカレンダー",
+          "action": "概要から日付を選ぶ",
+          "result": "確認済みの日別聴取記録を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_listening_maps.dart:891",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-calendar.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "リスニングカレンダー",
+          "action": "概要から日付を選ぶ",
+          "result": "確認済みの日別聴取記録を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_listening_maps.dart:891",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-calendar.png"
+          ],
+          "priority": "medium"
+        }
+      }
+    },
+    {
+      "file": "app-store/ipad/app-store_ipad_12_screenshot.png",
+      "width": 2732,
+      "height": 2048,
+      "store": "app-store",
+      "device": "ipad",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-recap.png",
+          "sha256": "7e53a1a6e158a90f84a12dd63bc59f5bb72ad3bc2cb53e7c905eadbc097eecfc"
+        }
+      ],
+      "config": {
+        "id": "ipad-recap",
+        "store": "app-store",
+        "device": "ipad",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/ipad-recap.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2732,
+        "height": 2048,
+        "format": "png",
+        "feature": {
+          "name": "月間の聴取記録",
+          "action": "リキャップの月間タブを選ぶ",
+          "result": "当月の聴取記録とハイライトを確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_recaps.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-recap.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "月間の聴取記録",
+          "action": "リキャップの月間タブを選ぶ",
+          "result": "当月の聴取記録とハイライトを確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_recaps.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\ipad-recap.png"
+          ],
+          "priority": "medium"
+        }
+      }
+    },
+    {
+      "file": "app-store/duo/app-store_duo_13_screenshot.png",
+      "width": 2007,
+      "height": 2853,
+      "store": "app-store",
+      "device": "duo",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-playing.png",
+          "sha256": "8128f2f5930862e823c766eba021118ea5e13f4897e9b782872660a3edfd07a0"
+        }
+      ],
+      "config": {
+        "id": "duo-playing",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/duo-playing.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "再生中の曲と累積再生回数",
+          "action": "再生中画面を開く",
+          "result": "曲の詳細と再生回数を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/playing_section.dart:306",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-playing.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "再生中の曲と累積再生回数",
+          "action": "再生中画面を開く",
+          "result": "曲の詳細と再生回数を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/playing_section.dart:306",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-playing.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/duo/app-store_duo_14_screenshot.png",
+      "width": 2007,
+      "height": 2853,
+      "store": "app-store",
+      "device": "duo",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-overview.png",
+          "sha256": "8b7328098f1e92dfa35b5c1edf95d355478a4831bc18a3dbc8f117eef6b1ab8b"
+        }
+      ],
+      "config": {
+        "id": "duo-overview",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/duo-overview.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリの概要",
+          "action": "概要タブを開く",
+          "result": "総再生時間とスキップ率を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-overview.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "ライブラリの概要",
+          "action": "概要タブを開く",
+          "result": "総再生時間とスキップ率を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-overview.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/duo/app-store_duo_15_screenshot.png",
+      "width": 2007,
+      "height": 2853,
+      "store": "app-store",
+      "device": "duo",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-rankings.png",
+          "sha256": "a48344d30958224c1bb2854158a3d6593fcea90f6b3613d421277dd3e0b06667"
+        }
+      ],
+      "config": {
+        "id": "duo-rankings",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/duo-rankings.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "再生ランキング",
+          "action": "ランキングタブを開く",
+          "result": "再生回数順に曲を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/rankings_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-rankings.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "再生ランキング",
+          "action": "ランキングタブを開く",
+          "result": "再生回数順に曲を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/rankings_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-rankings.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/duo/app-store_duo_16_screenshot.png",
+      "width": 2007,
+      "height": 2853,
+      "store": "app-store",
+      "device": "duo",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-library.png",
+          "sha256": "fc92fe8f9a2b842fa09d6ea09ee5e65cb2e7ff6fb19a2dd4fe381ec1db31b270"
+        }
+      ],
+      "config": {
+        "id": "duo-library",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/duo-library.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "ライブラリ検索",
+          "action": "ライブラリを開いて検索",
+          "result": "曲とアルバムを探す",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/library_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-library.png"
+          ],
+          "priority": "high"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "ライブラリ検索",
+          "action": "ライブラリを開いて検索",
+          "result": "曲とアルバムを探す",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/library_section.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-library.png"
+          ],
+          "priority": "high"
+        }
+      }
+    },
+    {
+      "file": "app-store/duo/app-store_duo_17_screenshot.png",
+      "width": 2007,
+      "height": 2853,
+      "store": "app-store",
+      "device": "duo",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-calendar.png",
+          "sha256": "e05d6d4468594a754e2ca4132587dece46a8ae743e03506d995466306673b333"
+        }
+      ],
+      "config": {
+        "id": "duo-calendar",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/duo-calendar.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "リスニングカレンダー",
+          "action": "概要から日付を選ぶ",
+          "result": "確認済みの日別聴取記録を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_listening_maps.dart:891",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-calendar.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "リスニングカレンダー",
+          "action": "概要から日付を選ぶ",
+          "result": "確認済みの日別聴取記録を確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_listening_maps.dart:891",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-calendar.png"
+          ],
+          "priority": "medium"
+        }
+      }
+    },
+    {
+      "file": "app-store/duo/app-store_duo_18_screenshot.png",
+      "width": 2007,
+      "height": 2853,
+      "store": "app-store",
+      "device": "duo",
+      "kind": "screenshot",
+      "template": "raw",
+      "inputs": [
+        {
+          "file": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\duo-recap.png",
+          "sha256": "4667dd94fcc061c0062352fdb67f20dfc8cec9e6e8bd85c3e0471c7871f252f1"
+        }
+      ],
+      "config": {
+        "id": "duo-recap",
+        "store": "app-store",
+        "device": "duo",
+        "kind": "screenshot",
+        "inputs": [
+          "raw/duo-recap.png"
+        ],
+        "template": "raw",
+        "headline": "",
+        "background": "#040708",
+        "color": "#F4FBF8",
+        "width": 2007,
+        "height": 2853,
+        "format": "png",
+        "feature": {
+          "name": "月間の聴取記録",
+          "action": "リキャップの月間タブを選ぶ",
+          "result": "当月の聴取記録とハイライトを確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_recaps.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-recap.png"
+          ],
+          "priority": "medium"
+        }
+      },
+      "textMeasurements": [],
+      "manualReview": {
+        "required": true,
+        "checks": [
+          "text legibility",
+          "feature claim matches evidence",
+          "crop and callout placement"
+        ],
+        "featureMapping": {
+          "name": "月間の聴取記録",
+          "action": "リキャップの月間タブを選ぶ",
+          "result": "当月の聴取記録とハイライトを確認",
+          "evidence": [
+            "D:/git/SongBrief/lib/src/features/home/parts/overview_recaps.dart:3",
+            "D:\\git\\SongBrief\\store_assets\\v1.2.8\\raw\\iphone-recap.png"
+          ],
+          "priority": "medium"
+        }
+      }
+    }
+  ]
+}

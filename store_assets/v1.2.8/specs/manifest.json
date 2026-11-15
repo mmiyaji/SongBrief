@@ -1,0 +1,526 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-15T16:42:09.573352+00:00",
+  "sources": [
+    {
+      "store": "app-store",
+      "url": "https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/",
+      "fetchedAt": "2026-11-15T16:41:21.411Z",
+      "verifiedAt": "2026-11-15T16:42:09.573352+00:00",
+      "status": "verified",
+      "evidence": "Manually verified Apple screenshot specifications on 2026-11-16 JST: lines 406-423 formats/count/no-alpha; 450-538 large iPhone accepted dimensions 1320x2868, 1290x2796, 1260x2736, 1284x2778, 1242x2688; 542-575 medium optional; 13-inch iPad 2752x2064. iPhone Duo is required starting April 2027, not for this submission.",
+      "scope": "App Store Connect screenshots for iPhone, iPadOS, macOS; other Apple device families are outside this cache.",
+      "contentHash": "97f46e312748d8e5ffe488feaa5e60a866a9959e8205458e34dca067784a84c4",
+      "observedHash": "97f46e312748d8e5ffe488feaa5e60a866a9959e8205458e34dca067784a84c4"
+    },
+    {
+      "store": "google-play",
+      "url": "https://support.google.com/googleplay/android-developer/answer/9866151",
+      "fetchedAt": "2026-11-15T16:41:21.411Z",
+      "verifiedAt": "2026-11-15T16:41:21.411Z",
+      "status": "verified",
+      "evidence": "Official Play Console help was re-reviewed after source change. Current source section matches: feature graphic required 1024px by 500px, JPEG or 24-bit PNG without alpha; screenshots JPEG or 24-bit PNG without alpha, up to 8 per device type, min dimension 320px, max 3840px, max 2:1, minimum 2 across device types. Article body manually checked against cached feature graphic, screenshot bounds, format, alpha and count rules on 2026-11-01 JST.",
+      "scope": "Phone/tablet generic listing constraints only. Device-specific Automotive, TV, Wear OS, XR, and recommendation-eligibility quality thresholds are outside this target set. Fingerprint: complete article-container section; dynamic navigation and survey excluded.",
+      "contentHash": "73962b8353b7bb7d7e8bb52d653941b20f3b061b11cc29dd0927b4b95a5df9a8",
+      "observedHash": "73962b8353b7bb7d7e8bb52d653941b20f3b061b11cc29dd0927b4b95a5df9a8"
+    },
+    {
+      "store": "microsoft-store",
+      "id": "microsoft-store-msix",
+      "url": "https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/screenshots-and-images",
+      "fetchedAt": "2026-11-15T16:41:21.411Z",
+      "verifiedAt": "2026-11-15T16:41:21.411Z",
+      "status": "verified",
+      "evidence": "Official Microsoft Learn MSIX screenshot page: PNG, either orientation, max 50 MB; desktop 1366x768 or larger; super hero PNG 1920x1080 or 3840x2160; featured promo square 1080x1080.",
+      "scope": "MSIX app listing. MSI/EXE listing requirements differ and are documented separately; their screenshot geometry is not represented by this MSIX target.",
+      "contentHash": "235aaea6e10013c08de59269707158e7ff9ca3a79b080f3474467ea6d309d903",
+      "observedHash": "235aaea6e10013c08de59269707158e7ff9ca3a79b080f3474467ea6d309d903"
+    },
+    {
+      "store": "chrome-web-store",
+      "url": "https://developer.chrome.com/docs/webstore/cws-dashboard-listing/?hl=en",
+      "fetchedAt": "2026-11-15T16:41:21.411Z",
+      "verifiedAt": "2026-11-15T16:41:21.411Z",
+      "status": "verified",
+      "evidence": "Official Chrome Web Store dashboard listing page: 128x128 icon, 1280x800 screenshot (one to five), 440x280 small promo tile, 1400x560 marquee tile; marquee explicitly optional.",
+      "scope": "Chrome Web Store extension listing assets; packaged extension icon is checked as a listing image here only when included in output manifest.",
+      "contentHash": "7fe5f66cd7f5a1022242818837182ddc8e5939c526efb3431cb6b1369607b077",
+      "observedHash": "7fe5f66cd7f5a1022242818837182ddc8e5939c526efb3431cb6b1369607b077"
+    }
+  ],
+  "targets": [
+    {
+      "id": "app-store/iphone/screenshot",
+      "store": "app-store",
+      "device": "iphone",
+      "kind": "screenshot",
+      "required": true,
+      "requiredWhen": "when app supports iPhone; accepted large-display screenshot family",
+      "minCount": 1,
+      "maxCount": 10,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 1179,
+            "height": 2556
+          },
+          {
+            "width": 2556,
+            "height": 1179
+          },
+          {
+            "width": 1206,
+            "height": 2622
+          },
+          {
+            "width": 2622,
+            "height": 1206
+          },
+          {
+            "width": 1320,
+            "height": 2868
+          },
+          {
+            "width": 2868,
+            "height": 1320
+          },
+          {
+            "width": 1284,
+            "height": 2778
+          },
+          {
+            "width": 2778,
+            "height": 1284
+          }
+        ]
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "alpha": false,
+      "notes": "Primary large-display iPhone family; original medium-display alternatives remain accepted. Reviewed against current official Apple page."
+    },
+    {
+      "id": "app-store/ipad/screenshot",
+      "store": "app-store",
+      "device": "ipad",
+      "kind": "screenshot",
+      "required": true,
+      "requiredWhen": "when the app supports iPadOS",
+      "minCount": 1,
+      "maxCount": 10,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 2064,
+            "height": 2752
+          },
+          {
+            "width": 2752,
+            "height": 2064
+          },
+          {
+            "width": 2048,
+            "height": 2732
+          },
+          {
+            "width": 2732,
+            "height": 2048
+          }
+        ]
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "alpha": false,
+      "notes": "13-inch display required when app supports iPadOS."
+    },
+    {
+      "id": "app-store/macos/screenshot",
+      "store": "app-store",
+      "device": "macos",
+      "kind": "screenshot",
+      "required": true,
+      "requiredWhen": "when the app is a Mac app",
+      "minCount": 1,
+      "maxCount": 10,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 1280,
+            "height": 800
+          },
+          {
+            "width": 1440,
+            "height": 900
+          },
+          {
+            "width": 2560,
+            "height": 1600
+          },
+          {
+            "width": 2880,
+            "height": 1800
+          }
+        ]
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "alpha": false,
+      "notes": "Required for Mac apps. Supported sizes have 16:10 ratio."
+    },
+    {
+      "id": "google-play/phone/screenshot",
+      "store": "google-play",
+      "device": "phone",
+      "kind": "screenshot",
+      "required": false,
+      "minCount": 0,
+      "maxCount": 8,
+      "dimensions": {
+        "minWidth": 320,
+        "maxWidth": 3840,
+        "minHeight": 320,
+        "maxHeight": 3840,
+        "aspectRatio": {
+          "min": 0.5,
+          "max": 2
+        }
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "png24Only": true,
+      "alpha": false,
+      "notes": "Google states minimum dimension 320, maximum dimension 3840, no more than 2x longer than the other dimension. Count is up to 8 per supported device type; global minimum two across device types is not enforced here."
+    },
+    {
+      "id": "google-play/tablet-7-inch/screenshot",
+      "store": "google-play",
+      "device": "tablet-7-inch",
+      "kind": "screenshot",
+      "required": false,
+      "minCount": 0,
+      "maxCount": 8,
+      "dimensions": {
+        "minWidth": 320,
+        "maxWidth": 3840,
+        "minHeight": 320,
+        "maxHeight": 3840,
+        "aspectRatio": {
+          "min": 0.5,
+          "max": 2
+        }
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "png24Only": true,
+      "alpha": false,
+      "notes": "Generic Android tablet bounds. Category/device-specific requirements need separate scoped targets."
+    },
+    {
+      "id": "google-play/tablet-10-inch/screenshot",
+      "store": "google-play",
+      "device": "tablet-10-inch",
+      "kind": "screenshot",
+      "required": false,
+      "minCount": 0,
+      "maxCount": 8,
+      "dimensions": {
+        "minWidth": 320,
+        "maxWidth": 3840,
+        "minHeight": 320,
+        "maxHeight": 3840,
+        "aspectRatio": {
+          "min": 0.5,
+          "max": 2
+        }
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "png24Only": true,
+      "alpha": false,
+      "notes": "Generic Android tablet bounds. Category/device-specific requirements need separate scoped targets."
+    },
+    {
+      "id": "google-play/listing/feature-graphic",
+      "store": "google-play",
+      "device": "listing",
+      "kind": "feature-graphic",
+      "required": true,
+      "requiredWhen": "for every Google Play listing",
+      "minCount": 1,
+      "maxCount": 1,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 1024,
+            "height": 500
+          }
+        ]
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "png24Only": true,
+      "alpha": false,
+      "notes": "PNG must be 24-bit (alpha disallowed)."
+    },
+    {
+      "id": "microsoft-store/desktop/screenshot",
+      "store": "microsoft-store",
+      "device": "desktop",
+      "kind": "screenshot",
+      "required": true,
+      "requiredWhen": "when an MSIX desktop listing is configured",
+      "minCount": 1,
+      "maxCount": 10,
+      "dimensions": {
+        "eitherOrientation": {
+          "minLong": 1366,
+          "minShort": 768
+        }
+      },
+      "formats": [
+        "png"
+      ],
+      "maxBytes": 52428800,
+      "contentRules": {
+        "noMarketingOverlay": true
+      },
+      "notes": "MSIX desktop listing: either orientation with long side >=1366 and short side >=768; up to 10. No maximum geometry stated by source. Additional logos, icons, or marketing messages must not be added to screenshots."
+    },
+    {
+      "id": "microsoft-store/msi-exe/screenshot",
+      "store": "microsoft-store",
+      "device": "msi-exe",
+      "kind": "screenshot",
+      "sourceId": "microsoft-store-msi-exe",
+      "verificationStatus": "needs-review",
+      "required": true,
+      "requiredWhen": "when an MSI/EXE listing is configured",
+      "minCount": 1,
+      "maxCount": 10,
+      "dimensions": null,
+      "formats": null,
+      "maxBytes": null,
+      "notes": "MSI/EXE listing screenshot required. The import/export source provides up to ten screenshot fields but does not state pixel dimensions, format, or byte ceiling for these screenshots; all remain unknown."
+    },
+    {
+      "id": "microsoft-store/listing/super-hero-art",
+      "store": "microsoft-store",
+      "device": "listing",
+      "kind": "super-hero-art",
+      "required": false,
+      "minCount": 0,
+      "maxCount": 1,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 1920,
+            "height": 1080
+          },
+          {
+            "width": 3840,
+            "height": 2160
+          }
+        ]
+      },
+      "formats": [
+        "png"
+      ],
+      "maxBytes": 52428800,
+      "contentRules": {
+        "noProductTitle": true
+      },
+      "notes": "Optional; required for games when listing includes video trailers. Excludes product title/text per source; manual review needed."
+    },
+    {
+      "id": "microsoft-store/listing/featured-promotional-square",
+      "store": "microsoft-store",
+      "device": "listing",
+      "kind": "featured-promotional-square",
+      "required": false,
+      "minCount": 0,
+      "maxCount": 1,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 1080,
+            "height": 1080
+          }
+        ]
+      },
+      "formats": [
+        "png"
+      ],
+      "maxBytes": 52428800,
+      "contentRules": {
+        "noProductTitle": true
+      },
+      "notes": "Xbox artwork target, optional unless Xbox listing context makes it applicable. Must not include product title; manual review needed."
+    },
+    {
+      "id": "microsoft-store/msi-exe/store-logo-1x1",
+      "store": "microsoft-store",
+      "device": "msi-exe",
+      "kind": "store-logo-1x1",
+      "required": false,
+      "minCount": 1,
+      "maxCount": 1,
+      "dimensions": {
+        "aspectRatio": {
+          "min": 1,
+          "max": 1
+        }
+      },
+      "formats": [
+        "png"
+      ],
+      "notes": "MSI/EXE listing requires a 1:1 box-art Store logo per Microsoft import/export specification. Pixel dimensions and max bytes are not stated by that source, so remain unbounded."
+    },
+    {
+      "id": "chrome-web-store/desktop/screenshot",
+      "store": "chrome-web-store",
+      "device": "desktop",
+      "kind": "screenshot",
+      "required": true,
+      "requiredWhen": "when a Chrome Web Store listing is configured",
+      "minCount": 1,
+      "maxCount": 5,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 1280,
+            "height": 800
+          }
+        ]
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "notes": "Dashboard listing specifies 1280x800; at least one screenshot is required. The 640x400 alternative is omitted because this cache anchors on the dashboard listing page."
+    },
+    {
+      "id": "chrome-web-store/listing/store-icon",
+      "store": "chrome-web-store",
+      "device": "listing",
+      "kind": "store-icon",
+      "required": true,
+      "minCount": 1,
+      "maxCount": 1,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 128,
+            "height": 128
+          }
+        ]
+      },
+      "formats": [
+        "png"
+      ],
+      "notes": "Extension icon. Package-level icon has additional artwork guidance not machine checked."
+    },
+    {
+      "id": "chrome-web-store/listing/small-promo-tile",
+      "store": "chrome-web-store",
+      "device": "listing",
+      "kind": "small-promo-tile",
+      "required": false,
+      "minCount": 0,
+      "maxCount": 1,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 440,
+            "height": 280
+          }
+        ]
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ]
+    },
+    {
+      "id": "chrome-web-store/listing/marquee-promo-tile",
+      "store": "chrome-web-store",
+      "device": "listing",
+      "kind": "marquee-promo-tile",
+      "required": false,
+      "minCount": 0,
+      "maxCount": 1,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 1400,
+            "height": 560
+          }
+        ]
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ]
+    },
+    {
+      "id": "app-store/duo/screenshot",
+      "store": "app-store",
+      "device": "duo",
+      "kind": "screenshot",
+      "required": false,
+      "requiredWhen": "optional before April 2027; included to update the existing iPhone Duo listing",
+      "minCount": 1,
+      "maxCount": 10,
+      "dimensions": {
+        "exact": [
+          {
+            "width": 2007,
+            "height": 2853
+          },
+          {
+            "width": 2853,
+            "height": 2007
+          },
+          {
+            "width": 1398,
+            "height": 2034
+          },
+          {
+            "width": 2034,
+            "height": 1398
+          }
+        ]
+      },
+      "formats": [
+        "jpg",
+        "jpeg",
+        "png"
+      ],
+      "alpha": false,
+      "notes": "Apple screenshot specifications lines 425-447, manually verified 2026-11-16 JST. No fabricated device chrome."
+    }
+  ]
+}

@@ -1,0 +1,249 @@
+{
+  "version": "1.2.8",
+  "build": "2611151552",
+  "approved": true,
+  "style": "raw",
+  "approval": "User requested pure screenshots without explanatory text on 2026-11-16 JST.",
+  "groups": [
+    {
+      "locale": "ja",
+      "display": "APP_IPHONE_65",
+      "dimensions": [
+        1284,
+        2778
+      ],
+      "images": [
+        {
+          "file": "output/ja/app-store/iphone/app-store_iphone_01_screenshot.png",
+          "name": "v128-ja-iphone-01-playing.png",
+          "sha256": "a21c7de06af8d4faf4eb9f74e0ac983d421bcda8973ea754f7b68ffcfeb599b5"
+        },
+        {
+          "file": "output/ja/app-store/iphone/app-store_iphone_02_screenshot.png",
+          "name": "v128-ja-iphone-02-overview.png",
+          "sha256": "e024176da8e75e422d15db43a1758b13d36ecccd1b45335113fe17fe203d8465"
+        },
+        {
+          "file": "output/ja/app-store/iphone/app-store_iphone_03_screenshot.png",
+          "name": "v128-ja-iphone-03-rankings.png",
+          "sha256": "79a81e51c54f4372ffcf70cdd74a1a75a28ddd7be23e79afae227f82df7ac6fc"
+        },
+        {
+          "file": "output/ja/app-store/iphone/app-store_iphone_04_screenshot.png",
+          "name": "v128-ja-iphone-04-library.png",
+          "sha256": "1910b3b627941ea4230a40c88854d84e2c41f6d0194d18539a2dd18602b8b46c"
+        },
+        {
+          "file": "output/ja/app-store/iphone/app-store_iphone_05_screenshot.png",
+          "name": "v128-ja-iphone-05-calendar.png",
+          "sha256": "947b7e68968f1fda4c10f18ef35f8bfe01dfd73d331233ca47bc3fd4d22d103a"
+        },
+        {
+          "file": "output/ja/app-store/iphone/app-store_iphone_06_screenshot.png",
+          "name": "v128-ja-iphone-06-recap.png",
+          "sha256": "739aedf302e3773c37efb33413dfd806d7bb512ff621610f432301b9ca1d7707"
+        }
+      ]
+    },
+    {
+      "locale": "ja",
+      "display": "APP_IPAD_PRO_3GEN_129",
+      "dimensions": [
+        2732,
+        2048
+      ],
+      "images": [
+        {
+          "file": "output/ja/app-store/ipad/app-store_ipad_07_screenshot.png",
+          "name": "v128-ja-ipad-01-playing.png",
+          "sha256": "28448161d6a06e6d0548f7c5106ee6d38c53d7aa9a526faa64d47c1bbd364483"
+        },
+        {
+          "file": "output/ja/app-store/ipad/app-store_ipad_08_screenshot.png",
+          "name": "v128-ja-ipad-02-overview.png",
+          "sha256": "ee7adfa50ec992cfacde080246db47d0964155e5a414317669644f02792e42cb"
+        },
+        {
+          "file": "output/ja/app-store/ipad/app-store_ipad_09_screenshot.png",
+          "name": "v128-ja-ipad-03-rankings.png",
+          "sha256": "86a49d82380620887836064f69e1e868c290c96e185132d84d57d5c5cf1f35da"
+        },
+        {
+          "file": "output/ja/app-store/ipad/app-store_ipad_10_screenshot.png",
+          "name": "v128-ja-ipad-04-library.png",
+          "sha256": "129ea8510610506aac085d7ca48e012aa7c2a6438be52791dd27acbb8b3b8187"
+        },
+        {
+          "file": "output/ja/app-store/ipad/app-store_ipad_11_screenshot.png",
+          "name": "v128-ja-ipad-05-calendar.png",
+          "sha256": "1b5ae48a46638e80ef19a7cb34247677ff85d9e50230988c01587b8ddeb3e766"
+        },
+        {
+          "file": "output/ja/app-store/ipad/app-store_ipad_12_screenshot.png",
+          "name": "v128-ja-ipad-06-recap.png",
+          "sha256": "f4e8b0b73838575eff5c156b3ce0406258fb997955712071cbf2d5de67bc5d03"
+        }
+      ]
+    },
+    {
+      "locale": "ja",
+      "display": "APP_IPHONE_DUO",
+      "dimensions": [
+        2007,
+        2853
+      ],
+      "images": [
+        {
+          "file": "output/ja/app-store/duo/app-store_duo_13_screenshot.png",
+          "name": "v128-ja-duo-01-playing.png",
+          "sha256": "4639ed3565a2ee87a3f7bccdaf91f8c8b91e54206ad43bab16eb5ef395b05f38"
+        },
+        {
+          "file": "output/ja/app-store/duo/app-store_duo_14_screenshot.png",
+          "name": "v128-ja-duo-02-overview.png",
+          "sha256": "5c24c145a00e350094e2aa69fd83f66648a19486ae6a158640b2e827b4f1da56"
+        },
+        {
+          "file": "output/ja/app-store/duo/app-store_duo_15_screenshot.png",
+          "name": "v128-ja-duo-03-rankings.png",
+          "sha256": "5572a6428aa64d6a20c5e67116804ebae6932c68e9405c3d33b1142f8abfd304"
+        },
+        {
+          "file": "output/ja/app-store/duo/app-store_duo_16_screenshot.png",
+          "name": "v128-ja-duo-04-library.png",
+          "sha256": "d852019792a2bbbefd9f7a0193de6e5b49ba175e5e6d938db000ca4ec51303f4"
+        },
+        {
+          "file": "output/ja/app-store/duo/app-store_duo_17_screenshot.png",
+          "name": "v128-ja-duo-05-calendar.png",
+          "sha256": "d66c03248c12506a498a68645225d6aac793da0fb24ae60a092bfd2114e97de6"
+        },
+        {
+          "file": "output/ja/app-store/duo/app-store_duo_18_screenshot.png",
+          "name": "v128-ja-duo-06-recap.png",
+          "sha256": "dc1131cbefdde9a9bfa84b8c28a36c931b3bf4acdf685dc1371646ec8e628e72"
+        }
+      ]
+    },
+    {
+      "locale": "en-US",
+      "display": "APP_IPHONE_65",
+      "dimensions": [
+        1284,
+        2778
+      ],
+      "images": [
+        {
+          "file": "output/en/app-store/iphone/app-store_iphone_01_screenshot.png",
+          "name": "v128-en-iphone-01-playing.png",
+          "sha256": "69c867e8b913a44358368576e2c0dff3c1cc52c90b45197e747146dd614914f4"
+        },
+        {
+          "file": "output/en/app-store/iphone/app-store_iphone_02_screenshot.png",
+          "name": "v128-en-iphone-02-overview.png",
+          "sha256": "e4001005479a7a2165e15fd016609eb9b618c6a9470205abd7faa9167190359d"
+        },
+        {
+          "file": "output/en/app-store/iphone/app-store_iphone_03_screenshot.png",
+          "name": "v128-en-iphone-03-rankings.png",
+          "sha256": "a21cb09aa33152376491b85d77c0a732d493d390c87b59a9ce9063fbd167a642"
+        },
+        {
+          "file": "output/en/app-store/iphone/app-store_iphone_04_screenshot.png",
+          "name": "v128-en-iphone-04-library.png",
+          "sha256": "5bef00e232ac12adba6aa75c43db708d01ef164ebbdf2826d8b0135ebfcd5148"
+        },
+        {
+          "file": "output/en/app-store/iphone/app-store_iphone_05_screenshot.png",
+          "name": "v128-en-iphone-05-calendar.png",
+          "sha256": "b08cad7410b2306d29c9801e4e9b5df905a74954c5d776463b84c0f6fc610a15"
+        },
+        {
+          "file": "output/en/app-store/iphone/app-store_iphone_06_screenshot.png",
+          "name": "v128-en-iphone-06-recap.png",
+          "sha256": "498ec00073d899624915fc1efdab68e1e97142fcaddafd86b9041ed49d7fcc5b"
+        }
+      ]
+    },
+    {
+      "locale": "en-US",
+      "display": "APP_IPAD_PRO_3GEN_129",
+      "dimensions": [
+        2732,
+        2048
+      ],
+      "images": [
+        {
+          "file": "output/en/app-store/ipad/app-store_ipad_07_screenshot.png",
+          "name": "v128-en-ipad-01-playing.png",
+          "sha256": "a2e16befe83b9139dcba8f58f2b9dac2b10798939fee8a09de6684d775972864"
+        },
+        {
+          "file": "output/en/app-store/ipad/app-store_ipad_08_screenshot.png",
+          "name": "v128-en-ipad-02-overview.png",
+          "sha256": "ce936cc6916d4a940e23bb44b6021f8ac3940299a57a9ae0e2e1a58541f744ab"
+        },
+        {
+          "file": "output/en/app-store/ipad/app-store_ipad_09_screenshot.png",
+          "name": "v128-en-ipad-03-rankings.png",
+          "sha256": "c9d49b4421fa62af19a1d8b88a2bfbe1caa5a2096cbfdc7bf4e28bb8704e4431"
+        },
+        {
+          "file": "output/en/app-store/ipad/app-store_ipad_10_screenshot.png",
+          "name": "v128-en-ipad-04-library.png",
+          "sha256": "c6eb1dcade463ade9d853dec138bb248088a67d500c12d0f150e83427277c7b1"
+        },
+        {
+          "file": "output/en/app-store/ipad/app-store_ipad_11_screenshot.png",
+          "name": "v128-en-ipad-05-calendar.png",
+          "sha256": "a2a16e52100263f82507c6e13423bea6d0551dac2e511d57dc40fe91d1237122"
+        },
+        {
+          "file": "output/en/app-store/ipad/app-store_ipad_12_screenshot.png",
+          "name": "v128-en-ipad-06-recap.png",
+          "sha256": "3d4d630cc88733ae393ae72b80958bf9e23a670510c331902e52e8f568a46758"
+        }
+      ]
+    },
+    {
+      "locale": "en-US",
+      "display": "APP_IPHONE_DUO",
+      "dimensions": [
+        2007,
+        2853
+      ],
+      "images": [
+        {
+          "file": "output/en/app-store/duo/app-store_duo_13_screenshot.png",
+          "name": "v128-en-duo-01-playing.png",
+          "sha256": "3b0494bb92ba511df1d8bb4cd47e7f4be01a3222eca73b188877047095ac2c2d"
+        },
+        {
+          "file": "output/en/app-store/duo/app-store_duo_14_screenshot.png",
+          "name": "v128-en-duo-02-overview.png",
+          "sha256": "873cf77abfa66651c9558d5ac463418ab7543ba01bfc0821c7fc84135fdec268"
+        },
+        {
+          "file": "output/en/app-store/duo/app-store_duo_15_screenshot.png",
+          "name": "v128-en-duo-03-rankings.png",
+          "sha256": "0f6083b1712ff75fbe732aeed8f19acb5ab4caeefa4e06fa3d0b14935cee5469"
+        },
+        {
+          "file": "output/en/app-store/duo/app-store_duo_16_screenshot.png",
+          "name": "v128-en-duo-04-library.png",
+          "sha256": "ccfb5f34f0f4c815db5bd6781414c6f84ab79bf0a8280677127e4711ce43a25d"
+        },
+        {
+          "file": "output/en/app-store/duo/app-store_duo_17_screenshot.png",
+          "name": "v128-en-duo-05-calendar.png",
+          "sha256": "35ea1389a40a59bd94668a086ce8db780546beb8f4d3af240ee5871021b7b3c0"
+        },
+        {
+          "file": "output/en/app-store/duo/app-store_duo_18_screenshot.png",
+          "name": "v128-en-duo-06-recap.png",
+          "sha256": "e607277d7d16169be0fb589a55bbf09e3e0243651f00b77159fe848ed33a6790"
+        }
+      ]
+    }
+  ]
+}

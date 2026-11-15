@@ -215,6 +215,15 @@ def main():
         target, summary = prepare_release(api, versions, version_name, os.environ.get("RELEASE_BUILD_NUMBER"))
         print(json.dumps({"prepared": summary}, ensure_ascii=False, indent=2), flush=True)
         if action == "submit":
+            screenshot_manifest = Path("store_assets") / f"v{version_name}" / "upload-manifest.json"
+            if screenshot_manifest.exists() and target["attributes"]["appStoreState"] not in (
+                "WAITING_FOR_REVIEW", "IN_REVIEW", "PENDING_APPLE_RELEASE", "READY_FOR_SALE",
+            ):
+                from app_store_screenshots import read_manifest, verify_uploaded
+                manifest = read_manifest(screenshot_manifest)
+                if manifest["version"] != version_name or manifest["build"] != os.environ.get("RELEASE_BUILD_NUMBER"):
+                    raise RuntimeError("Screenshot manifest must match the exact release version/build.")
+                print(json.dumps({"verifiedScreenshots": verify_uploaded(api, manifest)}, ensure_ascii=False), flush=True)
             submission = submit_release(api, target)
             target = api.request(f"appStoreVersions/{target['id']}")["data"]
             print(json.dumps({"submission": submission, "verified": version_summary(api, target)},
