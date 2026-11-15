@@ -1,0 +1,53 @@
+{
+  "status": "pass",
+  "submissionReady": false,
+  "machine": {
+    "status": "pass",
+    "issues": [],
+    "warnings": [
+      {
+        "code": "unknown-limit",
+        "target": "app-store/iphone/screenshot",
+        "message": "Source does not state all limits: formats=jpg,jpeg,png, maxBytes=null, maxWidth=null, maxHeight=null. Null means unknown."
+      },
+      {
+        "code": "unknown-limit",
+        "target": "app-store/ipad/screenshot",
+        "message": "Source does not state all limits: formats=jpg,jpeg,png, maxBytes=null, maxWidth=null, maxHeight=null. Null means unknown."
+      },
+      {
+        "code": "unknown-limit",
+        "target": "app-store/duo/screenshot",
+        "message": "Source does not state all limits: formats=jpg,jpeg,png, maxBytes=null, maxWidth=null, maxHeight=null. Null means unknown."
+      }
+    ],
+    "checkedFiles": 18
+  },
+  "manualReview": "pending",
+  "specFreshness": {
+    "status": "fresh",
+    "generatedAt": "2026-11-15T16:42:09.573352+00:00"
+  },
+  "specCoverage": [
+    {
+      "target": "app-store/iphone/screenshot",
+      "maxBytes": null,
+      "maxWidth": null,
+      "maxHeight": null
+    },
+    {
+      "target": "app-store/ipad/screenshot",
+      "maxBytes": null,
+      "maxWidth": null,
+      "maxHeight": null
+    },
+    {
+      "target": "app-store/duo/screenshot",
+      "maxBytes": null,
+      "maxWidth": null,
+      "maxHeight": null
+    }
+  ],
+  "outputDir": "D:\\git\\SongBrief\\store_assets\\v1.2.8\\output\\ja",
+  "createdAt": "2026-11-15T17:24:49.800Z"
+}

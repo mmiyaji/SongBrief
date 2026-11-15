@@ -686,6 +686,59 @@ void main() {
     );
   });
 
+  testWidgets(
+    'track details follow native metadata and outside-library songs',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final first = _detailTrack('first-track', 'First Track');
+      final next = _detailTrack('next-track', 'Next Track');
+      final playback = _ChangingTrackPlaybackController();
+      await _pumpApp(
+        tester,
+        AppLanguage.english,
+        statsState: MusicStatsState(
+          authorizationStatus: MusicLibraryAuthorizationStatus.unsupported,
+          overview: LibraryOverview.fromTracks([first, next], isDemo: false),
+          snapshotHistory: SnapshotHistory.empty,
+        ),
+        playbackControllerBuilder: () => playback,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Show current track details'));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(BottomSheet);
+      Finder title(String text) =>
+          find.descendant(of: sheet, matching: find.text(text));
+      expect(title('First Track'), findsOneWidget);
+
+      // Native catalog IDs need not exist in the library. Also deliver new
+      // metadata under the same ID, as can happen before the native ID settles.
+      for (final track in [
+        _detailTrack('catalog-track', 'Streamed Track'),
+        _detailTrack('catalog-track', 'Another Streamed Track'),
+        _detailTrack('catalog-next', 'Next Track'),
+      ]) {
+        playback.emit(track);
+        await tester.pumpAndSettle();
+        expect(title(track.title), findsOneWidget);
+        expect(title('First Track'), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+
+      // A temporary empty player snapshot must not reset to the opening song.
+      playback.emit(null);
+      await tester.pumpAndSettle();
+      expect(title('Next Track'), findsOneWidget);
+      playback.emit(first);
+      await tester.pumpAndSettle();
+      expect(title('First Track'), findsOneWidget);
+      expect(title('Next Track'), findsNothing);
+    },
+  );
+
   testWidgets('opens trend calculation details from the info button', (
     tester,
   ) async {
@@ -1402,6 +1455,31 @@ class _StreamedTrackPlaybackController extends PlaybackController {
         skipCount: 0,
         isCloudItem: true,
       ),
+    );
+  }
+}
+
+LibraryTrack _detailTrack(String id, String title) => LibraryTrack(
+  id: id,
+  title: title,
+  artist: 'Test Artist',
+  albumTitle: 'Test Album',
+  duration: const Duration(minutes: 3),
+  playCount: 2,
+  skipCount: 0,
+  isCloudItem: false,
+);
+
+class _ChangingTrackPlaybackController extends PlaybackController {
+  @override
+  PlaybackState build() =>
+      const PlaybackState(activeTrackId: 'first-track', isPlaying: true);
+
+  void emit(LibraryTrack? track) {
+    state = PlaybackState(
+      activeTrackId: track?.id,
+      nowPlaying: track,
+      isPlaying: track != null,
     );
   }
 }
