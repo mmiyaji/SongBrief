@@ -12,8 +12,8 @@ from urllib.request import Request, urlopen
 import jwt
 
 WHATS_NEW = {
-    "ja": "動作の安定性を向上しました。\n再生履歴の表示と集計を改善しました。",
-    "en-US": "Improved stability.\nImproved listening history display and aggregation.",
+    "ja": "起動時や画面切り替え時の動作を改善しました。\n画面の表示を調整し、操作性と安定性を向上しました。",
+    "en-US": "Improved performance when launching the app and switching screens.\nRefined the interface to improve usability and stability.",
 }
 
 
