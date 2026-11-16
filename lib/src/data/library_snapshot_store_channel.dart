@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/library_snapshot.dart';
+import 'background_platform_call.dart';
 import 'library_snapshot_store_base.dart';
 
 class MethodChannelSnapshotStore implements SnapshotStore {
@@ -14,12 +15,30 @@ class MethodChannelSnapshotStore implements SnapshotStore {
   final MethodChannel _channel;
 
   @override
-  Future<SnapshotHistory> loadHistory() async {
-    final rawSnapshots = await _channel.invokeListMethod<Object?>(
+  Future<SnapshotHistory> loadHistory() {
+    // The detailed history can hold hundreds of thousands of track counters;
+    // decoding it on the UI isolate stalls startup animations.
+    final channel = _channel;
+    return runPlatformCallOffUiIsolate(
+      offUiIsolate: () async =>
+          _decodeSnapshotHistory(await _loadRawHistory(channel)),
+      onUiIsolate: () => _loadHistoryOnUiIsolate(channel),
+      debugName: 'load snapshot history',
+    );
+  }
+
+  static Future<List<Object?>> _loadRawHistory(MethodChannel channel) async {
+    final rawSnapshots = await channel.invokeListMethod<Object?>(
       'loadLocalSnapshotHistory',
       {'detailedLimit': detailedSnapshotHistoryEntries},
     );
-    final values = rawSnapshots ?? const <Object?>[];
+    return rawSnapshots ?? const <Object?>[];
+  }
+
+  static Future<SnapshotHistory> _loadHistoryOnUiIsolate(
+    MethodChannel channel,
+  ) async {
+    final values = await _loadRawHistory(channel);
     if (_shouldDecodeSnapshotHistoryInIsolate(values)) {
       return compute(
         _decodeSnapshotHistory,

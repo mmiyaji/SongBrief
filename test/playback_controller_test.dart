@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:songbrief/src/data/library_snapshot_repository.dart';
 import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/data/music_stats_repository.dart';
+import 'package:songbrief/src/domain/library_load_progress.dart';
 import 'package:songbrief/src/domain/library_overview.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
@@ -417,7 +418,10 @@ class _FakeMusicStatsRepository extends MusicStatsRepository {
   var pauseCalls = 0;
 
   @override
-  Future<MusicStatsState> load({bool requestAccess = false}) async {
+  Future<MusicStatsState> load({
+    bool requestAccess = false,
+    LibraryLoadProgressCallback? onProgress,
+  }) async {
     loadCalls += 1;
     return MusicStatsState(
       authorizationStatus: overview == null

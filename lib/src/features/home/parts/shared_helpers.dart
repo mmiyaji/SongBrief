@@ -694,12 +694,136 @@ class _LoadingStateState extends State<_LoadingState>
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              const SizedBox(height: 28),
+              const _LoadingProgressDetails(),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _LoadingProgressDetails extends ConsumerWidget {
+  const _LoadingProgressDetails();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final progress = ref.watch(libraryLoadProgressProvider);
+    final label = progress == null
+        ? _t(context, 'Getting ready…', '準備しています…', zh: '正在准备…', ko: '준비 중…')
+        : _loadStageLabel(context, progress);
+    final stepText = progress == null
+        ? null
+        : '${progress.step}/${progress.totalSteps}';
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: stepText == null ? label : '$label $stepText',
+      child: ExcludeSemantics(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (stepText != null) ...[
+                  const SizedBox(width: 12),
+                  Text(
+                    stepText,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            TweenAnimationBuilder<double>(
+              tween: Tween(end: progress?.completedFraction ?? 0),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 450),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) => LinearProgressIndicator(
+                value: value,
+                minHeight: 6,
+                borderRadius: BorderRadius.circular(999),
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _loadStageLabel(BuildContext context, LibraryLoadProgress progress) {
+  final count = progress.trackCount;
+  final countText = count == null
+      ? null
+      : NumberFormat.decimalPattern().format(count);
+  return switch (progress.stage) {
+    LibraryLoadStage.checkingAccess => _t(
+      context,
+      'Checking library access',
+      'ライブラリへのアクセスを確認中',
+      zh: '正在确认音乐库访问权限',
+      ko: '라이브러리 접근 권한 확인 중',
+    ),
+    LibraryLoadStage.fetchingTracks => _t(
+      context,
+      'Fetching songs from your library',
+      'ライブラリから曲を取得中',
+      zh: '正在从音乐库获取歌曲',
+      ko: '라이브러리에서 곡을 가져오는 중',
+    ),
+    LibraryLoadStage.buildingOverview =>
+      countText == null
+          ? _t(
+              context,
+              'Tallying play counts',
+              '再生回数を集計中',
+              zh: '正在统计播放次数',
+              ko: '재생 횟수 집계 중',
+            )
+          : _t(
+              context,
+              'Tallying play counts for $countText songs',
+              '$countText曲の再生回数を集計中',
+              zh: '正在统计 $countText 首歌曲的播放次数',
+              ko: '$countText곡의 재생 횟수 집계 중',
+            ),
+    LibraryLoadStage.savingSnapshot => _t(
+      context,
+      "Saving today's listening record",
+      '今日の聴取記録を保存中',
+      zh: '正在保存今天的聆听记录',
+      ko: '오늘의 감상 기록 저장 중',
+    ),
+    LibraryLoadStage.loadingHistory => _t(
+      context,
+      'Loading your listening history',
+      'これまでの聴取記録を読み込み中',
+      zh: '正在读取聆听记录',
+      ko: '지금까지의 감상 기록 읽는 중',
+    ),
+  };
 }
 
 class _LoadingPulseLoader extends StatelessWidget {

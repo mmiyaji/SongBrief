@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../domain/library_track.dart';
 import '../domain/music_library_authorization.dart';
+import 'background_platform_call.dart';
 
 abstract class MusicLibraryClient {
   Future<MusicLibraryAuthorizationStatus> authorizationStatus();
@@ -80,7 +81,20 @@ class PlatformMusicLibraryClient
   }
 
   @override
-  Future<List<LibraryTrack>> fetchTracks() async {
+  Future<List<LibraryTrack>> fetchTracks() {
+    return runPlatformCallOffUiIsolate(
+      offUiIsolate: _fetchTracksOffUiIsolate,
+      onUiIsolate: _fetchTracksOnUiIsolate,
+      debugName: 'fetch music library',
+    );
+  }
+
+  static Future<List<LibraryTrack>> _fetchTracksOffUiIsolate() async {
+    final rawTracks = await _channel.invokeMethod<List<Object?>>('fetchTracks');
+    return _decodePlatformTracks(rawTracks ?? const <Object?>[]);
+  }
+
+  static Future<List<LibraryTrack>> _fetchTracksOnUiIsolate() async {
     final rawTracks = await _channel.invokeMethod<List<Object?>>('fetchTracks');
     final values = rawTracks ?? const <Object?>[];
     if (values.length >= _trackDecodeIsolateThreshold) {

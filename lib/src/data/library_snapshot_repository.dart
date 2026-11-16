@@ -35,8 +35,10 @@ class LibrarySnapshotRepository {
     DateTime? capturedAt,
     String source = 'foreground',
     String? filterSignature,
+    void Function()? onHistoryLoadStarted,
   }) async {
     if (!overview.hasTracks) {
+      onHistoryLoadStarted?.call();
       return loadHistory();
     }
 
@@ -48,6 +50,7 @@ class LibrarySnapshotRepository {
       filterSignature: filterSignature,
     );
     await _effectiveStore.writeSnapshot(snapshot);
+    onHistoryLoadStarted?.call();
     return _effectiveStore.loadHistory();
   }
 

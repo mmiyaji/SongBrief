@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/data/library_snapshot_repository.dart';
 import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/data/music_stats_repository.dart';
+import 'package:songbrief/src/domain/library_load_progress.dart';
 import 'package:songbrief/src/domain/library_overview.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
@@ -205,7 +206,10 @@ class HistoryRepository extends MusicStatsRepository {
   LibraryTrack? libraryTrackMatching(LibraryTrack track) =>
       catalog?.match(track);
   @override
-  Future<MusicStatsState> load({bool requestAccess = false}) async =>
+  Future<MusicStatsState> load({
+    bool requestAccess = false,
+    LibraryLoadProgressCallback? onProgress,
+  }) async =>
       MusicStatsState(
         authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
         overview: LibraryOverview.fromTracks([

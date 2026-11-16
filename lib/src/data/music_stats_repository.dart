@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/library_load_progress.dart';
 import '../domain/library_overview.dart';
 import '../domain/library_snapshot.dart';
 import '../domain/library_track.dart';
@@ -141,11 +142,34 @@ class MusicStatsRepository {
     return _client.exportSnapshotRefreshLogs();
   }
 
-  Future<MusicStatsState> load({bool requestAccess = false}) async {
+  Future<MusicStatsState> load({
+    bool requestAccess = false,
+    LibraryLoadProgressCallback? onProgress,
+  }) async {
     if (!_isIosMusicRuntime) {
       return _buildDemoState(MusicLibraryAuthorizationStatus.unsupported);
     }
 
+    final stages = [
+      LibraryLoadStage.checkingAccess,
+      LibraryLoadStage.fetchingTracks,
+      LibraryLoadStage.buildingOverview,
+      if (snapshotRecordingEnabled) LibraryLoadStage.savingSnapshot,
+      LibraryLoadStage.loadingHistory,
+    ];
+    int? trackCount;
+    void report(LibraryLoadStage stage) {
+      onProgress?.call(
+        LibraryLoadProgress(
+          stage: stage,
+          step: stages.indexOf(stage) + 1,
+          totalSteps: stages.length,
+          trackCount: trackCount,
+        ),
+      );
+    }
+
+    report(LibraryLoadStage.checkingAccess);
     final status = requestAccess
         ? await _client.requestAuthorization()
         : await _client.authorizationStatus();
@@ -154,6 +178,7 @@ class MusicStatsRepository {
       if (temporaryDemoLibraryEnabled) {
         return _buildDemoState(status);
       }
+      report(LibraryLoadStage.loadingHistory);
       return MusicStatsState(
         authorizationStatus: status,
         overview: LibraryOverview.empty(isDemo: false),
@@ -163,6 +188,7 @@ class MusicStatsRepository {
       );
     }
 
+    report(LibraryLoadStage.fetchingTracks);
     final allTracks = await _client.fetchTracks();
     libraryCatalog?.replace(allTracks);
     final tracks = _filteredTracks(allTracks);
@@ -173,13 +199,21 @@ class MusicStatsRepository {
     if (snapshotRecordingEnabled) {
       await _client.scheduleSnapshotRefresh();
     }
+    trackCount = tracks.length;
+    report(LibraryLoadStage.buildingOverview);
     final overview = await _buildLibraryOverview(tracks, isDemo: false);
-    final snapshotHistory = snapshotRecordingEnabled
-        ? await _snapshotRepository.recordSnapshot(
-            overview,
-            filterSignature: libraryFilters?.snapshotSignature,
-          )
-        : await _snapshotRepository.loadHistory();
+    final SnapshotHistory snapshotHistory;
+    if (snapshotRecordingEnabled) {
+      report(LibraryLoadStage.savingSnapshot);
+      snapshotHistory = await _snapshotRepository.recordSnapshot(
+        overview,
+        filterSignature: libraryFilters?.snapshotSignature,
+        onHistoryLoadStarted: () => report(LibraryLoadStage.loadingHistory),
+      );
+    } else {
+      report(LibraryLoadStage.loadingHistory);
+      snapshotHistory = await _snapshotRepository.loadHistory();
+    }
     return MusicStatsState(
       authorizationStatus: status,
       overview: overview,

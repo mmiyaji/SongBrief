@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../analytics/app_analytics.dart';
 import '../../data/music_stats_repository.dart';
 import '../../data/music_library_channel.dart';
+import '../../domain/library_load_progress.dart';
 import '../../domain/library_overview.dart';
 import '../../domain/library_snapshot.dart';
 import '../../domain/library_track.dart';
@@ -405,20 +406,43 @@ class PlaybackState {
   }
 }
 
+/// Stage of the library load in progress, shown on the loading screen.
+final libraryLoadProgressProvider =
+    NotifierProvider<LibraryLoadProgressController, LibraryLoadProgress?>(
+      LibraryLoadProgressController.new,
+    );
+
+class LibraryLoadProgressController extends Notifier<LibraryLoadProgress?> {
+  @override
+  LibraryLoadProgress? build() => null;
+
+  void report(LibraryLoadProgress? progress) {
+    state = progress;
+  }
+}
+
 class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   Future<void>? _refreshInFlight;
   Future<void> _snapshotHistoryOperationTail = Future<void>.value();
+
+  void _reportLoadProgress(LibraryLoadProgress? progress) {
+    if (!ref.mounted) return;
+    ref.read(libraryLoadProgressProvider.notifier).report(progress);
+  }
 
   @override
   Future<MusicStatsState> build() async {
     final loadingPreviewDelay = _startupLoadingPreviewDelay();
     ref.watch(musicStatsRepositoryProvider);
     await ref.watch(musicDataPreferencesReadyProvider.future);
+    _reportLoadProgress(null);
     final next = await _runSnapshotHistoryOperation(
-      () => ref.read(musicStatsRepositoryProvider).load(),
+      () => ref
+          .read(musicStatsRepositoryProvider)
+          .load(onProgress: _reportLoadProgress),
     );
     if (loadingPreviewDelay > Duration.zero) {
-      await Future<void>.delayed(loadingPreviewDelay);
+      await _previewLoadProgress(loadingPreviewDelay);
     }
     if (!next.overview.isDemo) {
       unawaited(HomeWidgetBridge.update(next.snapshotHistory));
@@ -426,6 +450,25 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
     }
     _refreshRecentHistory(next);
     return next;
+  }
+
+  /// Steps through every stage for the `?loading_preview` QA mode.
+  Future<void> _previewLoadProgress(Duration duration) async {
+    const stages = LibraryLoadStage.values;
+    final perStage = duration ~/ stages.length;
+    for (final (index, stage) in stages.indexed) {
+      _reportLoadProgress(
+        LibraryLoadProgress(
+          stage: stage,
+          step: index + 1,
+          totalSteps: stages.length,
+          trackCount: stage.index >= LibraryLoadStage.buildingOverview.index
+              ? 5441
+              : null,
+        ),
+      );
+      await Future<void>.delayed(perStage);
+    }
   }
 
   void _refreshRecentHistory(MusicStatsState next) {
@@ -479,10 +522,13 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   }
 
   Future<void> requestAccess() async {
+    _reportLoadProgress(null);
     state = const AsyncLoading();
     state = await AsyncValue.guard(
       () => _runSnapshotHistoryOperation(
-        () => ref.read(musicStatsRepositoryProvider).load(requestAccess: true),
+        () => ref
+            .read(musicStatsRepositoryProvider)
+            .load(requestAccess: true, onProgress: _reportLoadProgress),
       ),
     );
     if (state.hasValue) {
@@ -593,11 +639,14 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   Future<void> _load({required bool showLoading}) async {
     final previous = state.asData?.value;
     if (showLoading) {
+      _reportLoadProgress(null);
       state = const AsyncLoading();
     }
     final next = await AsyncValue.guard(
       () => _runSnapshotHistoryOperation(
-        () => ref.read(musicStatsRepositoryProvider).load(),
+        () => ref
+            .read(musicStatsRepositoryProvider)
+            .load(onProgress: showLoading ? _reportLoadProgress : null),
       ),
     );
     state = switch (next) {

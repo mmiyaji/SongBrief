@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/data/library_snapshot_repository.dart';
 import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/data/music_stats_repository.dart';
+import 'package:songbrief/src/domain/library_load_progress.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/domain/music_library_authorization.dart';
@@ -402,6 +403,40 @@ void main() {
       expect(stats.overview.tracksByPlayCount.first.title, 'Large Track 0');
       expect(stats.snapshotRecordingEnabled, isFalse);
       expect(stats.snapshotHistory.snapshotCount, 0);
+    });
+
+    test('reports each load stage in order with the track count', () async {
+      final client = _CloudSyncSpyClient()
+        ..tracks = [
+          LibraryTrack(
+            id: 'progress-track',
+            title: 'Progress Track',
+            artist: 'Artist',
+            albumTitle: 'Album',
+            duration: const Duration(minutes: 3),
+            playCount: 3,
+            skipCount: 0,
+            isCloudItem: false,
+          ),
+        ];
+      final reported = <LibraryLoadProgress>[];
+
+      await repository(
+        client,
+        recordingEnabled: false,
+      ).load(onProgress: reported.add);
+
+      expect(reported.map((progress) => progress.stage), [
+        LibraryLoadStage.checkingAccess,
+        LibraryLoadStage.fetchingTracks,
+        LibraryLoadStage.buildingOverview,
+        LibraryLoadStage.loadingHistory,
+      ]);
+      expect(reported.map((progress) => progress.step), [1, 2, 3, 4]);
+      expect(reported.every((progress) => progress.totalSteps == 4), isTrue);
+      expect(reported[1].trackCount, isNull);
+      expect(reported[2].trackCount, 1);
+      expect(reported.last.completedFraction, 0.75);
     });
 
     test('shows temporary demo data when music access is denied', () async {

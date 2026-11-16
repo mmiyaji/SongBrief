@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/data/library_snapshot_repository.dart';
 import 'package:songbrief/src/data/music_library_channel.dart';
 import 'package:songbrief/src/data/music_stats_repository.dart';
+import 'package:songbrief/src/domain/library_load_progress.dart';
 import 'package:songbrief/src/domain/library_overview.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
@@ -455,7 +456,10 @@ class _ControlledMusicStatsRepository extends MusicStatsRepository {
   int get loadCount => _loadCount;
 
   @override
-  Future<MusicStatsState> load({bool requestAccess = false}) {
+  Future<MusicStatsState> load({
+    bool requestAccess = false,
+    LibraryLoadProgressCallback? onProgress,
+  }) {
     _loadCount += 1;
     if (_loadCount == 1) {
       return Future.value(_state('Initial'));
@@ -488,7 +492,10 @@ class _TestPlaybackController extends PlaybackController {
 
 class _ForegroundRefreshRepository extends _WidgetRefreshRepository {
   @override
-  Future<MusicStatsState> load({bool requestAccess = false}) {
+  Future<MusicStatsState> load({
+    bool requestAccess = false,
+    LibraryLoadProgressCallback? onProgress,
+  }) {
     loadCount++;
     return super.load(requestAccess: requestAccess);
   }
@@ -526,7 +533,10 @@ class _SnapshotRaceRepository extends MusicStatsRepository {
   );
 
   @override
-  Future<MusicStatsState> load({bool requestAccess = false}) {
+  Future<MusicStatsState> load({
+    bool requestAccess = false,
+    LibraryLoadProgressCallback? onProgress,
+  }) {
     loadCount += 1;
     return Future.value(_libraryState(_history));
   }
@@ -579,7 +589,10 @@ class _WidgetDeletionRepository extends _SnapshotRaceRepository {
   );
 
   @override
-  Future<MusicStatsState> load({bool requestAccess = false}) async =>
+  Future<MusicStatsState> load({
+    bool requestAccess = false,
+    LibraryLoadProgressCallback? onProgress,
+  }) async =>
       _libraryState(history);
 
   @override
@@ -600,7 +613,10 @@ class _WidgetRefreshRepository extends _WidgetDeletionRepository {
   int syncCalls = 0;
 
   @override
-  Future<MusicStatsState> load({bool requestAccess = false}) async =>
+  Future<MusicStatsState> load({
+    bool requestAccess = false,
+    LibraryLoadProgressCallback? onProgress,
+  }) async =>
       demo ? _state('Demo') : _libraryState(history);
 
   @override
