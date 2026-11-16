@@ -127,7 +127,7 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
       let arguments = call.arguments as? [String: Any]
       let requestedLimit = (arguments?["detailedLimit"] as? NSNumber)?.intValue ?? 400
       let detailedLimit = max(0, min(requestedLimit, 500))
-      runSnapshotStoreOperation(result: result) {
+      runSnapshotStoreOperation(result: result, replyOnWorker: true) {
         SnapshotFileStore.readSnapshotsForFlutter(detailedLimit: detailedLimit)
       }
     case "writeLocalSnapshot":
@@ -156,10 +156,15 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
 
   private func runSnapshotStoreOperation(
     result: @escaping FlutterResult,
+    replyOnWorker: Bool = false,
     operation: @escaping () -> Any?
   ) {
     snapshotStoreQueue.async {
       let payload = operation()
+      if replyOnWorker {
+        result(payload)
+        return
+      }
       DispatchQueue.main.async {
         result(payload)
       }
@@ -283,9 +288,7 @@ final class MusicLibraryBridge: NSObject, FlutterStreamHandler {
         )
       }
 
-      DispatchQueue.main.async {
-        result(tracks)
-      }
+      result(tracks)
     }
   }
 

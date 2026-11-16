@@ -797,17 +797,17 @@ String _loadStageLabel(BuildContext context, LibraryLoadProgress progress) {
       countText == null
           ? _t(
               context,
-              'Tallying play counts',
-              '再生回数を集計中',
-              zh: '正在统计播放次数',
-              ko: '재생 횟수 집계 중',
+              'Preparing library statistics',
+              'ライブラリの統計を準備中',
+              zh: '正在准备音乐库统计数据',
+              ko: '라이브러리 통계 준비 중',
             )
           : _t(
               context,
-              'Tallying play counts for $countText songs',
-              '$countText曲の再生回数を集計中',
-              zh: '正在统计 $countText 首歌曲的播放次数',
-              ko: '$countText곡의 재생 횟수 집계 중',
+              'Preparing statistics for $countText songs',
+              '$countText曲の統計を準備中',
+              zh: '正在准备 $countText 首歌曲的统计数据',
+              ko: '$countText곡의 통계 준비 중',
             ),
     LibraryLoadStage.savingSnapshot => _t(
       context,
