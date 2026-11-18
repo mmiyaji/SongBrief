@@ -373,7 +373,7 @@ class _RankingRow extends ConsumerWidget {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: FractionallySizedBox(
-                        widthFactor: ratio.clamp(0.04, 1.0),
+                        widthFactor: ratio.clamp(0.0, 1.0),
                         child: SizedBox(
                           height: 5,
                           child: DecoratedBox(
@@ -650,53 +650,57 @@ class _LoadingStateState extends State<_LoadingState>
     }
 
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RepaintBoundary(
-                child: AnimatedBuilder(
-                  animation: _controller,
-                  builder: (context, child) => _LoadingPulseLoader(
-                    progress: reduceMotion ? 0.62 : _controller.value,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RepaintBoundary(
+                    child: AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) => _LoadingPulseLoader(
+                        progress: reduceMotion ? 0.62 : _controller.value,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 26),
+                  Text(
+                    _t(
+                      context,
+                      'Reading your library',
+                      'ライブラリを読み込んでいます',
+                      zh: '正在读取音乐库',
+                      ko: '라이브러리를 읽는 중',
+                    ),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _t(
+                      context,
+                      'Preparing play counts, rankings, and listening records.',
+                      '再生回数、ランキング、聴取記録を準備しています。',
+                      zh: '正在准备播放次数、排行榜和聆听记录。',
+                      ko: '재생 횟수, 랭킹, 감상 기록을 준비하고 있습니다.',
+                    ),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  const _LoadingProgressDetails(),
+                ],
               ),
-              const SizedBox(height: 26),
-              Text(
-                _t(
-                  context,
-                  'Reading your library',
-                  'ライブラリを読み込んでいます',
-                  zh: '正在读取音乐库',
-                  ko: '라이브러리를 읽는 중',
-                ),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _t(
-                  context,
-                  'Preparing play counts, rankings, and listening records.',
-                  '再生回数、ランキング、聴取記録を準備しています。',
-                  zh: '正在准备播放次数、排行榜和聆听记录。',
-                  ko: '재생 횟수, 랭킹, 감상 기록을 준비하고 있습니다.',
-                ),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 28),
-              const _LoadingProgressDetails(),
-            ],
+            ),
           ),
         ),
       ),
@@ -714,58 +718,53 @@ class _LoadingProgressDetails extends ConsumerWidget {
     final label = progress == null
         ? _t(context, 'Getting ready…', '準備しています…', zh: '正在准备…', ko: '준비 중…')
         : _loadStageLabel(context, progress);
-    final stepText = progress == null
+    final completedText = progress == null
         ? null
-        : '${progress.step}/${progress.totalSteps}';
+        : _t(
+            context,
+            '${progress.step - 1} of ${progress.totalSteps} stages complete',
+            '${progress.totalSteps}工程中${progress.step - 1}工程が完了',
+            zh: '已完成 ${progress.totalSteps} 个步骤中的 ${progress.step - 1} 个',
+            ko: '전체 ${progress.totalSteps}단계 중 ${progress.step - 1}단계 완료',
+          );
     return Semantics(
       container: true,
       liveRegion: true,
-      label: stepText == null ? label : '$label $stepText',
+      label: completedText == null ? label : '$label. $completedText',
       child: ExcludeSemantics(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (stepText != null) ...[
-                  const SizedBox(width: 12),
-                  Text(
-                    stepText,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 10),
-            TweenAnimationBuilder<double>(
-              tween: Tween(end: progress?.completedFraction ?? 0),
-              duration: MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 450),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, child) => LinearProgressIndicator(
-                value: value,
-                minHeight: 6,
-                borderRadius: BorderRadius.circular(999),
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
             ),
+            if (completedText != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                completedText,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TweenAnimationBuilder<double>(
+                tween: Tween(end: progress!.completedFraction),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 450),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) => LinearProgressIndicator(
+                  value: value,
+                  minHeight: 6,
+                  borderRadius: BorderRadius.circular(999),
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                ),
+              ),
+            ],
           ],
         ),
       ),

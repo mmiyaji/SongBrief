@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/app.dart';
 import 'package:songbrief/src/domain/library_overview.dart';
+import 'package:songbrief/src/domain/library_load_progress.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/domain/music_library_authorization.dart';
@@ -82,6 +83,45 @@ void main() {
     await tester.pump(const Duration(milliseconds: 120));
     expect(find.text('Reading your library'), findsOneWidget);
     expect(tester.binding.transientCallbackCount, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('loading stage wraps and identifies completed stages', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 690);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await _pumpLoading(tester, Completer<MusicStatsState>());
+    final container = ProviderScope.containerOf(
+      tester.element(find.text('Reading your library')),
+    );
+    container
+        .read(libraryLoadProgressProvider.notifier)
+        .report(
+          const LibraryLoadProgress(
+            stage: LibraryLoadStage.loadingHistory,
+            step: 5,
+            totalSteps: 5,
+          ),
+        );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    final label = tester.widget<Text>(
+      find.text('Loading your listening history'),
+    );
+    expect(label.maxLines, isNull);
+    expect(label.overflow, isNot(TextOverflow.ellipsis));
+    expect(find.text('4 of 5 stages complete'), findsOneWidget);
+    expect(
+      tester
+          .widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator))
+          .value,
+      0.8,
+    );
     expect(tester.takeException(), isNull);
   });
 }
