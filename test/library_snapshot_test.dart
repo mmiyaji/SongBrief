@@ -4,6 +4,32 @@ import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
 
 void main() {
+  test('decodes counters in id order and retains strongest duplicates', () {
+    Map<String, Object?> counter(String id, int plays, int skips) => {
+      'id': id,
+      'playCount': plays,
+      'skipCount': skips,
+    };
+    final snapshot = DailyLibrarySnapshot.fromJson({
+      'dateKey': '2026-07-01',
+      'tracks': [
+        counter('b', 2, 9),
+        counter('a', 1, 0),
+        counter('b', 3, 0),
+        counter('b', 3, 2),
+      ],
+    });
+
+    expect(snapshot.tracks.map((track) => track.id), ['a', 'b']);
+    expect(snapshot.tracks.last.playCount, 3);
+    expect(snapshot.tracks.last.skipCount, 2);
+    final sorted = DailyLibrarySnapshot.fromJson({
+      'dateKey': '2026-07-01',
+      'tracks': [counter('a', 1, 0), counter('b', 2, 0)],
+    });
+    expect(sorted.tracks.map((track) => track.id), ['a', 'b']);
+  });
+
   test('keeps one snapshot per day and replaces the same day', () {
     final first = DailyLibrarySnapshot.fromOverview(
       _overview(playCount: 3),

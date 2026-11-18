@@ -302,24 +302,26 @@ List<TrackCounterSnapshot> _snapshotTrackCounters(LibraryOverview overview) {
 List<TrackCounterSnapshot> _compactTrackCounters(
   Iterable<TrackCounterSnapshot> tracks,
 ) {
-  final sorted = tracks.toList(growable: false)
-    ..sort((a, b) {
-      final byPlays = b.playCount.compareTo(a.playCount);
-      if (byPlays != 0) {
-        return byPlays;
-      }
-      final bySkips = b.skipCount.compareTo(a.skipCount);
-      if (bySkips != 0) {
-        return bySkips;
-      }
-      return a.id.compareTo(b.id);
-    });
   final byId = <String, TrackCounterSnapshot>{};
-  for (final track in sorted) {
-    byId.putIfAbsent(track.id, () => track);
+  String? lastId;
+  var alreadySorted = true;
+  for (final track in tracks) {
+    if (lastId != null && track.id.compareTo(lastId) < 0) {
+      alreadySorted = false;
+    }
+    lastId = track.id;
+    final previous = byId[track.id];
+    if (previous == null ||
+        track.playCount > previous.playCount ||
+        (track.playCount == previous.playCount &&
+            track.skipCount > previous.skipCount)) {
+      byId[track.id] = track;
+    }
   }
-  final compacted = byId.values.toList()
-    ..sort((a, b) => a.id.compareTo(b.id));
+  final compacted = byId.values.toList();
+  if (!alreadySorted) {
+    compacted.sort((a, b) => a.id.compareTo(b.id));
+  }
   return compacted;
 }
 
