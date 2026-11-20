@@ -1021,7 +1021,18 @@ class _StatsContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (historyPending && selectedSection != HomeSection.playing) {
-      return const _LoadingState();
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: _ContentLoading(
+              label: _listeningHistoryLoadingLabel(context),
+              minHeight: 120,
+            ),
+          ),
+        ),
+      );
     }
     final deviceBottomInset = MediaQueryData.fromView(View.of(context))
         .viewPadding
@@ -1129,8 +1140,16 @@ class _SectionBody extends ConsumerWidget {
                 songsOverview: data.songsOverview,
                 supplementalTrackIds: data.supplementalTrackIds,
               ),
-              loading: () =>
-                  const Center(child: CircularProgressIndicator.adaptive()),
+              loading: () => _ContentLoading(
+                label: _t(
+                  context,
+                  'Reading your library',
+                  'ライブラリを読み込んでいます',
+                  zh: '正在读取音乐库',
+                  ko: '라이브러리를 읽는 중',
+                ),
+                minHeight: 140,
+              ),
               error: (_, _) => Center(
                 child: TextButton(
                   onPressed: () => ref.invalidate(libraryTabOverviewProvider),

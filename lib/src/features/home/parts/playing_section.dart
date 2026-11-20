@@ -38,7 +38,6 @@ class _NowPlayingSection extends ConsumerWidget {
       },
       itemBuilder: (context, index) => _RetainedPlayingPanel(
         key: keys[index],
-        deferFirstFrame: children[index] is _TrendPanel,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 900),
@@ -101,20 +100,26 @@ class _NowPlayingSection extends ConsumerWidget {
         const SizedBox(height: 8),
       ],
       _HeroTrackPanel(track: track, artwork: artwork, playRank: playRank),
-      if (historyPending) ...[
-        const SizedBox(height: 14),
-        const _LoadingProgressDetails(),
-      ] else if (stats.snapshotRecordingEnabled && !outsideLibrary) ...[
+      if (stats.snapshotRecordingEnabled && !outsideLibrary) ...[
         const SizedBox(height: 14),
         _TrendPanel(
           track: track,
           overview: overview,
           history: stats.snapshotHistory,
+          historyPending: historyPending,
         ),
       ],
       const SizedBox(height: 14),
       _NowPlayingLyricsPanel(track: track),
-      if (!historyPending)
+      if (historyPending && (!stats.snapshotRecordingEnabled || outsideLibrary))
+        Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: _ContentLoading(
+            label: _listeningHistoryLoadingLabel(context),
+            minHeight: 80,
+          ),
+        )
+      else if (!historyPending)
         _PlayingRecentHistory(
           outsideLibraryIds: {for (final play in outsideLibraryPlays) play.id},
         ),
@@ -145,40 +150,20 @@ class _PlayingRecentHistory extends ConsumerWidget {
 // Keep a visited panel alive when it scrolls out of view. Stable keys in
 // _panels also retain its state when optional notices change position.
 class _RetainedPlayingPanel extends StatefulWidget {
-  const _RetainedPlayingPanel({
-    required this.child,
-    this.deferFirstFrame = false,
-    super.key,
-  });
+  const _RetainedPlayingPanel({required this.child, super.key});
   final Widget child;
-  final bool deferFirstFrame;
   @override
   State<_RetainedPlayingPanel> createState() => _RetainedPlayingPanelState();
 }
 
 class _RetainedPlayingPanelState extends State<_RetainedPlayingPanel>
     with AutomaticKeepAliveClientMixin {
-  late bool _ready;
-
-  @override
-  void initState() {
-    super.initState();
-    _ready = !widget.deferFirstFrame;
-    if (!_ready) {
-      // Present the song and transport first, then build the history chart.
-      // Keep its space reserved so lower panels are not eagerly built instead.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _ready = true);
-      });
-    }
-  }
-
   @override
   bool get wantKeepAlive => true;
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return _ready ? widget.child : const SizedBox(height: 360);
+    return widget.child;
   }
 }
 
@@ -288,8 +273,17 @@ class _NowPlayingLyricsPanel extends ConsumerWidget {
             title: _t(context, 'Lyrics', '歌詞'),
           ),
           const SizedBox(height: 12),
-          if (isLoadingLyrics)
-            const SizedBox.shrink()
+          if (isLoadingLyrics && !lyricsAsync.hasValue)
+            _ContentLoading(
+              label: _t(
+                context,
+                'Loading lyrics',
+                '歌詞を読み込んでいます',
+                zh: '正在读取歌词',
+                ko: '가사를 읽고 있습니다',
+              ),
+              minHeight: 52,
+            )
           else if (lyrics == null || lyrics.isEmpty)
             _TrackContextEmptyText(
               text: _t(
@@ -341,8 +335,8 @@ class _HeroTrackPanel extends ConsumerWidget {
         ),
         IconButton.filled(
           style: IconButton.styleFrom(
-            backgroundColor: color.onSurface,
-            foregroundColor: color.surface,
+            backgroundColor: color.primary,
+            foregroundColor: color.onPrimary,
             minimumSize: const Size.square(48),
           ),
           tooltip: isPlaying
@@ -396,7 +390,26 @@ class _HeroTrackPanel extends ConsumerWidget {
                     dimension: artworkSize,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: _TrackArtworkImage(track: track, artwork: artwork),
+                      child:
+                          artwork.isLoading &&
+                              !artwork.hasValue &&
+                              track.artworkAsset == null
+                          ? _ContentLoading(
+                              label: _t(
+                                context,
+                                'Loading artwork',
+                                'ジャケットを読み込んでいます',
+                                zh: '正在读取封面',
+                                ko: '앨범 표지를 읽고 있습니다',
+                              ),
+                              minHeight: artworkSize,
+                              showLabel: false,
+                            )
+                          : _TrackArtworkImage(
+                              key: ValueKey(track.id),
+                              track: track,
+                              artwork: artwork,
+                            ),
                     ),
                   ),
                   SizedBox(width: gap),
@@ -667,11 +680,13 @@ class _TrendPanel extends StatefulWidget {
     required this.track,
     required this.overview,
     required this.history,
+    required this.historyPending,
   });
 
   final LibraryTrack track;
   final LibraryOverview overview;
   final SnapshotHistory history;
+  final bool historyPending;
 
   @override
   State<_TrendPanel> createState() => _TrendPanelState();
@@ -679,6 +694,22 @@ class _TrendPanel extends StatefulWidget {
 
 class _TrendPanelState extends State<_TrendPanel> {
   TrendRange? _selectedRange;
+  bool _preparing = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _prepareAfterFrame();
+  }
+
+  void _prepareAfterFrame() {
+    _preparing = true;
+    // Give the song header a frame before doing synchronous history work.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _preparing = false);
+    });
+  }
+
   LibraryOverview? _cachedOverview;
   SnapshotHistory? _cachedHistory;
   String? _cachedTrackId;
@@ -693,6 +724,7 @@ class _TrendPanelState extends State<_TrendPanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.track.id != widget.track.id) {
       _selectedRange = null;
+      _prepareAfterFrame();
     }
   }
 
@@ -750,20 +782,27 @@ class _TrendPanelState extends State<_TrendPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    _updateTrendCache(context);
-    final snapshots = _snapshotsWithProvisionalCurrent(
-      widget.history,
-      _currentSnapshot,
-    );
-    final range =
-        _selectedRange ??
-        TrendRange.values.firstWhere(
-          (range) =>
-              _valuesFor(context, range).any((value) => value.playDelta > 0),
-          orElse: () => TrendRange.year,
-        );
-    final values = _valuesFor(context, range);
-    final hasSnapshotData = snapshots.length >= 2;
+    final loading = widget.historyPending || _preparing;
+    var range = _selectedRange ?? TrendRange.week;
+    var values = const <_TrackTrendValue>[];
+    var hasSnapshotData = false;
+    if (!loading) {
+      _updateTrendCache(context);
+      hasSnapshotData =
+          _snapshotsWithProvisionalCurrent(
+            widget.history,
+            _currentSnapshot,
+          ).length >=
+          2;
+      range =
+          _selectedRange ??
+          TrendRange.values.firstWhere(
+            (range) =>
+                _valuesFor(context, range).any((value) => value.playDelta > 0),
+            orElse: () => TrendRange.year,
+          );
+      values = _valuesFor(context, range);
+    }
     return GlassSurface.section(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       child: Column(
@@ -798,7 +837,7 @@ class _TrendPanelState extends State<_TrendPanel> {
           ),
           const SizedBox(height: 4),
           Text(
-            hasSnapshotData
+            loading || hasSnapshotData
                 ? _t(
                     context,
                     'Play-count changes for this song from daily listening records.',
@@ -828,7 +867,7 @@ class _TrendPanelState extends State<_TrendPanel> {
                       border: Border(
                         bottom: BorderSide(
                           color: value == range
-                              ? theme.colorScheme.onSurface
+                              ? theme.colorScheme.primary
                               : theme.colorScheme.outlineVariant,
                           width: value == range ? 2 : 1,
                         ),
@@ -841,7 +880,7 @@ class _TrendPanelState extends State<_TrendPanel> {
                         onPressed: () => setState(() => _selectedRange = value),
                         style: TextButton.styleFrom(
                           foregroundColor: value == range
-                              ? theme.colorScheme.onSurface
+                              ? theme.colorScheme.primary
                               : theme.colorScheme.onSurfaceVariant,
                           shape: const RoundedRectangleBorder(),
                         ),
@@ -853,16 +892,25 @@ class _TrendPanelState extends State<_TrendPanel> {
             ],
           ),
           const SizedBox(height: 18),
-          _TrendBars(
-            values: values,
-            hasSnapshotData: hasSnapshotData,
-            range: range,
-          ),
+          if (loading)
+            _ContentLoading(
+              label: _listeningHistoryLoadingLabel(context),
+              minHeight: _trendChartHeight(context),
+            )
+          else
+            _TrendBars(
+              values: values,
+              hasSnapshotData: hasSnapshotData,
+              range: range,
+            ),
         ],
       ),
     );
   }
 }
+
+double _trendChartHeight(BuildContext context) =>
+    MediaQuery.sizeOf(context).width < 600 ? 122 : 178;
 
 class _TrendBars extends StatelessWidget {
   const _TrendBars({
@@ -878,7 +926,7 @@ class _TrendBars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final chartHeight = MediaQuery.sizeOf(context).width < 600 ? 122.0 : 178.0;
+    final chartHeight = _trendChartHeight(context);
     if (!hasSnapshotData) {
       return SizedBox(
         height: chartHeight,
@@ -945,8 +993,8 @@ class _TrendBars extends StatelessWidget {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(3),
                             color: index == values.length - 1
-                                ? theme.colorScheme.onSurface
-                                : theme.colorScheme.onSurface.withValues(
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.primary.withValues(
                                     alpha: 0.7,
                                   ),
                           ),
@@ -2009,7 +2057,11 @@ class _GroupTrackRow extends ConsumerWidget {
 }
 
 class _TrackArtworkImage extends StatelessWidget {
-  const _TrackArtworkImage({required this.track, required this.artwork});
+  const _TrackArtworkImage({
+    required this.track,
+    required this.artwork,
+    super.key,
+  });
 
   final LibraryTrack track;
   final AsyncValue<Uint8List?> artwork;
@@ -2682,8 +2734,17 @@ class _TrackLibraryContextPanel extends ConsumerWidget {
             title: _t(context, 'Lyrics', '歌詞'),
           ),
           const SizedBox(height: 12),
-          if (isLoadingLyrics)
-            const SizedBox.shrink()
+          if (isLoadingLyrics && !lyricsAsync.hasValue)
+            _ContentLoading(
+              label: _t(
+                context,
+                'Loading lyrics',
+                '歌詞を読み込んでいます',
+                zh: '正在读取歌词',
+                ko: '가사를 읽고 있습니다',
+              ),
+              minHeight: 52,
+            )
           else if (lyrics == null || lyrics.isEmpty)
             _TrackContextEmptyText(
               text: _t(

@@ -86,7 +86,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('loading stage wraps and identifies completed stages', (
+  testWidgets('loading shows one wrapping message for the current stage', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 690);
@@ -115,13 +115,9 @@ void main() {
     );
     expect(label.maxLines, isNull);
     expect(label.overflow, isNot(TextOverflow.ellipsis));
-    expect(find.text('4 of 5 stages complete'), findsOneWidget);
-    expect(
-      tester
-          .widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator))
-          .value,
-      0.8,
-    );
+    expect(find.text('Reading your library'), findsNothing);
+    expect(find.textContaining('stages complete'), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -138,19 +134,23 @@ void main() {
       tester.element(find.text('Reading your library')),
     );
     container.read(startupOverviewProvider.notifier).publish(_loadedState());
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.text('Startup song'), findsWidgets);
     expect(find.text('Reading your library'), findsNothing);
+    expect(find.text('Listening trend'), findsOneWidget);
+    expect(find.text('Loading your listening history'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsWidgets);
 
     container
         .read(homeSectionProvider.notifier)
         .setSection(HomeSection.overview);
     await tester.pump();
-    expect(find.text('Reading your library'), findsOneWidget);
+    expect(find.text('Loading your listening history'), findsOneWidget);
     ready.complete(_loadedState());
     await tester.pumpAndSettle();
-    expect(find.text('Reading your library'), findsNothing);
+    expect(find.text('Loading your listening history'), findsNothing);
     expect(container.read(homeSectionProvider), HomeSection.overview);
     expect(tester.takeException(), isNull);
   });

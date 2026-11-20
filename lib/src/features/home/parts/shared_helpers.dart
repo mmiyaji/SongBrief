@@ -625,7 +625,6 @@ class _LoadingStateState extends State<_LoadingState>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     if (reduceMotion && _controller.isAnimating) {
       _controller.stop();
@@ -652,36 +651,7 @@ class _LoadingStateState extends State<_LoadingState>
                     ),
                   ),
                   const SizedBox(height: 26),
-                  Text(
-                    _t(
-                      context,
-                      'Reading your library',
-                      'ライブラリを読み込んでいます',
-                      zh: '正在读取音乐库',
-                      ko: '라이브러리를 읽는 중',
-                    ),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _t(
-                      context,
-                      'Preparing play counts, rankings, and listening records.',
-                      '再生回数、ランキング、聴取記録を準備しています。',
-                      zh: '正在准备播放次数、排行榜和聆听记录。',
-                      ko: '재생 횟수, 랭킹, 감상 기록을 준비하고 있습니다.',
-                    ),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  const _LoadingProgressDetails(),
+                  const _LoadingStatusText(),
                 ],
               ),
             ),
@@ -692,121 +662,122 @@ class _LoadingStateState extends State<_LoadingState>
   }
 }
 
-class _LoadingProgressDetails extends ConsumerWidget {
-  const _LoadingProgressDetails();
+class _LoadingStatusText extends ConsumerWidget {
+  const _LoadingStatusText();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final progress = ref.watch(libraryLoadProgressProvider);
-    final label = progress == null
-        ? _t(context, 'Getting ready…', '準備しています…', zh: '正在准备…', ko: '준비 중…')
-        : _loadStageLabel(context, progress);
-    final completedText = progress == null || progress.totalSteps == 0
-        ? null
-        : _t(
-            context,
-            '${progress.step - 1} of ${progress.totalSteps} stages complete',
-            '${progress.totalSteps}工程中${progress.step - 1}工程が完了',
-            zh: '已完成 ${progress.totalSteps} 个步骤中的 ${progress.step - 1} 个',
-            ko: '전체 ${progress.totalSteps}단계 중 ${progress.step - 1}단계 완료',
-          );
+    final stage = ref.watch(
+      libraryLoadProgressProvider.select((progress) => progress?.stage),
+    );
+    final label = switch (stage) {
+      LibraryLoadStage.buildingOverview => _t(
+        context,
+        'Preparing your statistics',
+        '統計を準備しています',
+        zh: '正在准备统计数据',
+        ko: '통계를 준비하고 있습니다',
+      ),
+      LibraryLoadStage.savingSnapshot => _t(
+        context,
+        'Saving today’s listening record',
+        '今日の聴取記録を保存しています',
+        zh: '正在保存今天的聆听记录',
+        ko: '오늘의 감상 기록을 저장하고 있습니다',
+      ),
+      LibraryLoadStage.loadingHistory => _listeningHistoryLoadingLabel(context),
+      _ => _t(
+        context,
+        'Reading your library',
+        'ライブラリを読み込んでいます',
+        zh: '正在读取音乐库',
+        ko: '라이브러리를 읽는 중',
+      ),
+    };
+
     return Semantics(
-      container: true,
       liveRegion: true,
-      label: completedText == null ? label : '$label. $completedText',
-      child: ExcludeSemantics(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            if (completedText != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                completedText,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TweenAnimationBuilder<double>(
-                tween: Tween(end: progress!.completedFraction),
-                duration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 450),
-                curve: Curves.easeOutCubic,
-                builder: (context, value, child) => LinearProgressIndicator(
-                  value: value,
-                  minHeight: 6,
-                  borderRadius: BorderRadius.circular(999),
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                ),
-              ),
-            ],
-          ],
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
   }
 }
 
-String _loadStageLabel(BuildContext context, LibraryLoadProgress progress) {
-  final count = progress.trackCount;
-  final countText = count == null
-      ? null
-      : NumberFormat.decimalPattern().format(count);
-  return switch (progress.stage) {
-    LibraryLoadStage.checkingAccess => _t(
-      context,
-      'Checking library access',
-      'ライブラリへのアクセスを確認中',
-      zh: '正在确认音乐库访问权限',
-      ko: '라이브러리 접근 권한 확인 중',
-    ),
-    LibraryLoadStage.fetchingTracks => _t(
-      context,
-      'Fetching songs from your library',
-      'ライブラリから曲を取得中',
-      zh: '正在从音乐库获取歌曲',
-      ko: '라이브러리에서 곡을 가져오는 중',
-    ),
-    LibraryLoadStage.buildingOverview =>
-      countText == null
-          ? _t(
-              context,
-              'Preparing library statistics',
-              'ライブラリの統計を準備中',
-              zh: '正在准备音乐库统计数据',
-              ko: '라이브러리 통계 준비 중',
-            )
-          : _t(
-              context,
-              'Preparing statistics for $countText songs',
-              '$countText曲の統計を準備中',
-              zh: '正在准备 $countText 首歌曲的统计数据',
-              ko: '$countText곡의 통계 준비 중',
+String _listeningHistoryLoadingLabel(BuildContext context) => _t(
+  context,
+  'Loading your listening history',
+  '聴取記録を読み込んでいます',
+  zh: '正在读取聆听记录',
+  ko: '감상 기록을 읽고 있습니다',
+);
+
+/// Reserves space for data that is still arriving without implying a value.
+class _ContentLoading extends StatelessWidget {
+  const _ContentLoading({
+    required this.label,
+    required this.minHeight,
+    this.showLabel = true,
+  });
+
+  final String label;
+  final double minHeight;
+  final bool showLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final animate = !MediaQuery.disableAnimationsOf(context);
+    return Semantics(
+      label: label,
+      liveRegion: showLabel,
+      child: ExcludeSemantics(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: minHeight),
+          child: ColoredBox(
+            color: Color.alphaBlend(
+              colors.primary.withValues(alpha: 0.05),
+              colors.surface,
             ),
-    LibraryLoadStage.savingSnapshot => _t(
-      context,
-      "Saving today's listening record",
-      '今日の聴取記録を保存中',
-      zh: '正在保存今天的聆听记录',
-      ko: '오늘의 감상 기록 저장 중',
-    ),
-    LibraryLoadStage.loadingHistory => _t(
-      context,
-      'Loading your listening history',
-      'これまでの聴取記録を読み込み中',
-      zh: '正在读取聆听记录',
-      ko: '지금까지의 감상 기록 읽는 중',
-    ),
-  };
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (animate)
+                      RepaintBoundary(
+                        child: SizedBox.square(
+                          dimension: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            color: colors.primary.withValues(alpha: 0.64),
+                          ),
+                        ),
+                      ),
+                    if (showLabel) ...[
+                      if (animate) const SizedBox(height: 6),
+                      Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _LoadingPulseLoader extends StatelessWidget {

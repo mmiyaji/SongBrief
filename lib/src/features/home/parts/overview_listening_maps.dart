@@ -948,9 +948,9 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
   Widget build(BuildContext context) {
     final ready = ref.watch(_calendarHistoryReadyProvider(widget.history));
     if (ready.isLoading) {
-      return const SizedBox(
-        height: 320,
-        child: Center(child: CircularProgressIndicator.adaptive()),
+      return _ContentLoading(
+        label: _listeningHistoryLoadingLabel(context),
+        minHeight: 320,
       );
     }
     if (ready.hasError) {
