@@ -6,17 +6,26 @@ class _RankingPanel extends ConsumerWidget {
     required this.snapshotOverview,
     required this.history,
     required this.snapshotRecordingEnabled,
+    this.historyPending = false,
   });
 
   final LibraryOverview overview;
   final LibraryOverview snapshotOverview;
   final SnapshotHistory history;
   final bool snapshotRecordingEnabled;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scope = ref.watch(rankingScopeProvider);
-    final entries = overview.entriesFor(scope);
+    // Recent rankings use saved evidence even when supplemental counts are off.
+    final rankingPending =
+        historyPending &&
+        (scope == RankingScope.recent ||
+            ref.watch(supplementalHistoryIncludedProvider));
+    final entries = rankingPending
+        ? const <RankingEntry>[]
+        : overview.entriesFor(scope);
     final focus = ref.watch(rankingFocusProvider);
     final visibleCount = ref.watch(
       rankingVisibleCountProvider.select(
@@ -59,11 +68,13 @@ class _RankingPanel extends ConsumerWidget {
                 ),
               ),
               IconButton.filledTonal(
-                onPressed: () {
-                  ref
-                      .read(musicStatsControllerProvider.notifier)
-                      .refreshStats();
-                },
+                onPressed: historyPending
+                    ? null
+                    : () {
+                        ref
+                            .read(musicStatsControllerProvider.notifier)
+                            .refreshStats();
+                      },
                 icon: const Icon(Icons.refresh),
                 tooltip: _t(context, 'Refresh', '更新'),
               ),
@@ -126,13 +137,20 @@ class _RankingPanel extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 14),
-          _RankingList(
-            overview: overview,
-            scope: scope,
-            entries: visibleEntries,
-            showLastPlayedAt: scope == RankingScope.recent,
-            focus: scopedFocus,
-          ),
+          if (rankingPending)
+            _LoadingSkeleton(
+              label: _listeningHistoryLoadingLabel(context),
+              showStatus: true,
+              child: const _SkeletonRows(ranked: true),
+            )
+          else
+            _RankingList(
+              overview: overview,
+              scope: scope,
+              entries: visibleEntries,
+              showLastPlayedAt: scope == RankingScope.recent,
+              focus: scopedFocus,
+            ),
           if (visibleEntries.length < entries.length) ...[
             const SizedBox(height: 12),
             _LoadMoreButton(
@@ -152,6 +170,7 @@ class _RankingPanel extends ConsumerWidget {
             snapshotOverview: snapshotOverview,
             history: history,
             snapshotRecordingEnabled: snapshotRecordingEnabled,
+            historyPending: historyPending,
           ),
           const SizedBox(height: 14),
           AdBannerSlot(placement: _t(context, 'Rankings', 'ランキング')),
@@ -167,22 +186,31 @@ class _RankingExtensions extends StatelessWidget {
     required this.snapshotOverview,
     required this.history,
     required this.snapshotRecordingEnabled,
+    required this.historyPending,
   });
 
   final LibraryOverview overview;
   final LibraryOverview snapshotOverview;
   final SnapshotHistory history;
   final bool snapshotRecordingEnabled;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context) {
-    final rediscoveryItems = _rediscoveryRankingItems(overview);
+    final rediscoveryItems = historyPending
+        ? const <_RankingInsightItem>[]
+        : _rediscoveryRankingItems(overview);
     final showSnapshotSections =
-        snapshotRecordingEnabled && history.snapshots.length >= 2;
+        !historyPending &&
+        snapshotRecordingEnabled &&
+        history.snapshots.length >= 2;
     final showSnapshotHint =
-        snapshotRecordingEnabled && history.snapshots.length < 2;
+        !historyPending &&
+        snapshotRecordingEnabled &&
+        history.snapshots.length < 2;
 
-    if (!showSnapshotSections &&
+    if (!historyPending &&
+        !showSnapshotSections &&
         !showSnapshotHint &&
         rediscoveryItems.isEmpty) {
       return const SizedBox.shrink();
@@ -230,7 +258,13 @@ class _RankingExtensions extends StatelessWidget {
             ),
           ],
         ),
-        if (showSnapshotSections) ...[
+        if (historyPending) ...[
+          const SizedBox(height: 16),
+          _LoadingSkeleton(
+            label: _listeningHistoryLoadingLabel(context),
+            child: const _SkeletonRows(ranked: true, count: 2),
+          ),
+        ] else if (showSnapshotSections) ...[
           const SizedBox(height: 16),
           _PeriodRankingSection(overview: snapshotOverview, history: history),
           const SizedBox(height: 18),

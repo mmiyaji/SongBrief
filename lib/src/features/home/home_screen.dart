@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' show ImageByteFormat;
@@ -1020,20 +1021,6 @@ class _StatsContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (historyPending && selectedSection != HomeSection.playing) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: _ContentLoading(
-              label: _listeningHistoryLoadingLabel(context),
-              minHeight: 120,
-            ),
-          ),
-        ),
-      );
-    }
     final deviceBottomInset = MediaQueryData.fromView(View.of(context))
         .viewPadding
         .bottom;
@@ -1073,6 +1060,7 @@ class _StatsContent extends ConsumerWidget {
           if (selectedSection == HomeSection.overview)
             _OverviewSliverSection(
               stats: stats,
+              historyPending: historyPending,
               horizontalPadding: EdgeInsets.only(
                 left: useRail ? 24 : 20,
                 right: useRail ? 28 : 20,
@@ -1108,6 +1096,7 @@ class _StatsContent extends ConsumerWidget {
                     child: _SectionBody(
                       stats: stats,
                       selectedSection: selectedSection,
+                      historyPending: historyPending,
                     ),
                   ),
                 ),
@@ -1120,10 +1109,15 @@ class _StatsContent extends ConsumerWidget {
 }
 
 class _SectionBody extends ConsumerWidget {
-  const _SectionBody({required this.stats, required this.selectedSection});
+  const _SectionBody({
+    required this.stats,
+    required this.selectedSection,
+    required this.historyPending,
+  });
 
   final MusicStatsState stats;
   final HomeSection selectedSection;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1132,48 +1126,48 @@ class _SectionBody extends ConsumerWidget {
       HomeSection.overview => _OverviewSection(stats: stats),
       HomeSection.rankings => _buildRankings(context, ref),
       HomeSection.library =>
-        ref
-            .watch(libraryTabOverviewProvider)
-            .when(
-              data: (data) => _LibrarySection(
-                overview: data.overview,
-                songsOverview: data.songsOverview,
-                supplementalTrackIds: data.supplementalTrackIds,
-              ),
-              loading: () => _ContentLoading(
-                label: _t(
-                  context,
-                  'Reading your library',
-                  'ライブラリを読み込んでいます',
-                  zh: '正在读取音乐库',
-                  ko: '라이브러리를 읽는 중',
-                ),
-                minHeight: 140,
-              ),
-              error: (_, _) => Center(
-                child: TextButton(
-                  onPressed: () => ref.invalidate(libraryTabOverviewProvider),
-                  child: Text(
-                    _t(context, 'Retry', '再試行', zh: '重试', ko: '다시 시도'),
+        historyPending
+            ? _LibrarySection(overview: stats.overview, loading: true)
+            : ref
+                  .watch(libraryTabOverviewProvider)
+                  .when(
+                    data: (data) => _LibrarySection(
+                      overview: data.overview,
+                      songsOverview: data.songsOverview,
+                      supplementalTrackIds: data.supplementalTrackIds,
+                    ),
+                    loading: () => _LibrarySection(
+                      overview: stats.overview,
+                      loading: true,
+                    ),
+                    error: (_, _) => Center(
+                      child: TextButton(
+                        onPressed: () =>
+                            ref.invalidate(libraryTabOverviewProvider),
+                        child: Text(
+                          _t(context, 'Retry', '再試行', zh: '重试', ko: '다시 시도'),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
       // Lets the 20px icons of plain switch rows keep their text on the same
       // column as _SettingsRow instead of the default 24px leading slot.
       HomeSection.settings => ListTileTheme.merge(
         minLeadingWidth: 20,
-        child: _SettingsSection(stats: stats),
+        child: _SettingsSection(stats: stats, historyPending: historyPending),
       ),
     };
   }
 
   Widget _buildRankings(BuildContext context, WidgetRef ref) {
-    final countedOverview =
-        ref.watch(rankingScopeProvider) == RankingScope.recent
+    final countedOverview = historyPending
+        ? stats.overview
+        : ref.watch(rankingScopeProvider) == RankingScope.recent
         ? ref.watch(libraryBrowsingOverviewProvider)
         : ref.watch(countedListeningOverviewProvider);
-    final supplementalTracks = ref.watch(countedOutsideTracksProvider);
+    final supplementalTracks = historyPending
+        ? const <LibraryTrack>[]
+        : ref.watch(countedOutsideTracksProvider);
     if (!countedOverview.hasTracks) return const _EmptyLibraryPanel();
 
     return Column(
@@ -1207,6 +1201,7 @@ class _SectionBody extends ConsumerWidget {
           snapshotOverview: stats.overview,
           history: stats.snapshotHistory,
           snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
+          historyPending: historyPending,
         ),
       ],
     );

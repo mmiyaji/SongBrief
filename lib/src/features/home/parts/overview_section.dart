@@ -24,19 +24,26 @@ class _OverviewSliverSection extends ConsumerWidget {
     required this.stats,
     required this.horizontalPadding,
     required this.bottomPadding,
+    required this.historyPending,
   });
 
   final MusicStatsState stats;
   final EdgeInsets horizontalPadding;
   final double bottomPadding;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = _overviewPanelItems(
       context,
       stats: stats,
-      countedOverview: ref.watch(countedListeningOverviewProvider),
-      supplementalTracks: ref.watch(countedOutsideTracksProvider),
+      countedOverview: historyPending
+          ? stats.overview
+          : ref.watch(countedListeningOverviewProvider),
+      supplementalTracks: historyPending
+          ? const []
+          : ref.watch(countedOutsideTracksProvider),
+      historyPending: historyPending,
     );
 
     return SliverPadding(
@@ -59,6 +66,7 @@ List<Widget> _overviewPanelItems(
   required MusicStatsState stats,
   required LibraryOverview countedOverview,
   required List<LibraryTrack> supplementalTracks,
+  bool historyPending = false,
 }) {
   final overview = stats.overview;
   final items = <Widget>[];
@@ -97,6 +105,7 @@ List<Widget> _overviewPanelItems(
         history: stats.snapshotHistory,
         overview: overview,
         isDemo: overview.isDemo,
+        historyPending: historyPending,
       ),
     );
   }
@@ -112,6 +121,7 @@ List<Widget> _overviewPanelItems(
       history: stats.snapshotHistory,
       snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
       includeCalendar: false,
+      historyPending: historyPending,
     ),
   );
   if (stats.snapshotRecordingEnabled) {
@@ -121,11 +131,16 @@ List<Widget> _overviewPanelItems(
         child: _ActivityHeatmapCard(
           overview: overview,
           history: stats.snapshotHistory,
+          historyPending: historyPending,
         ),
       ),
     );
     add(
-      _RecapHighlightsPanel(overview: overview, history: stats.snapshotHistory),
+      _RecapHighlightsPanel(
+        overview: overview,
+        history: stats.snapshotHistory,
+        historyPending: historyPending,
+      ),
     );
   }
   add(
@@ -466,11 +481,13 @@ class _SnapshotStatusPanel extends ConsumerWidget {
     required this.history,
     required this.overview,
     required this.isDemo,
+    this.historyPending = false,
   });
 
   final SnapshotHistory history;
   final LibraryOverview overview;
   final bool isDemo;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -489,9 +506,11 @@ class _SnapshotStatusPanel extends ConsumerWidget {
         ? null
         : listeningActivityDelta(previous: previous, current: latest);
 
-    if (latest == null) {
+    if (historyPending || latest == null) {
       final hasDatedHistory =
-          !isDemo && ref.watch(countedSupplementalEventsProvider).isNotEmpty;
+          !historyPending &&
+          !isDemo &&
+          ref.watch(countedSupplementalEventsProvider).isNotEmpty;
       return GlassSurface.section(
         padding: const EdgeInsets.all(18),
         child: Column(
@@ -512,30 +531,53 @@ class _SnapshotStatusPanel extends ConsumerWidget {
                         _t(context, 'Daily listening records', '日々の聴取記録'),
                         style: theme.textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        isDemo
-                            ? _t(
-                                context,
-                                'Available after iOS Music access is granted.',
-                                'iOSミュージックへのアクセス許可後に利用できます。',
-                              )
-                            : _t(
-                                context,
-                                'The first listening record will be saved after the next library update.',
-                                '次回のライブラリ更新後に最初の聴取記録を保存します。',
-                              ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
+                      if (!historyPending) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          isDemo
+                              ? _t(
+                                  context,
+                                  'Available after iOS Music access is granted.',
+                                  'iOSミュージックへのアクセス許可後に利用できます。',
+                                )
+                              : _t(
+                                  context,
+                                  'The first listening record will be saved after the next library update.',
+                                  '次回のライブラリ更新後に最初の聴取記録を保存します。',
+                                ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
               ],
             ),
-            if (hasDatedHistory) ...[
+            if (historyPending) ...[
+              const SizedBox(height: 12),
+              Text(
+                _t(context, 'Listening record trend', '聴取記録の推移'),
+                style: theme.textTheme.labelLarge,
+              ),
+              const SizedBox(height: 10),
+              _LoadingSkeleton(
+                label: _listeningHistoryLoadingLabel(context),
+                showStatus: true,
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SkeletonBlock(height: 1),
+                    SizedBox(height: 25),
+                    _SkeletonBlock(height: 1),
+                    SizedBox(height: 25),
+                    _SkeletonBlock(height: 1),
+                  ],
+                ),
+              ),
+            ] else if (hasDatedHistory) ...[
               const SizedBox(height: 12),
               _SnapshotTrendChart(history: history),
             ],

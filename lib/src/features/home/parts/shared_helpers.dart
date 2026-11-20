@@ -5,12 +5,14 @@ class _SettingsRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.valuePlaceholder,
     this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final Widget? valuePlaceholder;
   final VoidCallback? onTap;
 
   @override
@@ -37,10 +39,12 @@ class _SettingsRow extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 );
-                final valueText = _SettingsRowValue(
-                  value: value,
-                  showOpenIcon: onTap != null,
-                );
+                final valueText =
+                    valuePlaceholder ??
+                    _SettingsRowValue(
+                      value: value,
+                      showOpenIcon: onTap != null,
+                    );
 
                 if (constraints.maxWidth < 360) {
                   return Column(
@@ -686,13 +690,7 @@ class _LoadingStatusText extends ConsumerWidget {
         ko: '오늘의 감상 기록을 저장하고 있습니다',
       ),
       LibraryLoadStage.loadingHistory => _listeningHistoryLoadingLabel(context),
-      _ => _t(
-        context,
-        'Reading your library',
-        'ライブラリを読み込んでいます',
-        zh: '正在读取音乐库',
-        ko: '라이브러리를 읽는 중',
-      ),
+      _ => _libraryLoadingLabel(context),
     };
 
     return Semantics(
@@ -700,9 +698,8 @@ class _LoadingStatusText extends ConsumerWidget {
       child: Text(
         label,
         textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w900,
-        ),
+        style: Theme.of(context).textTheme.titleLarge
+            ?.copyWith(fontWeight: FontWeight.w900),
       ),
     );
   }
@@ -716,66 +713,181 @@ String _listeningHistoryLoadingLabel(BuildContext context) => _t(
   ko: '감상 기록을 읽고 있습니다',
 );
 
-/// Reserves space for data that is still arriving without implying a value.
-class _ContentLoading extends StatelessWidget {
-  const _ContentLoading({
+String _libraryLoadingLabel(BuildContext context) => _t(
+  context,
+  'Reading your library',
+  'ライブラリを読み込んでいます',
+  zh: '正在读取音乐库',
+  ko: '라이브러리를 읽는 중',
+);
+
+class _LoadingSkeleton extends StatefulWidget {
+  const _LoadingSkeleton({
     required this.label,
-    required this.minHeight,
-    this.showLabel = true,
+    required this.child,
+    this.showStatus = false,
   });
 
   final String label;
-  final double minHeight;
-  final bool showLabel;
+  final Widget child;
+  final bool showStatus;
+
+  @override
+  State<_LoadingSkeleton> createState() => _LoadingSkeletonState();
+}
+
+class _LoadingSkeletonState extends State<_LoadingSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+  late final Animation<double> _opacity;
+  late final Timer _delay;
+  bool _isProlonged = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _opacity = _pulse
+        .drive(CurveTween(curve: Curves.easeInOut))
+        .drive(Tween(begin: 1.0, end: 0.65));
+    _delay = Timer(const Duration(milliseconds: 900), () {
+      setState(() => _isProlonged = true);
+      _updateMotion();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe even before the delay expires so a setting change stops motion.
+    _updateMotion();
+  }
+
+  void _updateMotion() {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (_isProlonged && !reduceMotion) {
+      if (!_pulse.isAnimating) _pulse.repeat(reverse: true);
+    } else {
+      _pulse.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _delay.cancel();
+    _pulse.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final animate = !MediaQuery.disableAnimationsOf(context);
+    final theme = Theme.of(context);
     return Semantics(
-      label: label,
-      liveRegion: showLabel,
+      container: true,
+      label: widget.label,
+      liveRegion: widget.showStatus && _isProlonged,
       child: ExcludeSemantics(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: minHeight),
-          child: ColoredBox(
-            color: Color.alphaBlend(
-              colors.primary.withValues(alpha: 0.05),
-              colors.surface,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            RepaintBoundary(
+              child: FadeTransition(opacity: _opacity, child: widget.child),
             ),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (animate)
-                      RepaintBoundary(
-                        child: SizedBox.square(
-                          dimension: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                            color: colors.primary.withValues(alpha: 0.64),
-                          ),
-                        ),
-                      ),
-                    if (showLabel) ...[
-                      if (animate) const SizedBox(height: 6),
-                      Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ],
+            if (widget.showStatus)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Opacity(
+                  opacity: _isProlonged ? 1 : 0,
+                  child: Text(
+                    widget.label,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _SkeletonBlock extends StatelessWidget {
+  const _SkeletonBlock({this.width, required this.height, this.radius = 4});
+
+  final double? width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.outlineVariant
+            .withValues(alpha: 0.44),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: SizedBox(width: width, height: height),
+    );
+  }
+}
+
+class _SkeletonRows extends StatelessWidget {
+  const _SkeletonRows({this.ranked = false, this.count = 5});
+
+  final bool ranked;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var index = 0; index < count; index++) ...[
+          if (index > 0) const Divider(height: 1),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: ranked ? 12 : 9),
+            child: Row(
+              children: [
+                if (ranked) ...[
+                  const _SkeletonBlock(width: 20, height: 11),
+                  const SizedBox(width: 18),
+                ],
+                const _SkeletonBlock(width: 42, height: 42, radius: 7),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FractionallySizedBox(
+                        widthFactor: index.isEven ? 0.55 : 0.42,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: const _SkeletonBlock(height: 11),
+                      ),
+                      const SizedBox(height: 8),
+                      const FractionallySizedBox(
+                        widthFactor: 0.3,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: _SkeletonBlock(height: 8),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                _SkeletonBlock(
+                  width: ranked ? 38 : 26,
+                  height: ranked ? 10 : 26,
+                  radius: ranked ? 4 : 13,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

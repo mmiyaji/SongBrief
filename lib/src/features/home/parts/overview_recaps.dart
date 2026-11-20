@@ -1,13 +1,17 @@
 part of '../home_screen.dart';
 
 class _RecapHighlightsPanel extends StatelessWidget {
-  const _RecapHighlightsPanel({required this.overview, required this.history});
+  const _RecapHighlightsPanel({
+    required this.overview,
+    required this.history,
+    required this.historyPending,
+  });
 
   final LibraryOverview overview;
   final SnapshotHistory history;
+  final bool historyPending;
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSummary(BuildContext context) {
     final week = _periodRecap(
       history: history,
       period: _RecapPeriod.week,
@@ -23,9 +27,18 @@ class _RecapHighlightsPanel extends StatelessWidget {
       period: _RecapPeriod.year,
       now: overview.generatedAt,
     );
-    final milestones = _milestoneForecasts(context, overview, history);
-    final burnout = _burnoutSummary(context, overview, history);
+    return _RecapSummaryCard(
+      overview: overview,
+      week: week,
+      month: month,
+      year: year,
+      milestones: _milestoneForecasts(context, overview, history),
+      burnout: _burnoutSummary(context, overview, history),
+    );
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return GlassSurface.section(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -41,14 +54,13 @@ class _RecapHighlightsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          _RecapSummaryCard(
-            overview: overview,
-            week: week,
-            month: month,
-            year: year,
-            milestones: milestones,
-            burnout: burnout,
-          ),
+          if (historyPending)
+            _LoadingSkeleton(
+              label: _listeningHistoryLoadingLabel(context),
+              child: const _SkeletonRows(count: 3),
+            )
+          else
+            _buildSummary(context),
         ],
       ),
     );

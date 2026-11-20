@@ -1,9 +1,10 @@
 part of '../home_screen.dart';
 
 class _SettingsSection extends ConsumerWidget {
-  const _SettingsSection({required this.stats});
+  const _SettingsSection({required this.stats, this.historyPending = false});
 
   final MusicStatsState stats;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -60,16 +61,22 @@ class _SettingsSection extends ConsumerWidget {
                 value: stats.snapshotRecordingEnabled
                     ? _dateTimeFormat(context).format(overview.generatedAt)
                     : _t(context, 'Off', 'オフ'),
+                valuePlaceholder:
+                    historyPending && stats.snapshotRecordingEnabled
+                    ? const _PendingHistoryValue()
+                    : null,
               ),
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
-                  onPressed: () {
-                    ref
-                        .read(musicStatsControllerProvider.notifier)
-                        .refreshStats();
-                  },
+                  onPressed: historyPending
+                      ? null
+                      : () {
+                          ref
+                              .read(musicStatsControllerProvider.notifier)
+                              .refreshStats();
+                        },
                   icon: const Icon(Icons.refresh),
                   label: Text(_t(context, 'Refresh', '更新')),
                 ),
@@ -79,6 +86,7 @@ class _SettingsSection extends ConsumerWidget {
                 _TemporaryDemoLibrarySetting(
                   enabled: temporaryDemoLibraryEnabled,
                   stats: stats,
+                  historyPending: historyPending,
                 ),
               ],
             ],
@@ -188,7 +196,7 @@ class _SettingsSection extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ExportSetting(stats: stats),
+              _ExportSetting(stats: stats, historyPending: historyPending),
               const SizedBox(height: 16),
               Divider(
                 color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
@@ -207,7 +215,10 @@ class _SettingsSection extends ConsumerWidget {
         const SizedBox(height: 14),
         _SettingsGroup(
           title: _t(context, 'Data Management', 'データ管理'),
-          child: _DataManagementSetting(stats: stats),
+          child: _DataManagementSetting(
+            stats: stats,
+            historyPending: historyPending,
+          ),
         ),
         const SizedBox(height: 14),
         _SettingsGroup(
@@ -382,10 +393,12 @@ class _TemporaryDemoLibrarySetting extends ConsumerWidget {
   const _TemporaryDemoLibrarySetting({
     required this.enabled,
     required this.stats,
+    required this.historyPending,
   });
 
   final bool enabled;
   final MusicStatsState stats;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -428,14 +441,18 @@ class _TemporaryDemoLibrarySetting extends ConsumerWidget {
       title: title,
       description: description,
       value: enabled,
-      onChanged: (value) async {
-        if (value) {
-          await _enableTemporaryDemoLibrary(context, ref);
-          return;
-        }
-        ref.read(temporaryDemoLibraryProvider.notifier).setEnabled(false);
-        await ref.read(musicStatsControllerProvider.notifier).refreshStats();
-      },
+      onChanged: historyPending
+          ? null
+          : (value) async {
+              if (value) {
+                await _enableTemporaryDemoLibrary(context, ref);
+                return;
+              }
+              ref.read(temporaryDemoLibraryProvider.notifier).setEnabled(false);
+              await ref
+                  .read(musicStatsControllerProvider.notifier)
+                  .refreshStats();
+            },
     );
     if (enabled || !realLibraryAvailable) {
       return switchCard;

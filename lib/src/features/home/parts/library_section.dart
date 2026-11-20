@@ -5,11 +5,13 @@ class _LibrarySection extends StatefulWidget {
     required this.overview,
     this.songsOverview,
     this.supplementalTrackIds = const <String>{},
+    this.loading = false,
   });
 
   final LibraryOverview overview;
   final LibraryOverview? songsOverview;
   final Set<String> supplementalTrackIds;
+  final bool loading;
 
   @override
   State<_LibrarySection> createState() => _LibrarySectionState();
@@ -98,26 +100,28 @@ class _LibrarySectionState extends State<_LibrarySection> {
   Widget build(BuildContext context) {
     final overview = widget.overview;
     final songsOverview = widget.songsOverview ?? overview;
-    if (!overview.hasTracks && !songsOverview.hasTracks) {
+    final loading = widget.loading;
+    if (!loading && !overview.hasTracks && !songsOverview.hasTracks) {
       return const _EmptyLibraryPanel();
     }
 
-    final songTracks = songsOverview.filteredTracks(_query);
-    final sortedTracks = _libraryTracksForSort(
-      songsOverview,
-      songTracks,
-      _sort,
-    );
-    final filteredTracks = overview.filteredTracks(_query);
-    final groups = _mode == _LibraryBrowseMode.songs
-        ? const <_LibraryGroupEntry>[]
-        : _libraryGroupsForMode(context, _mode, filteredTracks, _sort);
-    final totalCount = _mode == _LibraryBrowseMode.songs
-        ? sortedTracks.length
-        : groups.length;
-    final shownCount = _clampInt(_visibleCount, 0, totalCount);
-    final visibleTracks = sortedTracks.take(shownCount).toList(growable: false);
-    final visibleGroups = groups.take(shownCount).toList(growable: false);
+    final browsingSongs = _mode == _LibraryBrowseMode.songs;
+    final sortedTracks = !loading && browsingSongs
+        ? _libraryTracksForSort(
+            songsOverview,
+            songsOverview.filteredTracks(_query),
+            _sort,
+          )
+        : const <LibraryTrack>[];
+    final groups = !loading && !browsingSongs
+        ? _libraryGroupsForMode(
+            context,
+            _mode,
+            overview.filteredTracks(_query),
+            _sort,
+          )
+        : const <_LibraryGroupEntry>[];
+    final totalCount = browsingSongs ? sortedTracks.length : groups.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -145,16 +149,20 @@ class _LibrarySectionState extends State<_LibrarySection> {
           query: _query,
           mode: _mode,
           sort: _sort,
-          resultCount: totalCount,
+          resultCount: loading ? null : totalCount,
           onQueryChanged: _setQuery,
           onClearQuery: _clearQuery,
           onModeChanged: _setMode,
           onSortChanged: _setSort,
         ),
         const SizedBox(height: 14),
-        if (_mode == _LibraryBrowseMode.songs)
+        if (loading && browsingSongs)
+          const _LibraryTrackPanel.loading()
+        else if (loading)
+          _LibraryGroupPanel.loading(mode: _mode)
+        else if (browsingSongs)
           _LibraryTrackPanel(
-            tracks: visibleTracks,
+            tracks: sortedTracks.take(_visibleCount).toList(growable: false),
             supplementalTrackIds: widget.supplementalTrackIds,
             totalCount: totalCount,
             nextCount: _loadMoreCount,
@@ -163,13 +171,15 @@ class _LibrarySectionState extends State<_LibrarySection> {
         else
           _LibraryGroupPanel(
             mode: _mode,
-            groups: visibleGroups,
+            groups: groups.take(_visibleCount).toList(growable: false),
             totalCount: totalCount,
             nextCount: _loadMoreCount,
             onLoadMore: _loadMore,
           ),
-        const SizedBox(height: 14),
-        AdBannerSlot(placement: _t(context, 'Library', 'ライブラリ')),
+        if (!loading) ...[
+          const SizedBox(height: 14),
+          AdBannerSlot(placement: _t(context, 'Library', 'ライブラリ')),
+        ],
       ],
     );
   }
@@ -192,7 +202,7 @@ class _LibrarySearchPanel extends StatelessWidget {
   final String query;
   final _LibraryBrowseMode mode;
   final _LibrarySortMode sort;
-  final int resultCount;
+  final int? resultCount;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
   final ValueChanged<_LibraryBrowseMode> onModeChanged;
@@ -202,6 +212,8 @@ class _LibrarySearchPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final number = _numberFormat(context);
+    final resultCount = this.resultCount;
+    final loading = resultCount == null;
     return GlassSurface.section(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -210,17 +222,23 @@ class _LibrarySearchPanel extends StatelessWidget {
           _PanelHeading(
             icon: Icons.search_rounded,
             title: _t(context, 'Library browser', 'ライブラリ'),
-            subtitle: _t(
-              context,
-              '${number.format(resultCount)} ${_libraryBrowseModeLabel(context, mode).toLowerCase()} matched',
-              '${number.format(resultCount)}件の${_libraryBrowseModeLabel(context, mode)}',
-              zh: '${number.format(resultCount)} 个${_libraryBrowseModeLabel(context, mode)}匹配',
-              ko: '${number.format(resultCount)}개 ${_libraryBrowseModeLabel(context, mode)} 일치',
-            ),
+            subtitlePlaceholder: loading
+                ? const _SkeletonBlock(width: 90, height: 14)
+                : null,
+            subtitle: loading
+                ? ''
+                : _t(
+                    context,
+                    '${number.format(resultCount)} ${_libraryBrowseModeLabel(context, mode).toLowerCase()} matched',
+                    '${number.format(resultCount)}件の${_libraryBrowseModeLabel(context, mode)}',
+                    zh: '${number.format(resultCount)} 个${_libraryBrowseModeLabel(context, mode)}匹配',
+                    ko: '${number.format(resultCount)}개 ${_libraryBrowseModeLabel(context, mode)} 일치',
+                  ),
           ),
           const SizedBox(height: 14),
           TextField(
             controller: controller,
+            enabled: !loading,
             onChanged: onQueryChanged,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
@@ -282,9 +300,9 @@ class _LibrarySearchPanel extends StatelessWidget {
                           )
                           .toList(),
                       selected: {mode},
-                      onSelectionChanged: (selection) {
-                        onModeChanged(selection.first);
-                      },
+                      onSelectionChanged: loading
+                          ? null
+                          : (selection) => onModeChanged(selection.first),
                     ),
                   ),
                 );
@@ -314,11 +332,13 @@ class _LibrarySearchPanel extends StatelessWidget {
                       ),
                     )
                     .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    onSortChanged(value);
-                  }
-                },
+                onChanged: loading
+                    ? null
+                    : (value) {
+                        if (value != null) {
+                          onSortChanged(value);
+                        }
+                      },
               );
 
               final shouldStackControls = constraints.maxWidth < 940;
@@ -367,15 +387,23 @@ class _LibraryTrackPanel extends StatelessWidget {
     required this.onLoadMore,
   });
 
+  const _LibraryTrackPanel.loading()
+    : tracks = const [],
+      supplementalTrackIds = const {},
+      totalCount = null,
+      nextCount = 0,
+      onLoadMore = null;
+
   final List<LibraryTrack> tracks;
   final Set<String> supplementalTrackIds;
-  final int totalCount;
+  final int? totalCount;
   final int nextCount;
-  final VoidCallback onLoadMore;
+  final VoidCallback? onLoadMore;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final totalCount = this.totalCount;
     return GlassSurface.section(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -391,7 +419,13 @@ class _LibraryTrackPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          if (totalCount == 0)
+          if (totalCount == null)
+            _LoadingSkeleton(
+              label: _libraryLoadingLabel(context),
+              showStatus: true,
+              child: const _SkeletonRows(),
+            )
+          else if (totalCount == 0)
             Text(
               _t(
                 context,
@@ -416,7 +450,7 @@ class _LibraryTrackPanel extends StatelessWidget {
                 shownCount: tracks.length,
                 totalCount: totalCount,
                 nextCount: nextCount,
-                onPressed: onLoadMore,
+                onPressed: onLoadMore!,
               ),
             ],
           ],
@@ -576,15 +610,22 @@ class _LibraryGroupPanel extends StatelessWidget {
     required this.onLoadMore,
   });
 
+  const _LibraryGroupPanel.loading({required this.mode})
+    : groups = const [],
+      totalCount = null,
+      nextCount = 0,
+      onLoadMore = null;
+
   final _LibraryBrowseMode mode;
   final List<_LibraryGroupEntry> groups;
-  final int totalCount;
+  final int? totalCount;
   final int nextCount;
-  final VoidCallback onLoadMore;
+  final VoidCallback? onLoadMore;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final totalCount = this.totalCount;
     return GlassSurface.section(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -600,7 +641,13 @@ class _LibraryGroupPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          if (totalCount == 0)
+          if (totalCount == null)
+            _LoadingSkeleton(
+              label: _libraryLoadingLabel(context),
+              showStatus: true,
+              child: const _SkeletonRows(),
+            )
+          else if (totalCount == 0)
             Text(
               _t(
                 context,
@@ -622,7 +669,7 @@ class _LibraryGroupPanel extends StatelessWidget {
                 shownCount: groups.length,
                 totalCount: totalCount,
                 nextCount: nextCount,
-                onPressed: onLoadMore,
+                onPressed: onLoadMore!,
               ),
             ],
           ],

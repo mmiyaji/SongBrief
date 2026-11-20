@@ -1,9 +1,13 @@
 part of '../home_screen.dart';
 
 class _DataManagementSetting extends ConsumerWidget {
-  const _DataManagementSetting({required this.stats});
+  const _DataManagementSetting({
+    required this.stats,
+    required this.historyPending,
+  });
 
   final MusicStatsState stats;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,10 +27,14 @@ class _DataManagementSetting extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SnapshotRecordingSetting(enabled: snapshotRecordingEnabled),
+        _SnapshotRecordingSetting(
+          enabled: snapshotRecordingEnabled,
+          historyPending: historyPending,
+        ),
         const SizedBox(height: 10),
         _SnapshotCloudSyncSetting(
           enabled: ref.watch(snapshotCloudSyncProvider),
+          historyPending: historyPending,
         ),
         const SizedBox(height: 10),
         _SnapshotBackgroundRefreshSetting(
@@ -57,11 +65,17 @@ class _DataManagementSetting extends ConsumerWidget {
               : _t(context, 'Listening record history', '聴取記録の履歴'),
           value:
               '${_dayCountLabel(context, history.snapshotCount)} / $rangeLabel',
+          valuePlaceholder: historyPending
+              ? const _PendingHistoryValue()
+              : null,
         ),
         Align(
           alignment: Alignment.centerRight,
           child: OutlinedButton.icon(
-            onPressed: stats.overview.isDemo || history.snapshotCount == 0
+            onPressed:
+                historyPending ||
+                    stats.overview.isDemo ||
+                    history.snapshotCount == 0
                 ? null
                 : () =>
                       _showListeningRecordManagementSheet(context, ref, stats),
@@ -76,10 +90,29 @@ class _DataManagementSetting extends ConsumerWidget {
   }
 }
 
+class _PendingHistoryValue extends StatelessWidget {
+  const _PendingHistoryValue();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: _listeningHistoryLoadingLabel(context),
+      child: const Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: _SkeletonBlock(width: 110, height: 14),
+      ),
+    );
+  }
+}
+
 class _SnapshotCloudSyncSetting extends ConsumerWidget {
-  const _SnapshotCloudSyncSetting({required this.enabled});
+  const _SnapshotCloudSyncSetting({
+    required this.enabled,
+    required this.historyPending,
+  });
 
   final bool enabled;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -109,17 +142,23 @@ class _SnapshotCloudSyncSetting extends ConsumerWidget {
               ko: '기록은 이 기기에만 저장됩니다.',
             ),
       value: enabled,
-      onChanged: (value) {
-        ref.read(snapshotCloudSyncProvider.notifier).setEnabled(value);
-      },
+      onChanged: historyPending
+          ? null
+          : (value) {
+              ref.read(snapshotCloudSyncProvider.notifier).setEnabled(value);
+            },
     );
   }
 }
 
 class _SnapshotRecordingSetting extends ConsumerWidget {
-  const _SnapshotRecordingSetting({required this.enabled});
+  const _SnapshotRecordingSetting({
+    required this.enabled,
+    required this.historyPending,
+  });
 
   final bool enabled;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -138,45 +177,53 @@ class _SnapshotRecordingSetting extends ConsumerWidget {
               '聴取記録を使った傾向・リキャップは非表示です。',
             ),
       value: enabled,
-      onChanged: (value) async {
-        final saved = await ref
-            .read(snapshotRecordingProvider.notifier)
-            .setEnabled(value);
-        if (!saved) {
-          if (context.mounted) {
-            _showDataManagementResult(
-              context,
-              _t(
-                context,
-                'Could not save the listening-record setting.',
-                '聴取記録の設定を保存できませんでした。',
-                zh: '无法保存收听记录设置。',
-                ko: '청취 기록 설정을 저장할 수 없습니다.',
-              ),
-            );
-          }
-          return;
-        }
-        try {
-          await ref
-              .read(musicStatsControllerProvider.notifier)
-              .rescheduleSnapshotRefresh();
-        } on Object {
-          if (context.mounted) {
-            _showDataManagementResult(
-              context,
-              _t(
-                context,
-                'Could not update the background recording request.',
-                'バックグラウンド記録の予約を更新できませんでした。',
-                zh: '无法更新后台记录请求。',
-                ko: '백그라운드 기록 요청을 업데이트할 수 없습니다.',
-              ),
-            );
-          }
-        }
-      },
+      onChanged: historyPending
+          ? null
+          : (value) => _saveRecordingPreference(context, ref, value),
     );
+  }
+
+  Future<void> _saveRecordingPreference(
+    BuildContext context,
+    WidgetRef ref,
+    bool value,
+  ) async {
+    final saved = await ref
+        .read(snapshotRecordingProvider.notifier)
+        .setEnabled(value);
+    if (!saved) {
+      if (context.mounted) {
+        _showDataManagementResult(
+          context,
+          _t(
+            context,
+            'Could not save the listening-record setting.',
+            '聴取記録の設定を保存できませんでした。',
+            zh: '无法保存收听记录设置。',
+            ko: '청취 기록 설정을 저장할 수 없습니다.',
+          ),
+        );
+      }
+      return;
+    }
+    try {
+      await ref
+          .read(musicStatsControllerProvider.notifier)
+          .rescheduleSnapshotRefresh();
+    } on Object {
+      if (context.mounted) {
+        _showDataManagementResult(
+          context,
+          _t(
+            context,
+            'Could not update the background recording request.',
+            'バックグラウンド記録の予約を更新できませんでした。',
+            zh: '无法更新后台记录请求。',
+            ko: '백그라운드 기록 요청을 업데이트할 수 없습니다.',
+          ),
+        );
+      }
+    }
   }
 }
 

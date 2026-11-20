@@ -334,12 +334,14 @@ class _PanelHeading extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.subtitlePlaceholder,
     this.trailing,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
+  final Widget? subtitlePlaceholder;
   final Widget? trailing;
 
   @override
@@ -355,13 +357,14 @@ class _PanelHeading extends StatelessWidget {
             children: [
               Text(title, style: theme.textTheme.titleLarge),
               const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              subtitlePlaceholder ??
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
             ],
           ),
         ),

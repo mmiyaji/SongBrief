@@ -111,18 +111,10 @@ class _NowPlayingSection extends ConsumerWidget {
       ],
       const SizedBox(height: 14),
       _NowPlayingLyricsPanel(track: track),
-      if (historyPending && (!stats.snapshotRecordingEnabled || outsideLibrary))
-        Padding(
-          padding: const EdgeInsets.only(top: 14),
-          child: _ContentLoading(
-            label: _listeningHistoryLoadingLabel(context),
-            minHeight: 80,
-          ),
-        )
-      else if (!historyPending)
-        _PlayingRecentHistory(
-          outsideLibraryIds: {for (final play in outsideLibraryPlays) play.id},
-        ),
+      _PlayingRecentHistory(
+        outsideLibraryIds: {for (final play in outsideLibraryPlays) play.id},
+        historyPending: historyPending,
+      ),
     ]);
   }
 }
@@ -130,18 +122,25 @@ class _NowPlayingSection extends ConsumerWidget {
 // The recent-history projection can merge a large native library. Subscribe
 // only when the sliver reaches this panel, rather than while building the hero.
 class _PlayingRecentHistory extends ConsumerWidget {
-  const _PlayingRecentHistory({required this.outsideLibraryIds});
+  const _PlayingRecentHistory({
+    required this.outsideLibraryIds,
+    required this.historyPending,
+  });
   final Set<String> outsideLibraryIds;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tracks = ref.watch(recentListeningTracksProvider);
-    if (tracks.isEmpty) return const SizedBox.shrink();
+    final tracks = historyPending
+        ? const <LibraryTrack>[]
+        : ref.watch(recentListeningTracksProvider);
+    if (!historyPending && tracks.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 14),
       child: _RecentTracksPanel(
         tracks: tracks,
         outsideLibraryIds: outsideLibraryIds,
+        loading: historyPending,
       ),
     );
   }
@@ -274,16 +273,7 @@ class _NowPlayingLyricsPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           if (isLoadingLyrics && !lyricsAsync.hasValue)
-            _ContentLoading(
-              label: _t(
-                context,
-                'Loading lyrics',
-                '歌詞を読み込んでいます',
-                zh: '正在读取歌词',
-                ko: '가사를 읽고 있습니다',
-              ),
-              minHeight: 52,
-            )
+            const _LyricsSkeleton()
           else if (lyrics == null || lyrics.isEmpty)
             _TrackContextEmptyText(
               text: _t(
@@ -296,6 +286,45 @@ class _NowPlayingLyricsPanel extends ConsumerWidget {
             )
           else
             _CollapsibleLyricsText(lyrics: lyrics),
+        ],
+      ),
+    );
+  }
+}
+
+class _LyricsSkeleton extends StatelessWidget {
+  const _LyricsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return _LoadingSkeleton(
+      label: _t(
+        context,
+        'Loading lyrics',
+        '歌詞を読み込んでいます',
+        zh: '正在读取歌词',
+        ko: '가사를 읽고 있습니다',
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FractionallySizedBox(
+            widthFactor: 0.72,
+            alignment: AlignmentDirectional.centerStart,
+            child: _SkeletonBlock(height: 10),
+          ),
+          SizedBox(height: 11),
+          FractionallySizedBox(
+            widthFactor: 0.86,
+            alignment: AlignmentDirectional.centerStart,
+            child: _SkeletonBlock(height: 10),
+          ),
+          SizedBox(height: 11),
+          FractionallySizedBox(
+            widthFactor: 0.51,
+            alignment: AlignmentDirectional.centerStart,
+            child: _SkeletonBlock(height: 10),
+          ),
         ],
       ),
     );
@@ -394,7 +423,7 @@ class _HeroTrackPanel extends ConsumerWidget {
                           artwork.isLoading &&
                               !artwork.hasValue &&
                               track.artworkAsset == null
-                          ? _ContentLoading(
+                          ? _LoadingSkeleton(
                               label: _t(
                                 context,
                                 'Loading artwork',
@@ -402,8 +431,10 @@ class _HeroTrackPanel extends ConsumerWidget {
                                 zh: '正在读取封面',
                                 ko: '앨범 표지를 읽고 있습니다',
                               ),
-                              minHeight: artworkSize,
-                              showLabel: false,
+                              child: _SkeletonBlock(
+                                height: artworkSize,
+                                radius: 12,
+                              ),
                             )
                           : _TrackArtworkImage(
                               key: ValueKey(track.id),
@@ -893,9 +924,30 @@ class _TrendPanelState extends State<_TrendPanel> {
           ),
           const SizedBox(height: 18),
           if (loading)
-            _ContentLoading(
+            _LoadingSkeleton(
               label: _listeningHistoryLoadingLabel(context),
-              minHeight: _trendChartHeight(context),
+              child: SizedBox(
+                height: _trendChartHeight(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Spacer(),
+                    const _SkeletonBlock(height: 1, radius: 0),
+                    const Spacer(),
+                    const _SkeletonBlock(height: 1, radius: 0),
+                    const Spacer(),
+                    const _SkeletonBlock(height: 1, radius: 0),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        for (var i = 0; i < 6; i++)
+                          const _SkeletonBlock(width: 1, height: 5, radius: 0),
+                      ],
+                    ),
+                    const SizedBox(height: 13),
+                  ],
+                ),
+              ),
             )
           else
             _TrendBars(
@@ -1096,11 +1148,13 @@ void _showTrackTrendInfoSheet(BuildContext context) {
 class _RecentTracksPanel extends ConsumerStatefulWidget {
   const _RecentTracksPanel({
     required this.tracks,
-    this.outsideLibraryIds = const {},
+    required this.outsideLibraryIds,
+    required this.loading,
   });
 
   final List<LibraryTrack> tracks;
   final Set<String> outsideLibraryIds;
+  final bool loading;
 
   @override
   ConsumerState<_RecentTracksPanel> createState() => _RecentTracksPanelState();
@@ -1169,12 +1223,18 @@ class _RecentTracksPanelState extends ConsumerState<_RecentTracksPanel> {
             ],
           ),
           const SizedBox(height: 10),
-          ...visibleTracks.map(
-            (track) => _RecentTrackRow(
-              track: track,
-              outsideLibrary: widget.outsideLibraryIds.contains(track.id),
+          if (widget.loading)
+            _LoadingSkeleton(
+              label: _listeningHistoryLoadingLabel(context),
+              child: const _SkeletonRows(count: _initialVisibleCount),
+            )
+          else
+            ...visibleTracks.map(
+              (track) => _RecentTrackRow(
+                track: track,
+                outsideLibrary: widget.outsideLibraryIds.contains(track.id),
+              ),
             ),
-          ),
           if (visibleTracks.length < widget.tracks.length) ...[
             const SizedBox(height: 8),
             _LoadMoreButton(
@@ -2735,16 +2795,7 @@ class _TrackLibraryContextPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           if (isLoadingLyrics && !lyricsAsync.hasValue)
-            _ContentLoading(
-              label: _t(
-                context,
-                'Loading lyrics',
-                '歌詞を読み込んでいます',
-                zh: '正在读取歌词',
-                ko: '가사를 읽고 있습니다',
-              ),
-              minHeight: 52,
-            )
+            const _LyricsSkeleton()
           else if (lyrics == null || lyrics.isEmpty)
             _TrackContextEmptyText(
               text: _t(

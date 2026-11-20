@@ -1,9 +1,10 @@
 part of '../home_screen.dart';
 
 class _ExportSetting extends StatelessWidget {
-  const _ExportSetting({required this.stats});
+  const _ExportSetting({required this.stats, required this.historyPending});
 
   final MusicStatsState stats;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +21,9 @@ class _ExportSetting extends StatelessWidget {
           icon: Icons.calendar_month_outlined,
           label: _t(context, 'Listening records', '聴取記録'),
           value: _dayCountLabel(context, stats.snapshotHistory.snapshotCount),
+          valuePlaceholder: historyPending
+              ? const _PendingHistoryValue()
+              : null,
         ),
         const SizedBox(height: 8),
         Text(
@@ -46,8 +50,13 @@ class _ExportSetting extends StatelessWidget {
               label: Text(_t(context, 'Save CSV', 'CSVを保存')),
             ),
             OutlinedButton.icon(
-              onPressed: () =>
-                  _saveLibraryExport(context, stats, LibraryExportFormat.json),
+              onPressed: historyPending
+                  ? null
+                  : () => _saveLibraryExport(
+                      context,
+                      stats,
+                      LibraryExportFormat.json,
+                    ),
               icon: const Icon(Icons.data_object_rounded),
               label: Text(_t(context, 'Save JSON', 'JSONを保存')),
             ),

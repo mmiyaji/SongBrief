@@ -115,12 +115,14 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
     required this.history,
     required this.snapshotRecordingEnabled,
     this.includeCalendar = true,
+    this.historyPending = false,
   });
 
   final LibraryOverview overview;
   final SnapshotHistory history;
   final bool snapshotRecordingEnabled;
   final bool includeCalendar;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context) {
@@ -145,12 +147,14 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
                     '現在のライブラリから発売年ごとの集中度を表示',
                   ),
             trailing: IconButton.filledTonal(
-              onPressed: () => _showListeningMapsDetailSheet(
-                context,
-                overview: overview,
-                history: history,
-                snapshotRecordingEnabled: snapshotRecordingEnabled,
-              ),
+              onPressed: historyPending && snapshotRecordingEnabled
+                  ? null
+                  : () => _showListeningMapsDetailSheet(
+                      context,
+                      overview: overview,
+                      history: history,
+                      snapshotRecordingEnabled: snapshotRecordingEnabled,
+                    ),
               icon: const Icon(Icons.open_in_full_rounded),
               tooltip: _t(context, 'Expand listening maps', 'リスニングマップを拡大'),
             ),
@@ -162,6 +166,7 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
               final heatmapCard = _ActivityHeatmapCard(
                 overview: overview,
                 history: history,
+                historyPending: historyPending,
               );
 
               if (!snapshotRecordingEnabled || !includeCalendar) {
@@ -902,6 +907,7 @@ class _ActivityHeatmapCard extends ConsumerStatefulWidget {
     this.initialDay,
     this.initialMonth,
     this.initialMode = _ActivityCalendarMode.song,
+    this.historyPending = false,
   });
 
   final LibraryOverview overview;
@@ -910,6 +916,7 @@ class _ActivityHeatmapCard extends ConsumerStatefulWidget {
   final _ActivityHeatmapDay? initialDay;
   final DateTime? initialMonth;
   final _ActivityCalendarMode initialMode;
+  final bool historyPending;
 
   @override
   ConsumerState<_ActivityHeatmapCard> createState() =>
@@ -946,11 +953,25 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = ref.watch(_calendarHistoryReadyProvider(widget.history));
+    final title = _t(
+      context,
+      'Listening calendar',
+      'リスニングカレンダー',
+      zh: '收听日历',
+      ko: '청취 달력',
+    );
+    final ready = widget.historyPending
+        ? const AsyncLoading<void>()
+        : ref.watch(_calendarHistoryReadyProvider(widget.history));
     if (ready.isLoading) {
-      return _ContentLoading(
-        label: _listeningHistoryLoadingLabel(context),
-        minHeight: 320,
+      return _OverviewAnalysisCard(
+        icon: Icons.grid_on_rounded,
+        title: title,
+        subtitle: '',
+        child: _LoadingSkeleton(
+          label: _listeningHistoryLoadingLabel(context),
+          child: const _CalendarSkeleton(),
+        ),
       );
     }
     if (ready.hasError) {
@@ -1045,13 +1066,7 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
 
     return _OverviewAnalysisCard(
       icon: Icons.grid_on_rounded,
-      title: _t(
-        context,
-        'Listening calendar',
-        'リスニングカレンダー',
-        zh: '收听日历',
-        ko: '청취 달력',
-      ),
+      title: title,
       subtitle: sourceLabel,
       trailing: widget.expanded
           ? null
@@ -1258,6 +1273,55 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
           );
         },
       ),
+    );
+  }
+}
+
+class _CalendarSkeleton extends StatelessWidget {
+  const _CalendarSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final first = DateTime(today.year, today.month);
+    final last = DateTime(today.year, today.month + 1, 0);
+    final weeks = ((first.weekday % 7 + last.day) / 7).ceil();
+    final calendar = Column(
+      children: [
+        const _SkeletonBlock(width: 110, height: 12),
+        const SizedBox(height: 16),
+        for (var week = 0; week < weeks; week++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                for (var day = 0; day < 7; day++)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: AspectRatio(
+                        aspectRatio: 1.2,
+                        child: _SkeletonBlock(height: 0, radius: 6),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+    const details = _SkeletonRows(count: 2);
+    return LayoutBuilder(
+      builder: (context, constraints) => constraints.maxWidth >= 640
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: calendar),
+                const SizedBox(width: 16),
+                const Expanded(flex: 2, child: details),
+              ],
+            )
+          : Column(children: [calendar, const SizedBox(height: 12), details]),
     );
   }
 }
