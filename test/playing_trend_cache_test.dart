@@ -76,10 +76,9 @@ void main() {
       final initialReads = counters.reads;
       expect(initialReads, greaterThan(0));
 
-      final selector = tester.widget<SegmentedButton<TrendRange>>(
-        find.byType(SegmentedButton<TrendRange>),
-      );
-      selector.onSelectionChanged!({TrendRange.year});
+      final yearTab = find.byKey(const ValueKey(TrendRange.year));
+      await tester.ensureVisible(yearTab);
+      await tester.tap(yearTab);
       await tester.pumpAndSettle();
       expect(counters.reads, initialReads);
 

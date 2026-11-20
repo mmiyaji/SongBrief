@@ -32,11 +32,8 @@ class _RankingPanel extends ConsumerWidget {
       visibleCount,
     );
 
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 26,
-      tint: const Color(0x62FFFFFF),
-      borderOpacity: 0.58,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

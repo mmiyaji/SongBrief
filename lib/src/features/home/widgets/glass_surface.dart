@@ -10,7 +10,18 @@ class GlassSurface extends StatelessWidget {
     this.borderOpacity = 0.5,
     this.shadowOpacity = 0.05,
     super.key,
-  });
+  }) : section = false;
+
+  /// A grouping on the page itself. Overlays can still use a raised surface.
+  const GlassSurface.section({
+    required this.child,
+    this.padding = const EdgeInsets.symmetric(vertical: 16),
+    super.key,
+  }) : section = true,
+       radius = 0,
+       tint = Colors.transparent,
+       borderOpacity = 0,
+       shadowOpacity = 0;
 
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -18,11 +29,25 @@ class GlassSurface extends StatelessWidget {
   final Color tint;
   final double borderOpacity;
   final double shadowOpacity;
+  final bool section;
 
   @override
   Widget build(BuildContext context) {
     final borderRadius = BorderRadius.circular(radius);
     final theme = Theme.of(context);
+    if (section) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Padding(padding: padding, child: child),
+        ),
+      );
+    }
     final surfaceColor = _surfaceColor(theme);
     return DecoratedBox(
       decoration: BoxDecoration(

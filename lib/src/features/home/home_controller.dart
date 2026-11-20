@@ -421,6 +421,19 @@ class LibraryLoadProgressController extends Notifier<LibraryLoadProgress?> {
   }
 }
 
+/// A preview for Playing while the main stats provider still awaits history.
+final startupOverviewProvider =
+    NotifierProvider<StartupOverviewController, MusicStatsState?>(
+      StartupOverviewController.new,
+    );
+
+class StartupOverviewController extends Notifier<MusicStatsState?> {
+  @override
+  MusicStatsState? build() => null;
+
+  void publish(MusicStatsState? overview) => state = overview;
+}
+
 class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   Future<void>? _refreshInFlight;
   Future<void> _snapshotHistoryOperationTail = Future<void>.value();
@@ -434,16 +447,36 @@ class MusicStatsController extends AsyncNotifier<MusicStatsState> {
   Future<MusicStatsState> build() async {
     final loadingPreviewDelay = _startupLoadingPreviewDelay();
     ref.watch(musicStatsRepositoryProvider);
+    var disposed = false;
+    ref.onDispose(() => disposed = true);
     await ref.watch(musicDataPreferencesReadyProvider.future);
     _reportLoadProgress(null);
-    final next = await _runSnapshotHistoryOperation(
-      () => ref
-          .read(musicStatsRepositoryProvider)
-          .load(onProgress: _reportLoadProgress),
-    );
+    final startupOverview = ref.read(startupOverviewProvider.notifier);
+    startupOverview.publish(null);
+    final next = await _runSnapshotHistoryOperation(() async {
+      try {
+        return await ref
+            .read(musicStatsRepositoryProvider)
+            .load(
+          onProgress: (progress) {
+            if (!disposed) _reportLoadProgress(progress);
+          },
+              onOverviewReady: loadingPreviewDelay > Duration.zero
+                  ? null
+                  : (overview) {
+                      if (!disposed && overview.overview.hasTracks) {
+                        startupOverview.publish(overview);
+                      }
+                    },
+            );
+      } finally {
+        if (!disposed) startupOverview.publish(null);
+      }
+    });
     if (loadingPreviewDelay > Duration.zero) {
       await _previewLoadProgress(loadingPreviewDelay);
     }
+    if (disposed) return next;
     if (!next.overview.isDemo) {
       unawaited(HomeWidgetBridge.update(next.snapshotHistory));
       unawaited(syncCloudSnapshots());

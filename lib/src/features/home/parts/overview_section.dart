@@ -7,8 +7,6 @@ class _OverviewSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final syncState = ref.watch(listeningHistorySyncStateProvider);
-    final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: _overviewPanelItems(
@@ -16,8 +14,6 @@ class _OverviewSection extends ConsumerWidget {
         stats: stats,
         countedOverview: ref.watch(countedListeningOverviewProvider),
         supplementalTracks: ref.watch(countedOutsideTracksProvider),
-        syncState: syncState,
-        cloudSyncEnabled: cloudSyncEnabled,
       ),
     );
   }
@@ -36,15 +32,11 @@ class _OverviewSliverSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final syncState = ref.watch(listeningHistorySyncStateProvider);
-    final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
     final items = _overviewPanelItems(
       context,
       stats: stats,
       countedOverview: ref.watch(countedListeningOverviewProvider),
       supplementalTracks: ref.watch(countedOutsideTracksProvider),
-      syncState: syncState,
-      cloudSyncEnabled: cloudSyncEnabled,
     );
 
     return SliverPadding(
@@ -67,8 +59,6 @@ List<Widget> _overviewPanelItems(
   required MusicStatsState stats,
   required LibraryOverview countedOverview,
   required List<LibraryTrack> supplementalTracks,
-  required SnapshotSyncState syncState,
-  required bool cloudSyncEnabled,
 }) {
   final overview = stats.overview;
   final items = <Widget>[];
@@ -107,14 +97,6 @@ List<Widget> _overviewPanelItems(
         history: stats.snapshotHistory,
         overview: overview,
         isDemo: overview.isDemo,
-        syncState: syncState,
-        cloudSyncEnabled: cloudSyncEnabled,
-        onSync: overview.isDemo || syncState.isSyncing
-            ? null
-            : () =>
-                  ProviderScope.containerOf(context)
-                      .read(musicStatsControllerProvider.notifier)
-                      .syncCloudSnapshots(),
       ),
     );
   }
@@ -134,12 +116,8 @@ List<Widget> _overviewPanelItems(
   );
   if (stats.snapshotRecordingEnabled) {
     add(
-      GlassSurface(
+      GlassSurface.section(
         padding: const EdgeInsets.all(18),
-        radius: 24,
-        tint: const Color(0x4FFFFFFF),
-        borderOpacity: 0.34,
-        shadowOpacity: 0.045,
         child: _ActivityHeatmapCard(
           overview: overview,
           history: stats.snapshotHistory,
@@ -199,12 +177,8 @@ class _OverviewPanel extends StatelessWidget {
         ? 0.0
         : nativeOverview.totalSkipCount / nativeOverview.totalPlayCount * 100;
 
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(20),
-      radius: 26,
-      tint: const Color(0x6BFFFFFF),
-      borderOpacity: 0.62,
-      shadowOpacity: 0.07,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final signalTiles = _OverviewSignals(
@@ -456,20 +430,9 @@ class _SignalTile extends StatelessWidget {
     return DecoratedBox(
       key: ValueKey('overview-signal-$label'),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.78,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.22),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -503,34 +466,34 @@ class _SnapshotStatusPanel extends ConsumerWidget {
     required this.history,
     required this.overview,
     required this.isDemo,
-    required this.syncState,
-    required this.cloudSyncEnabled,
-    required this.onSync,
   });
 
   final SnapshotHistory history;
   final LibraryOverview overview;
   final bool isDemo;
-  final SnapshotSyncState syncState;
-  final bool cloudSyncEnabled;
-  final VoidCallback? onSync;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final syncState = ref.watch(listeningHistorySyncStateProvider);
+    final cloudSyncEnabled = ref.watch(snapshotCloudSyncProvider);
+    final onSync = isDemo || syncState.isSyncing
+        ? null
+        : () => ref
+              .read(musicStatsControllerProvider.notifier)
+              .syncCloudSnapshots();
     final theme = Theme.of(context);
     final number = _numberFormat(context);
     final latest = history.latest;
-    final delta = history.latestDelta;
+    final previous = history.previous;
+    final delta = previous == null || latest == null
+        ? null
+        : listeningActivityDelta(previous: previous, current: latest);
 
     if (latest == null) {
       final hasDatedHistory =
           !isDemo && ref.watch(countedSupplementalEventsProvider).isNotEmpty;
-      return GlassSurface(
+      return GlassSurface.section(
         padding: const EdgeInsets.all(18),
-        radius: 24,
-        tint: const Color(0x54FFFFFF),
-        borderOpacity: 0.38,
-        shadowOpacity: 0.05,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -588,12 +551,8 @@ class _SnapshotStatusPanel extends ConsumerWidget {
         delta?.trackDeltas.take(3).toList(growable: false) ??
         const <TrackCounterDelta>[];
 
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x54FFFFFF),
-      borderOpacity: 0.38,
-      shadowOpacity: 0.05,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -894,20 +853,9 @@ class _SnapshotMetric extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.78,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.22),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.14),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1390,11 +1338,8 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final radius = BorderRadius.circular(18);
-    final content = GlassSurface(
+    final content = GlassSurface.section(
       padding: const EdgeInsets.all(12),
-      radius: 18,
-      tint: const Color(0x55FFFFFF),
-      shadowOpacity: 0.035,
       child: LayoutBuilder(
         builder: (context, constraints) {
           // Two-column phone cards are too narrow for labels such as

@@ -421,6 +421,7 @@ class _FakeMusicStatsRepository extends MusicStatsRepository {
   Future<MusicStatsState> load({
     bool requestAccess = false,
     LibraryLoadProgressCallback? onProgress,
+    void Function(MusicStatsState state)? onOverviewReady,
   }) async {
     loadCalls += 1;
     return MusicStatsState(

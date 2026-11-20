@@ -59,7 +59,7 @@ class ThemeStyleController extends Notifier<SongBriefThemeStyle> {
   @override
   SongBriefThemeStyle build() {
     _restore();
-    return SongBriefThemeStyle.prism;
+    return SongBriefThemeStyle.mono;
   }
 
   void setStyle(SongBriefThemeStyle style) {
@@ -154,6 +154,9 @@ ThemeData buildSongBriefTheme({
       ColorScheme.fromSeed(
         seedColor: tokens.primary,
         brightness: brightness,
+        dynamicSchemeVariant: style == SongBriefThemeStyle.mono
+            ? DynamicSchemeVariant.monochrome
+            : DynamicSchemeVariant.tonalSpot,
       ).copyWith(
         surface: tokens.surface,
         surfaceContainerHighest: tokens.surfaceHigh,
@@ -282,15 +285,15 @@ class _ThemeTokens {
           outline: Color(0xFFE2CCD4),
         ),
         SongBriefThemeStyle.mono => const _ThemeTokens(
-          surface: Color(0xFFFAFAFA),
-          surfaceHigh: Color(0xFFEDEDED),
-          primary: Color(0xFF171717),
+          surface: Color(0xFFF6F6F3),
+          surfaceHigh: Color(0xFFE9EAE6),
+          primary: Color(0xFF242523),
           onPrimary: Color(0xFFFFFFFF),
-          secondary: Color(0xFF246487),
-          tertiary: Color(0xFF4D6F00),
-          onSurface: Color(0xFF121212),
-          onSurfaceVariant: Color(0xFF606060),
-          outline: Color(0xFFD4D4D4),
+          secondary: Color(0xFF525850),
+          tertiary: Color(0xFF646B62),
+          onSurface: Color(0xFF242523),
+          onSurfaceVariant: Color(0xFF5F645D),
+          outline: Color(0xFFD4D7D1),
         ),
         SongBriefThemeStyle.aurora => const _ThemeTokens(
           surface: Color(0xFFFCF7FD),
@@ -374,15 +377,15 @@ class _ThemeTokens {
         outline: Color(0xFF34323A),
       ),
       SongBriefThemeStyle.mono => const _ThemeTokens(
-        surface: Color(0xFF050505),
-        surfaceHigh: Color(0xFF1A1A1A),
-        primary: Color(0xFFEDEDED),
-        onPrimary: Color(0xFF080808),
-        secondary: Color(0xFF9FD8FF),
-        tertiary: Color(0xFFC4FF8C),
-        onSurface: Color(0xFFF7F7F7),
-        onSurfaceVariant: Color(0xFFA6A6A6),
-        outline: Color(0xFF303030),
+        surface: Color(0xFF191B1A),
+        surfaceHigh: Color(0xFF30332F),
+        primary: Color(0xFFE9E9E0),
+        onPrimary: Color(0xFF191B1A),
+        secondary: Color(0xFFC3C7BF),
+        tertiary: Color(0xFFA2AAA0),
+        onSurface: Color(0xFFF1F1EB),
+        onSurfaceVariant: Color(0xFFB9BDB7),
+        outline: Color(0xFF454945),
       ),
       SongBriefThemeStyle.aurora => const _ThemeTokens(
         surface: Color(0xFF08050A),

@@ -26,12 +26,8 @@ class _RecapHighlightsPanel extends StatelessWidget {
     final milestones = _milestoneForecasts(context, overview, history);
     final burnout = _burnoutSummary(context, overview, history);
 
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x4FFFFFFF),
-      borderOpacity: 0.34,
-      shadowOpacity: 0.045,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -74,12 +70,8 @@ class _TasteAndCollectionPanel extends ConsumerWidget {
     final diversity = _diversityScore(overview);
     final albums = _albumCompletionValues(context, overview);
 
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x4FFFFFFF),
-      borderOpacity: 0.34,
-      shadowOpacity: 0.045,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

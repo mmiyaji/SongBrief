@@ -14,6 +14,7 @@ import 'package:songbrief/src/features/home/home_controller.dart';
 import 'package:songbrief/src/features/home/recent_listening_provider.dart';
 import 'package:songbrief/src/settings/app_preferences.dart';
 import 'package:songbrief/src/settings/library_filter_preferences.dart';
+import 'package:songbrief/src/settings/music_data_preferences_storage.dart';
 import 'package:songbrief/src/settings/snapshot_preferences.dart';
 
 void main() {
@@ -482,6 +483,9 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
+        musicDataPreferencesFallbackProvider.overrideWithValue(
+          Future.value(null),
+        ),
         appLanguageProvider.overrideWith(
           () => _FixedLanguageController(AppLanguage.english),
         ),
@@ -518,6 +522,9 @@ void main() {
       container
           .read(homeSectionProvider.notifier)
           .setSection(HomeSection.library);
+      await tester.runAsync(
+        () => container.read(libraryTabOverviewProvider.future),
+      );
       await tester.pumpAndSettle();
       expect(find.text('iPad Library Track 0'), findsAtLeastNWidgets(1));
 
@@ -850,10 +857,10 @@ void main() {
     await _pumpApp(tester, AppLanguage.english, statsState: stats);
     await tester.pumpAndSettle();
 
-    final selector = tester.widget<SegmentedButton<TrendRange>>(
-      find.byType(SegmentedButton<TrendRange>),
+    final tab = tester.widget<Semantics>(
+      find.byKey(const ValueKey(TrendRange.month)),
     );
-    expect(selector.selected, {TrendRange.month});
+    expect(tab.properties.selected, isTrue);
   });
 
   testWidgets('shows a useful empty trend beyond the last year', (
@@ -867,17 +874,17 @@ void main() {
     await _pumpApp(tester, AppLanguage.english, statsState: stats);
     await tester.pumpAndSettle();
 
-    final selector = tester.widget<SegmentedButton<TrendRange>>(
-      find.byType(SegmentedButton<TrendRange>),
+    final tab = tester.widget<Semantics>(
+      find.byKey(const ValueKey(TrendRange.year)),
     );
-    expect(selector.selected, {TrendRange.year});
+    expect(tab.properties.selected, isTrue);
     expect(
       find.text('This song has not been played in the last year.'),
       findsOneWidget,
     );
   });
 
-  testWidgets('shows the actual play-count rank on the hero artwork', (
+  testWidgets('shows the actual play-count rank in the track header', (
     tester,
   ) async {
     final now = DateTime.now();

@@ -9,6 +9,7 @@ import 'package:songbrief/src/domain/library_load_progress.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
 import 'package:songbrief/src/domain/library_track.dart';
 import 'package:songbrief/src/domain/music_library_authorization.dart';
+import 'package:songbrief/src/domain/music_stats_state.dart';
 import 'package:songbrief/src/settings/demo_library_preferences.dart';
 import 'package:songbrief/src/settings/snapshot_preferences.dart';
 
@@ -433,10 +434,87 @@ void main() {
         LibraryLoadStage.loadingHistory,
       ]);
       expect(reported.map((progress) => progress.step), [1, 2, 3, 4]);
-      expect(reported.every((progress) => progress.totalSteps == 4), isTrue);
+      expect(reported.map((progress) => progress.totalSteps), [0, 4, 4, 4]);
       expect(reported[1].trackCount, isNull);
       expect(reported[2].trackCount, 1);
       expect(reported.last.completedFraction, 0.75);
+    });
+
+    test(
+      'denied demo load reports authorization and demo preparation',
+      () async {
+        final client = _CloudSyncSpyClient()
+          ..authorizationStatusValue = MusicLibraryAuthorizationStatus.denied;
+        final reported = <LibraryLoadProgress>[];
+
+        await repository(
+          client,
+          temporaryDemoLibraryEnabled: true,
+        ).load(onProgress: reported.add);
+
+        expect(reported.map((progress) => progress.stage), [
+          LibraryLoadStage.checkingAccess,
+          LibraryLoadStage.buildingOverview,
+        ]);
+        expect(reported.last.step, 2);
+        expect(reported.last.totalSteps, 2);
+      },
+    );
+
+    test('empty demo load excludes snapshot and history stages', () async {
+      final reported = <LibraryLoadProgress>[];
+
+      await repository(
+        _CloudSyncSpyClient(),
+        temporaryDemoLibraryEnabled: true,
+      ).load(onProgress: reported.add);
+
+      expect(reported.map((progress) => progress.stage), [
+        LibraryLoadStage.checkingAccess,
+        LibraryLoadStage.fetchingTracks,
+        LibraryLoadStage.buildingOverview,
+      ]);
+      expect(reported.last.totalSteps, 3);
+      expect(reported.last.completedFraction, closeTo(2 / 3, 0.001));
+    });
+
+    test('publishes overview with provisional state before history', () async {
+      final client = _CloudSyncSpyClient()
+        ..tracks = [
+          LibraryTrack(
+            id: 'early-track',
+            title: 'Early Track',
+            artist: 'Artist',
+            albumTitle: 'Album',
+            duration: const Duration(minutes: 3),
+            playCount: 2,
+            skipCount: 0,
+            isCloudItem: false,
+          ),
+        ];
+      MusicStatsState? earlyState;
+      var historyStarted = false;
+
+      final finalState = await repository(
+        client,
+        recordingEnabled: false,
+      ).load(
+        onOverviewReady: (state) {
+          expect(historyStarted, isFalse);
+          earlyState = state;
+        },
+        onProgress: (progress) {
+          if (progress.stage == LibraryLoadStage.loadingHistory) {
+            historyStarted = true;
+          }
+        },
+      );
+
+      expect(historyStarted, isTrue);
+      expect(earlyState?.overview.totalTracks, 1);
+      expect(earlyState?.overview.latestTrack?.title, 'Early Track');
+      expect(earlyState?.snapshotHistory.snapshotCount, 0);
+      expect(finalState.snapshotHistory.snapshotCount, 0);
     });
 
     test('shows temporary demo data when music access is denied', () async {

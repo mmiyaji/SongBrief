@@ -1,10 +1,15 @@
 part of '../home_screen.dart';
 
 class _NowPlayingSection extends ConsumerWidget {
-  const _NowPlayingSection({required this.stats, this.asSliver = false});
+  const _NowPlayingSection({
+    required this.stats,
+    this.asSliver = false,
+    this.historyPending = false,
+  });
 
   final MusicStatsState stats;
   final bool asSliver;
+  final bool historyPending;
 
   Widget _panels(List<Widget> children) {
     if (!asSliver) {
@@ -96,7 +101,10 @@ class _NowPlayingSection extends ConsumerWidget {
         const SizedBox(height: 8),
       ],
       _HeroTrackPanel(track: track, artwork: artwork, playRank: playRank),
-      if (stats.snapshotRecordingEnabled && !outsideLibrary) ...[
+      if (historyPending) ...[
+        const SizedBox(height: 14),
+        const _LoadingProgressDetails(),
+      ] else if (stats.snapshotRecordingEnabled && !outsideLibrary) ...[
         const SizedBox(height: 14),
         _TrendPanel(
           track: track,
@@ -106,9 +114,10 @@ class _NowPlayingSection extends ConsumerWidget {
       ],
       const SizedBox(height: 14),
       _NowPlayingLyricsPanel(track: track),
-      _PlayingRecentHistory(
-        outsideLibraryIds: {for (final play in outsideLibraryPlays) play.id},
-      ),
+      if (!historyPending)
+        _PlayingRecentHistory(
+          outsideLibraryIds: {for (final play in outsideLibraryPlays) play.id},
+        ),
     ]);
   }
 }
@@ -269,12 +278,8 @@ class _NowPlayingLyricsPanel extends ConsumerWidget {
     final lyrics = lyricsAsync.asData?.value?.trim();
     final isLoadingLyrics = lyricsAsync.isLoading;
 
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x22FFFFFF),
-      borderOpacity: 0.12,
-      shadowOpacity: 0.08,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -321,549 +326,144 @@ class _HeroTrackPanel extends ConsumerWidget {
     final busy = playback.isBusy;
     final isActive = playback.isTrackActive(track.id, track: track);
     final isPlaying = playback.isTrackPlaying(track.id, track: track);
-    final number = _numberFormat(context);
-
-    return GlassSurface(
-      padding: EdgeInsets.zero,
-      radius: 30,
-      tint: const Color(0x24FFFFFF),
-      borderOpacity: 0.14,
-      shadowOpacity: 0.2,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: Column(
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth >= 560) {
-                  return _HeroTrackWideHeader(
-                    track: track,
-                    artwork: artwork,
-                    number: number,
-                    busy: busy,
-                    isActive: isActive,
-                    isPlaying: isPlaying,
-                    playRank: playRank,
-                    onTogglePlayback: () {
-                      ref
-                          .read(playbackControllerProvider.notifier)
-                          .toggleTrack(track.id);
-                    },
-                    onRestartPlayback: () {
-                      ref
-                          .read(playbackControllerProvider.notifier)
-                          .restartTrack(track.id);
-                    },
-                    onPrevious: () => ref
-                        .read(playbackControllerProvider.notifier)
-                        .skipToPrevious(),
-                    onNext: () => ref
-                        .read(playbackControllerProvider.notifier)
-                        .skipToNext(),
-                  );
-                }
-
-                return AspectRatio(
-                  aspectRatio: 1.05,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _TrackArtworkImage(track: track, artwork: artwork),
-                      const _HeroImageShade(),
-                      if (playRank != null)
-                        Positioned(
-                          left: 18,
-                          top: 18,
-                          child: _HeroBadge(
-                            label: _playRankBadgeLabel(context, playRank!),
-                          ),
-                        ),
-                      Positioned(
-                        right: 18,
-                        top: 18,
-                        child: _ArtworkTransportControls(
-                          isPlaying: isPlaying,
-                          busy: busy,
-                          onPrevious: () => ref
-                              .read(playbackControllerProvider.notifier)
-                              .skipToPrevious(),
-                          onToggle: () => ref
-                              .read(playbackControllerProvider.notifier)
-                              .toggleTrack(track.id),
-                          onNext: () => ref
-                              .read(playbackControllerProvider.notifier)
-                              .skipToNext(),
-                        ),
-                      ),
-                      Positioned(
-                        left: 20,
-                        right: 20,
-                        bottom: 22,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    track.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.headlineLarge
-                                        ?.copyWith(
-                                          fontSize: 42,
-                                          height: 1,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    track.artist,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.78,
-                                      ),
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  if (isActive) ...[
-                                    const SizedBox(height: 10),
-                                    _PlaybackStatusChip(
-                                      isPlaying: isPlaying,
-                                      onDark: true,
-                                    ),
-                                  ],
-                                  const SizedBox(height: 10),
-                                  _OpenInAppleMusicButton(
-                                    track: track,
-                                    onDark: true,
-                                  ),
-                                  _SearchWebButton(
-                                    query: _trackWebSearchQuery(track),
-                                    subject: track.title,
-                                    onDark: true,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            _HeroPlayCountOverlay(
-                              value: number.format(track.playCount),
-                              label: _t(context, 'Plays', '再生回数'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            _HeroStatStrip(track: track),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroTrackWideHeader extends StatelessWidget {
-  const _HeroTrackWideHeader({
-    required this.track,
-    required this.artwork,
-    required this.number,
-    required this.busy,
-    required this.isActive,
-    required this.isPlaying,
-    required this.playRank,
-    required this.onTogglePlayback,
-    required this.onRestartPlayback,
-    required this.onPrevious,
-    required this.onNext,
-  });
-
-  final LibraryTrack track;
-  final AsyncValue<Uint8List?> artwork;
-  final NumberFormat number;
-  final bool busy;
-  final bool isActive;
-  final bool isPlaying;
-  final int? playRank;
-  final VoidCallback onTogglePlayback;
-  final VoidCallback onRestartPlayback;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final controller = ref.read(playbackControllerProvider.notifier);
+    final color = theme.colorScheme;
     final albumArtist = track.albumArtist ?? track.artist;
-
-    return Padding(
-      padding: const EdgeInsets.all(18),
+    final controls = Wrap(
+      key: const ValueKey('hero-transport-controls'),
+      spacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        IconButton(
+          tooltip: _t(context, 'Previous', '前へ'),
+          onPressed: busy ? null : controller.skipToPrevious,
+          icon: const Icon(Icons.skip_previous_rounded),
+        ),
+        IconButton.filled(
+          style: IconButton.styleFrom(
+            backgroundColor: color.onSurface,
+            foregroundColor: color.surface,
+            minimumSize: const Size.square(48),
+          ),
+          tooltip: isPlaying
+              ? _t(context, 'Pause', '一時停止')
+              : _t(context, 'Play this track', 'この曲を再生'),
+          onPressed: busy ? null : () => controller.toggleTrack(track.id),
+          icon: Icon(
+            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+          ),
+        ),
+        IconButton(
+          tooltip: _t(context, 'Next', '次へ'),
+          onPressed: busy ? null : controller.skipToNext,
+          icon: const Icon(Icons.skip_next_rounded),
+        ),
+        IconButton(
+          tooltip: _playFromBeginningLabel(context),
+          onPressed: busy ? null : () => controller.restartTrack(track.id),
+          icon: const Icon(Icons.replay_rounded),
+        ),
+      ],
+    );
+    final links = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _OpenInAppleMusicButton(track: track),
+        _SearchWebButton(
+          query: _trackWebSearchQuery(track),
+          subject: track.title,
+        ),
+      ],
+    );
+    return Material(
+      type: MaterialType.transparency,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final artworkSize = (constraints.maxWidth * 0.42)
-              .clamp(210.0, 340.0)
-              .toDouble();
-
-          return Row(
+          final wide = constraints.maxWidth >= 560;
+          final artworkSize = wide
+              ? (constraints.maxWidth * 0.40).clamp(206.0, 314.0).toDouble()
+              : (constraints.maxWidth * 0.34).clamp(80.0, 128.0).toDouble();
+          final gap = wide ? 22.0 : 12.0;
+          final controlsBesideArt =
+              constraints.maxWidth - artworkSize - gap >= 198;
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox.square(
-                dimension: artworkSize,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _TrackArtworkImage(track: track, artwork: artwork),
-                      if (playRank != null)
-                        Positioned(
-                          left: 12,
-                          top: 12,
-                          child: _HeroBadge(
-                            label: _playRankBadgeLabel(context, playRank!),
-                          ),
-                        ),
-                    ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox.square(
+                    dimension: artworkSize,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: _TrackArtworkImage(track: track, artwork: artwork),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 22),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                  SizedBox(width: gap),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _TrackChip(
-                          icon: Icons.graphic_eq_rounded,
-                          label: _t(context, 'Recent play', '直近再生'),
-                        ),
-                        if (isActive) _PlaybackStatusChip(isPlaying: isPlaying),
-                        if (track.isCloudItem)
-                          _TrackChip(
-                            icon: Icons.cloud_rounded,
-                            label: _t(context, 'Cloud', 'クラウド'),
+                        Text(
+                          isActive
+                              ? (isPlaying
+                                    ? _t(context, 'Playing now', '再生中')
+                                    : _t(context, 'Paused', '一時停止中'))
+                              : _t(context, 'Recent play', '直近再生'),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: color.onSurfaceVariant,
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          track.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              (wide
+                                      ? theme.textTheme.headlineMedium
+                                      : theme.textTheme.titleLarge)
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(track.artist, style: theme.textTheme.titleSmall),
+                        Text(
+                          albumArtist == track.artist
+                              ? track.albumTitle
+                              : '$albumArtist - ${track.albumTitle}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: color.onSurfaceVariant,
+                          ),
+                        ),
+                        if (playRank != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _playRankBadgeLabel(context, playRank!),
+                            style: theme.textTheme.labelMedium,
+                          ),
+                        ],
+                        if (controlsBesideArt) ...[
+                          const SizedBox(height: 8),
+                          controls,
+                          links,
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      track.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontSize: 32,
-                        height: 1.02,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      track.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      albumArtist == track.artist
-                          ? track.albumTitle
-                          : '$albumArtist - ${track.albumTitle}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        _QuietTransportButton(
-                          icon: Icons.skip_previous_rounded,
-                          tooltip: _t(context, 'Previous', '前へ'),
-                          onPressed: busy ? null : onPrevious,
-                        ),
-                        const SizedBox(width: 6),
-                        IconButton.filled(
-                          style: IconButton.styleFrom(
-                            backgroundColor: theme.colorScheme.primary,
-                            foregroundColor: theme.colorScheme.onPrimary,
-                            minimumSize: const Size.square(54),
-                          ),
-                          onPressed: busy ? null : onTogglePlayback,
-                          tooltip: isPlaying
-                              ? _t(context, 'Pause', '一時停止')
-                              : _t(context, 'Play this track', 'この曲を再生'),
-                          icon: Icon(
-                            isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            size: 31,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        _QuietTransportButton(
-                          icon: Icons.skip_next_rounded,
-                          tooltip: _t(context, 'Next', '次へ'),
-                          onPressed: busy ? null : onNext,
-                        ),
-                        const SizedBox(width: 10),
-                        IconButton.filledTonal(
-                          onPressed: busy ? null : onRestartPlayback,
-                          tooltip: _playFromBeginningLabel(context),
-                          icon: const Icon(Icons.replay_rounded),
-                        ),
-                        const SizedBox(width: 14),
-                        Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  number.format(track.playCount),
-                                  style: theme.textTheme.headlineSmall
-                                      ?.copyWith(
-                                        color: theme.colorScheme.primary,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                ),
-                                _SmallMetricPill(
-                                  label: _t(context, 'Plays', '再生回数'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _OpenInAppleMusicButton(track: track),
-                    _SearchWebButton(
-                      query: _trackWebSearchQuery(track),
-                      subject: track.title,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+              if (!controlsBesideArt) ...[
+                const SizedBox(height: 8),
+                controls,
+                links,
+              ],
+              const SizedBox(height: 12),
+              _HeroStatStrip(track: track),
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _ArtworkTransportControls extends StatelessWidget {
-  const _ArtworkTransportControls({
-    required this.isPlaying,
-    required this.busy,
-    required this.onPrevious,
-    required this.onToggle,
-    required this.onNext,
-  });
-
-  final bool isPlaying;
-  final bool busy;
-  final VoidCallback onPrevious;
-  final VoidCallback onToggle;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      key: const ValueKey('hero-transport-controls'),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.58),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(3),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ArtworkTransportButton(
-              icon: Icons.skip_previous_rounded,
-              tooltip: _t(context, 'Previous', '前へ'),
-              onPressed: busy ? null : onPrevious,
-            ),
-            _ArtworkTransportButton(
-              icon: isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              tooltip: isPlaying
-                  ? _t(context, 'Pause', '一時停止')
-                  : _t(context, 'Play this track', 'この曲を再生'),
-              onPressed: busy ? null : onToggle,
-              emphasized: true,
-            ),
-            _ArtworkTransportButton(
-              icon: Icons.skip_next_rounded,
-              tooltip: _t(context, 'Next', '次へ'),
-              onPressed: busy ? null : onNext,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ArtworkTransportButton extends StatelessWidget {
-  const _ArtworkTransportButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-    this.emphasized = false,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onPressed;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    final size = emphasized ? 42.0 : 34.0;
-    return IconButton(
-      style: IconButton.styleFrom(
-        minimumSize: Size.square(size),
-        maximumSize: Size.square(size),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        backgroundColor: emphasized
-            ? Colors.white.withValues(alpha: 0.16)
-            : Colors.transparent,
-        foregroundColor: onPressed == null
-            ? Colors.white.withValues(alpha: 0.4)
-            : Colors.white,
-      ),
-      onPressed: onPressed,
-      tooltip: tooltip,
-      icon: Icon(icon, size: emphasized ? 24 : 20),
-    );
-  }
-}
-
-class _QuietTransportButton extends StatelessWidget {
-  const _QuietTransportButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return IconButton(
-      style: IconButton.styleFrom(
-        minimumSize: const Size.square(40),
-        maximumSize: const Size.square(40),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        foregroundColor: theme.colorScheme.onSurfaceVariant,
-        backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.58,
-        ),
-      ),
-      onPressed: onPressed,
-      tooltip: tooltip,
-      icon: Icon(icon, size: 21),
-    );
-  }
-}
-
-class _HeroPlayCountOverlay extends StatelessWidget {
-  const _HeroPlayCountOverlay({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.58),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: Colors.white.withValues(alpha: 0.88),
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroImageShade extends StatelessWidget {
-  const _HeroImageShade();
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(color: Colors.black.withValues(alpha: 0.34));
-  }
-}
-
-class _HeroBadge extends StatelessWidget {
-  const _HeroBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-        child: Text(
-          label,
-          style: theme.textTheme.titleSmall?.copyWith(
-            color: theme.colorScheme.onPrimary,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
       ),
     );
   }
@@ -880,67 +480,19 @@ String _playRankBadgeLabel(BuildContext context, int rank) {
   );
 }
 
-class _SmallMetricPill extends StatelessWidget {
-  const _SmallMetricPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final foreground = theme.colorScheme.primary;
-    final background = theme.colorScheme.primary.withValues(alpha: 0.1);
-    final border = foreground.withValues(alpha: 0.28);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        child: Text(
-          label,
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: foreground,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _PlaybackStatusChip extends StatelessWidget {
-  const _PlaybackStatusChip({required this.isPlaying, this.onDark = false});
+  const _PlaybackStatusChip({required this.isPlaying});
 
   final bool isPlaying;
-  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final activeColor = isPlaying
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
-    final darkColor = isPlaying
-        ? Colors.white
-        : Colors.white.withValues(alpha: 0.82);
-    final foreground = onDark ? darkColor : activeColor;
-
+    final foreground = theme.colorScheme.onSurfaceVariant;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: onDark
-            ? Colors.black.withValues(alpha: 0.56)
-            : theme.colorScheme.primary.withValues(
-                alpha: isPlaying ? 0.14 : 0.08,
-              ),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: onDark
-              ? Colors.white.withValues(alpha: 0.28)
-              : foreground.withValues(alpha: 0.28),
-        ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
@@ -979,21 +531,13 @@ class _HeroStatStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isLight = theme.colorScheme.brightness == Brightness.light;
     return Container(
       decoration: BoxDecoration(
-        color: isLight
-            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.84)
-            : Colors.black.withValues(alpha: 0.24),
         border: Border(
-          top: BorderSide(
-            color: isLight
-                ? theme.colorScheme.outlineVariant.withValues(alpha: 0.7)
-                : theme.colorScheme.primary.withValues(alpha: 0.32),
-          ),
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 15, 16, 18),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
           Expanded(
@@ -1001,7 +545,7 @@ class _HeroStatStrip extends ConsumerWidget {
               icon: Icons.play_arrow_rounded,
               label: _t(context, 'Plays', '再生回数'),
               value: _playCountLabel(context, track.playCount),
-              color: theme.colorScheme.primary,
+              color: theme.colorScheme.onSurface,
               onTap: () => _focusTrackInRanking(context, ref, track),
             ),
           ),
@@ -1011,7 +555,7 @@ class _HeroStatStrip extends ConsumerWidget {
               icon: Icons.fast_forward_rounded,
               label: _t(context, 'Skips', 'スキップ'),
               value: _skipCountLabel(context, track.skipCount),
-              color: theme.colorScheme.secondary,
+              color: theme.colorScheme.onSurface,
               onTap: () => _focusTrackInRanking(context, ref, track),
             ),
           ),
@@ -1021,7 +565,7 @@ class _HeroStatStrip extends ConsumerWidget {
               icon: Icons.schedule_rounded,
               label: _t(context, 'Last played', '最終再生'),
               value: _shortPlayedAtLabel(context, track.lastPlayedAt),
-              color: theme.colorScheme.tertiary,
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ],
@@ -1220,12 +764,8 @@ class _TrendPanelState extends State<_TrendPanel> {
         );
     final values = _valuesFor(context, range);
     final hasSnapshotData = snapshots.length >= 2;
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-      radius: 26,
-      tint: const Color(0x24FFFFFF),
-      borderOpacity: 0.12,
-      shadowOpacity: 0.12,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1279,48 +819,38 @@ class _TrendPanelState extends State<_TrendPanel> {
             ),
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<TrendRange>(
-              showSelectedIcon: false,
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                ),
-                backgroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return theme.colorScheme.primary;
-                  }
-                  return theme.colorScheme.surfaceContainerHighest;
-                }),
-                foregroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return theme.colorScheme.onPrimary;
-                  }
-                  return theme.colorScheme.onSurfaceVariant;
-                }),
-                side: WidgetStatePropertyAll(
-                  BorderSide(
-                    color: theme.colorScheme.outlineVariant.withValues(
-                      alpha: 0.48,
+          Row(
+            children: [
+              for (final value in TrendRange.values)
+                Expanded(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: value == range
+                              ? theme.colorScheme.onSurface
+                              : theme.colorScheme.outlineVariant,
+                          width: value == range ? 2 : 1,
+                        ),
+                      ),
+                    ),
+                    child: Semantics(
+                      key: ValueKey(value),
+                      selected: value == range,
+                      child: TextButton(
+                        onPressed: () => setState(() => _selectedRange = value),
+                        style: TextButton.styleFrom(
+                          foregroundColor: value == range
+                              ? theme.colorScheme.onSurface
+                              : theme.colorScheme.onSurfaceVariant,
+                          shape: const RoundedRectangleBorder(),
+                        ),
+                        child: Text(_trendRangeLabel(context, value)),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              segments: TrendRange.values
-                  .map(
-                    (value) => ButtonSegment<TrendRange>(
-                      value: value,
-                      label: Text(_trendRangeLabel(context, value)),
-                    ),
-                  )
-                  .toList(),
-              selected: {range},
-              onSelectionChanged: (selection) {
-                setState(() => _selectedRange = selection.first);
-              },
-            ),
+            ],
           ),
           const SizedBox(height: 18),
           _TrendBars(
@@ -1348,9 +878,10 @@ class _TrendBars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final chartHeight = MediaQuery.sizeOf(context).width < 600 ? 122.0 : 178.0;
     if (!hasSnapshotData) {
       return SizedBox(
-        height: 178,
+        height: chartHeight,
         child: Center(
           child: _TrackContextEmptyText(
             text: _t(
@@ -1372,7 +903,7 @@ class _TrendBars extends StatelessWidget {
 
     if (max == 0) {
       return SizedBox(
-        height: 178,
+        height: chartHeight,
         child: Center(
           child: _TrackContextEmptyText(
             text: _trendNoPlaysLabel(context, range),
@@ -1382,7 +913,7 @@ class _TrendBars extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 178,
+      height: chartHeight,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: values.indexed.map((indexed) {
@@ -1399,7 +930,7 @@ class _TrendBars extends StatelessWidget {
                     _compactNumber(value.playDelta),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: index == values.length - 1
-                          ? theme.colorScheme.primary
+                          ? theme.colorScheme.onSurface
                           : theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w800,
                     ),
@@ -1409,13 +940,13 @@ class _TrendBars extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.bottomCenter,
                       child: FractionallySizedBox(
-                        heightFactor: max == 0 ? 0 : ratio.clamp(0.08, 1.0),
+                        heightFactor: ratio.clamp(0.0, 1.0),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(9),
+                            borderRadius: BorderRadius.circular(3),
                             color: index == values.length - 1
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.primary.withValues(
+                                ? theme.colorScheme.onSurface
+                                : theme.colorScheme.onSurface.withValues(
                                     alpha: 0.7,
                                   ),
                           ),
@@ -1431,7 +962,7 @@ class _TrendBars extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: index == values.length - 1
-                          ? theme.colorScheme.primary
+                          ? theme.colorScheme.onSurface
                           : theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w800,
                     ),
@@ -1562,12 +1093,8 @@ class _RecentTracksPanelState extends ConsumerState<_RecentTracksPanel> {
     final visibleTracks = widget.tracks
         .take(_visibleCount)
         .toList(growable: false);
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-      radius: 26,
-      tint: const Color(0x24FFFFFF),
-      borderOpacity: 0.12,
-      shadowOpacity: 0.12,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2856,10 +2383,9 @@ class _PlaybackControls extends ConsumerWidget {
 }
 
 class _OpenInAppleMusicButton extends StatelessWidget {
-  const _OpenInAppleMusicButton({required this.track, this.onDark = false});
+  const _OpenInAppleMusicButton({required this.track});
 
   final LibraryTrack track;
-  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
@@ -2867,17 +2393,10 @@ class _OpenInAppleMusicButton extends StatelessWidget {
     final exactSongLink = hasAppleMusicSongLink(track);
     return Align(
       alignment: Alignment.centerLeft,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          backgroundColor: onDark
-              ? Colors.black.withValues(alpha: 0.36)
-              : Colors.transparent,
-          foregroundColor: onDark ? Colors.white : theme.colorScheme.primary,
-          side: BorderSide(
-            color: onDark
-                ? Colors.white.withValues(alpha: 0.28)
-                : theme.colorScheme.primary.withValues(alpha: 0.42),
-          ),
+      child: TextButton.icon(
+        style: TextButton.styleFrom(
+          foregroundColor: theme.colorScheme.onSurface,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         ),
         onPressed: () => _openAppleMusicTrack(context, track),
         icon: const Icon(Icons.open_in_new_rounded),
@@ -2892,15 +2411,10 @@ class _OpenInAppleMusicButton extends StatelessWidget {
 }
 
 class _SearchWebButton extends StatelessWidget {
-  const _SearchWebButton({
-    required this.query,
-    required this.subject,
-    this.onDark = false,
-  });
+  const _SearchWebButton({required this.query, required this.subject});
 
   final String query;
   final String subject;
-  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
@@ -2913,9 +2427,7 @@ class _SearchWebButton extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: TextButton.icon(
         style: TextButton.styleFrom(
-          foregroundColor: onDark
-              ? Colors.white.withValues(alpha: 0.82)
-              : theme.colorScheme.onSurfaceVariant,
+          foregroundColor: theme.colorScheme.onSurfaceVariant,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,

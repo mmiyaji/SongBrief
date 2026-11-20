@@ -384,7 +384,6 @@ class _SnapshotBackgroundRefreshSetting extends ConsumerWidget {
                         ko: '문제 조사용입니다. 곡 또는 보관함 메타데이터는 포함하지 않습니다.',
                       ),
                       value: detailedLoggingEnabled,
-                      surfaceAlpha: 0.18,
                       onChanged: diagnostics.isLoading || !supported
                           ? null
                           : (value) async {

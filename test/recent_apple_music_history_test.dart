@@ -209,14 +209,14 @@ class HistoryRepository extends MusicStatsRepository {
   Future<MusicStatsState> load({
     bool requestAccess = false,
     LibraryLoadProgressCallback? onProgress,
-  }) async =>
-      MusicStatsState(
-        authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
-        overview: LibraryOverview.fromTracks([
-          song('library', title: 'Library', count: 8),
-        ], isDemo: false),
-        snapshotHistory: SnapshotHistory.empty,
-      );
+    void Function(MusicStatsState state)? onOverviewReady,
+  }) async => MusicStatsState(
+    authorizationStatus: MusicLibraryAuthorizationStatus.authorized,
+    overview: LibraryOverview.fromTracks([
+      song('library', title: 'Library', count: 8),
+    ], isDemo: false),
+    snapshotHistory: SnapshotHistory.empty,
+  );
   @override
   Future<SnapshotSyncResult?> syncCloudSnapshots() async => null;
   @override

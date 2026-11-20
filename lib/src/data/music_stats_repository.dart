@@ -145,24 +145,19 @@ class MusicStatsRepository {
   Future<MusicStatsState> load({
     bool requestAccess = false,
     LibraryLoadProgressCallback? onProgress,
+    void Function(MusicStatsState state)? onOverviewReady,
   }) async {
     if (!_isIosMusicRuntime) {
       return _buildDemoState(MusicLibraryAuthorizationStatus.unsupported);
     }
 
-    final stages = [
-      LibraryLoadStage.checkingAccess,
-      LibraryLoadStage.fetchingTracks,
-      LibraryLoadStage.buildingOverview,
-      if (snapshotRecordingEnabled) LibraryLoadStage.savingSnapshot,
-      LibraryLoadStage.loadingHistory,
-    ];
+    var stages = <LibraryLoadStage>[];
     int? trackCount;
     void report(LibraryLoadStage stage) {
       onProgress?.call(
         LibraryLoadProgress(
           stage: stage,
-          step: stages.indexOf(stage) + 1,
+          step: stages.isEmpty ? 1 : stages.indexOf(stage) + 1,
           totalSteps: stages.length,
           trackCount: trackCount,
         ),
@@ -176,8 +171,17 @@ class MusicStatsRepository {
 
     if (!status.canReadLibrary) {
       if (temporaryDemoLibraryEnabled) {
+        stages = [
+          LibraryLoadStage.checkingAccess,
+          LibraryLoadStage.buildingOverview,
+        ];
+        report(LibraryLoadStage.buildingOverview);
         return _buildDemoState(status);
       }
+      stages = [
+        LibraryLoadStage.checkingAccess,
+        LibraryLoadStage.loadingHistory,
+      ];
       report(LibraryLoadStage.loadingHistory);
       return MusicStatsState(
         authorizationStatus: status,
@@ -188,22 +192,45 @@ class MusicStatsRepository {
       );
     }
 
+    stages = [
+      LibraryLoadStage.checkingAccess,
+      LibraryLoadStage.fetchingTracks,
+      LibraryLoadStage.buildingOverview,
+      if (snapshotRecordingEnabled) LibraryLoadStage.savingSnapshot,
+      LibraryLoadStage.loadingHistory,
+    ];
     report(LibraryLoadStage.fetchingTracks);
     final allTracks = await _client.fetchTracks();
     libraryCatalog?.replace(allTracks);
     final tracks = _filteredTracks(allTracks);
     if (tracks.isEmpty && temporaryDemoLibraryEnabled) {
+      stages = [
+        LibraryLoadStage.checkingAccess,
+        LibraryLoadStage.fetchingTracks,
+        LibraryLoadStage.buildingOverview,
+      ];
+      report(LibraryLoadStage.buildingOverview);
       return _buildDemoState(status);
     }
 
+    if (tracks.isEmpty) stages.remove(LibraryLoadStage.savingSnapshot);
     if (snapshotRecordingEnabled) {
       await _client.scheduleSnapshotRefresh();
     }
     trackCount = tracks.length;
     report(LibraryLoadStage.buildingOverview);
     final overview = await _buildLibraryOverview(tracks, isDemo: false);
+    onOverviewReady?.call(
+      MusicStatsState(
+        authorizationStatus: status,
+        overview: overview,
+        snapshotHistory: SnapshotHistory.empty,
+        snapshotRecordingEnabled: snapshotRecordingEnabled,
+        lastDataRefreshAt: DateTime.now(),
+      ),
+    );
     final SnapshotHistory snapshotHistory;
-    if (snapshotRecordingEnabled) {
+    if (snapshotRecordingEnabled && tracks.isNotEmpty) {
       report(LibraryLoadStage.savingSnapshot);
       snapshotHistory = await _snapshotRepository.recordSnapshot(
         overview,

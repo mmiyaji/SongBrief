@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/music_stats_repository.dart';
@@ -9,6 +10,62 @@ import '../../settings/library_filter_preferences.dart';
 import 'home_controller.dart';
 import 'counted_listening_provider.dart';
 import 'supplemental_history_controller.dart';
+
+typedef LibraryTabOverview = ({
+  LibraryOverview overview,
+  LibraryOverview songsOverview,
+  Set<String> supplementalTrackIds,
+});
+
+/// Builds the library tab projection only when that tab is requested. Large
+/// native libraries build their search and ranking indexes off the UI isolate.
+final libraryTabOverviewProvider = FutureProvider<LibraryTabOverview>((ref) {
+  final evidence = ref.watch(_recentListeningEvidenceProvider);
+  final libraryTracks = evidence._libraryTracks;
+  final native = evidence._nativeOverview;
+  final supplementalTracks = ref.watch(librarySupplementalTracksProvider);
+  if (libraryTracks == null && supplementalTracks.isEmpty) {
+    return (
+      overview: native,
+      songsOverview: native,
+      supplementalTrackIds: const <String>{},
+    );
+  }
+  final input = (
+    libraryTracks: libraryTracks,
+    supplementalTracks: supplementalTracks,
+    baseOverview: libraryTracks == null ? native : null,
+    isDemo: native.isDemo,
+  );
+  if (!kIsWeb &&
+      (libraryTracks?.length ?? native.totalTracks) +
+              supplementalTracks.length >=
+          700) {
+    return compute(_buildLibraryTabOverview, input);
+  }
+  return _buildLibraryTabOverview(input);
+});
+
+LibraryTabOverview _buildLibraryTabOverview(
+  ({
+    List<LibraryTrack>? libraryTracks,
+    List<LibraryTrack> supplementalTracks,
+    LibraryOverview? baseOverview,
+    bool isDemo,
+  })
+  input,
+) {
+  final overview =
+      input.baseOverview ??
+      LibraryOverview.fromTracks(input.libraryTracks!, isDemo: input.isDemo);
+  return (
+    overview: overview,
+    songsOverview: overview.withSupplementalTracks(input.supplementalTracks),
+    supplementalTrackIds: Set.unmodifiable(
+      input.supplementalTracks.map((track) => track.id),
+    ),
+  );
+}
 
 /// One cached projection shared by the library and Playing views. It never
 /// writes evidence dates back to native counters or persisted snapshots.

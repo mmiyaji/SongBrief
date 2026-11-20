@@ -124,13 +124,9 @@ class _OverviewAnalyticsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassSurface(
+    return GlassSurface.section(
       key: const ValueKey('overview-listening-maps'),
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x4FFFFFFF),
-      borderOpacity: 0.34,
-      shadowOpacity: 0.045,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -219,12 +215,22 @@ class _ReleaseYearPlayMapCard extends StatefulWidget {
 
 class _ReleaseYearPlayMapCardState extends State<_ReleaseYearPlayMapCard> {
   var _metric = _ReleaseYearMetric.plays;
+  List<LibraryTrack>? _cachedTracks;
+  List<_ReleaseYearBucket> _cachedBuckets = const [];
+
+  List<_ReleaseYearBucket> _bucketsFor(List<LibraryTrack> tracks) {
+    if (!identical(_cachedTracks, tracks)) {
+      _cachedTracks = tracks;
+      _cachedBuckets = _releaseYearBuckets(tracks);
+    }
+    return _cachedBuckets;
+  }
 
   @override
   Widget build(BuildContext context) {
     final number = _numberFormat(context);
     final metric = widget.expanded ? _metric : _ReleaseYearMetric.plays;
-    final buckets = _releaseYearBuckets(widget.overview.tracks);
+    final buckets = _bucketsFor(widget.overview.tracks);
     final topBucket = buckets.isEmpty
         ? null
         : buckets.reduce(
@@ -915,6 +921,13 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
   _ActivityHeatmapView _view = _ActivityHeatmapView.calendar;
   DateTime? _visibleMonth;
   _ActivityCalendarMode _mode = _ActivityCalendarMode.song;
+  LibraryOverview? _cachedDaysOverview;
+  SnapshotHistory? _cachedDaysHistory;
+  List<SupplementalListeningEvent>? _cachedDaysEvents;
+  List<_ActivityHeatmapDay>? _cachedDays;
+  SnapshotHistory? _cachedProjectionHistory;
+  List<SupplementalListeningEvent>? _cachedProjectionEvents;
+  ListeningEventProjection? _cachedProjection;
 
   @override
   void initState() {
@@ -950,19 +963,36 @@ class _ActivityHeatmapCardState extends ConsumerState<_ActivityHeatmapCard> {
         ),
       );
     }
-    final projection = widget.overview.isDemo
-        ? const ListeningEventProjection(uncoveredEvents: [], relocations: [])
-        : projectListeningEvents(
-            history: widget.history,
-            events: ref.watch(countedSupplementalEventsProvider),
-            dailyOnly: true,
-          );
-    final days = _activityHeatmapDays(
-      overview: widget.overview,
-      history: widget.history,
-      supplementalEvents: projection.uncoveredEvents,
-      relocations: projection.relocations,
-    );
+    final supplementalEvents = widget.overview.isDemo
+        ? const <SupplementalListeningEvent>[]
+        : ref.watch(countedSupplementalEventsProvider);
+    if (!identical(_cachedProjectionHistory, widget.history) ||
+        !identical(_cachedProjectionEvents, supplementalEvents)) {
+      _cachedProjectionHistory = widget.history;
+      _cachedProjectionEvents = supplementalEvents;
+      _cachedProjection = widget.overview.isDemo
+          ? const ListeningEventProjection(uncoveredEvents: [], relocations: [])
+          : projectListeningEvents(
+              history: widget.history,
+              events: supplementalEvents,
+              dailyOnly: true,
+            );
+    }
+    final projection = _cachedProjection!;
+    if (!identical(_cachedDaysOverview, widget.overview) ||
+        !identical(_cachedDaysHistory, widget.history) ||
+        !identical(_cachedDaysEvents, supplementalEvents)) {
+      _cachedDaysOverview = widget.overview;
+      _cachedDaysHistory = widget.history;
+      _cachedDaysEvents = supplementalEvents;
+      _cachedDays = _activityHeatmapDays(
+        overview: widget.overview,
+        history: widget.history,
+        supplementalEvents: projection.uncoveredEvents,
+        relocations: projection.relocations,
+      );
+    }
+    final days = _cachedDays!;
     final unplacedSupplementalTrackCount = widget.overview.isDemo
         ? 0
         : ref.watch(calendarUnplacedSupplementalTrackCountProvider);

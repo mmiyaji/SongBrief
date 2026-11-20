@@ -364,10 +364,8 @@ class _SettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x62FFFFFF),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -430,7 +428,6 @@ class _TemporaryDemoLibrarySetting extends ConsumerWidget {
       title: title,
       description: description,
       value: enabled,
-      surfaceAlpha: 0.22,
       onChanged: (value) async {
         if (value) {
           await _enableTemporaryDemoLibrary(context, ref);
@@ -478,7 +475,6 @@ class _SettingsSwitchCard extends StatelessWidget {
     required this.description,
     required this.value,
     required this.onChanged,
-    this.surfaceAlpha = 0.28,
   });
 
   final IconData icon;
@@ -486,19 +482,14 @@ class _SettingsSwitchCard extends StatelessWidget {
   final String description;
   final bool value;
   final ValueChanged<bool>? onChanged;
-  final double surfaceAlpha;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: surfaceAlpha,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
       ),
       child: Material(
@@ -581,12 +572,8 @@ class _PreferenceSelectorTile<T> extends StatelessWidget {
         ),
         child: Ink(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.22,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.42),
+            border: Border(
+              bottom: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
           ),
           child: Padding(

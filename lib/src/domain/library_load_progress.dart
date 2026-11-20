@@ -19,6 +19,8 @@ class LibraryLoadProgress {
 
   /// 1-based index of [stage] among the stages this load runs.
   final int step;
+
+  /// Number of stages, or zero while authorization leaves the path unknown.
   final int totalSteps;
 
   /// Number of tracks being processed, once known.

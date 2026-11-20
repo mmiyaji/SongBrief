@@ -459,6 +459,7 @@ class _ControlledMusicStatsRepository extends MusicStatsRepository {
   Future<MusicStatsState> load({
     bool requestAccess = false,
     LibraryLoadProgressCallback? onProgress,
+    void Function(MusicStatsState state)? onOverviewReady,
   }) {
     _loadCount += 1;
     if (_loadCount == 1) {
@@ -495,6 +496,7 @@ class _ForegroundRefreshRepository extends _WidgetRefreshRepository {
   Future<MusicStatsState> load({
     bool requestAccess = false,
     LibraryLoadProgressCallback? onProgress,
+    void Function(MusicStatsState state)? onOverviewReady,
   }) {
     loadCount++;
     return super.load(requestAccess: requestAccess);
@@ -536,6 +538,7 @@ class _SnapshotRaceRepository extends MusicStatsRepository {
   Future<MusicStatsState> load({
     bool requestAccess = false,
     LibraryLoadProgressCallback? onProgress,
+    void Function(MusicStatsState state)? onOverviewReady,
   }) {
     loadCount += 1;
     return Future.value(_libraryState(_history));
@@ -592,6 +595,7 @@ class _WidgetDeletionRepository extends _SnapshotRaceRepository {
   Future<MusicStatsState> load({
     bool requestAccess = false,
     LibraryLoadProgressCallback? onProgress,
+    void Function(MusicStatsState state)? onOverviewReady,
   }) async =>
       _libraryState(history);
 
@@ -616,6 +620,7 @@ class _WidgetRefreshRepository extends _WidgetDeletionRepository {
   Future<MusicStatsState> load({
     bool requestAccess = false,
     LibraryLoadProgressCallback? onProgress,
+    void Function(MusicStatsState state)? onOverviewReady,
   }) async =>
       demo ? _state('Demo') : _libraryState(history);
 

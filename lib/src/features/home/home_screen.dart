@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:ui' show ImageByteFormat, ImageFilter;
+import 'dart:ui' show ImageByteFormat;
 import 'dart:ui' as ui show TextDirection;
 
 import 'package:fl_chart/fl_chart.dart';
@@ -527,11 +527,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget build(BuildContext context) {
     final state = ref.watch(musicStatsControllerProvider);
     final selectedSection = ref.watch(homeSectionProvider);
+    final startupOverview = state.isLoading && !state.hasValue
+        ? ref.watch(startupOverviewProvider)
+        : null;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final useRail = constraints.maxWidth >= 720;
-        final hasData = state.hasValue;
+        final hasData = state.hasValue || startupOverview != null;
 
         return Scaffold(
           extendBody: hasData && !useRail,
@@ -541,7 +544,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   offstage: !hasData,
                   child: ExcludeFocus(
                     excluding: !hasData,
-                    child: _MobilePlaybackChrome(stats: state.asData?.value),
+                    child: _MobilePlaybackChrome(
+                      stats: state.asData?.value ?? startupOverview,
+                    ),
                   ),
                 )
               : null,
@@ -557,7 +562,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     useRail: useRail,
                   ),
                   error: (error, stackTrace) => const _ErrorState(),
-                  loading: () => const _LoadingState(),
+                  loading: () => startupOverview == null
+                      ? const _LoadingState()
+                      : _AdaptiveShell(
+                          stats: startupOverview,
+                          selectedSection: selectedSection,
+                          useRail: useRail,
+                          historyPending: true,
+                        ),
                 ),
               ),
             ],
@@ -573,11 +585,13 @@ class _AdaptiveShell extends StatelessWidget {
     required this.stats,
     required this.selectedSection,
     required this.useRail,
+    this.historyPending = false,
   });
 
   final MusicStatsState stats;
   final HomeSection selectedSection;
   final bool useRail;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context) {
@@ -585,6 +599,7 @@ class _AdaptiveShell extends StatelessWidget {
       stats: stats,
       selectedSection: selectedSection,
       useRail: useRail,
+      historyPending: historyPending,
     );
 
     if (!useRail) {
@@ -638,57 +653,23 @@ class _MobilePlaybackChrome extends ConsumerWidget {
         ? null
         : _playbackTrack(overview, playback);
     final track = activeTrack ?? overview?.latestTrack;
-    final isLight = theme.colorScheme.brightness == Brightness.light;
+    final colors = theme.colorScheme;
     return SafeArea(
       key: const ValueKey('mobile-playback-chrome'),
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: kIsWeb
-                ? const []
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.34),
-                      blurRadius: 30,
-                      offset: const Offset(0, 18),
-                    ),
-                  ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: BackdropFilter(
-              enabled: !kIsWeb,
-              filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface.withValues(
-                    alpha: isLight || kIsWeb ? 0.97 : 0.86,
-                  ),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.14),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (track != null) ...[
-                        _MiniPlayerBar(track: track),
-                        const SizedBox(height: 2),
-                      ],
-                      // Keep the prepared destinations intact when data arrives.
-                      // Selection updates are observed inside this widget.
-                      const _BottomTabs(),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surface,
+          border: Border(top: BorderSide(color: colors.outlineVariant)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (track != null) _MiniPlayerBar(track: track),
+              const _BottomTabs(),
+            ],
           ),
         ),
       ),
@@ -709,19 +690,11 @@ class _MiniPlayerBar extends ConsumerWidget {
     final busy = playback.isBusy;
     final isActive = playback.isTrackActive(track.id, track: track);
     final isPlaying = playback.isTrackPlaying(track.id, track: track);
-    final isLight = theme.colorScheme.brightness == Brightness.light;
-    final barColor = isLight
-        ? theme.colorScheme.surfaceContainerHighest
-        : Colors.black.withValues(alpha: 0.36);
-    final borderColor = isLight
-        ? theme.colorScheme.outlineVariant.withValues(alpha: 0.55)
-        : Colors.white.withValues(alpha: 0.1);
-
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: barColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor),
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
@@ -874,12 +847,14 @@ class _SideTabs extends ConsumerWidget {
         : ref.watch(trackArtworkProvider(track.id));
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 0, 12),
-      child: GlassSurface(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        radius: 24,
-        tint: const Color(0x26FFFFFF),
-        borderOpacity: 0.14,
-        shadowOpacity: 0.16,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: BorderDirectional(
+            end: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+        ),
         child: Column(
           children: [
             Expanded(
@@ -1035,20 +1010,27 @@ class _StatsContent extends ConsumerWidget {
     required this.stats,
     required this.selectedSection,
     required this.useRail,
+    required this.historyPending,
   });
 
   final MusicStatsState stats;
   final HomeSection selectedSection;
   final bool useRail;
+  final bool historyPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (historyPending && selectedSection != HomeSection.playing) {
+      return const _LoadingState();
+    }
     final deviceBottomInset = MediaQueryData.fromView(View.of(context))
         .viewPadding
         .bottom;
     final mobileBottomPadding = 172 + deviceBottomInset;
     return RefreshIndicator.adaptive(
       onRefresh: () => _refreshStatsFromPull(ref),
+      notificationPredicate: (notification) =>
+          !historyPending && defaultScrollNotificationPredicate(notification),
       child: CustomScrollView(
         key: PageStorageKey<HomeSection>(selectedSection),
         scrollCacheExtent:
@@ -1094,7 +1076,11 @@ class _StatsContent extends ConsumerWidget {
                 useRail ? 28 : 20,
                 useRail ? 28 : mobileBottomPadding,
               ),
-              sliver: _NowPlayingSection(stats: stats, asSliver: true),
+              sliver: _NowPlayingSection(
+                stats: stats,
+                asSliver: true,
+                historyPending: historyPending,
+              ),
             )
           else
             SliverPadding(
@@ -1134,14 +1120,26 @@ class _SectionBody extends ConsumerWidget {
       HomeSection.playing => _NowPlayingSection(stats: stats),
       HomeSection.overview => _OverviewSection(stats: stats),
       HomeSection.rankings => _buildRankings(context, ref),
-      HomeSection.library => _LibrarySection(
-        overview: ref.watch(libraryRecentOverviewProvider),
-        songsOverview: ref.watch(libraryBrowsingOverviewProvider),
-        supplementalTrackIds: {
-          for (final track in ref.watch(librarySupplementalTracksProvider))
-            track.id,
-        },
-      ),
+      HomeSection.library =>
+        ref
+            .watch(libraryTabOverviewProvider)
+            .when(
+              data: (data) => _LibrarySection(
+                overview: data.overview,
+                songsOverview: data.songsOverview,
+                supplementalTrackIds: data.supplementalTrackIds,
+              ),
+              loading: () =>
+                  const Center(child: CircularProgressIndicator.adaptive()),
+              error: (_, _) => Center(
+                child: TextButton(
+                  onPressed: () => ref.invalidate(libraryTabOverviewProvider),
+                  child: Text(
+                    _t(context, 'Retry', '再試行', zh: '重试', ko: '다시 시도'),
+                  ),
+                ),
+              ),
+            ),
       // Lets the 20px icons of plain switch rows keep their text on the same
       // column as _SettingsRow instead of the default 24px leading slot.
       HomeSection.settings => ListTileTheme.merge(

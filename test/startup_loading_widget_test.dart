@@ -124,6 +124,36 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('shows Playing and navigation while history is pending', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final ready = Completer<MusicStatsState>();
+    await _pumpLoading(tester, ready);
+    final container = ProviderScope.containerOf(
+      tester.element(find.text('Reading your library')),
+    );
+    container.read(startupOverviewProvider.notifier).publish(_loadedState());
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Startup song'), findsWidgets);
+    expect(find.text('Reading your library'), findsNothing);
+
+    container
+        .read(homeSectionProvider.notifier)
+        .setSection(HomeSection.overview);
+    await tester.pump();
+    expect(find.text('Reading your library'), findsOneWidget);
+    ready.complete(_loadedState());
+    await tester.pumpAndSettle();
+    expect(find.text('Reading your library'), findsNothing);
+    expect(container.read(homeSectionProvider), HomeSection.overview);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpLoading(

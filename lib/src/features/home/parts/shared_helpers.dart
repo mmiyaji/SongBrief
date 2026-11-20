@@ -236,20 +236,9 @@ class _RankingRow extends ConsumerWidget {
     final theme = Theme.of(context);
     final number = _numberFormat(context);
     final ratio = maxPlayCount == 0 ? 0.0 : entry.playCount / maxPlayCount;
-    final barColor = Color.lerp(
-      theme.colorScheme.primary,
-      theme.colorScheme.secondary,
-      (rank - 1) / 12,
-    )!;
-    final isTopRank = rank <= 3;
-    final rankBadgeFill = isTopRank
-        ? theme.colorScheme.primary.withValues(alpha: 0.1)
-        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.32);
-    final rankBadgeBorder = isTopRank
-        ? theme.colorScheme.primary.withValues(alpha: 0.18)
-        : theme.colorScheme.outlineVariant.withValues(alpha: 0.34);
-    final rankBadgeTextColor = isTopRank
-        ? theme.colorScheme.primary
+    final barColor = theme.colorScheme.primary;
+    final rankBadgeTextColor = rank <= 3
+        ? theme.colorScheme.onSurface
         : theme.colorScheme.onSurfaceVariant;
     final track = overview.trackById(entry.representativeTrackId);
     final artwork = track == null
@@ -295,11 +284,6 @@ class _RankingRow extends ConsumerWidget {
                       width: 38,
                       height: 38,
                       alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: rankBadgeFill,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: rankBadgeBorder),
-                      ),
                       child: Text(
                         '$rank',
                         style: theme.textTheme.titleSmall?.copyWith(
@@ -718,7 +702,7 @@ class _LoadingProgressDetails extends ConsumerWidget {
     final label = progress == null
         ? _t(context, 'Getting ready…', '準備しています…', zh: '正在准备…', ko: '준비 중…')
         : _loadStageLabel(context, progress);
-    final completedText = progress == null
+    final completedText = progress == null || progress.totalSteps == 0
         ? null
         : _t(
             context,

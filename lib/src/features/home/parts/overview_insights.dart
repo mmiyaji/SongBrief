@@ -169,13 +169,9 @@ class _OverviewInsightPanel extends StatelessWidget {
       ),
     ];
 
-    return GlassSurface(
+    return GlassSurface.section(
       key: const ValueKey('overview-insights'),
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x4FFFFFFF),
-      borderOpacity: 0.34,
-      shadowOpacity: 0.045,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -246,12 +242,8 @@ class _OverviewBreakdownPanel extends StatelessWidget {
       theme,
     );
 
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x4FFFFFFF),
-      borderOpacity: 0.34,
-      shadowOpacity: 0.045,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -482,13 +474,9 @@ class _SmartListsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lists = _smartListsFor(context, overview);
-    return GlassSurface(
+    return GlassSurface.section(
       key: const ValueKey('overview-smart-lists'),
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x4FFFFFFF),
-      borderOpacity: 0.34,
-      shadowOpacity: 0.045,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

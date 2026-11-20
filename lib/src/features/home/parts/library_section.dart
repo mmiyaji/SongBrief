@@ -202,12 +202,8 @@ class _LibrarySearchPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final number = _numberFormat(context);
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x5EFFFFFF),
-      borderOpacity: 0.42,
-      shadowOpacity: 0.04,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -380,11 +376,8 @@ class _LibraryTrackPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x5EFFFFFF),
-      borderOpacity: 0.42,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -592,11 +585,8 @@ class _LibraryGroupPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x5EFFFFFF),
-      borderOpacity: 0.42,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -816,10 +806,8 @@ class _LibraryStatsPanel extends StatelessWidget {
       ),
     ];
 
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x62FFFFFF),
       child: LayoutBuilder(
         builder: (context, constraints) {
           if (constraints.maxWidth < 560) {
@@ -949,10 +937,8 @@ class _EntryPanelState extends State<_EntryPanel> {
     final visibleEntries = widget.entries
         .take(_visibleCount)
         .toList(growable: false);
-    return GlassSurface(
+    return GlassSurface.section(
       padding: const EdgeInsets.all(18),
-      radius: 24,
-      tint: const Color(0x5EFFFFFF),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
