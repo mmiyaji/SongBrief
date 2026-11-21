@@ -45,6 +45,8 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-category-history')));
+    await tester.pumpAndSettle();
     final settingTitle = find.text(
       'Include plays outside your library (recommended)',
     );

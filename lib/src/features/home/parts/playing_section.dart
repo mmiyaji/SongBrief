@@ -867,25 +867,30 @@ class _TrendPanelState extends State<_TrendPanel> {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            loading || hasSnapshotData
-                ? _t(
-                    context,
-                    'Play-count changes for this song from daily listening records.',
-                    '日々の聴取記録から、この曲の再生回数の増分を表示します。',
-                    zh: '根据每日收听记录显示这首歌播放次数的变化。',
-                    ko: '일별 청취 기록을 바탕으로 이 곡의 재생 횟수 변화를 표시합니다.',
-                  )
-                : _t(
-                    context,
-                    'This chart appears after records from at least two different days are available.',
-                    '別の日の記録がもう1回分たまると、このグラフを表示できます。',
-                    zh: '至少有两个不同日期的记录后会显示此图表。',
-                    ko: '서로 다른 날짜의 기록이 2일 이상 있으면 이 차트를 표시합니다.',
-                  ),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
+          Semantics(
+            liveRegion: widget.historyPending,
+            child: Text(
+              widget.historyPending
+                  ? _listeningHistoryLoadingLabel(context)
+                  : loading || hasSnapshotData
+                  ? _t(
+                      context,
+                      'Play-count changes for this song from daily listening records.',
+                      '日々の聴取記録から、この曲の再生回数の増分を表示します。',
+                      zh: '根据每日收听记录显示这首歌播放次数的变化。',
+                      ko: '일별 청취 기록을 바탕으로 이 곡의 재생 횟수 변화를 표시합니다.',
+                    )
+                  : _t(
+                      context,
+                      'This chart appears after records from at least two different days are available.',
+                      '別の日の記録がもう1回分たまると、このグラフを表示できます。',
+                      zh: '至少有两个不同日期的记录后会显示此图表。',
+                      ko: '서로 다른 날짜의 기록이 2일 이상 있으면 이 차트를 표시합니다.',
+                    ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -924,29 +929,26 @@ class _TrendPanelState extends State<_TrendPanel> {
           ),
           const SizedBox(height: 18),
           if (loading)
-            _LoadingSkeleton(
-              label: _listeningHistoryLoadingLabel(context),
-              child: SizedBox(
-                height: _trendChartHeight(context),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Spacer(),
-                    const _SkeletonBlock(height: 1, radius: 0),
-                    const Spacer(),
-                    const _SkeletonBlock(height: 1, radius: 0),
-                    const Spacer(),
-                    const _SkeletonBlock(height: 1, radius: 0),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        for (var i = 0; i < 6; i++)
-                          const _SkeletonBlock(width: 1, height: 5, radius: 0),
-                      ],
-                    ),
-                    const SizedBox(height: 13),
-                  ],
-                ),
+            SizedBox(
+              height: _trendChartHeight(context),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Spacer(),
+                  const _SkeletonBlock(height: 1, radius: 0),
+                  const Spacer(),
+                  const _SkeletonBlock(height: 1, radius: 0),
+                  const Spacer(),
+                  const _SkeletonBlock(height: 1, radius: 0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      for (var i = 0; i < 6; i++)
+                        const _SkeletonBlock(width: 1, height: 5, radius: 0),
+                    ],
+                  ),
+                  const SizedBox(height: 13),
+                ],
               ),
             )
           else

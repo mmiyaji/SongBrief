@@ -21,6 +21,18 @@ void main() {
         }
         expect(find.text(text), findsWidgets, reason: text);
       }
+      if (section == HomeSection.settings) {
+        final library = find.byKey(const ValueKey('settings-category-library'));
+        expect(
+          tester.getCenter(library).dx,
+          lessThan(tester.getCenter(find.text('Theme')).dx),
+        );
+        await _expectSettingsDetail(tester, 'library', 'Music Access');
+        expect(library, findsOneWidget);
+        expect(find.text('Theme'), findsNothing);
+        await _expectSettingsDetail(tester, 'privacy', 'App Lock');
+        await _expectSettingsDetail(tester, 'about', 'Licenses');
+      }
     });
 
     testWidgets('localizes ${section.name} in Japanese', (tester) async {
@@ -36,6 +48,11 @@ void main() {
           await _scrollOverviewUntilVisible(tester, find.text(text));
         }
         expect(find.text(text), findsWidgets, reason: text);
+      }
+      if (section == HomeSection.settings) {
+        await _expectSettingsDetail(tester, 'library', 'ミュージックアクセス');
+        await _expectSettingsDetail(tester, 'privacy', 'アプリロック');
+        await _expectSettingsDetail(tester, 'about', 'ライセンス');
       }
     });
   }
@@ -88,10 +105,33 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('设置'), findsWidgets);
-    expect(find.text('音乐访问权限'), findsOneWidget);
     expect(find.text('主题'), findsOneWidget);
     expect(find.text('语言'), findsOneWidget);
-    expect(find.text('应用信息'), findsOneWidget);
+    for (final label in ['外观与语言', '聆听记录', '音乐资料库', '导出与缓存', '隐私与安全', '应用信息']) {
+      expect(find.text(label), findsWidgets);
+    }
+    await _expectSettingsDetail(tester, 'library', '访问与更新');
+  });
+
+  testWidgets('localizes settings in Korean', (tester) async {
+    await _pumpSection(
+      tester,
+      language: AppLanguage.korean,
+      section: HomeSection.settings,
+    );
+    await tester.pumpAndSettle();
+
+    for (final label in [
+      '설정',
+      '외관 및 언어',
+      '청취 기록',
+      '음악 보관함',
+      '내보내기 및 캐시',
+      '개인정보 보호 및 보안',
+      '앱 정보',
+    ]) {
+      expect(find.text(label), findsWidgets);
+    }
   });
 
   testWidgets('localizes playing in Korean', (tester) async {
@@ -107,6 +147,18 @@ void main() {
     expect(find.text('가사'), findsOneWidget);
     expect(find.text('재생 횟수'), findsWidgets);
   });
+}
+
+Future<void> _expectSettingsDetail(
+  WidgetTester tester,
+  String category,
+  String label,
+) async {
+  final entry = find.byKey(ValueKey('settings-category-$category'));
+  await tester.ensureVisible(entry);
+  await tester.tap(entry);
+  await tester.pumpAndSettle();
+  expect(find.text(label), findsWidgets);
 }
 
 Future<void> _scrollOverviewUntilVisible(
@@ -158,13 +210,14 @@ const _expectedEnglish = <HomeSection, List<String>>{
   ],
   HomeSection.settings: [
     'Settings',
-    'Music Access',
+    'Appearance & Language',
+    'Listening Records',
+    'Music Library',
+    'Export & Cache',
+    'Privacy & Security',
+    'App Info',
     'Theme',
     'Language',
-    'Security',
-    'App Lock',
-    'App Info',
-    'Licenses',
   ],
 };
 
@@ -175,13 +228,14 @@ const _expectedJapanese = <HomeSection, List<String>>{
   HomeSection.library: ['ライブラリ', '曲', 'プレイリスト', '検索可能な曲詳細と再生コントロール', '並び替え'],
   HomeSection.settings: [
     '設定',
-    'ミュージックアクセス',
+    '外観と言語',
+    '聴取記録',
+    'ミュージックライブラリ',
+    '書き出しとキャッシュ',
+    'プライバシーとセキュリティ',
+    'アプリ情報',
     'テーマ',
     '言語',
-    'セキュリティ',
-    'アプリロック',
-    'アプリ情報',
-    'ライセンス',
   ],
 };
 
@@ -191,7 +245,9 @@ Future<void> _pumpSection(
   required HomeSection section,
 }) {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(900, 1200);
+  tester.view.physicalSize = section == HomeSection.settings
+      ? const Size(1194, 1200)
+      : const Size(900, 1200);
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
 

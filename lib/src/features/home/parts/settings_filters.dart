@@ -29,8 +29,10 @@ class _ExportSetting extends StatelessWidget {
         Text(
           _t(
             context,
-            'CSV is suited for spreadsheets. JSON includes listening record summaries for backup or analysis.',
-            'CSVは表計算向け、JSONは聴取記録の概要も含む分析・バックアップ向けです。',
+            'JSON also includes listening record summaries.',
+            'JSONには聴取記録の概要も含まれます。',
+            zh: 'JSON 还包含收听记录摘要。',
+            ko: 'JSON에는 청취 기록 요약도 포함됩니다.',
           ),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -134,7 +136,15 @@ class _LibraryFilterSetting extends ConsumerWidget {
                   onPressed: () =>
                       _showLibraryFilterManagerSheet(context, stats: stats),
                   icon: const Icon(Icons.tune_rounded),
-                  label: Text(_t(context, 'Manage', '管理')),
+                  label: Text(
+                    _t(
+                      context,
+                      'Manage exclusions',
+                      '除外ルールを管理',
+                      zh: '管理排除规则',
+                      ko: '제외 규칙 관리',
+                    ),
+                  ),
                 );
 
                 if (constraints.maxWidth >= 620) {

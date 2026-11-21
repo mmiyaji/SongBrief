@@ -12,6 +12,11 @@ void main() {
   testWidgets('iCloud history control stays usable without daily snapshots', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     SharedPreferences.setMockInitialValues({
       snapshotRecordingEnabledPreferenceKey: false,
     });
@@ -33,6 +38,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-category-history')));
     await tester.pumpAndSettle();
     final title = find.text('Sync records with iCloud');
     await tester.ensureVisible(title);

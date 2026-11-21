@@ -142,6 +142,7 @@ void main() {
       expect(find.text('Startup song'), findsWidgets);
       expect(find.text('Reading your library'), findsNothing);
       expect(find.text('Listening trend'), findsOneWidget);
+      expect(find.text('Loading your listening history'), findsOneWidget);
       final sections = container.read(homeSectionProvider.notifier);
       sections.setSection(HomeSection.overview);
       await tester.pump();
@@ -164,11 +165,19 @@ void main() {
 
       sections.setSection(HomeSection.settings);
       await tester.pump();
-      expect(find.text('Display & Operation'), findsOneWidget);
+      expect(find.text('Theme'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('settings-category-history')));
+      await tester.pump();
       final records = find.widgetWithText(OutlinedButton, 'Manage records');
-      final caches = find.widgetWithText(OutlinedButton, 'Manage caches');
       expect(tester.widget<OutlinedButton>(records).onPressed, isNull);
+      await tester.tap(find.byKey(const ValueKey('settings-category-export')));
+      await tester.pump();
+      final caches = find.widgetWithText(OutlinedButton, 'Manage caches');
       expect(tester.widget<OutlinedButton>(caches).onPressed, isNotNull);
+      await tester.tap(
+        find.byKey(const ValueKey('settings-category-appearance')),
+      );
+      await tester.pump();
       await tester.tap(find.text('Theme'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
@@ -216,33 +225,45 @@ void main() {
           .setScope(RankingScope.recent);
       await tester.pump();
       final status = find.text('Loading your listening history');
-      final fade = find
+      final rows = find
           .byWidgetPredicate(
-            (widget) =>
-                widget is FadeTransition &&
-                widget.child.runtimeType.toString() == '_SkeletonRows',
+            (widget) => widget.runtimeType.toString() == '_SkeletonRows',
           )
           .first;
-      double opacity() => tester.widget<FadeTransition>(fade).opacity.value;
+      final waveMask = find.ancestor(
+        of: rows,
+        matching: find.byType(ShaderMask),
+      );
+      final wave = find
+          .ancestor(of: waveMask, matching: find.byType(AnimatedBuilder))
+          .first;
       double statusOpacity() => tester
           .widget<Opacity>(
             find.ancestor(of: status, matching: find.byType(Opacity)).first,
           )
           .opacity;
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(opacity(), 1.0);
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(waveMask, findsNothing);
       expect(statusOpacity(), 0.0);
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.pump(const Duration(milliseconds: 600));
-      expect(opacity(), lessThan(1.0));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(waveMask, findsOneWidget);
+      expect(statusOpacity(), 0.0);
+      final phase =
+          tester.widget<AnimatedBuilder>(wave).listenable as Animation<double>;
+      final initialPhase = phase.value;
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(phase.value, greaterThan(initialPhase));
+      expect(statusOpacity(), 0.0);
+      await tester.pump(const Duration(milliseconds: 1300));
       expect(statusOpacity(), 1.0);
+      expect(tester.getCenter(status).dy, lessThan(tester.getTopLeft(rows).dy));
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           FakeAccessibilityFeatures(disableAnimations: true);
       addTearDown(
         tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
       );
       await tester.pump();
-      expect(opacity(), 1.0);
+      expect(waveMask, findsNothing);
       expect(statusOpacity(), 1.0);
       ready.complete(_loadedState());
       await tester.pumpAndSettle();

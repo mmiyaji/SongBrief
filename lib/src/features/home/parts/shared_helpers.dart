@@ -738,25 +738,28 @@ class _LoadingSkeleton extends StatefulWidget {
 
 class _LoadingSkeletonState extends State<_LoadingSkeleton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse;
-  late final Animation<double> _opacity;
-  late final Timer _delay;
-  bool _isProlonged = false;
+  late final AnimationController _wave;
+  late final Timer _waveDelay;
+  Timer? _statusDelay;
+  bool _waveReady = false;
+  bool _statusVisible = false;
 
   @override
   void initState() {
     super.initState();
-    _pulse = AnimationController(
+    _wave = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1600),
     );
-    _opacity = _pulse
-        .drive(CurveTween(curve: Curves.easeInOut))
-        .drive(Tween(begin: 1.0, end: 0.65));
-    _delay = Timer(const Duration(milliseconds: 900), () {
-      setState(() => _isProlonged = true);
+    _waveDelay = Timer(const Duration(milliseconds: 400), () {
+      setState(() => _waveReady = true);
       _updateMotion();
     });
+    if (widget.showStatus) {
+      _statusDelay = Timer(const Duration(seconds: 2), () {
+        setState(() => _statusVisible = true);
+      });
+    }
   }
 
   @override
@@ -768,40 +771,40 @@ class _LoadingSkeletonState extends State<_LoadingSkeleton>
 
   void _updateMotion() {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    if (_isProlonged && !reduceMotion) {
-      if (!_pulse.isAnimating) _pulse.repeat(reverse: true);
+    if (_waveReady && !reduceMotion) {
+      if (!_wave.isAnimating) _wave.repeat();
     } else {
-      _pulse.reset();
+      _wave.reset();
     }
   }
 
   @override
   void dispose() {
-    _delay.cancel();
-    _pulse.dispose();
+    _waveDelay.cancel();
+    _statusDelay?.cancel();
+    _wave.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final animate = _waveReady && !MediaQuery.disableAnimationsOf(context);
+    final highlight = theme.colorScheme.onSurface;
     return Semantics(
       container: true,
       label: widget.label,
-      liveRegion: widget.showStatus && _isProlonged,
+      liveRegion: widget.showStatus && _statusVisible,
       child: ExcludeSemantics(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            RepaintBoundary(
-              child: FadeTransition(opacity: _opacity, child: widget.child),
-            ),
             if (widget.showStatus)
               Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(bottom: 6),
                 child: Opacity(
-                  opacity: _isProlonged ? 1 : 0,
+                  opacity: _statusVisible ? 1 : 0,
                   child: Text(
                     widget.label,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -810,6 +813,33 @@ class _LoadingSkeletonState extends State<_LoadingSkeleton>
                   ),
                 ),
               ),
+            RepaintBoundary(
+              child: animate
+                  ? AnimatedBuilder(
+                      animation: _wave,
+                      child: widget.child,
+                      builder: (context, child) {
+                        // Start and end beyond the edges so the loop has no flash.
+                        const halfBand = 0.60;
+                        final center =
+                            (2 + 2 * halfBand) * _wave.value - 1 - halfBand;
+                        return ShaderMask(
+                          blendMode: BlendMode.srcATop,
+                          shaderCallback: (bounds) => LinearGradient(
+                            begin: Alignment(center - halfBand, 0),
+                            end: Alignment(center + halfBand, 0),
+                            colors: [
+                              highlight.withValues(alpha: 0),
+                              highlight.withValues(alpha: 0.34),
+                              highlight.withValues(alpha: 0),
+                            ],
+                          ).createShader(bounds),
+                          child: child,
+                        );
+                      },
+                    )
+                  : widget.child,
+            ),
           ],
         ),
       ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:songbrief/src/app.dart';
@@ -269,6 +270,18 @@ void main() {
     final adSlot = find.byKey(const ValueKey('overview-ad-slot'));
     await _scrollOverviewUntilVisible(tester, adSlot);
     final playbackChrome = find.byKey(const ValueKey('mobile-playback-chrome'));
+    final floatingBar = find.ancestor(
+      of: find.byType(NavigationBar),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is ClipRRect &&
+            widget.borderRadius == BorderRadius.circular(30),
+      ),
+    );
+    final barBounds = tester.getRect(floatingBar);
+    expect(barBounds.left, 16);
+    expect(barBounds.right, 393 - 16);
+    expect(barBounds.bottom, 852 - 34 - 10);
     expect(
       tester.getBottomRight(adSlot).dy,
       lessThanOrEqualTo(tester.getTopLeft(playbackChrome).dy - 12),
@@ -970,6 +983,8 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Theme'), findsNothing);
+    await _openSettingsCategory(tester, 'appearance');
     await tester.ensureVisible(find.text('Appearance'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Appearance'));
@@ -980,6 +995,46 @@ void main() {
     expect(
       tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
       ThemeMode.light,
+    );
+    await tester.tap(find.byKey(const ValueKey('settings-category-back')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('settings-category-appearance')),
+      findsOneWidget,
+    );
+    expect(find.text('Theme'), findsNothing);
+  });
+
+  testWidgets('opens the App Store review page from App Info', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const launcher = MethodChannel('plugins.flutter.io/url_launcher');
+    final messenger = tester.binding.defaultBinaryMessenger;
+    final launches = <MethodCall>[];
+    messenger.setMockMethodCallHandler(launcher, (call) async {
+      launches.add(call);
+      return true;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(launcher, null));
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await _openSettingsCategory(tester, 'about');
+
+    final rate = find.widgetWithText(OutlinedButton, 'Rate on the App Store');
+    await tester.ensureVisible(rate);
+    await tester.tap(rate);
+    await tester.pumpAndSettle();
+
+    expect(launches, hasLength(1));
+    expect(launches.single.method, 'launch');
+    expect(
+      launches.single.arguments['url'],
+      'https://apps.apple.com/app/id6785969770?action=write-review',
     );
   });
 
@@ -995,6 +1050,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
+    await _openSettingsCategory(tester, 'appearance');
     await tester.ensureVisible(find.text('Theme'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Theme'));
@@ -1021,6 +1077,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
+    await _openSettingsCategory(tester, 'appearance');
     await tester.ensureVisible(find.text('Theme'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Theme'));
@@ -1079,6 +1136,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
+    await _openSettingsCategory(tester, 'appearance');
     await tester.ensureVisible(find.text('Theme'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Theme'));
@@ -1122,6 +1180,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
+    await _openSettingsCategory(tester, 'history');
     final sampleRecords = find.text('Sample records');
     await tester.scrollUntilVisible(
       sampleRecords,
@@ -1148,14 +1207,16 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Display & Exclusions'), findsOneWidget);
+    await _openSettingsCategory(tester, 'library');
+    expect(find.text('Music Access'), findsOneWidget);
     expect(find.text('Active exclusions'), findsOneWidget);
-    expect(find.text('Manage'), findsOneWidget);
+    final manageExclusions = find.text('Manage exclusions');
+    expect(manageExclusions, findsOneWidget);
     expect(find.text('Hidden playlists'), findsNothing);
 
-    await tester.ensureVisible(find.text('Manage'));
+    await tester.ensureVisible(manageExclusions);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Manage'));
+    await tester.tap(manageExclusions);
     await tester.pumpAndSettle();
 
     expect(find.text('Manage hidden items'), findsOneWidget);
@@ -1179,6 +1240,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
+    await _openSettingsCategory(tester, 'history');
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -520));
     await tester.pumpAndSettle();
     final settingsScrollable = tester.state<ScrollableState>(
@@ -1285,6 +1347,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
+    await _openSettingsCategory(tester, 'history');
     final backgroundSetting = find.byKey(
       const ValueKey('snapshot-background-refresh-setting'),
     );
@@ -1320,7 +1383,13 @@ void main() {
     expect(find.text('Support logs'), findsOneWidget);
 
     if (find.text('Daily record updated').evaluate().isEmpty) {
-      await tester.tap(find.text('Recent activity'));
+      final recentActivity = find.text('Recent activity');
+      await Scrollable.ensureVisible(
+        tester.element(recentActivity),
+        alignment: 0.35,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(recentActivity);
       await tester.pumpAndSettle();
     }
 
@@ -1373,6 +1442,13 @@ void main() {
     expect(find.text('Recent activity'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+}
+
+Future<void> _openSettingsCategory(WidgetTester tester, String category) async {
+  final entry = find.byKey(ValueKey('settings-category-$category'));
+  await tester.ensureVisible(entry);
+  await tester.tap(entry);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _scrollOverviewUntilVisible(

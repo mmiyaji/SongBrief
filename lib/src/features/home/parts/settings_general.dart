@@ -1,47 +1,372 @@
 part of '../home_screen.dart';
 
-class _SettingsSection extends ConsumerWidget {
+const _appStoreReviewUrl =
+    'https://apps.apple.com/app/id6785969770?action=write-review';
+
+enum _SettingsCategory {
+  appearance(Icons.palette_outlined),
+  history(Icons.history_rounded),
+  library(Icons.library_music_outlined),
+  export(Icons.download_outlined),
+  privacy(Icons.shield_outlined),
+  about(Icons.info_outline);
+
+  const _SettingsCategory(this.icon);
+
+  final IconData icon;
+
+  String label(BuildContext context) => switch (this) {
+    appearance => _t(
+      context,
+      'Appearance & Language',
+      '外観と言語',
+      zh: '外观与语言',
+      ko: '외관 및 언어',
+    ),
+    history => _t(
+      context,
+      'Listening Records',
+      '聴取記録',
+      zh: '聆听记录',
+      ko: '청취 기록',
+    ),
+    library => _t(
+      context,
+      'Music Library',
+      'ミュージックライブラリ',
+      zh: '音乐资料库',
+      ko: '음악 보관함',
+    ),
+    export => _t(
+      context,
+      'Export & Cache',
+      '書き出しとキャッシュ',
+      zh: '导出与缓存',
+      ko: '내보내기 및 캐시',
+    ),
+    privacy => _t(
+      context,
+      'Privacy & Security',
+      'プライバシーとセキュリティ',
+      zh: '隐私与安全',
+      ko: '개인정보 보호 및 보안',
+    ),
+    about => _t(context, 'App Info', 'アプリ情報', zh: '应用信息', ko: '앱 정보'),
+  };
+}
+
+class _SettingsSection extends ConsumerStatefulWidget {
   const _SettingsSection({required this.stats, this.historyPending = false});
 
   final MusicStatsState stats;
   final bool historyPending;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final overview = stats.overview;
-    final selectedTheme = ref.watch(themeStyleProvider);
-    final selectedBrightness = ref.watch(themeBrightnessProvider);
-    final selectedLanguage = ref.watch(appLanguageProvider);
-    final appLock = ref.watch(appLockControllerProvider);
-    final crashReporting = ref.watch(crashReportingControllerProvider);
-    final libraryFilters = ref.watch(libraryFilterPreferencesProvider);
-    final supplementalHistoryIncluded = ref.watch(
-      supplementalHistoryIncludedProvider,
-    );
-    final temporaryDemoLibraryEnabled = ref.watch(temporaryDemoLibraryProvider);
-    final appVersion = ref
-        .watch(_appVersionLabelProvider)
-        .maybeWhen(
-          data: (value) => value,
-          orElse: () => _fallbackAppVersionLabel,
+  ConsumerState<_SettingsSection> createState() => _SettingsSectionState();
+}
+
+class _SettingsSectionState extends ConsumerState<_SettingsSection> {
+  static const _categoryStorage = ValueKey('settings-active-category');
+  _SettingsCategory? _selected;
+  bool _restored = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_restored) return;
+    _restored = true;
+    _selected = PageStorage.maybeOf(
+      context,
+    )?.readState(context, identifier: _categoryStorage) as _SettingsCategory?;
+  }
+
+  void _select(_SettingsCategory? category) {
+    if (_selected == category) return;
+    PageStorage.maybeOf(context)
+        ?.writeState(context, category, identifier: _categoryStorage);
+    Scrollable.maybeOf(context)?.position.jumpTo(0);
+    setState(() => _selected = category);
+  }
+
+  String _summary(BuildContext context, _SettingsCategory category) {
+    final stats = widget.stats;
+    final on = _t(context, 'On', 'オン', zh: '开启', ko: '켜짐');
+    final off = _t(context, 'Off', 'オフ', zh: '关闭', ko: '꺼짐');
+    switch (category) {
+      case _SettingsCategory.appearance:
+        return '${_themeBrightnessLabel(context, ref.watch(themeBrightnessProvider))} · '
+            '${_languageLabel(context, ref.watch(appLanguageProvider))}';
+      case _SettingsCategory.history:
+        final recording = ref.watch(snapshotRecordingProvider) ? on : off;
+        final cloud = ref.watch(snapshotCloudSyncProvider) ? on : off;
+        return _t(
+          context,
+          'Recording $recording · iCloud $cloud',
+          '記録$recording・iCloud $cloud',
+          zh: '记录$recording · iCloud $cloud',
+          ko: '기록 $recording · iCloud $cloud',
         );
+      case _SettingsCategory.library:
+        final rules = ref.watch(libraryFilterPreferencesProvider).ruleCount;
+        final access = _labelsDemo(stats.overview)
+            ? _t(context, 'Demo mode', 'デモモード')
+            : _authorizationLabel(
+                context,
+                _displayedAuthorizationStatus(stats),
+              );
+        final exclusions = _filterRuleCountLabel(context, rules);
+        return _t(
+          context,
+          '$access · Exclusions: $exclusions',
+          '$access・除外$exclusions',
+          zh: '$access · 排除$exclusions',
+          ko: '$access · 제외 $exclusions',
+        );
+      case _SettingsCategory.export:
+        ref.watch(_cacheUsageRevisionProvider);
+        final size = _byteSizeLabel(_currentCacheUsage().bytes);
+        return _t(
+          context,
+          'CSV · JSON · Cache $size',
+          'CSV・JSON・キャッシュ $size',
+          zh: 'CSV · JSON · 缓存 $size',
+          ko: 'CSV · JSON · 캐시 $size',
+        );
+      case _SettingsCategory.privacy:
+        final enabled = ref.watch(
+          appLockControllerProvider.select((state) => state.value?.enabled),
+        );
+        if (enabled == null) {
+          return _t(context, 'App lock', 'アプリロック', zh: '应用锁', ko: '앱 잠금');
+        }
+        final lock = enabled ? on : off;
+        return _t(
+          context,
+          'App lock $lock',
+          'アプリロック $lock',
+          zh: '应用锁 $lock',
+          ko: '앱 잠금 $lock',
+        );
+      case _SettingsCategory.about:
+        return _t(
+          context,
+          'Version · Rate the app',
+          'バージョン・アプリを評価',
+          zh: '版本 · 为应用评分',
+          ko: '버전 · 앱 평가',
+        );
+    }
+  }
+
+  Widget _buildIndex(BuildContext context, _SettingsCategory? active) {
+    final theme = Theme.of(context);
+    return Material(
+      type: MaterialType.transparency,
+      child: Column(
+        children: [
+          for (final category in _SettingsCategory.values) ...[
+            ListTile(
+              key: ValueKey('settings-category-${category.name}'),
+              leading: Icon(
+                category.icon,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              title: Text(
+                category.label(context),
+                style: theme.textTheme.titleSmall,
+              ),
+              subtitle: Text(_summary(context, category)),
+              trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+              selected: active == category,
+              selectedTileColor: theme.colorScheme.surfaceContainerHighest,
+              selectedColor: theme.colorScheme.onSurface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(9),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ),
+              onTap: () => _select(category),
+            ),
+            Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetail(
+    BuildContext context,
+    _SettingsCategory category, {
+    required bool split,
+  }) {
+    final theme = Theme.of(context);
+    final stats = widget.stats;
+    final historyPending = widget.historyPending;
+    return Column(
+      key: ValueKey(category),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!split)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              key: const ValueKey('settings-category-back'),
+              onPressed: () => _select(null),
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              label: Text(
+                _t(
+                  context,
+                  'Back to Settings',
+                  '設定に戻る',
+                  zh: '返回设置',
+                  ko: '설정으로 돌아가기',
+                ),
+              ),
+            ),
+          ),
+        Semantics(
+          header: true,
+          child: Text(
+            category.label(context),
+            style: theme.textTheme.titleLarge,
+          ),
+        ),
+        const SizedBox(height: 14),
+        switch (category) {
+          _SettingsCategory.appearance => _buildAppearance(),
+          _SettingsCategory.history => _ListeningRecordsSetting(
+            stats: stats,
+            historyPending: historyPending,
+          ),
+          _SettingsCategory.library => _buildLibrary(),
+          _SettingsCategory.export => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsGroup(
+                title: _t(
+                  context,
+                  'Export data',
+                  'データの書き出し',
+                  zh: '导出数据',
+                  ko: '데이터 내보내기',
+                ),
+                child: _ExportSetting(
+                  stats: stats,
+                  historyPending: historyPending,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _SettingsGroup(
+                title: _t(
+                  context,
+                  'Device storage',
+                  '端末のストレージ',
+                  zh: '设备存储空间',
+                  ko: '기기 저장 공간',
+                ),
+                child: const _CacheSetting(),
+              ),
+            ],
+          ),
+          _SettingsCategory.privacy => _buildPrivacy(),
+          _SettingsCategory.about => _buildAbout(),
+        },
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = widget.stats;
+    final showAccess =
+        !stats.authorizationStatus.canReadLibrary && !stats.overview.isDemo;
+    final colors = Theme.of(context).colorScheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final split =
+            constraints.maxWidth >= 640 &&
+            MediaQuery.sizeOf(context).width >= 720;
+        final selected = _selected;
+        final active = selected ?? _SettingsCategory.appearance;
+        return PopScope<void>(
+          canPop: split || selected == null,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop && !split && _selected != null) _select(null);
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showAccess &&
+                  (split ||
+                      selected == null ||
+                      selected == _SettingsCategory.library)) ...[
+                _AuthorizationPanel(status: stats.authorizationStatus),
+                const SizedBox(height: 14),
+              ],
+              Divider(height: 1, color: colors.outlineVariant),
+              const SizedBox(height: 12),
+              if (split)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: (constraints.maxWidth * 0.36).clamp(218.0, 285.0),
+                      child: _buildIndex(context, active),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: BorderDirectional(
+                            start: BorderSide(color: colors.outlineVariant),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.only(start: 20),
+                          child: _buildDetail(context, active, split: true),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else if (selected == null)
+                _buildIndex(context, null)
+              else
+                _buildDetail(context, selected, split: false),
+              const SizedBox(height: 14),
+              AdBannerSlot(placement: _t(context, 'Settings', '設定')),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLibrary() {
+    final stats = widget.stats;
+    final demo = _labelsDemo(stats.overview);
+    final lastRefresh = stats.lastDataRefreshAt;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!stats.authorizationStatus.canReadLibrary && !overview.isDemo) ...[
-          _AuthorizationPanel(status: stats.authorizationStatus),
-          const SizedBox(height: 14),
-        ],
         _SettingsGroup(
-          title: _t(context, 'Music Access', 'ミュージックアクセス'),
+          title: _t(
+            context,
+            'Music Access',
+            'ミュージックアクセス',
+            zh: '访问与更新',
+            ko: '접근 및 업데이트',
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _SettingsRow(
-                icon: Icons.privacy_tip,
+                icon: Icons.privacy_tip_outlined,
                 label: _t(context, 'Authorization', '認証状態'),
-                value: _labelsDemo(overview)
+                value: demo
                     ? _t(context, 'Demo mode', 'デモモード')
                     : _authorizationLabel(
                         context,
@@ -51,32 +376,31 @@ class _SettingsSection extends ConsumerWidget {
               _SettingsRow(
                 icon: Icons.storage,
                 label: _t(context, 'Data source', 'データソース'),
-                value: _labelsDemo(overview)
+                value: demo
                     ? _t(context, 'Sample library', 'サンプルライブラリ')
                     : _t(context, 'iOS Music library', 'iOSミュージックライブラリ'),
               ),
               _SettingsRow(
                 icon: Icons.update,
-                label: _t(context, 'Last record', '最終記録'),
-                value: stats.snapshotRecordingEnabled
-                    ? _dateTimeFormat(context).format(overview.generatedAt)
-                    : _t(context, 'Off', 'オフ'),
-                valuePlaceholder:
-                    historyPending && stats.snapshotRecordingEnabled
-                    ? const _PendingHistoryValue()
-                    : null,
+                label: _t(
+                  context,
+                  'Last library update',
+                  'ライブラリの最終更新',
+                  zh: '资料库上次更新',
+                  ko: '보관함 마지막 업데이트',
+                ),
+                value: lastRefresh == null
+                    ? _t(context, 'Unavailable', '不明', zh: '未知', ko: '알 수 없음')
+                    : _dateTimeFormat(context).format(lastRefresh),
               ),
-              const SizedBox(height: 12),
               Align(
-                alignment: Alignment.centerRight,
+                alignment: AlignmentDirectional.centerEnd,
                 child: FilledButton.icon(
-                  onPressed: historyPending
+                  onPressed: widget.historyPending
                       ? null
-                      : () {
-                          ref
-                              .read(musicStatsControllerProvider.notifier)
-                              .refreshStats();
-                        },
+                      : () => ref
+                            .read(musicStatsControllerProvider.notifier)
+                            .refreshStats(),
                   icon: const Icon(Icons.refresh),
                   label: Text(_t(context, 'Refresh', '更新')),
                 ),
@@ -84,221 +408,231 @@ class _SettingsSection extends ConsumerWidget {
               if (!screenshotModeEnabled) ...[
                 const SizedBox(height: 10),
                 _TemporaryDemoLibrarySetting(
-                  enabled: temporaryDemoLibraryEnabled,
+                  enabled: ref.watch(temporaryDemoLibraryProvider),
                   stats: stats,
-                  historyPending: historyPending,
+                  historyPending: widget.historyPending,
                 ),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 24),
         _SettingsGroup(
-          title: _t(context, 'Display & Operation', '表示と操作'),
+          title: _t(
+            context,
+            'What to include',
+            '集計対象',
+            zh: '统计范围',
+            ko: '집계 대상',
+          ),
+          child: _LibraryFilterSetting(
+            stats: stats,
+            filters: ref.watch(libraryFilterPreferencesProvider),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppearance() {
+    final selectedTheme = ref.watch(themeStyleProvider);
+    final selectedBrightness = ref.watch(themeBrightnessProvider);
+    final selectedLanguage = ref.watch(appLanguageProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PreferenceSelectorTile<SongBriefThemeStyle>(
+          icon: Icons.palette_outlined,
+          label: _t(context, 'Theme', 'テーマ'),
+          valueLabel: _themeStyleLabel(context, selectedTheme),
+          valueLeading: _ThemeStyleSwatch(style: selectedTheme),
+          description: _themeStyleDescription(context, selectedTheme),
+          selected: selectedTheme,
+          options: [
+            for (final style in SongBriefThemeStyle.values)
+              _PreferenceOption(
+                value: style,
+                label: _themeStyleLabel(context, style),
+                description: _themeStyleDescription(context, style),
+                leading: _ThemeStyleSwatch(style: style),
+              ),
+          ],
+          onChanged: (style) {
+            ref.read(themeStyleProvider.notifier).setStyle(style);
+          },
+        ),
+        const SizedBox(height: 10),
+        _PreferenceSelectorTile<SongBriefThemeBrightness>(
+          icon: Icons.contrast_rounded,
+          label: _t(context, 'Appearance', '外観'),
+          valueLabel: _themeBrightnessLabel(context, selectedBrightness),
+          description: _themeBrightnessDescription(context, selectedBrightness),
+          selected: selectedBrightness,
+          options: [
+            for (final brightness in SongBriefThemeBrightness.values)
+              _PreferenceOption(
+                value: brightness,
+                label: _themeBrightnessLabel(context, brightness),
+                description: _themeBrightnessDescription(context, brightness),
+              ),
+          ],
+          onChanged: (brightness) {
+            ref
+                .read(themeBrightnessProvider.notifier)
+                .setBrightness(brightness);
+          },
+        ),
+        const SizedBox(height: 10),
+        _PreferenceSelectorTile<AppLanguage>(
+          icon: Icons.language_rounded,
+          label: _t(context, 'Language', '言語'),
+          valueLabel: _languageLabel(context, selectedLanguage),
+          description: _languageDescription(context, selectedLanguage),
+          selected: selectedLanguage,
+          options: [
+            for (final language in AppLanguage.values)
+              _PreferenceOption(
+                value: language,
+                label: _languageLabel(context, language),
+                description: _languageDescription(context, language),
+              ),
+          ],
+          onChanged: (language) {
+            ref.read(appLanguageProvider.notifier).setLanguage(language);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrivacy() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingsGroup(
+          title: _t(
+            context,
+            'Access protection',
+            'アクセスの保護',
+            zh: '访问保护',
+            ko: '접근 보호',
+          ),
+          child: _AppLockSetting(
+            lockState: ref.watch(appLockControllerProvider),
+          ),
+        ),
+        const SizedBox(height: 24),
+        _SettingsGroup(
+          title: _t(
+            context,
+            'Data sharing',
+            'データの共有',
+            zh: '数据共享',
+            ko: '데이터 공유',
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _PreferenceSelectorTile<SongBriefThemeStyle>(
-                icon: Icons.palette_outlined,
-                label: _t(context, 'Theme', 'テーマ'),
-                valueLabel: _themeStyleLabel(context, selectedTheme),
-                valueLeading: _ThemeStyleSwatch(style: selectedTheme),
-                description: _themeStyleDescription(context, selectedTheme),
-                selected: selectedTheme,
-                options: [
-                  for (final style in SongBriefThemeStyle.values)
-                    _PreferenceOption(
-                      value: style,
-                      label: _themeStyleLabel(context, style),
-                      description: _themeStyleDescription(context, style),
-                      leading: _ThemeStyleSwatch(style: style),
-                    ),
-                ],
-                onChanged: (style) {
-                  ref.read(themeStyleProvider.notifier).setStyle(style);
-                },
+              _CrashReportingSetting(
+                state: ref.watch(crashReportingControllerProvider),
               ),
-              const SizedBox(height: 10),
-              _PreferenceSelectorTile<SongBriefThemeBrightness>(
-                icon: Icons.contrast_rounded,
-                label: _t(context, 'Appearance', '外観'),
-                valueLabel: _themeBrightnessLabel(context, selectedBrightness),
-                description: _themeBrightnessDescription(
-                  context,
-                  selectedBrightness,
-                ),
-                selected: selectedBrightness,
-                options: [
-                  for (final brightness in SongBriefThemeBrightness.values)
-                    _PreferenceOption(
-                      value: brightness,
-                      label: _themeBrightnessLabel(context, brightness),
-                      description: _themeBrightnessDescription(
-                        context,
-                        brightness,
-                      ),
-                    ),
-                ],
-                onChanged: (brightness) {
-                  ref
-                      .read(themeBrightnessProvider.notifier)
-                      .setBrightness(brightness);
-                },
-              ),
-              const SizedBox(height: 10),
-              _PreferenceSelectorTile<AppLanguage>(
-                icon: Icons.language_rounded,
-                label: _t(context, 'Language', '言語'),
-                valueLabel: _languageLabel(context, selectedLanguage),
-                description: _languageDescription(context, selectedLanguage),
-                selected: selectedLanguage,
-                options: [
-                  for (final language in AppLanguage.values)
-                    _PreferenceOption(
-                      value: language,
-                      label: _languageLabel(context, language),
-                      description: _languageDescription(context, language),
-                    ),
-                ],
-                onChanged: (language) {
-                  ref.read(appLanguageProvider.notifier).setLanguage(language);
-                },
-              ),
-              const SizedBox(height: 18),
-              Text(
-                _t(context, 'Security', 'セキュリティ'),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
-              _AppLockSetting(lockState: appLock),
-              const SizedBox(height: 10),
-              _CrashReportingSetting(state: crashReporting),
               _AdPrivacySetting(),
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        _SettingsGroup(
-          title: _t(
+      ],
+    );
+  }
+
+  Widget _buildAbout() {
+    final theme = Theme.of(context);
+    final appVersion = ref
+        .watch(_appVersionLabelProvider)
+        .maybeWhen(
+          data: (value) => value,
+          orElse: () => _fallbackAppVersionLabel,
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingsRow(
+          icon: Icons.info_outline,
+          label: _t(context, 'Application', 'アプリケーション'),
+          value: 'SongBrief',
+          onTap: () => _openExternalUrl(
             context,
-            'Listening history',
-            '再生履歴の集計',
-            zh: '聆听历史',
-            ko: '청취 기록',
-          ),
-          child: _SupplementalHistorySetting(
-            enabled: supplementalHistoryIncluded,
+            _officialWebsiteUrl,
+            requireConfirmation: true,
           ),
         ),
-        const SizedBox(height: 14),
-        _SettingsGroup(
-          title: _t(context, 'Export & Exclusions', 'エクスポートと除外'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ExportSetting(stats: stats, historyPending: historyPending),
-              const SizedBox(height: 16),
-              Divider(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
-                height: 1,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _t(context, 'Display & Exclusions', '表示と除外'),
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
-              _LibraryFilterSetting(stats: stats, filters: libraryFilters),
-            ],
+        _SettingsRow(
+          icon: Icons.sell_outlined,
+          label: _t(context, 'Version', 'バージョン'),
+          value: appVersion,
+        ),
+        _SettingsRow(
+          icon: Icons.person_outline_rounded,
+          label: _t(context, 'Author', '作者', zh: '作者', ko: '작성자'),
+          value: 'mmiyaji',
+          onTap: () =>
+              _openExternalUrl(context, _authorUrl, requireConfirmation: true),
+        ),
+        _SettingsRow(
+          icon: Icons.privacy_tip_outlined,
+          label: _t(context, 'Privacy Policy', 'プライバシーポリシー'),
+          value: _t(context, 'Open', '開く'),
+          onTap: () => _openExternalUrl(
+            context,
+            _privacyPolicyUrl,
+            requireConfirmation: true,
           ),
         ),
-        const SizedBox(height: 14),
-        _SettingsGroup(
-          title: _t(context, 'Data Management', 'データ管理'),
-          child: _DataManagementSetting(
-            stats: stats,
-            historyPending: historyPending,
+        _SettingsRow(
+          icon: Icons.gavel_outlined,
+          label: _t(context, 'Terms of Use', '利用規約'),
+          value: _t(context, 'Open', '開く'),
+          onTap: () => _openExternalUrl(
+            context,
+            _termsOfUseUrl,
+            requireConfirmation: true,
           ),
         ),
-        const SizedBox(height: 14),
-        _SettingsGroup(
-          title: _t(context, 'App Info', 'アプリ情報'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _SettingsRow(
-                icon: Icons.info_outline,
-                label: _t(context, 'Application', 'アプリケーション'),
-                value: 'SongBrief',
-                onTap: () => _openExternalUrl(
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          alignment: WrapAlignment.end,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => _openExternalUrl(context, _appStoreReviewUrl),
+              icon: const Icon(Icons.star_outline_rounded),
+              label: Text(
+                _t(
                   context,
-                  _officialWebsiteUrl,
-                  requireConfirmation: true,
+                  'Rate on the App Store',
+                  'App Store で評価する',
+                  zh: '在 App Store 评分',
+                  ko: 'App Store에서 평가하기',
                 ),
               ),
-              _SettingsRow(
-                icon: Icons.sell_outlined,
-                label: _t(context, 'Version', 'バージョン'),
-                value: appVersion,
-              ),
-              _SettingsRow(
-                icon: Icons.person_outline_rounded,
-                label: _t(context, 'Author', '作者', zh: '作者', ko: '작성자'),
-                value: 'mmiyaji',
-                onTap: () => _openExternalUrl(
-                  context,
-                  _authorUrl,
-                  requireConfirmation: true,
-                ),
-              ),
-              _SettingsRow(
-                icon: Icons.privacy_tip_outlined,
-                label: _t(context, 'Privacy Policy', 'プライバシーポリシー'),
-                value: _t(context, 'Open', '開く'),
-                onTap: () => _openExternalUrl(
-                  context,
-                  _privacyPolicyUrl,
-                  requireConfirmation: true,
-                ),
-              ),
-              _SettingsRow(
-                icon: Icons.gavel_outlined,
-                label: _t(context, 'Terms of Use', '利用規約'),
-                value: _t(context, 'Open', '開く'),
-                onTap: () => _openExternalUrl(
-                  context,
-                  _termsOfUseUrl,
-                  requireConfirmation: true,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                alignment: WrapAlignment.end,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      showLicensePage(
-                        context: context,
-                        applicationName: 'SongBrief',
-                        applicationVersion: appVersion,
-                        applicationIcon: Icon(
-                          Icons.graphic_eq_rounded,
-                          color: theme.colorScheme.primary,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.description_outlined),
-                    label: Text(_t(context, 'Licenses', 'ライセンス')),
+            ),
+            OutlinedButton.icon(
+              onPressed: () {
+                showLicensePage(
+                  context: context,
+                  applicationName: 'SongBrief',
+                  applicationVersion: appVersion,
+                  applicationIcon: Icon(
+                    Icons.graphic_eq_rounded,
+                    color: theme.colorScheme.primary,
                   ),
-                ],
-              ),
-            ],
-          ),
+                );
+              },
+              icon: const Icon(Icons.description_outlined),
+              label: Text(_t(context, 'Licenses', 'ライセンス')),
+            ),
+          ],
         ),
-        const SizedBox(height: 14),
-        AdBannerSlot(placement: _t(context, 'Settings', '設定')),
       ],
     );
   }
@@ -375,16 +709,21 @@ class _SettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GlassSurface.section(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: theme.textTheme.titleLarge),
-          const SizedBox(height: 14),
-          child,
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
     );
   }
 }

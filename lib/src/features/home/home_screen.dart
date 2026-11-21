@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:ui' show ImageByteFormat;
+import 'dart:ui' show ImageByteFormat, ImageFilter;
 import 'dart:ui' as ui show TextDirection;
 
 import 'package:fl_chart/fl_chart.dart';
@@ -647,30 +647,65 @@ class _MobilePlaybackChrome extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+    final colors = Theme.of(context).colorScheme;
     final playback = ref.watch(playbackControllerProvider);
     final overview = stats?.overview;
     final activeTrack = overview == null
         ? null
         : _playbackTrack(overview, playback);
     final track = activeTrack ?? overview?.latestTrack;
-    final colors = theme.colorScheme;
+    final isLight = colors.brightness == Brightness.light;
+    const radius = BorderRadius.all(Radius.circular(30));
     return SafeArea(
       key: const ValueKey('mobile-playback-chrome'),
       top: false,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.surface,
-          border: Border(top: BorderSide(color: colors.outlineVariant)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (track != null) _MiniPlayerBar(track: track),
-              const _BottomTabs(),
-            ],
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            boxShadow: kIsWeb
+                ? const []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: isLight ? 0.06 : 0.10,
+                      ),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+          ),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: BackdropFilter(
+              enabled: !kIsWeb,
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.surface.withValues(
+                    alpha: isLight || kIsWeb ? 0.97 : 0.86,
+                  ),
+                  borderRadius: radius,
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: 0.14),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (track != null) ...[
+                        _MiniPlayerBar(track: track),
+                        const SizedBox(height: 2),
+                      ],
+                      const _BottomTabs(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -691,10 +726,18 @@ class _MiniPlayerBar extends ConsumerWidget {
     final busy = playback.isBusy;
     final isActive = playback.isTrackActive(track.id, track: track);
     final isPlaying = playback.isTrackPlaying(track.id, track: track);
+    final colors = theme.colorScheme;
+    final isLight = colors.brightness == Brightness.light;
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        color: isLight
+            ? colors.surfaceContainerHighest
+            : Colors.black.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isLight
+              ? colors.outlineVariant.withValues(alpha: 0.55)
+              : Colors.white.withValues(alpha: 0.1),
         ),
       ),
       child: Padding(
@@ -1237,6 +1280,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final overview = stats.overview;
+    final isSettings = selectedSection == HomeSection.settings;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1252,24 +1296,26 @@ class _Header extends StatelessWidget {
                   ],
                   Flexible(
                     child: Text(
-                      'SongBrief',
+                      isSettings ? _t(context, 'Settings', '設定') : 'SongBrief',
                       style: theme.textTheme.headlineLarge,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                _sectionSubtitle(
-                  context,
-                  selectedSection,
-                  _labelsDemo(overview),
+              if (!isSettings) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _sectionSubtitle(
+                    context,
+                    selectedSection,
+                    _labelsDemo(overview),
+                  ),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              ],
             ],
           ),
         ),

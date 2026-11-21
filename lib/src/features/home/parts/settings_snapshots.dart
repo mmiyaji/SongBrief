@@ -1,7 +1,7 @@
 part of '../home_screen.dart';
 
-class _DataManagementSetting extends ConsumerWidget {
-  const _DataManagementSetting({
+class _ListeningRecordsSetting extends ConsumerWidget {
+  const _ListeningRecordsSetting({
     required this.stats,
     required this.historyPending,
   });
@@ -11,14 +11,14 @@ class _DataManagementSetting extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(_cacheUsageRevisionProvider);
-    final cacheUsage = _currentCacheUsage();
     final snapshotRecordingEnabled = ref.watch(snapshotRecordingProvider);
     final history = stats.snapshotHistory;
     final oldestSnapshot = history.snapshots.isEmpty
         ? null
         : history.snapshots.first;
     final latestSnapshot = history.latest;
+    final lastSaved = latestSnapshot?.capturedAt;
+    final pendingValue = historyPending ? const _PendingHistoryValue() : null;
     final rangeLabel = oldestSnapshot == null || latestSnapshot == null
         ? _t(context, 'No records', '記録なし')
         : '${DateFormat.Md(_localeName(context)).format(oldestSnapshot.capturedAt)} - '
@@ -27,20 +27,130 @@ class _DataManagementSetting extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SnapshotRecordingSetting(
-          enabled: snapshotRecordingEnabled,
-          historyPending: historyPending,
+        _SettingsGroup(
+          title: _t(
+            context,
+            'Recording preferences',
+            '記録設定',
+            zh: '记录设置',
+            ko: '기록 설정',
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SnapshotRecordingSetting(
+                enabled: snapshotRecordingEnabled,
+                historyPending: historyPending,
+              ),
+              const SizedBox(height: 10),
+              _SupplementalHistorySetting(
+                enabled: ref.watch(supplementalHistoryIncludedProvider),
+              ),
+              const SizedBox(height: 10),
+              _SnapshotCloudSyncSetting(
+                enabled: ref.watch(snapshotCloudSyncProvider),
+                historyPending: historyPending,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 10),
-        _SnapshotCloudSyncSetting(
-          enabled: ref.watch(snapshotCloudSyncProvider),
-          historyPending: historyPending,
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: _t(
+            context,
+            'Saved records',
+            '保存済みの記録',
+            zh: '已保存的记录',
+            ko: '저장된 기록',
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsRow(
+                icon: Icons.schedule_rounded,
+                label: stats.overview.isDemo
+                    ? _t(
+                        context,
+                        'Latest sample record',
+                        '最新のサンプル記録',
+                        zh: '最新示例记录',
+                        ko: '최근 샘플 기록',
+                      )
+                    : _t(
+                        context,
+                        'Last saved',
+                        '最終保存日時',
+                        zh: '上次保存',
+                        ko: '마지막 저장',
+                      ),
+                value: lastSaved == null
+                    ? _t(context, 'No records', '記録なし', zh: '无记录', ko: '기록 없음')
+                    : _dateTimeFormat(context).format(lastSaved.toLocal()),
+                valuePlaceholder: pendingValue,
+              ),
+              _SettingsRow(
+                icon: Icons.calendar_month_outlined,
+                label: _labelsDemo(stats.overview)
+                    ? _t(
+                        context,
+                        'Sample records',
+                        'サンプル記録',
+                        zh: '示例记录',
+                        ko: '샘플 기록',
+                      )
+                    : _t(context, 'Listening record history', '聴取記録の履歴'),
+                value:
+                    '${_dayCountLabel(context, history.snapshotCount)} / $rangeLabel',
+                valuePlaceholder: pendingValue,
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed:
+                      historyPending ||
+                          stats.overview.isDemo ||
+                          history.snapshotCount == 0
+                      ? null
+                      : () => _showListeningRecordManagementSheet(
+                          context,
+                          ref,
+                          stats,
+                        ),
+                  icon: const Icon(Icons.tune_rounded),
+                  label: Text(
+                    _t(
+                      context,
+                      'Manage records',
+                      '記録を管理',
+                      zh: '管理记录',
+                      ko: '기록 관리',
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 16),
         _SnapshotBackgroundRefreshSetting(
           recordingEnabled: snapshotRecordingEnabled,
         ),
-        const SizedBox(height: 10),
+      ],
+    );
+  }
+}
+
+class _CacheSetting extends ConsumerWidget {
+  const _CacheSetting();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(_cacheUsageRevisionProvider);
+    final cacheUsage = _currentCacheUsage();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         _SettingsRow(
           icon: Icons.cleaning_services_outlined,
           label: _t(context, 'Temporary caches', '一時キャッシュ'),
@@ -54,34 +164,6 @@ class _DataManagementSetting extends ConsumerWidget {
             icon: const Icon(Icons.tune_rounded),
             label: Text(
               _t(context, 'Manage caches', 'キャッシュを管理', zh: '管理缓存', ko: '캐시 관리'),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        _SettingsRow(
-          icon: Icons.calendar_month_outlined,
-          label: _labelsDemo(stats.overview)
-              ? _t(context, 'Sample records', 'サンプル記録', zh: '示例记录', ko: '샘플 기록')
-              : _t(context, 'Listening record history', '聴取記録の履歴'),
-          value:
-              '${_dayCountLabel(context, history.snapshotCount)} / $rangeLabel',
-          valuePlaceholder: historyPending
-              ? const _PendingHistoryValue()
-              : null,
-        ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: OutlinedButton.icon(
-            onPressed:
-                historyPending ||
-                    stats.overview.isDemo ||
-                    history.snapshotCount == 0
-                ? null
-                : () =>
-                      _showListeningRecordManagementSheet(context, ref, stats),
-            icon: const Icon(Icons.tune_rounded),
-            label: Text(
-              _t(context, 'Manage records', '記録を管理', zh: '管理记录', ko: '기록 관리'),
             ),
           ),
         ),
