@@ -57,13 +57,12 @@ enum _SettingsCategory {
 
 class _SettingsSection extends ConsumerStatefulWidget {
   const _SettingsSection({
+    super.key,
     required this.stats,
-    required this.edgeInset,
     this.historyPending = false,
   });
 
   final MusicStatsState stats;
-  final double edgeInset;
   final bool historyPending;
 
   @override
@@ -72,11 +71,8 @@ class _SettingsSection extends ConsumerStatefulWidget {
 
 class _SettingsSectionState extends ConsumerState<_SettingsSection> {
   static const _categoryStorage = ValueKey('settings-active-category');
-  static const _backSwipeWidth = 28.0;
-  static const _backSwipeDistance = 64.0;
   _SettingsCategory? _selected;
   bool _restored = false;
-  double _backSwipeStart = 0;
 
   @override
   void didChangeDependencies() {
@@ -299,7 +295,7 @@ class _SettingsSectionState extends ConsumerState<_SettingsSection> {
             MediaQuery.sizeOf(context).width >= 720;
         final selected = _selected;
         final active = selected ?? _SettingsCategory.appearance;
-        final content = PopScope<void>(
+        return PopScope<void>(
           canPop: split || selected == null,
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop && !split && _selected != null) _select(null);
@@ -348,36 +344,6 @@ class _SettingsSectionState extends ConsumerState<_SettingsSection> {
               AdBannerSlot(placement: _t(context, 'Settings', '設定')),
             ],
           ),
-        );
-        if (widget.edgeInset == 0) return content;
-
-        return Stack(
-          children: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: widget.edgeInset),
-              child: content,
-            ),
-            if (!split && selected != null)
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: _backSwipeWidth,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  excludeFromSemantics: true,
-                  onHorizontalDragDown: (details) {
-                    _backSwipeStart = details.globalPosition.dx;
-                  },
-                  onHorizontalDragEnd: (details) {
-                    if (details.globalPosition.dx - _backSwipeStart >=
-                        _backSwipeDistance) {
-                      _select(null);
-                    }
-                  },
-                ),
-              ),
-          ],
         );
       },
     );
@@ -1160,15 +1126,17 @@ Future<void> _showPreferenceSheet<T>({
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
+    constraints: const BoxConstraints(maxWidth: 560),
     backgroundColor: theme.colorScheme.surface,
     builder: (context) {
-      final height = MediaQuery.sizeOf(context).height;
-      final maxSheetHeight = height * 0.86;
-      return Align(
-        alignment: Alignment.topCenter,
+      final content = SafeArea(
+        top: false,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 560, maxHeight: maxSheetHeight),
-          child: Padding(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+          ),
+          child: SingleChildScrollView(
+            primary: false,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1176,32 +1144,69 @@ Future<void> _showPreferenceSheet<T>({
               children: [
                 Text(title, style: theme.textTheme.titleLarge),
                 const SizedBox(height: 10),
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final option = options[index];
-                      final isSelected = option.value == selected;
-                      return _PreferenceOptionRow<T>(
-                        option: option,
-                        selected: isSelected,
-                        onTap: () {
-                          onChanged(option.value);
-                          Navigator.of(context).pop();
-                        },
-                      );
+                for (final (index, option) in options.indexed) ...[
+                  if (index > 0) const SizedBox(height: 8),
+                  _PreferenceOptionRow<T>(
+                    option: option,
+                    selected: option.value == selected,
+                    onTap: () {
+                      onChanged(option.value);
+                      Navigator.of(context).pop();
                     },
                   ),
-                ),
+                ],
               ],
             ),
           ),
         ),
       );
+      if (MediaQuery.sizeOf(context).width >= 720) return content;
+
+      return _SettingsBackSwipe(
+        onBack: () => Navigator.of(context).pop(),
+        child: content,
+      );
     },
   );
+}
+
+class _SettingsBackSwipe extends StatefulWidget {
+  const _SettingsBackSwipe({required this.onBack, required this.child});
+
+  final VoidCallback onBack;
+  final Widget child;
+
+  @override
+  State<_SettingsBackSwipe> createState() => _SettingsBackSwipeState();
+}
+
+class _SettingsBackSwipeState extends State<_SettingsBackSwipe> {
+  double _startX = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        widget.child,
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 28,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            excludeFromSemantics: true,
+            onHorizontalDragDown: (details) {
+              _startX = details.globalPosition.dx;
+            },
+            onHorizontalDragEnd: (details) {
+              if (details.globalPosition.dx - _startX >= 64) widget.onBack();
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _PreferenceOptionRow<T> extends StatelessWidget {

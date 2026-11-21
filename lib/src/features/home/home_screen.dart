@@ -1088,7 +1088,7 @@ class _RailNowPlayingShortcut extends StatelessWidget {
   }
 }
 
-class _StatsContent extends ConsumerWidget {
+class _StatsContent extends ConsumerStatefulWidget {
   const _StatsContent({
     required this.stats,
     required this.selectedSection,
@@ -1102,18 +1102,23 @@ class _StatsContent extends ConsumerWidget {
   final bool historyPending;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_StatsContent> createState() => _StatsContentState();
+}
+
+class _StatsContentState extends ConsumerState<_StatsContent> {
+  final _settingsKey = GlobalKey<_SettingsSectionState>();
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = widget.stats;
+    final selectedSection = widget.selectedSection;
+    final useRail = widget.useRail;
+    final historyPending = widget.historyPending;
     final deviceBottomInset = MediaQueryData.fromView(View.of(context))
         .viewPadding
         .bottom;
     final mobileBottomPadding = 172 + deviceBottomInset;
-    const phoneHorizontalPadding = 20.0;
-    // Keep the settings swipe target outside the visible content inset.
-    final settingsEdgeInset =
-        !useRail && selectedSection == HomeSection.settings
-        ? phoneHorizontalPadding
-        : 0.0;
-    return RefreshIndicator.adaptive(
+    final viewport = RefreshIndicator.adaptive(
       onRefresh: () => _refreshStatsFromPull(ref),
       notificationPredicate: (notification) =>
           !historyPending && defaultScrollNotificationPredicate(notification),
@@ -1173,9 +1178,9 @@ class _StatsContent extends ConsumerWidget {
           else
             SliverPadding(
               padding: EdgeInsets.fromLTRB(
-                useRail ? 24 : phoneHorizontalPadding - settingsEdgeInset,
+                useRail ? 24 : 20,
                 16,
-                useRail ? 28 : phoneHorizontalPadding - settingsEdgeInset,
+                useRail ? 28 : 20,
                 useRail ? 28 : mobileBottomPadding,
               ),
               sliver: SliverToBoxAdapter(
@@ -1186,7 +1191,7 @@ class _StatsContent extends ConsumerWidget {
                       stats: stats,
                       selectedSection: selectedSection,
                       historyPending: historyPending,
-                      settingsEdgeInset: settingsEdgeInset,
+                      settingsKey: _settingsKey,
                     ),
                   ),
                 ),
@@ -1194,6 +1199,12 @@ class _StatsContent extends ConsumerWidget {
             ),
         ],
       ),
+    );
+    if (useRail || selectedSection != HomeSection.settings) return viewport;
+
+    return _SettingsBackSwipe(
+      onBack: () => _settingsKey.currentState?._select(null),
+      child: viewport,
     );
   }
 }
@@ -1203,13 +1214,13 @@ class _SectionBody extends ConsumerWidget {
     required this.stats,
     required this.selectedSection,
     required this.historyPending,
-    required this.settingsEdgeInset,
+    required this.settingsKey,
   });
 
   final MusicStatsState stats;
   final HomeSection selectedSection;
   final bool historyPending;
-  final double settingsEdgeInset;
+  final GlobalKey<_SettingsSectionState> settingsKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1247,9 +1258,9 @@ class _SectionBody extends ConsumerWidget {
       HomeSection.settings => ListTileTheme.merge(
         minLeadingWidth: 20,
         child: _SettingsSection(
+          key: settingsKey,
           stats: stats,
           historyPending: historyPending,
-          edgeInset: settingsEdgeInset,
         ),
       ),
     };

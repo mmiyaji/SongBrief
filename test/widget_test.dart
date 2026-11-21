@@ -1002,7 +1002,28 @@ void main() {
     await tester.tap(setting);
     await tester.pumpAndSettle();
     expect(find.text('Overlay').last, findsOneWidget);
-    await tester.tap(find.text('Side by side').last);
+    final sheet = find.byType(BottomSheet);
+    final sideBySideOption = find.descendant(
+      of: sheet,
+      matching: find.text('Side by side'),
+    );
+    expect(tester.getSize(sheet).height, lessThan(422));
+    expect(sideBySideOption.hitTestable(), findsOneWidget);
+
+    await tester.dragFrom(
+      Offset(2, tester.getCenter(sideBySideOption).dy),
+      const Offset(150, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(sheet, findsNothing);
+    expect(
+      find.byKey(const ValueKey('settings-category-back')),
+      findsOneWidget,
+    );
+
+    await tester.tap(setting);
+    await tester.pumpAndSettle();
+    await tester.tap(sideBySideOption);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Playing'));
     await tester.pumpAndSettle();
@@ -1133,6 +1154,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(back, findsOneWidget);
 
+    // The header is outside the settings detail sliver.
+    await tester.dragFrom(
+      Offset(2, tester.getCenter(find.text('Settings').last).dy),
+      const Offset(150, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(back, findsNothing);
+    await _openSettingsCategory(tester, 'appearance');
+
     final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
     await tester.dragFrom(Offset(2, backY + 200), const Offset(0, -120));
     await tester.pumpAndSettle();
@@ -1207,10 +1237,14 @@ void main() {
   testWidgets('shows expanded theme and language choices in settings', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(390, 844);
+    tester.view.physicalSize = const Size(390, 650);
     tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
     await _pumpApp(tester, AppLanguage.english);
     await tester.pumpAndSettle();
@@ -1241,7 +1275,7 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    expect(find.text('Muse'), findsOneWidget);
+    expect(find.text('Muse').hitTestable(), findsOneWidget);
 
     await tester.tap(find.text('Muse'));
     await tester.pumpAndSettle();
@@ -1259,7 +1293,7 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    expect(find.text('한국어 (Korean)'), findsOneWidget);
+    expect(find.text('한국어 (Korean)').hitTestable(), findsOneWidget);
   });
 
   testWidgets('preference sheets announce the selected option', (tester) async {
