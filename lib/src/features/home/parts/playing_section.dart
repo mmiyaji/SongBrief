@@ -342,6 +342,28 @@ class _HeroTrackPanel extends ConsumerWidget {
   final AsyncValue<Uint8List?> artwork;
   final int? playRank;
 
+  Widget _artworkContent() {
+    if (artwork.isLoading && !artwork.hasValue && track.artworkAsset == null) {
+      return LayoutBuilder(
+        builder: (context, constraints) => _LoadingSkeleton(
+          label: _t(
+            context,
+            'Loading artwork',
+            'ジャケットを読み込んでいます',
+            zh: '正在读取封面',
+            ko: '앨범 표지를 읽고 있습니다',
+          ),
+          child: _SkeletonBlock(height: constraints.maxHeight, radius: 12),
+        ),
+      );
+    }
+    return _TrackArtworkImage(
+      key: ValueKey(track.id),
+      track: track,
+      artwork: artwork,
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -352,6 +374,62 @@ class _HeroTrackPanel extends ConsumerWidget {
     final controller = ref.read(playbackControllerProvider.notifier);
     final color = theme.colorScheme;
     final albumArtist = track.albumArtist ?? track.artist;
+    final overlay =
+        MediaQuery.sizeOf(context).width < 720 &&
+        ref.watch(phonePlayingLayoutProvider) == PhonePlayingLayout.overlay;
+
+    List<Widget> metadata({required bool largeTitle}) {
+      final foreground = overlay ? Colors.white : null;
+      final secondary = overlay ? Colors.white : color.onSurfaceVariant;
+      final titleStyle = overlay
+          ? theme.textTheme.headlineLarge
+          : largeTitle
+          ? theme.textTheme.headlineMedium
+          : theme.textTheme.titleLarge;
+      return [
+        Text(
+          isActive
+              ? (isPlaying
+                    ? _t(context, 'Playing now', '再生中')
+                    : _t(context, 'Paused', '一時停止中'))
+              : _t(context, 'Recent play', '直近再生'),
+          style: theme.textTheme.labelMedium?.copyWith(color: secondary),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          track.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: titleStyle?.copyWith(
+            color: foreground,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          track.artist,
+          maxLines: overlay ? 2 : null,
+          overflow: overlay ? TextOverflow.ellipsis : null,
+          style: theme.textTheme.titleSmall?.copyWith(color: foreground),
+        ),
+        Text(
+          albumArtist == track.artist
+              ? track.albumTitle
+              : '$albumArtist - ${track.albumTitle}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(color: secondary),
+        ),
+        if (playRank != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            _playRankBadgeLabel(context, playRank!),
+            style: theme.textTheme.labelMedium?.copyWith(color: foreground),
+          ),
+        ],
+      ];
+    }
+
     final controls = Wrap(
       key: const ValueKey('hero-transport-controls'),
       spacing: 2,
@@ -398,10 +476,117 @@ class _HeroTrackPanel extends ConsumerWidget {
         ),
       ],
     );
+    final artworkImage = _artworkContent();
+    final statStrip = _HeroStatStrip(track: track);
     return Material(
       type: MaterialType.transparency,
       child: LayoutBuilder(
         builder: (context, constraints) {
+          if (overlay) {
+            final controlsOverArtwork = constraints.maxWidth >= 250;
+            return Column(
+              key: const ValueKey('phone-playing-overlay'),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: math.min(constraints.maxWidth / 1.05, 440.0),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        Positioned.fill(child: artworkImage),
+                        Padding(
+                          padding: EdgeInsets.only(
+                            top: (constraints.maxWidth * 0.25).clamp(
+                              controlsOverArtwork ? 72.0 : 0.0,
+                              100.0,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(
+                                height: 44,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        Color(0xB8000000),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              DecoratedBox(
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Color(0xB8000000),
+                                      Color(0xE6000000),
+                                    ],
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    18,
+                                    0,
+                                    18,
+                                    16,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: metadata(largeTitle: true),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (controlsOverArtwork)
+                          PositionedDirectional(
+                            top: 12,
+                            end: 12,
+                            child: Material(
+                              color: const Color(0xB8000000),
+                              borderRadius: BorderRadius.circular(28),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                child: IconButtonTheme(
+                                  data: IconButtonThemeData(
+                                    style: IconButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                      disabledForegroundColor: Colors.white54,
+                                    ),
+                                  ),
+                                  child: controls,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (!controlsOverArtwork) controls,
+                links,
+                const SizedBox(height: 12),
+                statStrip,
+              ],
+            );
+          }
+
           final wide = constraints.maxWidth >= 560;
           final artworkSize = wide
               ? (constraints.maxWidth * 0.40).clamp(206.0, 314.0).toDouble()
@@ -410,6 +595,7 @@ class _HeroTrackPanel extends ConsumerWidget {
           final controlsBesideArt =
               constraints.maxWidth - artworkSize - gap >= 198;
           return Column(
+            key: const ValueKey('playing-side-by-side'),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -419,28 +605,7 @@ class _HeroTrackPanel extends ConsumerWidget {
                     dimension: artworkSize,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child:
-                          artwork.isLoading &&
-                              !artwork.hasValue &&
-                              track.artworkAsset == null
-                          ? _LoadingSkeleton(
-                              label: _t(
-                                context,
-                                'Loading artwork',
-                                'ジャケットを読み込んでいます',
-                                zh: '正在读取封面',
-                                ko: '앨범 표지를 읽고 있습니다',
-                              ),
-                              child: _SkeletonBlock(
-                                height: artworkSize,
-                                radius: 12,
-                              ),
-                            )
-                          : _TrackArtworkImage(
-                              key: ValueKey(track.id),
-                              track: track,
-                              artwork: artwork,
-                            ),
+                      child: artworkImage,
                     ),
                   ),
                   SizedBox(width: gap),
@@ -448,46 +613,7 @@ class _HeroTrackPanel extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          isActive
-                              ? (isPlaying
-                                    ? _t(context, 'Playing now', '再生中')
-                                    : _t(context, 'Paused', '一時停止中'))
-                              : _t(context, 'Recent play', '直近再生'),
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: color.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          track.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              (wide
-                                      ? theme.textTheme.headlineMedium
-                                      : theme.textTheme.titleLarge)
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(track.artist, style: theme.textTheme.titleSmall),
-                        Text(
-                          albumArtist == track.artist
-                              ? track.albumTitle
-                              : '$albumArtist - ${track.albumTitle}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: color.onSurfaceVariant,
-                          ),
-                        ),
-                        if (playRank != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            _playRankBadgeLabel(context, playRank!),
-                            style: theme.textTheme.labelMedium,
-                          ),
-                        ],
+                        ...metadata(largeTitle: wide),
                         if (controlsBesideArt) ...[
                           const SizedBox(height: 8),
                           controls,
@@ -504,7 +630,7 @@ class _HeroTrackPanel extends ConsumerWidget {
                 links,
               ],
               const SizedBox(height: 12),
-              _HeroStatStrip(track: track),
+              statStrip,
             ],
           );
         },
@@ -929,26 +1055,38 @@ class _TrendPanelState extends State<_TrendPanel> {
           ),
           const SizedBox(height: 18),
           if (loading)
-            SizedBox(
-              height: _trendChartHeight(context),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Spacer(),
-                  const _SkeletonBlock(height: 1, radius: 0),
-                  const Spacer(),
-                  const _SkeletonBlock(height: 1, radius: 0),
-                  const Spacer(),
-                  const _SkeletonBlock(height: 1, radius: 0),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+            ExcludeSemantics(
+              // The heading already announces that listening history is loading.
+              child: _LoadingSkeleton(
+                label: _listeningHistoryLoadingLabel(context),
+                highlightOpacity: 0.55,
+                child: SizedBox(
+                  key: const ValueKey('trend-chart-skeleton'),
+                  height: _trendChartHeight(context),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (var i = 0; i < 6; i++)
-                        const _SkeletonBlock(width: 1, height: 5, radius: 0),
+                      const Spacer(),
+                      const _SkeletonBlock(height: 2, radius: 0),
+                      const Spacer(),
+                      const _SkeletonBlock(height: 2, radius: 0),
+                      const Spacer(),
+                      const _SkeletonBlock(height: 2, radius: 0),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          for (var i = 0; i < 6; i++)
+                            const _SkeletonBlock(
+                              width: 1,
+                              height: 5,
+                              radius: 0,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 13),
                     ],
                   ),
-                  const SizedBox(height: 13),
-                ],
+                ),
               ),
             )
           else

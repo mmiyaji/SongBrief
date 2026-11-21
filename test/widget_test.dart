@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:songbrief/src/app.dart';
 import 'package:songbrief/src/domain/library_overview.dart';
 import 'package:songbrief/src/domain/library_snapshot.dart';
@@ -259,13 +260,19 @@ void main() {
     await _scrollOverviewUntilVisible(tester, listeningMaps);
     expect(listeningMaps, findsOneWidget);
 
-    final insightsPanel = find.byKey(const ValueKey('overview-insights'));
-    await _scrollOverviewUntilVisible(tester, insightsPanel);
-    expect(find.byKey(const ValueKey('overview-insight-5')), findsOneWidget);
-
     final smartListsPanel = find.byKey(const ValueKey('overview-smart-lists'));
     await _scrollOverviewUntilVisible(tester, smartListsPanel);
     expect(find.byKey(const ValueKey('overview-smart-list-3')), findsOneWidget);
+
+    final insightsDisclosure = find.byKey(
+      const PageStorageKey<String>('overview-insights-disclosure'),
+    );
+    await _scrollOverviewUntilVisible(tester, insightsDisclosure);
+    final insightsPanel = find.byKey(const ValueKey('overview-insights'));
+    expect(insightsPanel, findsNothing);
+    await tester.tap(find.text('Listening insights'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('overview-insight-5')), findsOneWidget);
 
     final adSlot = find.byKey(const ValueKey('overview-ad-slot'));
     await _scrollOverviewUntilVisible(tester, adSlot);
@@ -360,6 +367,10 @@ void main() {
     );
 
     await tester.tap(find.text('概要'));
+    await tester.pumpAndSettle();
+    final insightsTitle = find.text('リスニング洞察');
+    await _scrollOverviewUntilVisible(tester, insightsTitle);
+    await tester.tap(insightsTitle);
     await tester.pumpAndSettle();
     final lastInsight = find.byKey(const ValueKey('overview-insight-5'));
     await _scrollOverviewUntilVisible(tester, lastInsight, step: 420);
@@ -966,6 +977,96 @@ void main() {
     );
   });
 
+  testWidgets('switches and restores the phone Now Playing layout', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final overlay = find.byKey(const ValueKey('phone-playing-overlay'));
+    final sideBySide = find.byKey(const ValueKey('playing-side-by-side'));
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+    expect(overlay, findsOneWidget);
+    expect(sideBySide, findsNothing);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await _openSettingsCategory(tester, 'appearance');
+    final setting = find.text('Now Playing layout');
+    await tester.ensureVisible(setting);
+    await tester.pumpAndSettle();
+    await tester.tap(setting);
+    await tester.pumpAndSettle();
+    expect(find.text('Overlay').last, findsOneWidget);
+    await tester.tap(find.text('Side by side').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Playing'));
+    await tester.pumpAndSettle();
+    expect(sideBySide, findsOneWidget);
+    expect(overlay, findsNothing);
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getString('songbrief_phone_playing_layout_v1'),
+      'sideBySide',
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+    expect(sideBySide, findsOneWidget);
+    expect(overlay, findsNothing);
+  });
+
+  testWidgets('uses side-by-side Now Playing on tablet with overlay saved', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'songbrief_phone_playing_layout_v1': 'overlay',
+    });
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('playing-side-by-side')), findsOneWidget);
+    expect(find.byKey(const ValueKey('phone-playing-overlay')), findsNothing);
+  });
+
+  testWidgets('keeps overlay transport reachable on a compact phone', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+    final overlay = find.byKey(const ValueKey('phone-playing-overlay'));
+    final transport = find.descendant(
+      of: overlay,
+      matching: find.byTooltip('Play this track'),
+    );
+    await tester.scrollUntilVisible(
+      transport,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(overlay, findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(transport.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('switches to the light appearance from settings', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -1003,6 +1104,46 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Theme'), findsNothing);
+  });
+
+  testWidgets('a right swipe from the phone edge goes back to settings', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    final appearance = find.byKey(
+      const ValueKey('settings-category-appearance'),
+    );
+    final back = find.byKey(const ValueKey('settings-category-back'));
+    await _openSettingsCategory(tester, 'appearance');
+    final backY = tester.getCenter(back).dy;
+    await tester.dragFrom(Offset(100, backY), const Offset(150, 0));
+    await tester.pumpAndSettle();
+    expect(back, findsOneWidget);
+
+    await tester.dragFrom(Offset(2, backY), const Offset(40, 0));
+    await tester.pumpAndSettle();
+    expect(back, findsOneWidget);
+
+    final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
+    await tester.dragFrom(Offset(2, backY + 200), const Offset(0, -120));
+    await tester.pumpAndSettle();
+    expect(scroll.position.pixels, greaterThan(0));
+    expect(back, findsOneWidget);
+
+    await tester.dragFrom(Offset(2, backY + 200), const Offset(150, 0));
+    await tester.pumpAndSettle();
+    expect(back, findsNothing);
+    expect(appearance.hitTestable(), findsOneWidget);
+    expect(scroll.position.pixels, 0);
   });
 
   testWidgets('opens the App Store review page from App Info', (tester) async {
@@ -1256,6 +1397,69 @@ void main() {
     );
     expect(playingScrollable.position.pixels, 0);
     expect(find.text('Skyline Echo'), findsWidgets);
+  });
+
+  testWidgets('double-tapping a phone tab returns that tab to the top', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpApp(tester, AppLanguage.english);
+    await tester.pumpAndSettle();
+
+    final bar = find.byType(NavigationBar);
+    Offset iconCenter(IconData icon) =>
+        tester.getCenter(find.descendant(of: bar, matching: find.byIcon(icon)));
+    ScrollPosition position() =>
+        tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+
+    final settings = iconCenter(Icons.tune_outlined);
+    final overview = iconCenter(Icons.space_dashboard_outlined);
+    await tester.tapAt(settings);
+    await tester.pumpAndSettle();
+    await _openSettingsCategory(tester, 'history');
+    position().jumpTo(300);
+    await tester.pumpAndSettle();
+    expect(position().pixels, closeTo(300, 1));
+
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.tapAt(settings);
+    await tester.pumpAndSettle();
+    expect(position().pixels, closeTo(300, 1));
+
+    await tester.tapAt(overview);
+    await tester.pumpAndSettle();
+    position().jumpTo(240);
+    await tester.pumpAndSettle();
+    expect(position().pixels, closeTo(240, 1));
+
+    await tester.tapAt(settings);
+    await tester.pumpAndSettle();
+    expect(position().pixels, closeTo(300, 1));
+    await tester.tapAt(settings);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.tapAt(settings);
+    await tester.pumpAndSettle();
+    expect(position().pixels, closeTo(300, 1));
+
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.tapAt(settings);
+    await tester.tapAt(settings);
+    await tester.pumpAndSettle();
+    expect(position().pixels, 0);
+
+    await tester.tapAt(overview);
+    await tester.pumpAndSettle();
+    expect(position().pixels, closeTo(240, 1));
+    await tester.tapAt(settings);
+    await tester.pumpAndSettle();
+    await tester.tapAt(overview);
+    await tester.tapAt(overview);
+    await tester.pumpAndSettle();
+    expect(position().pixels, 0);
   });
 
   testWidgets('hides record-based panels when daily records are off', (

@@ -6,6 +6,7 @@ import 'dart:ui' as ui show TextDirection;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -617,11 +618,53 @@ class _AdaptiveShell extends StatelessWidget {
   }
 }
 
-class _BottomTabs extends ConsumerWidget {
+class _BottomTabs extends ConsumerStatefulWidget {
   const _BottomTabs();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BottomTabs> createState() => _BottomTabsState();
+}
+
+class _BottomTabsState extends ConsumerState<_BottomTabs> {
+  HomeSection? _lastTappedSection;
+  Timer? _tabTapTimer;
+
+  @override
+  void dispose() {
+    _tabTapTimer?.cancel();
+    super.dispose();
+  }
+
+  void _selectDestination(int index) {
+    final section = HomeSection.values[index];
+    final isDoubleTap =
+        _lastTappedSection == section &&
+        ref.read(homeSectionProvider) == section;
+    _tabTapTimer?.cancel();
+    if (isDoubleTap) {
+      _lastTappedSection = null;
+      final binding = WidgetsBinding.instance;
+      // Let a tab selected by the first tap attach its scroll position.
+      binding.addPostFrameCallback((_) {
+        if (!mounted || ref.read(homeSectionProvider) != section) return;
+        final controller = PrimaryScrollController.maybeOf(context);
+        if (controller == null || controller.positions.length != 1) return;
+        final position = controller.position;
+        if (position.hasContentDimensions) {
+          position.jumpTo(position.minScrollExtent);
+        }
+      });
+      binding.ensureVisualUpdate();
+      return;
+    }
+
+    _lastTappedSection = section;
+    _tabTapTimer = Timer(kDoubleTapTimeout, () => _lastTappedSection = null);
+    ref.read(homeSectionProvider.notifier).setSection(section);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final selectedSection = ref.watch(homeSectionProvider);
     final theme = Theme.of(context);
     final useCompactLabels = MediaQuery.sizeOf(context).width < 360;
@@ -631,11 +674,7 @@ class _BottomTabs extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       indicatorColor: theme.colorScheme.primary.withValues(alpha: 0.22),
       destinations: _navigationDestinations(context, compact: useCompactLabels),
-      onDestinationSelected: (index) {
-        ref
-            .read(homeSectionProvider.notifier)
-            .setSection(HomeSection.values[index]);
-      },
+      onDestinationSelected: _selectDestination,
     );
   }
 }
@@ -1068,12 +1107,19 @@ class _StatsContent extends ConsumerWidget {
         .viewPadding
         .bottom;
     final mobileBottomPadding = 172 + deviceBottomInset;
+    const phoneHorizontalPadding = 20.0;
+    // Keep the settings swipe target outside the visible content inset.
+    final settingsEdgeInset =
+        !useRail && selectedSection == HomeSection.settings
+        ? phoneHorizontalPadding
+        : 0.0;
     return RefreshIndicator.adaptive(
       onRefresh: () => _refreshStatsFromPull(ref),
       notificationPredicate: (notification) =>
           !historyPending && defaultScrollNotificationPredicate(notification),
       child: CustomScrollView(
         key: PageStorageKey<HomeSection>(selectedSection),
+        primary: useRail ? null : true,
         scrollCacheExtent:
             selectedSection == HomeSection.playing ||
                 selectedSection == HomeSection.overview
@@ -1127,9 +1173,9 @@ class _StatsContent extends ConsumerWidget {
           else
             SliverPadding(
               padding: EdgeInsets.fromLTRB(
-                useRail ? 24 : 20,
+                useRail ? 24 : phoneHorizontalPadding - settingsEdgeInset,
                 16,
-                useRail ? 28 : 20,
+                useRail ? 28 : phoneHorizontalPadding - settingsEdgeInset,
                 useRail ? 28 : mobileBottomPadding,
               ),
               sliver: SliverToBoxAdapter(
@@ -1140,6 +1186,7 @@ class _StatsContent extends ConsumerWidget {
                       stats: stats,
                       selectedSection: selectedSection,
                       historyPending: historyPending,
+                      settingsEdgeInset: settingsEdgeInset,
                     ),
                   ),
                 ),
@@ -1156,11 +1203,13 @@ class _SectionBody extends ConsumerWidget {
     required this.stats,
     required this.selectedSection,
     required this.historyPending,
+    required this.settingsEdgeInset,
   });
 
   final MusicStatsState stats;
   final HomeSection selectedSection;
   final bool historyPending;
+  final double settingsEdgeInset;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1197,7 +1246,11 @@ class _SectionBody extends ConsumerWidget {
       // column as _SettingsRow instead of the default 24px leading slot.
       HomeSection.settings => ListTileTheme.merge(
         minLeadingWidth: 20,
-        child: _SettingsSection(stats: stats, historyPending: historyPending),
+        child: _SettingsSection(
+          stats: stats,
+          historyPending: historyPending,
+          edgeInset: settingsEdgeInset,
+        ),
       ),
     };
   }
@@ -1224,19 +1277,6 @@ class _SectionBody extends ConsumerWidget {
             ),
             undatedTrackCount: ref.watch(supplementalUndatedTrackCountProvider),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _t(
-              context,
-              'Lifetime totals include supplemental plays; period rankings use library records only.',
-              '累計には補完再生を含みます。期間別ランキングはライブラリの記録のみです。',
-              zh: '累计播放包含补充记录；期间排名仅使用媒体库记录。',
-              ko: '누적에는 보완 재생이 포함되며, 기간별 순위는 보관함 기록만 사용합니다.',
-            ),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
           const SizedBox(height: 10),
         ],
         _RankingPanel(
@@ -1245,6 +1285,7 @@ class _SectionBody extends ConsumerWidget {
           history: stats.snapshotHistory,
           snapshotRecordingEnabled: stats.snapshotRecordingEnabled,
           historyPending: historyPending,
+          includesSupplemental: supplementalTracks.isNotEmpty,
         ),
       ],
     );
@@ -1302,7 +1343,7 @@ class _Header extends StatelessWidget {
                   ),
                 ],
               ),
-              if (!isSettings) ...[
+              if (!isSettings && selectedSection != HomeSection.rankings) ...[
                 const SizedBox(height: 6),
                 Text(
                   _sectionSubtitle(

@@ -169,53 +169,35 @@ class _OverviewInsightPanel extends StatelessWidget {
       ),
     ];
 
-    return GlassSurface.section(
+    return LayoutBuilder(
       key: const ValueKey('overview-insights'),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _PanelHeading(
-            icon: Icons.insights_rounded,
-            title: _t(context, 'Listening insights', 'リスニング洞察'),
-            subtitle: _t(
-              context,
-              'Lifetime listening trends; unplayed and cloud counts use library tracks.',
-              '累計の聴取傾向を表示します。未再生・クラウド項目は登録曲が対象です。',
-              zh: '显示累计收听趋势；未播放和云端项目仅统计媒体库歌曲。',
-              ko: '누적 청취 경향을 표시합니다. 미재생 및 클라우드 항목은 보관함 곡을 집계합니다.',
-            ),
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 720
+            ? 3
+            : constraints.maxWidth >= 460
+            ? 2
+            : 1;
+        return GridView.builder(
+          // Keep the grid's scroll offset separate from the tile's open state.
+          key: const PageStorageKey<String>('overview-insights-grid'),
+          padding: EdgeInsets.zero,
+          primary: false,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: insights.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            mainAxisExtent: columns == 1 ? 92 : null,
+            childAspectRatio: 2.05,
           ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 720
-                  ? 3
-                  : constraints.maxWidth >= 460
-                  ? 2
-                  : 1;
-              return GridView.builder(
-                padding: EdgeInsets.zero,
-                primary: false,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: insights.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  mainAxisExtent: columns == 1 ? 92 : null,
-                  childAspectRatio: 2.05,
-                ),
-                itemBuilder: (context, index) => _OverviewInsightTile(
-                  key: ValueKey('overview-insight-$index'),
-                  value: insights[index],
-                ),
-              );
-            },
+          itemBuilder: (context, index) => _OverviewInsightTile(
+            key: ValueKey('overview-insight-$index'),
+            value: insights[index],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

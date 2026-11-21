@@ -129,7 +129,13 @@ void main() {
           await tester.pumpAndSettle();
           await _capture(tester, '$device-${section.name}$suffix');
           if (section == HomeSection.overview) {
-            await _showActualPanel(tester, '_ActivityHeatmapCard');
+            await _showActualPanel(
+              tester,
+              find.byWidgetPredicate(
+                (widget) =>
+                    widget.runtimeType.toString() == '_ActivityHeatmapCard',
+              ),
+            );
             final artistLabel = language == AppLanguage.english
                 ? 'Artist'
                 : 'アーティスト';
@@ -139,7 +145,12 @@ void main() {
               await tester.pumpAndSettle();
             }
             await _capture(tester, '$device-calendar$suffix');
-            await _showActualPanel(tester, '_RecapHighlightsPanel');
+            final recap = find.byKey(
+              const PageStorageKey<String>('overview-recap-disclosure'),
+            );
+            await _showActualPanel(tester, recap);
+            await tester.tap(recap);
+            await tester.pumpAndSettle();
             final month = find.text(
               language == AppLanguage.english ? 'Month' : '月間',
             );
@@ -157,10 +168,7 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 10)));
 }
 
-Future<void> _showActualPanel(WidgetTester tester, String type) async {
-  final target = find.byWidgetPredicate(
-    (widget) => widget.runtimeType.toString() == type,
-  );
+Future<void> _showActualPanel(WidgetTester tester, Finder target) async {
   tester
       .state<ScrollableState>(find.byType(Scrollable).first)
       .position

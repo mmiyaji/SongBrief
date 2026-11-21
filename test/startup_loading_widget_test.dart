@@ -143,6 +143,25 @@ void main() {
       expect(find.text('Reading your library'), findsNothing);
       expect(find.text('Listening trend'), findsOneWidget);
       expect(find.text('Loading your listening history'), findsOneWidget);
+      final chart = find.byKey(const ValueKey('trend-chart-skeleton'));
+      final chartWave = find.ancestor(
+        of: chart,
+        matching: find.byType(ShaderMask),
+      );
+      final chartHeight = tester.getSize(chart).height;
+      expect(chartWave, findsNothing);
+      await tester.pump(const Duration(milliseconds: 310));
+      expect(chartWave, findsOneWidget);
+      expect(tester.getSize(chart).height, chartHeight);
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await tester.pump();
+      expect(chartWave, findsNothing);
+      expect(find.text('Loading your listening history'), findsOneWidget);
+      tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
       final sections = container.read(homeSectionProvider.notifier);
       sections.setSection(HomeSection.overview);
       await tester.pump();

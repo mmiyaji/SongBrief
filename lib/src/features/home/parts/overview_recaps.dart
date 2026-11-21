@@ -39,42 +39,20 @@ class _RecapHighlightsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassSurface.section(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _PanelHeading(
-            icon: Icons.auto_awesome_rounded,
-            title: _t(context, 'Recap highlights', 'リキャップ'),
-            subtitle: _t(
-              context,
-              'Monthly and yearly movement from daily listening records',
-              '日々の聴取記録から月間・年間の動きを表示',
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (historyPending)
-            _LoadingSkeleton(
-              label: _listeningHistoryLoadingLabel(context),
-              child: const _SkeletonRows(count: 3),
-            )
-          else
-            _buildSummary(context),
-        ],
-      ),
-    );
+    if (historyPending) {
+      return _LoadingSkeleton(
+        label: _listeningHistoryLoadingLabel(context),
+        child: const _SkeletonRows(count: 3),
+      );
+    }
+    return _buildSummary(context);
   }
 }
 
 class _TasteAndCollectionPanel extends ConsumerWidget {
-  const _TasteAndCollectionPanel({
-    required this.overview,
-    required this.history,
-  });
+  const _TasteAndCollectionPanel({required this.overview});
 
   final LibraryOverview overview;
-  final SnapshotHistory history;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -82,64 +60,44 @@ class _TasteAndCollectionPanel extends ConsumerWidget {
     final diversity = _diversityScore(overview);
     final albums = _albumCompletionValues(context, overview);
 
-    return GlassSurface.section(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _PanelHeading(
-            icon: Icons.explore_rounded,
-            title: _t(context, 'Taste and collection', '好みとコレクション'),
-            subtitle: _t(
-              context,
-              'Rediscovery, listening range, and album completion for library tracks',
-              '登録曲の再発見・聴取幅・アルバム制覇率を表示',
-              zh: '显示媒体库歌曲的再发现、收听范围和专辑完成率',
-              ko: '보관함 곡의 재발견, 청취 범위 및 앨범 완주율을 표시합니다.',
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 820;
+        final cards = [
+          _RediscoveryCard(
+            tracks: rediscoveryTracks,
+            onPlay: (track) => ref
+                .read(playbackControllerProvider.notifier)
+                .playTrack(track.id),
           ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 820;
-              final cards = [
-                _RediscoveryCard(
-                  tracks: rediscoveryTracks,
-                  onPlay: (track) => ref
-                      .read(playbackControllerProvider.notifier)
-                      .playTrack(track.id),
-                ),
-                _DiversityScoreCard(score: diversity),
-                _AlbumCompletionCard(albums: albums),
-              ];
+          _DiversityScoreCard(score: diversity),
+          _AlbumCompletionCard(albums: albums),
+        ];
 
-              if (wide) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: cards[0]),
-                    const SizedBox(width: 12),
-                    Expanded(child: cards[1]),
-                    const SizedBox(width: 12),
-                    Expanded(child: cards[2]),
-                  ],
-                );
-              }
+        if (wide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: cards[0]),
+              const SizedBox(width: 12),
+              Expanded(child: cards[1]),
+              const SizedBox(width: 12),
+              Expanded(child: cards[2]),
+            ],
+          );
+        }
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  cards[0],
-                  const SizedBox(height: 12),
-                  cards[1],
-                  const SizedBox(height: 12),
-                  cards[2],
-                ],
-              );
-            },
-          ),
-        ],
-      ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            cards[0],
+            const SizedBox(height: 12),
+            cards[1],
+            const SizedBox(height: 12),
+            cards[2],
+          ],
+        );
+      },
     );
   }
 }

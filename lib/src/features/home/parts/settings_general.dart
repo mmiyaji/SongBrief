@@ -56,9 +56,14 @@ enum _SettingsCategory {
 }
 
 class _SettingsSection extends ConsumerStatefulWidget {
-  const _SettingsSection({required this.stats, this.historyPending = false});
+  const _SettingsSection({
+    required this.stats,
+    required this.edgeInset,
+    this.historyPending = false,
+  });
 
   final MusicStatsState stats;
+  final double edgeInset;
   final bool historyPending;
 
   @override
@@ -67,8 +72,11 @@ class _SettingsSection extends ConsumerStatefulWidget {
 
 class _SettingsSectionState extends ConsumerState<_SettingsSection> {
   static const _categoryStorage = ValueKey('settings-active-category');
+  static const _backSwipeWidth = 28.0;
+  static const _backSwipeDistance = 64.0;
   _SettingsCategory? _selected;
   bool _restored = false;
+  double _backSwipeStart = 0;
 
   @override
   void didChangeDependencies() {
@@ -291,7 +299,7 @@ class _SettingsSectionState extends ConsumerState<_SettingsSection> {
             MediaQuery.sizeOf(context).width >= 720;
         final selected = _selected;
         final active = selected ?? _SettingsCategory.appearance;
-        return PopScope<void>(
+        final content = PopScope<void>(
           canPop: split || selected == null,
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop && !split && _selected != null) _select(null);
@@ -340,6 +348,36 @@ class _SettingsSectionState extends ConsumerState<_SettingsSection> {
               AdBannerSlot(placement: _t(context, 'Settings', '設定')),
             ],
           ),
+        );
+        if (widget.edgeInset == 0) return content;
+
+        return Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: widget.edgeInset),
+              child: content,
+            ),
+            if (!split && selected != null)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: _backSwipeWidth,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  excludeFromSemantics: true,
+                  onHorizontalDragDown: (details) {
+                    _backSwipeStart = details.globalPosition.dx;
+                  },
+                  onHorizontalDragEnd: (details) {
+                    if (details.globalPosition.dx - _backSwipeStart >=
+                        _backSwipeDistance) {
+                      _select(null);
+                    }
+                  },
+                ),
+              ),
+          ],
         );
       },
     );
@@ -438,6 +476,7 @@ class _SettingsSectionState extends ConsumerState<_SettingsSection> {
     final selectedTheme = ref.watch(themeStyleProvider);
     final selectedBrightness = ref.watch(themeBrightnessProvider);
     final selectedLanguage = ref.watch(appLanguageProvider);
+    final playingLayout = ref.watch(phonePlayingLayoutProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -481,6 +520,35 @@ class _SettingsSectionState extends ConsumerState<_SettingsSection> {
                 .read(themeBrightnessProvider.notifier)
                 .setBrightness(brightness);
           },
+        ),
+        const SizedBox(height: 10),
+        _PreferenceSelectorTile<PhonePlayingLayout>(
+          icon: Icons.photo_library_outlined,
+          label: _t(
+            context,
+            'Now Playing layout',
+            '再生中のレイアウト',
+            zh: '正在播放的布局',
+            ko: '재생 중 화면 배치',
+          ),
+          valueLabel: _phonePlayingLayoutLabel(context, playingLayout),
+          description: _t(
+            context,
+            'Applies to phone-sized screens.',
+            'スマホサイズの画面に適用します。',
+            zh: '适用于手机尺寸的屏幕。',
+            ko: '휴대전화 크기의 화면에 적용합니다.',
+          ),
+          selected: playingLayout,
+          options: [
+            for (final layout in PhonePlayingLayout.values)
+              _PreferenceOption(
+                value: layout,
+                label: _phonePlayingLayoutLabel(context, layout),
+                description: _phonePlayingLayoutDescription(context, layout),
+              ),
+          ],
+          onChanged: ref.read(phonePlayingLayoutProvider.notifier).setLayout,
         ),
         const SizedBox(height: 10),
         _PreferenceSelectorTile<AppLanguage>(
@@ -637,6 +705,46 @@ class _SettingsSectionState extends ConsumerState<_SettingsSection> {
     );
   }
 }
+
+String _phonePlayingLayoutLabel(
+  BuildContext context,
+  PhonePlayingLayout layout,
+) => switch (layout) {
+  PhonePlayingLayout.overlay => _t(
+    context,
+    'Overlay',
+    'オーバーレイ',
+    zh: '叠加显示',
+    ko: '오버레이',
+  ),
+  PhonePlayingLayout.sideBySide => _t(
+    context,
+    'Side by side',
+    '横並び',
+    zh: '并排显示',
+    ko: '나란히 표시',
+  ),
+};
+
+String _phonePlayingLayoutDescription(
+  BuildContext context,
+  PhonePlayingLayout layout,
+) => switch (layout) {
+  PhonePlayingLayout.overlay => _t(
+    context,
+    'Show track details over large artwork.',
+    '大きなジャケットに曲情報を重ねます。',
+    zh: '在大幅封面上叠加歌曲信息。',
+    ko: '큰 앨범 표지 위에 곡 정보를 표시합니다.',
+  ),
+  PhonePlayingLayout.sideBySide => _t(
+    context,
+    'Show artwork and track details side by side.',
+    'ジャケットと曲情報を横に並べます。',
+    zh: '并排显示封面和歌曲信息。',
+    ko: '앨범 표지와 곡 정보를 나란히 표시합니다.',
+  ),
+};
 
 class _SupplementalHistorySetting extends ConsumerStatefulWidget {
   const _SupplementalHistorySetting({required this.enabled});

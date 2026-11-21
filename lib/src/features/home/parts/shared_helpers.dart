@@ -726,11 +726,13 @@ class _LoadingSkeleton extends StatefulWidget {
     required this.label,
     required this.child,
     this.showStatus = false,
+    this.highlightOpacity = 0.34,
   });
 
   final String label;
   final Widget child;
   final bool showStatus;
+  final double highlightOpacity;
 
   @override
   State<_LoadingSkeleton> createState() => _LoadingSkeletonState();
@@ -830,7 +832,9 @@ class _LoadingSkeletonState extends State<_LoadingSkeleton>
                             end: Alignment(center + halfBand, 0),
                             colors: [
                               highlight.withValues(alpha: 0),
-                              highlight.withValues(alpha: 0.34),
+                              highlight.withValues(
+                                alpha: widget.highlightOpacity,
+                              ),
                               highlight.withValues(alpha: 0),
                             ],
                           ).createShader(bounds),

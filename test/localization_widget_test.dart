@@ -21,6 +21,10 @@ void main() {
         }
         expect(find.text(text), findsWidgets, reason: text);
       }
+      if (section == HomeSection.rankings) {
+        expect(find.text('Rankings from the demo library'), findsNothing);
+        await _expectRankingInfo(tester, 'Ranked by play count');
+      }
       if (section == HomeSection.settings) {
         final library = find.byKey(const ValueKey('settings-category-library'));
         expect(
@@ -48,6 +52,9 @@ void main() {
           await _scrollOverviewUntilVisible(tester, find.text(text));
         }
         expect(find.text(text), findsWidgets, reason: text);
+      }
+      if (section == HomeSection.rankings) {
+        await _expectRankingInfo(tester, '再生回数順');
       }
       if (section == HomeSection.settings) {
         await _expectSettingsDetail(tester, 'library', 'ミュージックアクセス');
@@ -165,16 +172,23 @@ Future<void> _scrollOverviewUntilVisible(
   WidgetTester tester,
   Finder target,
 ) async {
-  for (var attempt = 0; attempt < 30; attempt += 1) {
+  for (var attempt = 0; attempt < 60; attempt += 1) {
     if (target.evaluate().isNotEmpty) {
-      await tester.ensureVisible(target.first);
-      await tester.pumpAndSettle();
       return;
     }
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -420));
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -220));
     await tester.pumpAndSettle();
   }
   expect(target, findsWidgets);
+}
+
+Future<void> _expectRankingInfo(WidgetTester tester, String caption) async {
+  final info = find.byKey(const ValueKey('ranking-info-button'));
+  final tooltip = find.text(caption, findRichText: true);
+  expect(tooltip, findsNothing);
+  await tester.tap(info);
+  await tester.pumpAndSettle();
+  expect(tooltip, findsOneWidget);
 }
 
 const _expectedEnglish = <HomeSection, List<String>>{
@@ -188,13 +202,12 @@ const _expectedEnglish = <HomeSection, List<String>>{
     'Overview',
     'Total Plays',
     'Daily listening records',
-    'Listening insights',
     'Library distribution',
+    'Listening insights',
   ],
   HomeSection.rankings: [
     'Rankings',
     'Top Songs',
-    'Ranked by play count',
     'Songs',
     'Artists',
     'Albums',
@@ -223,8 +236,8 @@ const _expectedEnglish = <HomeSection, List<String>>{
 
 const _expectedJapanese = <HomeSection, List<String>>{
   HomeSection.playing: ['再生中', '再生傾向', '最近再生した曲', '再生回数'],
-  HomeSection.overview: ['概要', '総再生回数', '日々の聴取記録', 'リスニング洞察', 'ライブラリ分布'],
-  HomeSection.rankings: ['ランキング', 'トップ曲', '再生回数順', '曲', 'アーティスト', 'アルバム', '最近'],
+  HomeSection.overview: ['概要', '総再生回数', '日々の聴取記録', 'ライブラリ分布', 'リスニング洞察'],
+  HomeSection.rankings: ['ランキング', 'トップ曲', '曲', 'アーティスト', 'アルバム', '最近'],
   HomeSection.library: ['ライブラリ', '曲', 'プレイリスト', '検索可能な曲詳細と再生コントロール', '並び替え'],
   HomeSection.settings: [
     '設定',

@@ -135,28 +135,66 @@ List<Widget> _overviewPanelItems(
         ),
       ),
     );
-    add(
-      _RecapHighlightsPanel(
-        overview: overview,
-        history: stats.snapshotHistory,
-        historyPending: historyPending,
-      ),
-    );
   }
-  add(
-    _TasteAndCollectionPanel(
-      overview: overview,
-      history: stats.snapshotHistory,
-    ),
-  );
-  add(
-    _OverviewInsightPanel(overview: countedOverview, nativeOverview: overview),
-  );
   add(_SmartListsPanel(overview: overview));
   add(
     _OverviewBreakdownPanel(
       overview: countedOverview,
       nativeOverview: overview,
+    ),
+  );
+  if (stats.snapshotRecordingEnabled) {
+    add(
+      _OverviewDisclosure(
+        id: 'overview-recap-disclosure',
+        icon: Icons.auto_awesome_rounded,
+        title: _t(context, 'Recap highlights', 'リキャップ'),
+        description: _t(
+          context,
+          'Monthly and yearly movement from daily listening records',
+          '日々の聴取記録から月間・年間の動きを表示',
+        ),
+        child: _RecapHighlightsPanel(
+          overview: overview,
+          history: stats.snapshotHistory,
+          historyPending: historyPending,
+        ),
+      ),
+      spaceAfter: 0,
+    );
+  }
+  add(
+    _OverviewDisclosure(
+      id: 'overview-collection-disclosure',
+      icon: Icons.explore_rounded,
+      title: _t(context, 'Taste and collection', '好みとコレクション'),
+      description: _t(
+        context,
+        'Rediscovery, listening range, and album completion for library tracks',
+        '登録曲の再発見・聴取幅・アルバム制覇率を表示',
+        zh: '显示媒体库歌曲的再发现、收听范围和专辑完成率',
+        ko: '보관함 곡의 재발견, 청취 범위 및 앨범 완주율을 표시합니다.',
+      ),
+      child: _TasteAndCollectionPanel(overview: overview),
+    ),
+    spaceAfter: 0,
+  );
+  add(
+    _OverviewDisclosure(
+      id: 'overview-insights-disclosure',
+      icon: Icons.insights_rounded,
+      title: _t(context, 'Listening insights', 'リスニング洞察'),
+      description: _t(
+        context,
+        'Lifetime listening trends; unplayed and cloud counts use library tracks.',
+        '累計の聴取傾向を表示します。未再生・クラウド項目は登録曲が対象です。',
+        zh: '显示累计收听趋势；未播放和云端项目仅统计媒体库歌曲。',
+        ko: '누적 청취 경향을 표시합니다. 미재생 및 클라우드 항목은 보관함 곡을 집계합니다.',
+      ),
+      child: _OverviewInsightPanel(
+        overview: countedOverview,
+        nativeOverview: overview,
+      ),
     ),
   );
   add(
@@ -167,6 +205,50 @@ List<Widget> _overviewPanelItems(
     spaceAfter: 0,
   );
   return items;
+}
+
+class _OverviewDisclosure extends StatelessWidget {
+  const _OverviewDisclosure({
+    required this.id,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.child,
+  });
+
+  final String id;
+  final IconData icon;
+  final String title;
+  final String description;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final divider = Border(
+      top: BorderSide(color: theme.colorScheme.outlineVariant),
+    );
+    return ExpansionTile(
+      key: PageStorageKey<String>(id),
+      shape: divider,
+      collapsedShape: divider,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 18),
+      childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+      expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+      leading: Icon(icon, size: 20, color: theme.colorScheme.primary),
+      title: Text(title, style: theme.textTheme.titleMedium),
+      children: [
+        Text(
+          description,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 14),
+        child,
+      ],
+    );
+  }
 }
 
 class _OverviewPanel extends StatelessWidget {

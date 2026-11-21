@@ -72,12 +72,23 @@ void main() {
       expect(find.text('Period movers'), findsOneWidget);
       expect(find.text('Rising now'), findsOneWidget);
       expect(find.text('Rank changes'), findsOneWidget);
-      expect(
-        find.textContaining('Lifetime totals include supplemental'),
-        findsOneWidget,
-      );
       expect(find.text('Library song'), findsWidgets);
       expect(find.text('+2'), findsWidgets);
+      expect(
+        find.textContaining(
+          'Includes at least 100 plays confirmed from history',
+        ),
+        findsOneWidget,
+      );
+
+      final explanation = find.textContaining(
+        'Lifetime totals include supplemental plays; period rankings use library records only.',
+        findRichText: true,
+      );
+      expect(explanation, findsNothing);
+      await tester.tap(find.byKey(const ValueKey('ranking-info-button')));
+      await tester.pumpAndSettle();
+      expect(explanation, findsOneWidget);
     },
   );
 

@@ -720,12 +720,22 @@ void main() {
     }
   });
 
-  testWidgets('shows recap and collection insight panels', (tester) async {
+  testWidgets('opens recap and collection after the library distribution', (
+    tester,
+  ) async {
     await _pumpOverview(tester);
     await tester.pumpAndSettle();
 
-    await _scrollOverviewUntilVisible(tester, find.text('Recap highlights'));
-    expect(find.text('Recap highlights'), findsOneWidget);
+    await _scrollOverviewDisclosureIntoView(tester, find.text('Smart lists'));
+    await _scrollOverviewDisclosureIntoView(
+      tester,
+      find.text('Library distribution'),
+    );
+    final recap = find.text('Recap highlights');
+    await _scrollOverviewDisclosureIntoView(tester, recap);
+    expect(find.text('SongBrief Recap'), findsNothing);
+    await tester.tap(recap);
+    await tester.pumpAndSettle();
     expect(find.text('SongBrief Recap'), findsOneWidget);
     expect(find.text('Week'), findsOneWidget);
     expect(find.text('Month'), findsOneWidget);
@@ -748,6 +758,11 @@ void main() {
     expect(find.text('Next milestone'), findsOneWidget);
     expect(find.text('Listening curve'), findsOneWidget);
 
+    final collection = find.text('Taste and collection');
+    await _scrollOverviewDisclosureIntoView(tester, collection);
+    expect(find.text('Rediscovery'), findsNothing);
+    await tester.tap(collection);
+    await tester.pumpAndSettle();
     final rediscovery = find.text('Rediscovery');
     await tester.scrollUntilVisible(
       rediscovery,
@@ -800,7 +815,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollOverviewUntilVisible(tester, find.text('Recap highlights'));
+    await _openOverviewDisclosure(tester, 'Recap highlights');
     expect(find.text('Waiting'), findsOneWidget);
     expect(find.text('1,000'), findsNothing);
   });
@@ -809,6 +824,7 @@ void main() {
     await _pumpOverview(tester);
     await tester.pumpAndSettle();
 
+    await _openOverviewDisclosure(tester, 'Taste and collection');
     final album = find.text('Small Signals');
     await tester.scrollUntilVisible(
       album,
@@ -826,6 +842,7 @@ void main() {
     await _pumpOverview(tester, tracks: _albumCompletionTracks());
     await tester.pumpAndSettle();
 
+    await _openOverviewDisclosure(tester, 'Taste and collection');
     final albumCompletion = find.text('Album completion');
     await tester.scrollUntilVisible(
       albumCompletion,
@@ -861,6 +878,26 @@ void main() {
 
     expect(find.textContaining('Release decade songs'), findsOneWidget);
   });
+}
+
+Future<void> _openOverviewDisclosure(WidgetTester tester, String title) async {
+  final disclosure = find.text(title);
+  await _scrollOverviewDisclosureIntoView(tester, disclosure);
+  await tester.tap(disclosure);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _scrollOverviewDisclosureIntoView(
+  WidgetTester tester,
+  Finder disclosure,
+) async {
+  final visible = disclosure.hitTestable();
+  for (var attempt = 0; attempt < 60; attempt += 1) {
+    if (visible.evaluate().isNotEmpty) return;
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -220));
+    await tester.pumpAndSettle();
+  }
+  expect(visible, findsOneWidget);
 }
 
 Future<void> _openExpandedListeningMaps(WidgetTester tester) async {

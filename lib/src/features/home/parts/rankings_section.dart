@@ -6,6 +6,7 @@ class _RankingPanel extends ConsumerWidget {
     required this.snapshotOverview,
     required this.history,
     required this.snapshotRecordingEnabled,
+    required this.includesSupplemental,
     this.historyPending = false,
   });
 
@@ -13,6 +14,7 @@ class _RankingPanel extends ConsumerWidget {
   final LibraryOverview snapshotOverview;
   final SnapshotHistory history;
   final bool snapshotRecordingEnabled;
+  final bool includesSupplemental;
   final bool historyPending;
 
   @override
@@ -49,23 +51,23 @@ class _RankingPanel extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _rankingTitle(context, scope),
-                      style: theme.textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _rankingSubtitle(context, scope),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  _rankingTitle(context, scope),
+                  style: theme.textTheme.titleLarge,
                 ),
+              ),
+              _RankingInfoButton(
+                message: [
+                  _rankingSubtitle(context, scope),
+                  if (includesSupplemental)
+                    _t(
+                      context,
+                      'Lifetime totals include supplemental plays; period rankings use library records only.',
+                      '累計には補完再生を含みます。期間別ランキングはライブラリの記録のみです。',
+                      zh: '累计播放包含补充记录；期间排名仅使用媒体库记录。',
+                      ko: '누적에는 보완 재생이 포함되며, 기간별 순위는 보관함 기록만 사용합니다.',
+                    ),
+                ].join('\n'),
               ),
               IconButton.filledTonal(
                 onPressed: historyPending
@@ -175,6 +177,45 @@ class _RankingPanel extends ConsumerWidget {
           const SizedBox(height: 14),
           AdBannerSlot(placement: _t(context, 'Rankings', 'ランキング')),
         ],
+      ),
+    );
+  }
+}
+
+class _RankingInfoButton extends StatefulWidget {
+  const _RankingInfoButton({required this.message});
+
+  final String message;
+
+  @override
+  State<_RankingInfoButton> createState() => _RankingInfoButtonState();
+}
+
+class _RankingInfoButtonState extends State<_RankingInfoButton> {
+  final _tooltipKey = GlobalKey<TooltipState>();
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      key: _tooltipKey,
+      message: widget.message,
+      triggerMode: TooltipTriggerMode.manual,
+      constraints: const BoxConstraints(maxWidth: 300),
+      excludeFromSemantics: true,
+      child: Semantics(
+        label: _t(
+          context,
+          'About this ranking',
+          'ランキングの集計方法',
+          zh: '排名的统计方式',
+          ko: '순위 집계 방법',
+        ),
+        hint: widget.message,
+        child: IconButton(
+          key: const ValueKey('ranking-info-button'),
+          onPressed: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+          icon: const Icon(Icons.info_outline_rounded),
+        ),
       ),
     );
   }
@@ -928,9 +969,8 @@ SnapshotDelta? _snapshotDeltaForRange(
   if (current == null) {
     return null;
   }
-  final windowStart = _localDateOnly(
-    current.capturedAt,
-  ).subtract(_rankingRangeDuration(range));
+  final windowStart = _localDateOnly(current.capturedAt)
+      .subtract(_rankingRangeDuration(range));
   return history.latestDeltaSince(windowStart, includePeriodDate: true);
 }
 
